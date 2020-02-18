@@ -172,3 +172,8 @@ drivers/soc/oplus
 include/soc/oplus/dfr
 include/soc/oplus/dft
 include/soc/oplus/boot
+
+#
+#Ignoring Android.bp link file
+#
+Android.bp
