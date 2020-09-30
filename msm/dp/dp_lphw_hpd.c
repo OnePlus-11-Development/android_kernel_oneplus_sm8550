@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
  */
 
@@ -320,6 +321,7 @@ static void dp_lphw_hpd_init(struct dp_lphw_hpd_private *lphw_hpd)
 			if (rc)
 				DP_ERR("failed to set hpd_active state\n");
 		}
+		pinctrl.state_hpd_tlmm = pinctrl.state_hpd_ctrl = NULL;
 	}
 }
 
@@ -344,11 +346,19 @@ struct dp_hpd *dp_lphw_hpd_get(struct device *dev, struct dp_parser *parser,
 	int rc = 0;
 	const char *hpd_gpio_name = "qcom,dp-hpd-gpio";
 	struct dp_lphw_hpd_private *lphw_hpd;
+	unsigned int gpio;
 
 	if (!dev || !parser || !cb) {
 		DP_ERR("invalid device\n");
 		rc = -EINVAL;
 		goto error;
+	}
+
+	gpio = of_get_named_gpio(dev->of_node, hpd_gpio_name, 0);
+	if (!gpio_is_valid(gpio)) {
+		DP_DEBUG("%s gpio not specified\n", hpd_gpio_name);
+		rc = -EINVAL;
+		goto gpio_error;
 	}
 
 	lphw_hpd = devm_kzalloc(dev, sizeof(*lphw_hpd), GFP_KERNEL);
@@ -357,14 +367,7 @@ struct dp_hpd *dp_lphw_hpd_get(struct device *dev, struct dp_parser *parser,
 		goto error;
 	}
 
-	lphw_hpd->gpio_cfg.gpio = of_get_named_gpio(dev->of_node,
-		hpd_gpio_name, 0);
-	if (!gpio_is_valid(lphw_hpd->gpio_cfg.gpio)) {
-		DP_ERR("%s gpio not specified\n", hpd_gpio_name);
-		rc = -EINVAL;
-		goto gpio_error;
-	}
-
+	lphw_hpd->gpio_cfg.gpio = gpio;
 	strlcpy(lphw_hpd->gpio_cfg.gpio_name, hpd_gpio_name,
 		sizeof(lphw_hpd->gpio_cfg.gpio_name));
 	lphw_hpd->gpio_cfg.value = 0;
