@@ -465,7 +465,8 @@ int sde_wb_connector_set_info_blob(struct drm_connector *connector,
 		}
 
 		sde_kms = to_sde_kms(priv->kms);
-		sde_kms_info_add_keyint(info, "has_cwb_dither", sde_kms->catalog->has_cwb_dither);
+		sde_kms_info_add_keyint(info, "has_cwb_dither", test_bit(SDE_FEATURE_CWB_DITHER,
+				sde_kms->catalog->features));
 	} else {
 		SDE_ERROR("invalid params %pK\n", wb_dev->drm_dev);
 		return -EINVAL;
@@ -507,7 +508,7 @@ static void sde_wb_connector_install_dither_property(struct sde_wb_device *wb_de
 	sde_kms = to_sde_kms(priv->kms);
 	catalog = sde_kms->catalog;
 
-	if (!catalog->has_cwb_dither)
+	if (!test_bit(SDE_FEATURE_CWB_DITHER, catalog->features))
 		return;
 
 	version = SDE_COLOR_PROCESS_MAJOR(

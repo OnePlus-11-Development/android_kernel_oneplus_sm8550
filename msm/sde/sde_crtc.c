@@ -1968,19 +1968,16 @@ static void _sde_drm_fb_sec_dir_trans(
 	struct sde_mdss_cfg *catalog, bool old_valid_fb, int *ops)
 {
 	/* secure display usecase */
-	if ((smmu_state->state == ATTACHED)
-			&& (secure_level == SDE_DRM_SEC_ONLY)) {
-		smmu_state->state = catalog->sui_ns_allowed ?
-			DETACH_SEC_REQ : DETACH_ALL_REQ;
+	if ((smmu_state->state == ATTACHED) && (secure_level == SDE_DRM_SEC_ONLY)) {
+		smmu_state->state = (test_bit(SDE_FEATURE_SUI_NS_ALLOWED, catalog->features)) ?
+				    DETACH_SEC_REQ : DETACH_ALL_REQ;
 		smmu_state->secure_level = secure_level;
 		smmu_state->transition_type = PRE_COMMIT;
 		*ops |= SDE_KMS_OPS_SECURE_STATE_CHANGE;
 		if (old_valid_fb)
-			*ops |= (SDE_KMS_OPS_WAIT_FOR_TX_DONE  |
-					SDE_KMS_OPS_CLEANUP_PLANE_FB);
-		if (catalog->sui_misr_supported)
-			smmu_state->sui_misr_state =
-				SUI_MISR_ENABLE_REQ;
+			*ops |= (SDE_KMS_OPS_WAIT_FOR_TX_DONE | SDE_KMS_OPS_CLEANUP_PLANE_FB);
+		if (test_bit(SDE_FEATURE_SUI_MISR, catalog->features))
+			smmu_state->sui_misr_state = SUI_MISR_ENABLE_REQ;
 	/* secure camera usecase */
 	} else if (smmu_state->state == ATTACHED) {
 		smmu_state->state = DETACH_SEC_REQ;
@@ -2000,16 +1997,15 @@ static void _sde_drm_fb_transactions(
 			|| ((smmu_state->secure_level == SDE_DRM_SEC_ONLY)
 				&& ((smmu_state->state == DETACHED_SEC)
 				|| (smmu_state->state == DETACH_SEC_REQ)))) {
-		smmu_state->state = catalog->sui_ns_allowed ?
+		smmu_state->state = (test_bit(SDE_FEATURE_SUI_NS_ALLOWED, catalog->features)) ?
 			ATTACH_SEC_REQ : ATTACH_ALL_REQ;
 		smmu_state->transition_type = post_commit ?
 			POST_COMMIT : PRE_COMMIT;
 		*ops |= SDE_KMS_OPS_SECURE_STATE_CHANGE;
 		if (old_valid_fb)
 			*ops |= SDE_KMS_OPS_WAIT_FOR_TX_DONE;
-		if (catalog->sui_misr_supported)
-			smmu_state->sui_misr_state =
-				SUI_MISR_DISABLE_REQ;
+		if (test_bit(SDE_FEATURE_SUI_MISR, catalog->features))
+			smmu_state->sui_misr_state = SUI_MISR_DISABLE_REQ;
 	} else if ((smmu_state->state == DETACHED_SEC)
 			|| (smmu_state->state == DETACH_SEC_REQ)) {
 		smmu_state->state = ATTACH_SEC_REQ;
@@ -2923,9 +2919,8 @@ static void _sde_crtc_set_dim_layer_v1(struct drm_crtc *crtc,
 		user_cfg = &dim_layer_v1.layer_cfg[i];
 
 		dim_layer[i].flags = user_cfg->flags;
-		dim_layer[i].stage = (kms->catalog->has_base_layer) ?
-					user_cfg->stage : user_cfg->stage +
-					SDE_STAGE_0;
+		dim_layer[i].stage = test_bit(SDE_FEATURE_BASE_LAYER, kms->catalog->features) ?
+					user_cfg->stage : user_cfg->stage + SDE_STAGE_0;
 
 		dim_layer[i].rect.x = user_cfg->rect.x1;
 		dim_layer[i].rect.y = user_cfg->rect.y1;
@@ -4570,7 +4565,7 @@ static void sde_crtc_disable(struct drm_crtc *crtc)
 		 * reset idle power-collapse to original state during suspend;
 		 * user-mode will change the state on resume, if required
 		 */
-		if (sde_kms->catalog->has_idle_pc)
+		if (test_bit(SDE_FEATURE_IDLE_PC, sde_kms->catalog->features))
 			sde_encoder_control_idle_pc(encoder, true);
 	}
 
@@ -4831,7 +4826,7 @@ static int _sde_crtc_check_secure_blend_config(struct drm_crtc *crtc,
 			int sec_stage = cnt ? pstates[0].sde_pstate->stage :
 						cstate->dim_layer[0].stage;
 
-			if (!sde_kms->catalog->has_base_layer)
+			if (!test_bit(SDE_FEATURE_BASE_LAYER, sde_kms->catalog->features))
 				sec_stage -= SDE_STAGE_0;
 
 			if ((!cnt && !cstate->num_dim_layers) ||
@@ -5071,7 +5066,7 @@ static int _sde_crtc_check_get_pstates(struct drm_crtc *crtc,
 		blend_type = sde_plane_get_property(pstates[*cnt].sde_pstate,
 			PLANE_PROP_BLEND_OP);
 
-		if (!kms->catalog->has_base_layer)
+		if (!test_bit(SDE_FEATURE_BASE_LAYER, kms->catalog->features))
 			inc_sde_stage = SDE_STAGE_0;
 
 		/* check dim layer stage with every plane */
@@ -5230,7 +5225,7 @@ static int _sde_crtc_check_zpos(struct drm_crtc_state *state,
 		rc = _sde_crtc_noise_layer_check_zpos(cstate, z_pos);
 		if (rc)
 			break;
-		if (!kms->catalog->has_base_layer)
+		if (!test_bit(SDE_FEATURE_BASE_LAYER, kms->catalog->features))
 			pstates[i].sde_pstate->stage = z_pos + SDE_STAGE_0;
 		else
 			pstates[i].sde_pstate->stage = z_pos;
@@ -5715,11 +5710,13 @@ static void sde_crtc_setup_capabilities_blob(struct sde_kms_info *info,
 					"smart_dma_rev", "smart_dma_v2p5");
 	}
 
-	sde_kms_info_add_keyint(info, "has_src_split", catalog->has_src_split);
-	sde_kms_info_add_keyint(info, "has_hdr", catalog->has_hdr);
-	sde_kms_info_add_keyint(info, "has_hdr_plus", catalog->has_hdr_plus);
+	sde_kms_info_add_keyint(info, "has_src_split", test_bit(SDE_FEATURE_SRC_SPLIT,
+								catalog->features));
+	sde_kms_info_add_keyint(info, "has_hdr", test_bit(SDE_FEATURE_HDR, catalog->features));
+	sde_kms_info_add_keyint(info, "has_hdr_plus", test_bit(SDE_FEATURE_HDR_PLUS,
+							       catalog->features));
 	sde_kms_info_add_keyint(info, "skip_inline_rot_threshold",
-			catalog->skip_inline_rot_threshold);
+				test_bit(SDE_FEATURE_INLINE_SKIP_THRESHOLD, catalog->features));
 
 	if (catalog->allowed_dsc_reservation_switch)
 		sde_kms_info_add_keyint(info, "allowed_dsc_reservation_switch",
@@ -5849,7 +5846,7 @@ static void sde_crtc_install_properties(struct drm_crtc *crtc,
 		"idle_time", 0, 0, U64_MAX, 0,
 		CRTC_PROP_IDLE_TIMEOUT);
 
-	if (catalog->has_trusted_vm_support) {
+	if (test_bit(SDE_FEATURE_TRUSTED_VM, catalog->features)) {
 		int init_idx = sde_in_trusted_vm(sde_kms) ? 1 : 0;
 
 		msm_property_install_enum(&sde_crtc->property_info,
@@ -5858,18 +5855,18 @@ static void sde_crtc_install_properties(struct drm_crtc *crtc,
 			CRTC_PROP_VM_REQ_STATE);
 	}
 
-	if (catalog->has_idle_pc)
+	if (test_bit(SDE_FEATURE_IDLE_PC, catalog->features))
 		msm_property_install_enum(&sde_crtc->property_info,
 			"idle_pc_state", 0x0, 0, e_idle_pc_state,
 			ARRAY_SIZE(e_idle_pc_state), 0,
 			CRTC_PROP_IDLE_PC_STATE);
 
-	if (catalog->has_dedicated_cwb_support)
+	if (test_bit(SDE_FEATURE_DEDICATED_CWB, catalog->features))
 		msm_property_install_enum(&sde_crtc->property_info,
 				"capture_mode", 0, 0, e_dcwb_data_points,
 				ARRAY_SIZE(e_dcwb_data_points), 0,
 				CRTC_PROP_CAPTURE_OUTPUT);
-	else if (catalog->has_cwb_support)
+	else if (test_bit(SDE_FEATURE_CWB, catalog->features))
 		msm_property_install_enum(&sde_crtc->property_info,
 				"capture_mode", 0, 0, e_cwb_data_points,
 				ARRAY_SIZE(e_cwb_data_points), 0,
@@ -5883,13 +5880,13 @@ static void sde_crtc_install_properties(struct drm_crtc *crtc,
 			ARRAY_SIZE(e_secure_level), 0,
 			CRTC_PROP_SECURITY_LEVEL);
 
-	if (catalog->syscache_supported)
+	if (test_bit(SDE_FEATURE_SYSCACHE, catalog->features))
 		msm_property_install_enum(&sde_crtc->property_info, "cache_state",
 			0x0, 0, e_cache_state,
 			ARRAY_SIZE(e_cache_state), 0,
 			CRTC_PROP_CACHE_STATE);
 
-	if (catalog->has_dim_layer) {
+	if (test_bit(SDE_FEATURE_DIM_LAYER, catalog->features)) {
 		msm_property_install_volatile_range(&sde_crtc->property_info,
 			"dim_layer_v1", 0x0, 0, ~0, 0, CRTC_PROP_DIM_LAYER_V1);
 		sde_kms_info_add_keyint(info, "dim_layer_v1_max_layers",
@@ -5921,7 +5918,7 @@ static void sde_crtc_install_properties(struct drm_crtc *crtc,
 		DRM_MODE_PROP_IMMUTABLE, CRTC_PROP_INFO);
 
 	sde_kms_info_add_keyint(info, "use_baselayer_for_stage",
-			 catalog->has_base_layer);
+				test_bit(SDE_FEATURE_BASE_LAYER, catalog->features));
 
 	msm_property_set_blob(&sde_crtc->property_info, &sde_crtc->blob_info,
 			info->data, SDE_KMS_INFO_DATALEN(info),
@@ -5929,7 +5926,7 @@ static void sde_crtc_install_properties(struct drm_crtc *crtc,
 
 	sde_crtc_install_noise_layer_properties(sde_crtc, catalog, info);
 
-	if (catalog->has_ubwc_stats)
+	if (test_bit(SDE_FEATURE_UBWC_STATS, catalog->features))
 		msm_property_install_range(&sde_crtc->property_info, "frame_data",
 				0x0, 0, ~0, 0, CRTC_PROP_FRAME_DATA_BUF);
 
@@ -7023,7 +7020,7 @@ void sde_crtc_static_img_control(struct drm_crtc *crtc,
 		return;
 	}
 
-	if (!sde_kms->catalog->syscache_supported) {
+	if (!test_bit(SDE_FEATURE_SYSCACHE, sde_kms->catalog->features)) {
 		SDE_DEBUG("syscache not supported\n");
 		return;
 	}
@@ -7231,7 +7228,8 @@ struct drm_crtc *sde_crtc_init(struct drm_device *dev, struct drm_plane *plane)
 				sde_crtc_frame_event_work);
 	}
 
-	crtc_funcs = kms->catalog->has_precise_vsync_ts ? &sde_crtc_funcs_v1 : &sde_crtc_funcs;
+	crtc_funcs = test_bit(SDE_FEATURE_HW_VSYNC_TS, kms->catalog->features) ?
+			&sde_crtc_funcs_v1 : &sde_crtc_funcs;
 	drm_crtc_init_with_planes(dev, crtc, plane, NULL, crtc_funcs, NULL);
 	drm_crtc_helper_add(crtc, &sde_crtc_helper_funcs);
 
@@ -7640,7 +7638,7 @@ static void sde_cp_crtc_apply_noise(struct drm_crtc *crtc,
 	cfg.alpha_noise = cstate->layer_cfg.alpha_noise;
 	cfg.attn_factor = cstate->layer_cfg.attn_factor;
 	cfg.strength = cstate->layer_cfg.strength;
-	if (!kms->catalog->has_base_layer) {
+	if (!test_bit(SDE_FEATURE_BASE_LAYER, kms->catalog->features)) {
 		cfg.noise_blend_stage = cstate->layer_cfg.zposn + SDE_STAGE_0;
 		cfg.attn_blend_stage = cstate->layer_cfg.zposattn + SDE_STAGE_0;
 	} else {

@@ -4759,7 +4759,7 @@ static int _sde_kms_hw_init_blocks(struct sde_kms *sde_kms,
 	 * timestamp as the DRM hooks for vblank timestamp/counters would be set
 	 * based on the feature
 	 */
-	if (sde_kms->catalog->has_precise_vsync_ts)
+	if (test_bit(SDE_FEATURE_HW_VSYNC_TS, sde_kms->catalog->features))
 		dev->vblank_disable_immediate = true;
 
 	/*

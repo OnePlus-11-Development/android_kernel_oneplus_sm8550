@@ -3355,7 +3355,8 @@ static void sde_encoder_vblank_callback(struct drm_encoder *drm_enc,
 	 * calculate accurate vsync timestamp when available
 	 * set current time otherwise
 	 */
-	if (phy_enc->sde_kms && phy_enc->sde_kms->catalog->has_precise_vsync_ts)
+	if (phy_enc->sde_kms && test_bit(SDE_FEATURE_HW_VSYNC_TS,
+					 phy_enc->sde_kms->catalog->features))
 		ts = sde_encoder_calc_last_vsync_timestamp(drm_enc);
 	if (!ts)
 		ts = ktime_get();
@@ -3485,9 +3486,9 @@ static void sde_encoder_frame_done_callback(
 		is_cmd_mode = true;
 
 	/* get precise vsync timestamp for retire fence, if precise vsync timestamp is enabled */
-	if (sde_kms->catalog->has_precise_vsync_ts
-	    && (event & SDE_ENCODER_FRAME_EVENT_SIGNAL_RETIRE_FENCE)
-	    && (!(event & (SDE_ENCODER_FRAME_EVENT_ERROR | SDE_ENCODER_FRAME_EVENT_PANEL_DEAD))))
+	if (test_bit(SDE_FEATURE_HW_VSYNC_TS, sde_kms->catalog->features) &&
+	    (event & SDE_ENCODER_FRAME_EVENT_SIGNAL_RETIRE_FENCE) &&
+	    (!(event & (SDE_ENCODER_FRAME_EVENT_ERROR | SDE_ENCODER_FRAME_EVENT_PANEL_DEAD))))
 		ts = sde_encoder_calc_last_vsync_timestamp(drm_enc);
 
 	/*
@@ -5092,9 +5093,11 @@ static int sde_encoder_setup_display(struct sde_encoder_virt *sde_enc,
 
 	if ((disp_info->capabilities & MSM_DISPLAY_CAP_CMD_MODE) ||
 	    (disp_info->capabilities & MSM_DISPLAY_CAP_VID_MODE))
-		sde_enc->idle_pc_enabled = sde_kms->catalog->has_idle_pc;
+		sde_enc->idle_pc_enabled = test_bit(SDE_FEATURE_IDLE_PC,
+						    sde_kms->catalog->features);
 
-	sde_enc->input_event_enabled = sde_kms->catalog->wakeup_with_touch;
+	sde_enc->input_event_enabled = test_bit(SDE_FEATURE_TOUCH_WAKEUP,
+						sde_kms->catalog->features);
 
 	mutex_lock(&sde_enc->enc_lock);
 	for (i = 0; i < disp_info->num_of_h_tiles && !ret; i++) {

@@ -3716,7 +3716,7 @@ static void _sde_plane_setup_capabilities_blob(struct sde_plane *psde,
 	sde_kms_info_add_keyint(info, "pipe_idx", pipe_id);
 
 	index = (master_plane_id == 0) ? 0 : 1;
-	if (catalog->has_demura &&
+	if (test_bit(SDE_FEATURE_DEMURA, catalog->features) &&
 	    catalog->demura_supported[psde->pipe][index] != ~0x0)
 		sde_kms_info_add_keyint(info, "demura_block", index);
 
@@ -3816,7 +3816,7 @@ static void _sde_plane_install_properties(struct drm_plane *plane,
 		if (catalog->mixer_count &&
 				catalog->mixer[0].sblk->maxblendstages) {
 			zpos_max = catalog->mixer[0].sblk->maxblendstages - 1;
-			if (catalog->has_base_layer &&
+			if (test_bit(SDE_FEATURE_BASE_LAYER, catalog->features) &&
 					(zpos_max > SDE_STAGE_MAX - 1))
 				zpos_max = SDE_STAGE_MAX - 1;
 			else if (zpos_max > SDE_STAGE_MAX - SDE_STAGE_0 - 1)

@@ -398,18 +398,18 @@ static inline bool sde_kms_is_secure_session_inprogress(struct sde_kms *sde_kms)
 {
 	bool ret = false;
 
-	if (!sde_kms)
+	if (!sde_kms || !sde_kms->catalog)
 		return false;
 
 	mutex_lock(&sde_kms->secure_transition_lock);
-	if (((sde_kms->catalog->sui_ns_allowed) &&
-		(sde_kms->smmu_state.secure_level == SDE_DRM_SEC_ONLY) &&
-			((sde_kms->smmu_state.state == DETACHED_SEC) ||
-				(sde_kms->smmu_state.state == DETACH_SEC_REQ) ||
-				(sde_kms->smmu_state.state == ATTACH_SEC_REQ)))
-		|| (((sde_kms->smmu_state.state == DETACHED) ||
-			(sde_kms->smmu_state.state == DETACH_ALL_REQ) ||
-			(sde_kms->smmu_state.state == ATTACH_ALL_REQ))))
+	if (((test_bit(SDE_FEATURE_SUI_NS_ALLOWED, sde_kms->catalog->features)) &&
+	     (sde_kms->smmu_state.secure_level == SDE_DRM_SEC_ONLY) &&
+	     ((sde_kms->smmu_state.state == DETACHED_SEC) ||
+	      (sde_kms->smmu_state.state == DETACH_SEC_REQ) ||
+	      (sde_kms->smmu_state.state == ATTACH_SEC_REQ))) ||
+	    (((sde_kms->smmu_state.state == DETACHED) ||
+	      (sde_kms->smmu_state.state == DETACH_ALL_REQ) ||
+	      (sde_kms->smmu_state.state == ATTACH_ALL_REQ))))
 		ret = true;
 	mutex_unlock(&sde_kms->secure_transition_lock);
 
@@ -429,7 +429,7 @@ static inline bool sde_kms_is_vbif_operation_allowed(struct sde_kms *sde_kms)
 	if (!sde_kms)
 		return false;
 
-	if (!sde_kms->catalog->sui_misr_supported)
+	if (!test_bit(SDE_FEATURE_SUI_MISR, sde_kms->catalog->features))
 		return true;
 
 	return !sde_kms_is_secure_session_inprogress(sde_kms);
@@ -446,7 +446,7 @@ static inline bool sde_kms_is_cp_operation_allowed(struct sde_kms *sde_kms)
 	if (!sde_kms || !sde_kms->catalog)
 		return false;
 
-	if (sde_kms->catalog->sui_ns_allowed)
+	if (test_bit(SDE_FEATURE_SUI_NS_ALLOWED, sde_kms->catalog->features))
 		return true;
 
 	return !sde_kms_is_secure_session_inprogress(sde_kms);

@@ -2209,7 +2209,7 @@ static int _sde_rm_populate_requirements(
 	 */
 	if ((!RM_RQ_CWB(reqs) || !RM_RQ_DCWB(reqs))
 				&& sde_crtc_state_in_clone_mode(enc, crtc_state)) {
-		if (cfg->has_dedicated_cwb_support)
+		if (test_bit(SDE_FEATURE_DEDICATED_CWB, cfg->features))
 			reqs->top_ctrl |= BIT(SDE_RM_TOPCTL_DCWB);
 		else
 			reqs->top_ctrl |= BIT(SDE_RM_TOPCTL_CWB);

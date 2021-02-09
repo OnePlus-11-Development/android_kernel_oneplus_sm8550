@@ -1622,7 +1622,7 @@ static int _sde_sspp_setup_vigs(struct device_node *np,
 					MAX_DOWNSCALE_RATIO_INROT_NRT_DEFAULT;
 		}
 
-		if (sde_cfg->inline_disable_const_clr)
+		if (test_bit(SDE_FEATURE_INLINE_DISABLE_CONST_CLR, sde_cfg->features))
 			set_bit(SDE_SSPP_INLINE_CONST_CLR, &sspp->features);
 
 	}
@@ -1914,7 +1914,7 @@ static void sde_sspp_set_features(struct sde_mdss_cfg *sde_cfg,
 		sblk->src_blk.id = SDE_SSPP_SRC;
 		set_bit(SDE_SSPP_SRC, &sspp->features);
 
-		if (sde_cfg->has_cdp)
+		if (test_bit(SDE_FEATURE_CDP, sde_cfg->features))
 			set_bit(SDE_PERF_SSPP_CDP, &sspp->perf_features);
 
 		if (sde_cfg->ts_prefill_rev == 1) {
@@ -1931,10 +1931,10 @@ static void sde_sspp_set_features(struct sde_mdss_cfg *sde_cfg,
 		if (sde_cfg->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache)
 			set_bit(SDE_PERF_SSPP_SYS_CACHE, &sspp->perf_features);
 
-		if (sde_cfg->sspp_multirect_error)
+		if (test_bit(SDE_FEATURE_MULTIRECT_ERROR, sde_cfg->features))
 			set_bit(SDE_SSPP_MULTIRECT_ERROR, &sspp->features);
 
-		if (sde_cfg->has_decimation) {
+		if (test_bit(SDE_FEATURE_DECIMATION, sde_cfg->features)) {
 			sblk->maxhdeciexp = MAX_HORZ_DECIMATION;
 			sblk->maxvdeciexp = MAX_VERT_DECIMATION;
 		} else {
@@ -1960,7 +1960,7 @@ static void sde_sspp_set_features(struct sde_mdss_cfg *sde_cfg,
 		else
 			sblk->max_per_pipe_bw_high = sblk->max_per_pipe_bw;
 
-		if (sde_cfg->has_ubwc_stats)
+		if (test_bit(SDE_FEATURE_UBWC_STATS, sde_cfg->features))
 			set_bit(SDE_SSPP_UBWC_STATS, &sspp->features);
 	}
 }
@@ -2286,11 +2286,11 @@ static int sde_mixer_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_c
 				PROP_VALUE_ACCESS(blend_props->values,
 						MIXER_BLEND_OP_OFF, j);
 
-		if (sde_cfg->has_src_split)
+		if (test_bit(SDE_FEATURE_SRC_SPLIT, sde_cfg->features))
 			set_bit(SDE_MIXER_SOURCESPLIT, &mixer->features);
-		if (sde_cfg->has_dim_layer)
+		if (test_bit(SDE_FEATURE_DIM_LAYER, sde_cfg->features))
 			set_bit(SDE_DIM_LAYER, &mixer->features);
-		if (sde_cfg->has_mixer_combined_alpha)
+		if (test_bit(SDE_FEATURE_COMBINED_ALPHA, sde_cfg->features))
 			set_bit(SDE_MIXER_COMBINED_ALPHA, &mixer->features);
 
 		of_property_read_string_index(np,
@@ -2545,17 +2545,17 @@ static int sde_wb_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
 		set_bit(SDE_WB_TRAFFIC_SHAPER, &wb->features);
 		set_bit(SDE_WB_YUV_CONFIG, &wb->features);
 
-		if (sde_cfg->has_cdp)
+		if (test_bit(SDE_FEATURE_CDP, sde_cfg->features))
 			set_bit(SDE_WB_CDP, &wb->features);
 
 		set_bit(SDE_WB_QOS, &wb->features);
 		if (sde_cfg->vbif_qos_nlvl == 8)
 			set_bit(SDE_WB_QOS_8LVL, &wb->features);
 
-		if (sde_cfg->has_wb_ubwc)
+		if (test_bit(SDE_FEATURE_WB_UBWC, sde_cfg->features))
 			set_bit(SDE_WB_UBWC, &wb->features);
 
-		if (sde_cfg->has_cwb_crop)
+		if (test_bit(SDE_FEATURE_CWB_CROP, sde_cfg->features))
 			set_bit(SDE_WB_CROP, &wb->features);
 
 		set_bit(SDE_WB_XY_ROI_OFFSET, &wb->features);
@@ -2563,7 +2563,7 @@ static int sde_wb_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
 		if (IS_SDE_CTL_REV_100(sde_cfg->ctl_rev))
 			set_bit(SDE_WB_INPUT_CTRL, &wb->features);
 
-		if (sde_cfg->has_dedicated_cwb_support) {
+		if (test_bit(SDE_FEATURE_DEDICATED_CWB, sde_cfg->features)) {
 			set_bit(SDE_WB_HAS_DCWB, &wb->features);
 			if (IS_SDE_CTL_REV_100(sde_cfg->ctl_rev))
 				set_bit(SDE_WB_DCWB_CTRL, &wb->features);
@@ -2575,10 +2575,10 @@ static int sde_wb_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
 				sde_cfg->cwb_blk_stride = 0x100;
 			}
 
-			if (sde_cfg->has_cwb_dither)
+			if (test_bit(SDE_FEATURE_CWB_DITHER, sde_cfg->features))
 				set_bit(SDE_WB_CWB_DITHER_CTRL, &wb->features);
 
-		} else if (sde_cfg->has_cwb_support) {
+		} else if (test_bit(SDE_FEATURE_CWB, sde_cfg->features)) {
 			set_bit(SDE_WB_HAS_CWB, &wb->features);
 			if (IS_SDE_CTL_REV_100(sde_cfg->ctl_rev))
 				set_bit(SDE_WB_CWB_CTRL, &wb->features);
@@ -3496,7 +3496,7 @@ static int sde_cache_parse_dt(struct device_node *np,
 		return -EINVAL;
 	}
 
-	if (!sde_cfg->syscache_supported)
+	if (!test_bit(SDE_FEATURE_SYSCACHE, sde_cfg->features))
 		return 0;
 
 	llcc_node = of_find_node_by_name(NULL, "cache-controller");
@@ -3675,7 +3675,7 @@ static int _sde_vbif_populate(struct sde_mdss_cfg *sde_cfg,
 	for (j = 0; j < prop_count[VBIF_MEMTYPE_1]; j++)
 		vbif->memtype[k++] = PROP_VALUE_ACCESS(
 				prop_value, VBIF_MEMTYPE_1, j);
-	if (sde_cfg->vbif_disable_inner_outer_shareable)
+	if (test_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features))
 		set_bit(SDE_VBIF_DISABLE_SHAREABLE, &vbif->features);
 
 	return 0;
@@ -3844,7 +3844,7 @@ static int sde_pp_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
 
 		if (PROP_VALUE_ACCESS(prop_value, PP_CWB, i)) {
 			set_bit(SDE_PINGPONG_CWB, &pp->features);
-			if (sde_cfg->has_dedicated_cwb_support)
+			if (test_bit(SDE_FEATURE_DEDICATED_CWB, sde_cfg->features))
 				sde_cfg->dcwb_count++;
 		}
 
@@ -3872,12 +3872,12 @@ static int sde_pp_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
 		sblk->dither.version = PROP_VALUE_ACCESS(prop_value, DITHER_VER,
 								0);
 
-		if (sde_cfg->has_cwb_dither &&
-			PROP_VALUE_ACCESS(prop_value, CWB_DITHER, i)) {
+		if (test_bit(SDE_FEATURE_CWB_DITHER, sde_cfg->features) &&
+		    PROP_VALUE_ACCESS(prop_value, CWB_DITHER, i)) {
 			set_bit(SDE_PINGPONG_CWB_DITHER, &pp->features);
 		}
 
-		if (sde_cfg->dither_luma_mode_support)
+		if (test_bit(SDE_FEATURE_DITHER_LUMA_MODE, sde_cfg->features))
 			set_bit(SDE_PINGPONG_DITHER_LUMA, &pp->features);
 
 		if (prop_exists[PP_MERGE_3D_ID]) {
@@ -3972,18 +3972,21 @@ static void _sde_top_parse_dt_helper(struct sde_mdss_cfg *cfg,
 					SEC_SID_MASK, i);
 	}
 
-	cfg->has_src_split = PROP_VALUE_ACCESS(props->values, SRC_SPLIT, 0);
-	cfg->has_dim_layer = PROP_VALUE_ACCESS(props->values, DIM_LAYER, 0);
-	cfg->has_idle_pc = PROP_VALUE_ACCESS(props->values, IDLE_PC, 0);
-	cfg->wakeup_with_touch = PROP_VALUE_ACCESS(props->values,
-			WAKEUP_WITH_TOUCH, 0);
+	if (PROP_VALUE_ACCESS(props->values, SRC_SPLIT, 0))
+		set_bit(SDE_FEATURE_SRC_SPLIT, cfg->features);
+	if (PROP_VALUE_ACCESS(props->values, DIM_LAYER, 0))
+		set_bit(SDE_FEATURE_DIM_LAYER, cfg->features);
+	if (PROP_VALUE_ACCESS(props->values, IDLE_PC, 0))
+		set_bit(SDE_FEATURE_IDLE_PC, cfg->features);
+	if (PROP_VALUE_ACCESS(props->values, WAKEUP_WITH_TOUCH, 0))
+		set_bit(SDE_FEATURE_TOUCH_WAKEUP, cfg->features);
 	cfg->pipe_order_type = PROP_VALUE_ACCESS(props->values,
 			PIPE_ORDER_VERSION, 0);
-	cfg->has_base_layer = PROP_VALUE_ACCESS(props->values, BASE_LAYER, 0);
+	if (PROP_VALUE_ACCESS(props->values, BASE_LAYER, 0))
+		set_bit(SDE_FEATURE_BASE_LAYER, cfg->features);
 	cfg->qseed_hw_version = PROP_VALUE_ACCESS(props->values,
 			 QSEED_HW_VERSION, 0);
-	cfg->trusted_vm_env = PROP_VALUE_ACCESS(props->values, TRUSTED_VM_ENV,
-			 0);
+	cfg->trusted_vm_env = PROP_VALUE_ACCESS(props->values, TRUSTED_VM_ENV, 0);
 	cfg->max_trusted_vm_displays = PROP_VALUE_ACCESS(props->values,
 			MAX_TRUSTED_VM_DISPLAYS, 0);
 	if (props->exists[TVM_INCLUDE_REG]) {
@@ -4413,7 +4416,7 @@ static int _sde_perf_parse_dt_cfg(struct device_node *np,
 				cfg->perf.cdp_cfg[j].wr_enable);
 		}
 
-		cfg->has_cdp = true;
+		set_bit(SDE_FEATURE_CDP, cfg->features);
 	}
 
 	cfg->perf.cpu_mask =
@@ -4612,7 +4615,7 @@ static int sde_hardware_format_caps(struct sde_mdss_cfg *sde_cfg,
 	const struct sde_format_extended *inline_restricted_fmt_tbl = NULL;
 
 	/* cursor input formats */
-	if (sde_cfg->has_cursor) {
+	if (test_bit(SDE_FEATURE_CURSOR, sde_cfg->features)) {
 		cursor_list_size = ARRAY_SIZE(cursor_formats);
 		sde_cfg->cursor_formats = kcalloc(cursor_list_size,
 			sizeof(struct sde_format_extended), GFP_KERNEL);
@@ -4627,7 +4630,7 @@ static int sde_hardware_format_caps(struct sde_mdss_cfg *sde_cfg,
 
 	/* DMA pipe input formats */
 	dma_list_size = ARRAY_SIZE(plane_formats);
-	if (sde_cfg->has_fp16)
+	if (test_bit(SDE_FEATURE_FP16, sde_cfg->features))
 		dma_list_size += ARRAY_SIZE(fp16_formats);
 
 	sde_cfg->dma_formats = kcalloc(dma_list_size,
@@ -4639,15 +4642,15 @@ static int sde_hardware_format_caps(struct sde_mdss_cfg *sde_cfg,
 
 	index = sde_copy_formats(sde_cfg->dma_formats, dma_list_size,
 			0, plane_formats, ARRAY_SIZE(plane_formats));
-	if (sde_cfg->has_fp16)
+	if (test_bit(SDE_FEATURE_FP16, sde_cfg->features))
 		index += sde_copy_formats(sde_cfg->dma_formats, dma_list_size,
 			index, fp16_formats, ARRAY_SIZE(fp16_formats));
 
 	/* ViG pipe input formats */
 	vig_list_size = ARRAY_SIZE(plane_formats_vig);
-	if (sde_cfg->has_vig_p010)
+	if (test_bit(SDE_FEATURE_VIG_P010, sde_cfg->features))
 		vig_list_size += ARRAY_SIZE(p010_ubwc_formats);
-	if (sde_cfg->has_fp16)
+	if (test_bit(SDE_FEATURE_FP16, sde_cfg->features))
 		vig_list_size += ARRAY_SIZE(fp16_formats);
 
 	sde_cfg->vig_formats = kcalloc(vig_list_size,
@@ -4659,17 +4662,17 @@ static int sde_hardware_format_caps(struct sde_mdss_cfg *sde_cfg,
 
 	index = sde_copy_formats(sde_cfg->vig_formats, vig_list_size,
 			0, plane_formats_vig, ARRAY_SIZE(plane_formats_vig));
-	if (sde_cfg->has_vig_p010)
+	if (test_bit(SDE_FEATURE_VIG_P010, sde_cfg->features))
 		index += sde_copy_formats(sde_cfg->vig_formats,
 				vig_list_size, index, p010_ubwc_formats,
 				ARRAY_SIZE(p010_ubwc_formats));
-	if (sde_cfg->has_fp16)
+	if (test_bit(SDE_FEATURE_FP16, sde_cfg->features))
 		index += sde_copy_formats(sde_cfg->vig_formats, vig_list_size,
 			index, fp16_formats, ARRAY_SIZE(fp16_formats));
 
 	/* Virtual ViG pipe input formats (all virt pipes use DMA formats) */
 	virt_vig_list_size = ARRAY_SIZE(plane_formats);
-	if (sde_cfg->has_fp16)
+	if (test_bit(SDE_FEATURE_FP16, sde_cfg->features))
 		virt_vig_list_size += ARRAY_SIZE(fp16_formats);
 
 	sde_cfg->virt_vig_formats = kcalloc(virt_vig_list_size,
@@ -4681,7 +4684,7 @@ static int sde_hardware_format_caps(struct sde_mdss_cfg *sde_cfg,
 
 	index = sde_copy_formats(sde_cfg->virt_vig_formats, virt_vig_list_size,
 			0, plane_formats, ARRAY_SIZE(plane_formats));
-	if (sde_cfg->has_fp16)
+	if (test_bit(SDE_FEATURE_FP16, sde_cfg->features))
 		index += sde_copy_formats(sde_cfg->virt_vig_formats,
 				virt_vig_list_size, index, fp16_formats,
 				ARRAY_SIZE(fp16_formats));
@@ -4752,7 +4755,7 @@ free_vig:
 free_dma:
 	kfree(sde_cfg->dma_formats);
 free_cursor:
-	if (sde_cfg->has_cursor)
+	if (test_bit(SDE_FEATURE_CURSOR, sde_cfg->features))
 		kfree(sde_cfg->cursor_formats);
 out:
 	return rc;
@@ -4810,7 +4813,12 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		return -EINVAL;
 
 	/* default settings for *MOST* targets */
-	sde_cfg->has_mixer_combined_alpha = true;
+	set_bit(SDE_FEATURE_COMBINED_ALPHA, sde_cfg->features);
+	set_bit(SDE_FEATURE_DELAY_PRG_FETCH, sde_cfg->features);
+	set_bit(SDE_FEATURE_SUI_MISR, sde_cfg->features);
+	set_bit(SDE_FEATURE_SUI_BLENDSTAGE, sde_cfg->features);
+	set_bit(SDE_FEATURE_SUI_NS_ALLOWED, sde_cfg->features);
+	set_bit(SDE_FEATURE_HDR, sde_cfg->features);
 	sde_cfg->mdss_hw_block_size = DEFAULT_MDSS_HW_BLOCK_SIZE;
 
 	for (i = 0; i < SSPP_MAX; i++) {
@@ -4821,326 +4829,271 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 	/* target specific settings */
 	if (IS_MSM8996_TARGET(hw_rev)) {
 		sde_cfg->perf.min_prefill_lines = 21;
-		sde_cfg->has_decimation = true;
-		sde_cfg->has_mixer_combined_alpha = false;
+		set_bit(SDE_FEATURE_DECIMATION, sde_cfg->features);
+		clear_bit(SDE_FEATURE_COMBINED_ALPHA, sde_cfg->features);
+		clear_bit(SDE_FEATURE_HDR, sde_cfg->features);
+		clear_bit(SDE_FEATURE_DELAY_PRG_FETCH, sde_cfg->features);
+		clear_bit(SDE_FEATURE_SUI_MISR, sde_cfg->features);
+		clear_bit(SDE_FEATURE_SUI_BLENDSTAGE, sde_cfg->features);
+		clear_bit(SDE_FEATURE_SUI_NS_ALLOWED, sde_cfg->features);
 	} else if (IS_MSM8998_TARGET(hw_rev)) {
-		sde_cfg->has_wb_ubwc = true;
+		set_bit(SDE_FEATURE_WB_UBWC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 25;
 		sde_cfg->vbif_qos_nlvl = 4;
 		sde_cfg->ts_prefill_rev = 1;
-		sde_cfg->has_decimation = true;
-		sde_cfg->has_cursor = true;
-		sde_cfg->has_hdr = true;
-		sde_cfg->has_mixer_combined_alpha = false;
+		set_bit(SDE_FEATURE_DECIMATION, sde_cfg->features);
+		set_bit(SDE_FEATURE_CURSOR, sde_cfg->features);
+		clear_bit(SDE_FEATURE_COMBINED_ALPHA, sde_cfg->features);
+		clear_bit(SDE_FEATURE_DELAY_PRG_FETCH, sde_cfg->features);
+		clear_bit(SDE_FEATURE_SUI_MISR, sde_cfg->features);
+		clear_bit(SDE_FEATURE_SUI_BLENDSTAGE, sde_cfg->features);
+		clear_bit(SDE_FEATURE_SUI_NS_ALLOWED, sde_cfg->features);
 	} else if (IS_SDM845_TARGET(hw_rev)) {
-		sde_cfg->has_wb_ubwc = true;
-		sde_cfg->has_cwb_support = true;
+		set_bit(SDE_FEATURE_WB_UBWC, sde_cfg->features);
+		set_bit(SDE_FEATURE_CWB, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 24;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
-		sde_cfg->sui_misr_supported = true;
 		sde_cfg->sui_block_xin_mask = 0x3F71;
-		sde_cfg->has_decimation = true;
-		sde_cfg->has_hdr = true;
-		sde_cfg->has_vig_p010 = true;
+		set_bit(SDE_FEATURE_DECIMATION, sde_cfg->features);
+		set_bit(SDE_FEATURE_VIG_P010, sde_cfg->features);
+		clear_bit(SDE_FEATURE_DELAY_PRG_FETCH, sde_cfg->features);
+		clear_bit(SDE_FEATURE_SUI_BLENDSTAGE, sde_cfg->features);
+		clear_bit(SDE_FEATURE_SUI_NS_ALLOWED, sde_cfg->features);
 	} else if (IS_SDM670_TARGET(hw_rev)) {
-		sde_cfg->has_wb_ubwc = true;
+		set_bit(SDE_FEATURE_WB_UBWC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 24;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
-		sde_cfg->has_decimation = true;
-		sde_cfg->has_hdr = true;
-		sde_cfg->has_vig_p010 = true;
+		set_bit(SDE_FEATURE_DECIMATION, sde_cfg->features);
+		set_bit(SDE_FEATURE_VIG_P010, sde_cfg->features);
+		clear_bit(SDE_FEATURE_DELAY_PRG_FETCH, sde_cfg->features);
+		clear_bit(SDE_FEATURE_SUI_MISR, sde_cfg->features);
+		clear_bit(SDE_FEATURE_SUI_BLENDSTAGE, sde_cfg->features);
+		clear_bit(SDE_FEATURE_SUI_NS_ALLOWED, sde_cfg->features);
 	} else if (IS_SM8150_TARGET(hw_rev)) {
-		sde_cfg->has_cwb_support = true;
-		sde_cfg->has_wb_ubwc = true;
-		sde_cfg->has_qsync = true;
-		sde_cfg->has_hdr = true;
-		sde_cfg->has_hdr_plus = true;
+		set_bit(SDE_FEATURE_CWB, sde_cfg->features);
+		set_bit(SDE_FEATURE_WB_UBWC, sde_cfg->features);
+		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
+		set_bit(SDE_FEATURE_HDR_PLUS, sde_cfg->features);
 		set_bit(SDE_MDP_DHDR_MEMPOOL, &sde_cfg->mdp[0].features);
-		sde_cfg->has_vig_p010 = true;
+		set_bit(SDE_FEATURE_VIG_P010, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 24;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-		sde_cfg->delay_prg_fetch_start = true;
-		sde_cfg->sui_ns_allowed = true;
-		sde_cfg->sui_misr_supported = true;
 		sde_cfg->sui_block_xin_mask = 0x3F71;
-		sde_cfg->has_sui_blendstage = true;
-		sde_cfg->has_3d_merge_reset = true;
-		sde_cfg->has_decimation = true;
-		sde_cfg->vbif_disable_inner_outer_shareable = true;
+		set_bit(SDE_FEATURE_3D_MERGE_RESET, sde_cfg->features);
+		set_bit(SDE_FEATURE_DECIMATION, sde_cfg->features);
+		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
 	} else if (IS_SDMSHRIKE_TARGET(hw_rev)) {
-		sde_cfg->has_wb_ubwc = true;
+		set_bit(SDE_FEATURE_WB_UBWC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 24;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-		sde_cfg->delay_prg_fetch_start = true;
-		sde_cfg->has_decimation = true;
-		sde_cfg->has_hdr = true;
-		sde_cfg->has_vig_p010 = true;
+		set_bit(SDE_FEATURE_DECIMATION, sde_cfg->features);
+		set_bit(SDE_FEATURE_VIG_P010, sde_cfg->features);
+		clear_bit(SDE_FEATURE_SUI_MISR, sde_cfg->features);
+		clear_bit(SDE_FEATURE_SUI_BLENDSTAGE, sde_cfg->features);
+		clear_bit(SDE_FEATURE_SUI_NS_ALLOWED, sde_cfg->features);
 	} else if (IS_SM6150_TARGET(hw_rev)) {
-		sde_cfg->has_cwb_support = true;
-		sde_cfg->has_qsync = true;
+		set_bit(SDE_FEATURE_CWB, sde_cfg->features);
+		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 24;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-		sde_cfg->delay_prg_fetch_start = true;
-		sde_cfg->sui_ns_allowed = true;
-		sde_cfg->sui_misr_supported = true;
-		sde_cfg->has_decimation = true;
+		set_bit(SDE_FEATURE_DECIMATION, sde_cfg->features);
 		sde_cfg->sui_block_xin_mask = 0x2EE1;
-		sde_cfg->has_sui_blendstage = true;
-		sde_cfg->has_3d_merge_reset = true;
-		sde_cfg->has_hdr = true;
-		sde_cfg->has_vig_p010 = true;
-		sde_cfg->vbif_disable_inner_outer_shareable = true;
+		set_bit(SDE_FEATURE_3D_MERGE_RESET, sde_cfg->features);
+		set_bit(SDE_FEATURE_VIG_P010, sde_cfg->features);
+		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
 	} else if (IS_SDMMAGPIE_TARGET(hw_rev)) {
-		sde_cfg->has_cwb_support = true;
-		sde_cfg->has_wb_ubwc = true;
-		sde_cfg->has_qsync = true;
+		set_bit(SDE_FEATURE_CWB, sde_cfg->features);
+		set_bit(SDE_FEATURE_WB_UBWC, sde_cfg->features);
+		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 24;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
+		clear_bit(SDE_FEATURE_HDR, sde_cfg->features);
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-		sde_cfg->delay_prg_fetch_start = true;
-		sde_cfg->sui_ns_allowed = true;
-		sde_cfg->sui_misr_supported = true;
 		sde_cfg->sui_block_xin_mask = 0xE71;
-		sde_cfg->has_sui_blendstage = true;
-		sde_cfg->has_3d_merge_reset = true;
-		sde_cfg->vbif_disable_inner_outer_shareable = true;
+		set_bit(SDE_FEATURE_3D_MERGE_RESET, sde_cfg->features);
+		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
 	} else if (IS_KONA_TARGET(hw_rev)) {
-		sde_cfg->has_cwb_support = true;
-		sde_cfg->has_wb_ubwc = true;
-		sde_cfg->has_qsync = true;
+		set_bit(SDE_FEATURE_CWB, sde_cfg->features);
+		set_bit(SDE_FEATURE_WB_UBWC, sde_cfg->features);
+		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 35;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-		sde_cfg->delay_prg_fetch_start = true;
-		sde_cfg->sui_ns_allowed = true;
-		sde_cfg->sui_misr_supported = true;
 		sde_cfg->sui_block_xin_mask = 0x3F71;
-		sde_cfg->has_sui_blendstage = true;
-		sde_cfg->has_3d_merge_reset = true;
-		sde_cfg->has_hdr = true;
-		sde_cfg->has_hdr_plus = true;
+		set_bit(SDE_FEATURE_3D_MERGE_RESET, sde_cfg->features);
+		set_bit(SDE_FEATURE_HDR_PLUS, sde_cfg->features);
 		set_bit(SDE_MDP_DHDR_MEMPOOL, &sde_cfg->mdp[0].features);
-		sde_cfg->has_vig_p010 = true;
+		set_bit(SDE_FEATURE_VIG_P010, sde_cfg->features);
 		sde_cfg->true_inline_rot_rev = SDE_INLINE_ROT_VERSION_1_0_0;
 		sde_cfg->uidle_cfg.uidle_rev = SDE_UIDLE_VERSION_1_0_0;
-		sde_cfg->inline_disable_const_clr = true;
+		set_bit(SDE_FEATURE_INLINE_DISABLE_CONST_CLR, sde_cfg->features);
 	} else if (IS_SAIPAN_TARGET(hw_rev)) {
-		sde_cfg->has_cwb_support = true;
-		sde_cfg->has_wb_ubwc = true;
-		sde_cfg->has_qsync = true;
+		set_bit(SDE_FEATURE_CWB, sde_cfg->features);
+		set_bit(SDE_FEATURE_WB_UBWC, sde_cfg->features);
+		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 40;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-		sde_cfg->delay_prg_fetch_start = true;
-		sde_cfg->sui_ns_allowed = true;
-		sde_cfg->sui_misr_supported = true;
 		sde_cfg->sui_block_xin_mask = 0xE71;
-		sde_cfg->has_sui_blendstage = true;
-		sde_cfg->has_3d_merge_reset = true;
-		sde_cfg->has_hdr = true;
-		sde_cfg->has_hdr_plus = true;
+		set_bit(SDE_FEATURE_3D_MERGE_RESET, sde_cfg->features);
+		set_bit(SDE_FEATURE_HDR_PLUS, sde_cfg->features);
 		set_bit(SDE_MDP_DHDR_MEMPOOL, &sde_cfg->mdp[0].features);
-		sde_cfg->has_vig_p010 = true;
+		set_bit(SDE_FEATURE_VIG_P010, sde_cfg->features);
 		sde_cfg->true_inline_rot_rev = SDE_INLINE_ROT_VERSION_1_0_0;
-		sde_cfg->inline_disable_const_clr = true;
+		set_bit(SDE_FEATURE_INLINE_DISABLE_CONST_CLR, sde_cfg->features);
 	} else if (IS_SDMTRINKET_TARGET(hw_rev)) {
-		sde_cfg->has_cwb_support = true;
-		sde_cfg->has_qsync = true;
+		set_bit(SDE_FEATURE_CWB, sde_cfg->features);
+		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 24;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-		sde_cfg->delay_prg_fetch_start = true;
-		sde_cfg->sui_ns_allowed = true;
-		sde_cfg->sui_misr_supported = true;
 		sde_cfg->sui_block_xin_mask = 0xC61;
-		sde_cfg->has_hdr = false;
-		sde_cfg->has_sui_blendstage = true;
-		sde_cfg->vbif_disable_inner_outer_shareable = true;
+		clear_bit(SDE_FEATURE_HDR, sde_cfg->features);
+		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
 	} else if (IS_BENGAL_TARGET(hw_rev)) {
-		sde_cfg->has_cwb_support = false;
-		sde_cfg->has_qsync = true;
+		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 24;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-		sde_cfg->delay_prg_fetch_start = true;
-		sde_cfg->sui_ns_allowed = true;
-		sde_cfg->sui_misr_supported = true;
 		sde_cfg->sui_block_xin_mask = 0xC01;
-		sde_cfg->has_hdr = false;
-		sde_cfg->has_sui_blendstage = true;
-		sde_cfg->vbif_disable_inner_outer_shareable = true;
+		clear_bit(SDE_FEATURE_HDR, sde_cfg->features);
+		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
 	} else if (IS_LAGOON_TARGET(hw_rev)) {
-		sde_cfg->has_cwb_support = true;
-		sde_cfg->has_qsync = true;
+		set_bit(SDE_FEATURE_CWB, sde_cfg->features);
+		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 40;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-		sde_cfg->delay_prg_fetch_start = true;
-		sde_cfg->sui_ns_allowed = true;
-		sde_cfg->sui_misr_supported = true;
 		sde_cfg->sui_block_xin_mask = 0x261;
-		sde_cfg->has_sui_blendstage = true;
-		sde_cfg->has_hdr = true;
-		sde_cfg->has_vig_p010 = true;
-		sde_cfg->vbif_disable_inner_outer_shareable = true;
+		set_bit(SDE_FEATURE_VIG_P010, sde_cfg->features);
+		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
 	} else if (IS_SCUBA_TARGET(hw_rev)) {
-		sde_cfg->has_cwb_support = false;
-		sde_cfg->has_qsync = true;
+		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 24;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-		sde_cfg->delay_prg_fetch_start = true;
-		sde_cfg->sui_ns_allowed = true;
-		sde_cfg->sui_misr_supported = true;
 		sde_cfg->sui_block_xin_mask = 0x1;
-		sde_cfg->has_hdr = false;
-		sde_cfg->has_sui_blendstage = true;
+		clear_bit(SDE_FEATURE_HDR, sde_cfg->features);
 	} else if (IS_LAHAINA_TARGET(hw_rev)) {
-		sde_cfg->has_demura = true;
+		set_bit(SDE_FEATURE_DEMURA, sde_cfg->features);
 		sde_cfg->demura_supported[SSPP_DMA1][0] = 0;
 		sde_cfg->demura_supported[SSPP_DMA1][1] = 1;
 		sde_cfg->demura_supported[SSPP_DMA3][0] = 0;
 		sde_cfg->demura_supported[SSPP_DMA3][1] = 1;
-		sde_cfg->has_cwb_support = true;
-		sde_cfg->has_wb_ubwc = true;
-		sde_cfg->has_qsync = true;
+		set_bit(SDE_FEATURE_CWB, sde_cfg->features);
+		set_bit(SDE_FEATURE_WB_UBWC, sde_cfg->features);
+		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 40;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-		sde_cfg->delay_prg_fetch_start = true;
-		sde_cfg->sui_ns_allowed = true;
-		sde_cfg->sui_misr_supported = true;
 		sde_cfg->sui_block_xin_mask = 0x3F71;
-		sde_cfg->has_sui_blendstage = true;
-		sde_cfg->has_3d_merge_reset = true;
-		sde_cfg->has_hdr = true;
-		sde_cfg->has_hdr_plus = true;
+		set_bit(SDE_FEATURE_3D_MERGE_RESET, sde_cfg->features);
+		set_bit(SDE_FEATURE_HDR_PLUS, sde_cfg->features);
 		set_bit(SDE_MDP_DHDR_MEMPOOL_4K, &sde_cfg->mdp[0].features);
-		sde_cfg->has_vig_p010 = true;
+		set_bit(SDE_FEATURE_VIG_P010, sde_cfg->features);
 		sde_cfg->true_inline_rot_rev = SDE_INLINE_ROT_VERSION_2_0_0;
 		sde_cfg->uidle_cfg.uidle_rev = SDE_UIDLE_VERSION_1_0_1;
-		sde_cfg->vbif_disable_inner_outer_shareable = true;
-		sde_cfg->dither_luma_mode_support = true;
+		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
+		set_bit(SDE_FEATURE_DITHER_LUMA_MODE, sde_cfg->features);
 		sde_cfg->mdss_hw_block_size = 0x158;
-		sde_cfg->has_trusted_vm_support = true;
-		sde_cfg->syscache_supported = true;
+		set_bit(SDE_FEATURE_TRUSTED_VM, sde_cfg->features);
+		set_bit(SDE_FEATURE_SYSCACHE, sde_cfg->features);
 	} else if (IS_HOLI_TARGET(hw_rev)) {
-		sde_cfg->has_cwb_support = false;
-		sde_cfg->has_qsync = true;
+		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 24;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-		sde_cfg->delay_prg_fetch_start = true;
-		sde_cfg->sui_ns_allowed = true;
-		sde_cfg->sui_misr_supported = true;
 		sde_cfg->sui_block_xin_mask = 0xC01;
-		sde_cfg->has_hdr = false;
-		sde_cfg->has_sui_blendstage = true;
-		sde_cfg->vbif_disable_inner_outer_shareable = true;
+		clear_bit(SDE_FEATURE_HDR, sde_cfg->features);
+		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
 		sde_cfg->mdss_hw_block_size = 0x158;
-		sde_cfg->rc_lm_flush_override = true;
+		set_bit(SDE_FEATURE_RC_LM_FLUSH_OVERRIDE, sde_cfg->features);
 	} else if (IS_SHIMA_TARGET(hw_rev)) {
-		sde_cfg->has_cwb_support = true;
-		sde_cfg->has_wb_ubwc = true;
-		sde_cfg->has_qsync = true;
+		set_bit(SDE_FEATURE_CWB, sde_cfg->features);
+		set_bit(SDE_FEATURE_WB_UBWC, sde_cfg->features);
+		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 35;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-		sde_cfg->delay_prg_fetch_start = true;
-		sde_cfg->sui_ns_allowed = true;
-		sde_cfg->sui_misr_supported = true;
 		sde_cfg->sui_block_xin_mask = 0xE71;
-		sde_cfg->has_sui_blendstage = true;
-		sde_cfg->has_3d_merge_reset = true;
-		sde_cfg->has_hdr = true;
-		sde_cfg->has_hdr_plus = true;
+		set_bit(SDE_FEATURE_3D_MERGE_RESET, sde_cfg->features);
+		set_bit(SDE_FEATURE_HDR_PLUS, sde_cfg->features);
 		set_bit(SDE_MDP_DHDR_MEMPOOL, &sde_cfg->mdp[0].features);
-		sde_cfg->has_vig_p010 = true;
+		set_bit(SDE_FEATURE_VIG_P010, sde_cfg->features);
 		sde_cfg->true_inline_rot_rev = SDE_INLINE_ROT_VERSION_1_0_0;
-		sde_cfg->inline_disable_const_clr = true;
-		sde_cfg->vbif_disable_inner_outer_shareable = true;
+		set_bit(SDE_FEATURE_INLINE_DISABLE_CONST_CLR, sde_cfg->features);
+		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
 		sde_cfg->mdss_hw_block_size = 0x158;
-		sde_cfg->has_trusted_vm_support = true;
-		sde_cfg->syscache_supported = true;
+		set_bit(SDE_FEATURE_TRUSTED_VM, sde_cfg->features);
+		set_bit(SDE_FEATURE_SYSCACHE, sde_cfg->features);
 	} else if (IS_WAIPIO_TARGET(hw_rev)) {
 		sde_cfg->allowed_dsc_reservation_switch = SDE_DP_DSC_RESERVATION_SWITCH;
-		sde_cfg->has_dedicated_cwb_support = true;
-		sde_cfg->has_cwb_dither = true;
-		sde_cfg->has_wb_ubwc = true;
-		sde_cfg->has_cwb_crop = true;
-		sde_cfg->has_qsync = true;
+		set_bit(SDE_FEATURE_DEDICATED_CWB, sde_cfg->features);
+		set_bit(SDE_FEATURE_CWB_DITHER, sde_cfg->features);
+		set_bit(SDE_FEATURE_WB_UBWC, sde_cfg->features);
+		set_bit(SDE_FEATURE_CWB_CROP, sde_cfg->features);
+		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 40;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-		sde_cfg->delay_prg_fetch_start = true;
-		sde_cfg->sui_ns_allowed = true;
-		sde_cfg->sui_misr_supported = true;
-		sde_cfg->has_sui_blendstage = true;
-		sde_cfg->has_3d_merge_reset = true;
-		sde_cfg->has_hdr = true;
-		sde_cfg->has_hdr_plus = true;
-		sde_cfg->skip_inline_rot_threshold = true;
+		set_bit(SDE_FEATURE_3D_MERGE_RESET, sde_cfg->features);
+		set_bit(SDE_FEATURE_HDR_PLUS, sde_cfg->features);
+		set_bit(SDE_FEATURE_INLINE_SKIP_THRESHOLD, sde_cfg->features);
 		set_bit(SDE_MDP_DHDR_MEMPOOL_4K, &sde_cfg->mdp[0].features);
-		sde_cfg->has_vig_p010 = true;
+		set_bit(SDE_FEATURE_VIG_P010, sde_cfg->features);
 		sde_cfg->true_inline_rot_rev = SDE_INLINE_ROT_VERSION_2_0_1;
 		sde_cfg->uidle_cfg.uidle_rev = SDE_UIDLE_VERSION_1_0_2;
-		sde_cfg->vbif_disable_inner_outer_shareable = true;
-		sde_cfg->dither_luma_mode_support = true;
+		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
+		set_bit(SDE_FEATURE_DITHER_LUMA_MODE, sde_cfg->features);
 		sde_cfg->mdss_hw_block_size = 0x158;
-		sde_cfg->syscache_supported = true;
-		sde_cfg->sspp_multirect_error = true;
-		sde_cfg->has_fp16 = true;
+		set_bit(SDE_FEATURE_SYSCACHE, sde_cfg->features);
+		set_bit(SDE_FEATURE_MULTIRECT_ERROR, sde_cfg->features);
+		set_bit(SDE_FEATURE_FP16, sde_cfg->features);
 		set_bit(SDE_MDP_PERIPH_TOP_0_REMOVED, &sde_cfg->mdp[0].features);
-		sde_cfg->has_precise_vsync_ts = true;
-		sde_cfg->has_avr_step = true;
-		sde_cfg->has_trusted_vm_support = true;
-		sde_cfg->has_ubwc_stats = true;
-		sde_cfg->has_demura = true;
+		set_bit(SDE_FEATURE_DEMURA, sde_cfg->features);
 		sde_cfg->demura_supported[SSPP_DMA1][0] = 0;
 		sde_cfg->demura_supported[SSPP_DMA1][1] = 1;
 		sde_cfg->demura_supported[SSPP_DMA3][0] = 0;
 		sde_cfg->demura_supported[SSPP_DMA3][1] = 1;
+		set_bit(SDE_FEATURE_UBWC_STATS, sde_cfg->features);
+		set_bit(SDE_FEATURE_HW_VSYNC_TS, sde_cfg->features);
+		set_bit(SDE_FEATURE_AVR_STEP, sde_cfg->features);
+		set_bit(SDE_FEATURE_TRUSTED_VM, sde_cfg->features);
 	} else if (IS_YUPIK_TARGET(hw_rev)) {
-		sde_cfg->has_cwb_support = true;
-		sde_cfg->has_qsync = true;
+		set_bit(SDE_FEATURE_CWB, sde_cfg->features);
+		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 40;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-		sde_cfg->delay_prg_fetch_start = true;
-		sde_cfg->sui_ns_allowed = true;
-		sde_cfg->sui_misr_supported = true;
 		sde_cfg->sui_block_xin_mask = 0x261;
-		sde_cfg->has_sui_blendstage = true;
-		sde_cfg->has_3d_merge_reset = true;
-		sde_cfg->has_hdr = true;
-		sde_cfg->has_hdr_plus = true;
+		set_bit(SDE_FEATURE_3D_MERGE_RESET, sde_cfg->features);
+		set_bit(SDE_FEATURE_HDR_PLUS, sde_cfg->features);
 		set_bit(SDE_MDP_DHDR_MEMPOOL_4K, &sde_cfg->mdp[0].features);
-		sde_cfg->has_vig_p010 = true;
+		set_bit(SDE_FEATURE_VIG_P010, sde_cfg->features);
 		sde_cfg->true_inline_rot_rev = SDE_INLINE_ROT_VERSION_2_0_0;
-		sde_cfg->vbif_disable_inner_outer_shareable = true;
-		sde_cfg->dither_luma_mode_support = true;
+		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
+		set_bit(SDE_FEATURE_DITHER_LUMA_MODE, sde_cfg->features);
 		sde_cfg->mdss_hw_block_size = 0x158;
-		sde_cfg->rc_lm_flush_override = false;
 	} else {
 		SDE_ERROR("unsupported chipset id:%X\n", hw_rev);
 		sde_cfg->perf.min_prefill_lines = 0xffff;
@@ -5164,9 +5117,8 @@ static int _sde_hardware_post_caps(struct sde_mdss_cfg *sde_cfg,
 	if (!sde_cfg)
 		return -EINVAL;
 
-	if (sde_cfg->has_sui_blendstage)
-		sde_cfg->sui_supported_blendstage =
-			sde_cfg->max_mixer_blendstages - SDE_STAGE_0;
+	if (test_bit(SDE_FEATURE_SUI_BLENDSTAGE, sde_cfg->features))
+		sde_cfg->sui_supported_blendstage = sde_cfg->max_mixer_blendstages - SDE_STAGE_0;
 
 	for (i = 0; i < sde_cfg->sspp_count; i++) {
 		if (sde_cfg->sspp[i].sblk) {
@@ -5180,11 +5132,9 @@ static int _sde_hardware_post_caps(struct sde_mdss_cfg *sde_cfg,
 		 * set sec-ui blocked SSPP feature flag based on blocked
 		 * xin-mask if sec-ui-misr feature is enabled;
 		 */
-		if (sde_cfg->sui_misr_supported
-				&& (sde_cfg->sui_block_xin_mask
-					& BIT(sde_cfg->sspp[i].xin_id)))
-			set_bit(SDE_SSPP_BLOCK_SEC_UI,
-					&sde_cfg->sspp[i].features);
+		if (test_bit(SDE_FEATURE_SUI_MISR, sde_cfg->features) &&
+		    (sde_cfg->sui_block_xin_mask & BIT(sde_cfg->sspp[i].xin_id)))
+			set_bit(SDE_SSPP_BLOCK_SEC_UI, &sde_cfg->sspp[i].features);
 	}
 
 	if (max_horz_deci)

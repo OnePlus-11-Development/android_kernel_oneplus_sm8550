@@ -3061,7 +3061,7 @@ static void _dspp_rc_install_property(struct drm_crtc *crtc)
 				sizeof(struct drm_msm_rc_mask_cfg));
 
 		/* Override flush mechanism to use layer mixer flush bits */
-		if (!catalog->rc_lm_flush_override)
+		if (!test_bit(SDE_FEATURE_RC_LM_FLUSH_OVERRIDE, catalog->features))
 			break;
 
 		DRM_DEBUG("rc using lm flush override\n");

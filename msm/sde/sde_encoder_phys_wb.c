@@ -1876,7 +1876,7 @@ static void sde_encoder_phys_wb_disable(struct sde_encoder_phys *phys_enc)
 	 * If has_3d_merge_reset is not set, legacy reset
 	 * sequence is executed.
 	 */
-	if (hw_wb->catalog->has_3d_merge_reset) {
+	if (test_bit(SDE_FEATURE_3D_MERGE_RESET, hw_wb->catalog->features)) {
 		sde_encoder_helper_phys_disable(phys_enc, wb_enc);
 		goto exit;
 	}

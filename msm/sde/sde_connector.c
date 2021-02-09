@@ -2860,9 +2860,10 @@ static int sde_connector_populate_mode_info(struct drm_connector *conn,
 		}
 
 		sde_kms_info_add_keyint(info, "qsync_min_fps", mode_info.qsync_min_fps);
-		sde_kms_info_add_keyint(info, "has_cwb_crop", sde_kms->catalog->has_cwb_crop);
+		sde_kms_info_add_keyint(info, "has_cwb_crop", test_bit(SDE_FEATURE_CWB_CROP,
+								       sde_kms->catalog->features));
 		sde_kms_info_add_keyint(info, "has_dedicated_cwb_support",
-			sde_kms->catalog->has_dedicated_cwb_support);
+				test_bit(SDE_FEATURE_DEDICATED_CWB, sde_kms->catalog->features));
 
 		sde_kms_info_add_keyint(info, "mdp_transfer_time_us",
 			mode_info.mdp_transfer_time_us);
@@ -3083,13 +3084,13 @@ static int _sde_connector_install_properties(struct drm_device *dev,
 			CONNECTOR_PROP_AUTOREFRESH);
 
 	if (connector_type == DRM_MODE_CONNECTOR_DSI) {
-		if (sde_kms->catalog->has_qsync && dsi_display && dsi_display->panel &&
-				dsi_display->panel->qsync_caps.qsync_support) {
+		if (test_bit(SDE_FEATURE_QSYNC, sde_kms->catalog->features) && dsi_display &&
+		    dsi_display->panel && dsi_display->panel->qsync_caps.qsync_support) {
 			msm_property_install_enum(&c_conn->property_info,
 					"qsync_mode", 0, 0, e_qsync_mode,
 					ARRAY_SIZE(e_qsync_mode), 0,
 					CONNECTOR_PROP_QSYNC_MODE);
-			if (sde_kms->catalog->has_avr_step)
+			if (test_bit(SDE_FEATURE_AVR_STEP, sde_kms->catalog->features))
 				msm_property_install_range(&c_conn->property_info,
 						"avr_step", 0x0, 0, U32_MAX, 0,
 						CONNECTOR_PROP_AVR_STEP);
@@ -3113,7 +3114,7 @@ static int _sde_connector_install_properties(struct drm_device *dev,
 			ARRAY_SIZE(e_panel_mode), 0,
 			CONNECTOR_PROP_SET_PANEL_MODE);
 
-		if (sde_kms->catalog->has_demura) {
+		if (test_bit(SDE_FEATURE_DEMURA, sde_kms->catalog->features)) {
 			msm_property_install_blob(&c_conn->property_info,
 				"DEMURA_PANEL_ID", DRM_MODE_PROP_IMMUTABLE,
 				CONNECTOR_PROP_DEMURA_PANEL_ID);
@@ -3292,7 +3293,7 @@ struct drm_connector *sde_connector_init(struct drm_device *dev,
 		goto error_cleanup_fence;
 
 	if (connector_type == DRM_MODE_CONNECTOR_DSI &&
-			sde_kms->catalog->has_demura) {
+			test_bit(SDE_FEATURE_DEMURA, sde_kms->catalog->features)) {
 		rc = sde_connector_register_event(&c_conn->base,
 			SDE_CONN_EVENT_PANEL_ID,
 			sde_connector_handle_panel_id, c_conn);
