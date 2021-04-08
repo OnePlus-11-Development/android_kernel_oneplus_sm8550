@@ -312,7 +312,7 @@ static void sde_hw_setup_vsync_source_v1(struct sde_hw_mdp *mdp,
 void sde_hw_reset_ubwc(struct sde_hw_mdp *mdp, struct sde_mdss_cfg *m)
 {
 	struct sde_hw_blk_reg_map c;
-	u32 ubwc_version;
+	u32 ubwc_rev;
 
 	if (!mdp || !m)
 		return;
@@ -320,9 +320,9 @@ void sde_hw_reset_ubwc(struct sde_hw_mdp *mdp, struct sde_mdss_cfg *m)
 	/* force blk offset to zero to access beginning of register region */
 	c = mdp->hw;
 	c.blk_off = 0x0;
-	ubwc_version = SDE_REG_READ(&c, UBWC_DEC_HW_VERSION);
+	ubwc_rev = SDE_REG_READ(&c, UBWC_DEC_HW_VERSION);
 
-	if (IS_UBWC_40_SUPPORTED(ubwc_version)) {
+	if (IS_UBWC_40_SUPPORTED(ubwc_rev)) {
 		u32 ver = 2;
 		u32 mode = 1;
 		u32 reg = (m->mdp[0].ubwc_swizzle & 0x7) |
@@ -330,7 +330,7 @@ void sde_hw_reset_ubwc(struct sde_hw_mdp *mdp, struct sde_mdss_cfg *m)
 			((m->mdp[0].highest_bank_bit & 0x7) << 4) |
 			((m->macrotile_mode & 0x1) << 12);
 
-		if (IS_UBWC_30_SUPPORTED(m->ubwc_version)) {
+		if (IS_UBWC_30_SUPPORTED(m->ubwc_rev)) {
 			ver = 1;
 			mode = 0;
 		}
@@ -338,22 +338,22 @@ void sde_hw_reset_ubwc(struct sde_hw_mdp *mdp, struct sde_mdss_cfg *m)
 		SDE_REG_WRITE(&c, UBWC_STATIC, reg);
 		SDE_REG_WRITE(&c, UBWC_CTRL_2, ver);
 		SDE_REG_WRITE(&c, UBWC_PREDICTION_MODE, mode);
-	} else if (IS_UBWC_20_SUPPORTED(ubwc_version)) {
+	} else if (IS_UBWC_20_SUPPORTED(ubwc_rev)) {
 		SDE_REG_WRITE(&c, UBWC_STATIC, m->mdp[0].ubwc_static);
-	} else if (IS_UBWC_30_SUPPORTED(ubwc_version)) {
+	} else if (IS_UBWC_30_SUPPORTED(ubwc_rev)) {
 		u32 reg = m->mdp[0].ubwc_static |
 			(m->mdp[0].ubwc_swizzle & 0x1) |
 			((m->mdp[0].highest_bank_bit & 0x3) << 4) |
 			((m->macrotile_mode & 0x1) << 12);
 
-		if (IS_UBWC_30_SUPPORTED(m->ubwc_version))
+		if (IS_UBWC_30_SUPPORTED(m->ubwc_rev))
 			reg |= BIT(10);
-		if (IS_UBWC_10_SUPPORTED(m->ubwc_version))
+		if (IS_UBWC_10_SUPPORTED(m->ubwc_rev))
 			reg |= BIT(8);
 
 		SDE_REG_WRITE(&c, UBWC_STATIC, reg);
 	} else {
-		SDE_ERROR("Unsupported UBWC version 0x%08x\n", ubwc_version);
+		SDE_ERROR("Unsupported UBWC version 0x%08x\n", ubwc_rev);
 	}
 }
 
@@ -393,7 +393,7 @@ struct sde_hw_sid *sde_hw_sid_init(void __iomem *addr,
 	c->hw.base_off = addr;
 	c->hw.blk_off = 0;
 	c->hw.length = sid_len;
-	c->hw.hwversion = m->hwversion;
+	c->hw.hw_rev = m->hw_rev;
 	c->hw.log_mask = SDE_DBG_MASK_SID;
 
 	return c;
@@ -549,7 +549,7 @@ static const struct sde_mdp_cfg *_top_offset(enum sde_mdp mdp,
 			b->base_off = addr;
 			b->blk_off = m->mdp[i].base;
 			b->length = m->mdp[i].len;
-			b->hwversion = m->hwversion;
+			b->hw_rev = m->hw_rev;
 			b->log_mask = SDE_DBG_MASK_TOP;
 			return &m->mdp[i];
 		}

@@ -49,10 +49,10 @@ static const struct sde_uidle_cfg *_top_offset(enum sde_uidle uidle,
 		b->base_off = addr;
 		b->blk_off = m->uidle_cfg.base;
 		b->length = m->uidle_cfg.len;
-		b->hwversion = m->hwversion;
+		b->hw_rev = m->hw_rev;
 		b->log_mask = SDE_DBG_MASK_UIDLE;
-		SDE_DEBUG("base:0x%p blk_off:0x%x length:%d hwversion:0x%x\n",
-			b->base_off, b->blk_off, b->length, b->hwversion);
+		SDE_DEBUG("base:0x%p blk_off:0x%x length:%d hw_rev:0x%x\n",
+			  b->base_off, b->blk_off, b->length, b->hw_rev);
 		return &m->uidle_cfg;
 	}
 

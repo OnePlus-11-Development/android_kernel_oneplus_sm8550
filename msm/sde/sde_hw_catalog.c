@@ -1716,7 +1716,7 @@ static void _sde_sspp_setup_cursor(struct sde_mdss_cfg *sde_cfg,
 	struct sde_sspp_cfg *sspp, struct sde_sspp_sub_blks *sblk,
 	struct sde_prop_value *prop_value, u32 *cursor_count)
 {
-	if (!IS_SDE_MAJOR_MINOR_SAME(sde_cfg->hwversion, SDE_HW_VER_300))
+	if (!IS_SDE_MAJOR_MINOR_SAME(sde_cfg->hw_rev, SDE_HW_VER_300))
 		SDE_ERROR("invalid sspp type %d, xin id %d\n",
 				sspp->type, sspp->xin_id);
 	set_bit(SDE_SSPP_CURSOR, &sspp->features);
@@ -1846,7 +1846,7 @@ static int _sde_sspp_setup_dmas(struct device_node *np,
 					DMA_DGM_INVERSE_PMA, 0)) {
 				set_bit(SDE_SSPP_DGM_INVERSE_PMA,
 						&sspp->features);
-				if (sde_cfg->hwversion >= SDE_HW_VER_810)
+				if (sde_cfg->hw_rev >= SDE_HW_VER_810)
 					sblk->unmult_offset[j] = SDE_DGM_UNMULT_2 + j*0x1000;
 				else
 					sblk->unmult_offset[j] = SDE_DGM_UNMULT + j*0x1000;
@@ -2121,8 +2121,7 @@ static int sde_ctl_parse_dt(struct device_node *np,
 			set_bit(SDE_CTL_ACTIVE_CFG, &ctl->features);
 		if (SDE_UIDLE_MAJOR(sde_cfg->uidle_cfg.uidle_rev))
 			set_bit(SDE_CTL_UIDLE, &ctl->features);
-		if (SDE_HW_MAJOR(sde_cfg->hwversion) >=
-				SDE_HW_MAJOR(SDE_HW_VER_700))
+		if (SDE_HW_MAJOR(sde_cfg->hw_rev) >= SDE_HW_MAJOR(SDE_HW_VER_700))
 			set_bit(SDE_CTL_UNIFIED_DSPP_FLUSH, &ctl->features);
 	}
 
@@ -2444,16 +2443,13 @@ static int sde_intf_parse_dt(struct device_node *np,
 			set_bit(SDE_INTF_TE, &intf->features);
 		}
 
-		if (SDE_HW_MAJOR(sde_cfg->hwversion) >=
-				SDE_HW_MAJOR(SDE_HW_VER_500))
+		if (SDE_HW_MAJOR(sde_cfg->hw_rev) >= SDE_HW_MAJOR(SDE_HW_VER_500))
 			set_bit(SDE_INTF_STATUS, &intf->features);
 
-		if (SDE_HW_MAJOR(sde_cfg->hwversion) >=
-				SDE_HW_MAJOR(SDE_HW_VER_700))
+		if (SDE_HW_MAJOR(sde_cfg->hw_rev) >= SDE_HW_MAJOR(SDE_HW_VER_700))
 			set_bit(SDE_INTF_TE_ALIGN_VSYNC, &intf->features);
 
-		if (SDE_HW_MAJOR(sde_cfg->hwversion) >=
-				SDE_HW_MAJOR(SDE_HW_VER_810)) {
+		if (SDE_HW_MAJOR(sde_cfg->hw_rev) >= SDE_HW_MAJOR(SDE_HW_VER_810)) {
 			set_bit(SDE_INTF_WD_TIMER, &intf->features);
 			set_bit(SDE_INTF_RESET_COUNTER, &intf->features);
 			set_bit(SDE_INTF_VSYNC_TIMESTAMP, &intf->features);
@@ -2500,7 +2496,7 @@ static int sde_wb_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
 	if (rc)
 		goto end;
 
-	major_version = SDE_HW_MAJOR(sde_cfg->hwversion);
+	major_version = SDE_HW_MAJOR(sde_cfg->hw_rev);
 	for (i = 0; i < off_count; i++) {
 		wb = sde_cfg->wb + i;
 		sblk = kzalloc(sizeof(*sblk), GFP_KERNEL);
@@ -2526,8 +2522,7 @@ static int sde_wb_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
 			goto end;
 		}
 
-		if (IS_SDE_MAJOR_MINOR_SAME((sde_cfg->hwversion),
-				SDE_HW_VER_170))
+		if (IS_SDE_MAJOR_MINOR_SAME((sde_cfg->hw_rev), SDE_HW_VER_170))
 			wb->vbif_idx = VBIF_NRT;
 		else
 			wb->vbif_idx = VBIF_RT;
@@ -3805,7 +3800,7 @@ static int sde_pp_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
 	if (rc)
 		goto end;
 
-	major_version = SDE_HW_MAJOR(sde_cfg->hwversion);
+	major_version = SDE_HW_MAJOR(sde_cfg->hw_rev);
 	for (i = 0; i < off_count; i++) {
 		pp = sde_cfg->pingpong + i;
 		sblk = kzalloc(sizeof(*sblk), GFP_KERNEL);
@@ -3927,7 +3922,7 @@ static void _sde_top_parse_dt_helper(struct sde_mdss_cfg *cfg,
 			PROP_VALUE_ACCESS(props->values, MIXER_BLEND, 0) :
 			DEFAULT_SDE_MIXER_BLENDSTAGES;
 
-	cfg->ubwc_version = props->exists[UBWC_VERSION] ?
+	cfg->ubwc_rev = props->exists[UBWC_VERSION] ?
 			SDE_HW_UBWC_VER(PROP_VALUE_ACCESS(props->values,
 			UBWC_VERSION, 0)) : DEFAULT_SDE_UBWC_NONE;
 
@@ -3948,8 +3943,7 @@ static void _sde_top_parse_dt_helper(struct sde_mdss_cfg *cfg,
 			PROP_VALUE_ACCESS(props->values, MACROTILE_MODE, 0) :
 			DEFAULT_SDE_UBWC_MACROTILE_MODE;
 
-	cfg->ubwc_bw_calc_version =
-		PROP_VALUE_ACCESS(props->values, UBWC_BW_CALC_VERSION, 0);
+	cfg->ubwc_bw_calc_rev = PROP_VALUE_ACCESS(props->values, UBWC_BW_CALC_VERSION, 0);
 
 	cfg->mdp[0].ubwc_static = props->exists[UBWC_STATIC] ?
 			PROP_VALUE_ACCESS(props->values, UBWC_STATIC, 0) :
@@ -3984,8 +3978,7 @@ static void _sde_top_parse_dt_helper(struct sde_mdss_cfg *cfg,
 			PIPE_ORDER_VERSION, 0);
 	if (PROP_VALUE_ACCESS(props->values, BASE_LAYER, 0))
 		set_bit(SDE_FEATURE_BASE_LAYER, cfg->features);
-	cfg->qseed_hw_version = PROP_VALUE_ACCESS(props->values,
-			 QSEED_HW_VERSION, 0);
+	cfg->qseed_hw_rev = PROP_VALUE_ACCESS(props->values, QSEED_HW_VERSION, 0);
 	cfg->trusted_vm_env = PROP_VALUE_ACCESS(props->values, TRUSTED_VM_ENV, 0);
 	cfg->max_trusted_vm_displays = PROP_VALUE_ACCESS(props->values,
 			MAX_TRUSTED_VM_DISPLAYS, 0);
@@ -4041,7 +4034,7 @@ static int sde_top_parse_dt(struct device_node *np, struct sde_mdss_cfg *cfg)
 
 	_sde_top_parse_dt_helper(cfg, props);
 
-	major_version = SDE_HW_MAJOR(cfg->hwversion);
+	major_version = SDE_HW_MAJOR(cfg->hw_rev);
 	if (major_version < SDE_HW_MAJOR(SDE_HW_VER_500))
 		set_bit(SDE_MDP_VSYNC_SEL, &cfg->mdp[0].features);
 	else if (major_version < SDE_HW_MAJOR(SDE_HW_VER_810))
@@ -5238,10 +5231,9 @@ static int sde_hw_ver_parse_dt(struct drm_device *dev, struct device_node *np,
 		goto end;
 
 	if (prop_exists[SDE_HW_VERSION])
-		cfg->hwversion = PROP_VALUE_ACCESS(prop_value,
-					SDE_HW_VERSION, 0);
+		cfg->hw_rev = PROP_VALUE_ACCESS(prop_value, SDE_HW_VERSION, 0);
 	else
-		cfg->hwversion = sde_kms_get_hw_version(dev);
+		cfg->hw_rev = sde_kms_get_hw_version(dev);
 
 end:
 	kfree(prop_value);
@@ -5270,7 +5262,7 @@ struct sde_mdss_cfg *sde_hw_catalog_init(struct drm_device *dev)
 	if (rc)
 		goto end;
 
-	rc = _sde_hardware_pre_caps(sde_cfg, sde_cfg->hwversion);
+	rc = _sde_hardware_pre_caps(sde_cfg, sde_cfg->hw_rev);
 	if (rc)
 		goto end;
 
@@ -5366,7 +5358,7 @@ struct sde_mdss_cfg *sde_hw_catalog_init(struct drm_device *dev)
 	if (rc)
 		goto end;
 
-	rc = _sde_hardware_post_caps(sde_cfg, sde_cfg->hwversion);
+	rc = _sde_hardware_post_caps(sde_cfg, sde_cfg->hw_rev);
 	if (rc)
 		goto end;
 

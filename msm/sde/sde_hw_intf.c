@@ -103,7 +103,7 @@ static struct sde_intf_cfg *_intf_offset(enum sde_intf intf,
 			b->base_off = addr;
 			b->blk_off = m->intf[i].base;
 			b->length = m->intf[i].len;
-			b->hwversion = m->hwversion;
+			b->hw_rev = m->hw_rev;
 			b->log_mask = SDE_DBG_MASK_INTF;
 			return &m->intf[i];
 		}
@@ -202,11 +202,8 @@ static u32 sde_hw_intf_get_avr_status(struct sde_hw_intf *ctx)
 static inline void _check_and_set_comp_bit(struct sde_hw_intf *ctx,
 		bool dsc_4hs_merge, bool compression_en, u32 *intf_cfg2)
 {
-	if (((SDE_HW_MAJOR(ctx->mdss->hwversion) >=
-				SDE_HW_MAJOR(SDE_HW_VER_700)) &&
-				compression_en) ||
-			(IS_SDE_MAJOR_SAME(ctx->mdss->hwversion,
-				SDE_HW_VER_600) && dsc_4hs_merge))
+	if (((SDE_HW_MAJOR(ctx->mdss->hw_rev) >= SDE_HW_MAJOR(SDE_HW_VER_700)) && compression_en)
+	    || (IS_SDE_MAJOR_SAME(ctx->mdss->hw_rev, SDE_HW_VER_600) && dsc_4hs_merge))
 		(*intf_cfg2) |= BIT(12);
 	else if (!compression_en)
 		(*intf_cfg2) &= ~BIT(12);

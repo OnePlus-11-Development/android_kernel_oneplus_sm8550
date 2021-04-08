@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 #include <linux/iopoll.h>
 
@@ -279,7 +279,7 @@ static const struct sde_vbif_cfg *_top_offset(enum sde_vbif vbif,
 			b->base_off = addr;
 			b->blk_off = m->vbif[i].base;
 			b->length = m->vbif[i].len;
-			b->hwversion = m->hwversion;
+			b->hw_rev = m->hw_rev;
 			b->log_mask = SDE_DBG_MASK_VBIF;
 			return &m->vbif[i];
 		}

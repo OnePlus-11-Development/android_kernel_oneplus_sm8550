@@ -68,7 +68,7 @@ static struct sde_wb_cfg *_wb_offset(enum sde_wb wb,
 			b->base_off = addr;
 			b->blk_off = m->wb[i].base;
 			b->length = m->wb[i].len;
-			b->hwversion = m->hwversion;
+			b->hw_rev = m->hw_rev;
 			b->log_mask = SDE_DBG_MASK_WB;
 			return &m->wb[i];
 		}
@@ -89,7 +89,7 @@ static void _sde_hw_cwb_ctrl_init(struct sde_mdss_cfg *m,
 	b->base_off = addr;
 	b->blk_off = m->cwb_blk_off;
 	b->length = 0x20;
-	b->hwversion = m->hwversion;
+	b->hw_rev = m->hw_rev;
 	b->log_mask = SDE_DBG_MASK_WB;
 
 	for (i = 0; i < m->pingpong_count; i++) {
@@ -114,7 +114,7 @@ static void _sde_hw_dcwb_ctrl_init(struct sde_mdss_cfg *m,
 	b->base_off = addr;
 	b->blk_off = m->cwb_blk_off;
 	b->length = 0x20;
-	b->hwversion = m->hwversion;
+	b->hw_rev = m->hw_rev;
 	b->log_mask = SDE_DBG_MASK_WB;
 
 	for (i = 0; i < m->dcwb_count; i++) {
@@ -146,7 +146,7 @@ static void _sde_hw_dcwb_pp_ctrl_init(struct sde_mdss_cfg *m,
 				hw_wb->dcwb_pp_hw[dcwb_pp_count].hw.base_off = addr;
 				hw_wb->dcwb_pp_hw[dcwb_pp_count].hw.blk_off = pp_blk->base;
 				hw_wb->dcwb_pp_hw[dcwb_pp_count].hw.length = pp_blk->len;
-				hw_wb->dcwb_pp_hw[dcwb_pp_count].hw.hwversion = m->hwversion;
+				hw_wb->dcwb_pp_hw[dcwb_pp_count].hw.hw_rev = m->hw_rev;
 				hw_wb->dcwb_pp_hw[dcwb_pp_count].hw.log_mask = SDE_DBG_MASK_WB;
 			} else {
 				DRM_ERROR("Invalid dcwb pp count %d more than %d",
@@ -228,11 +228,11 @@ static void sde_hw_wb_setup_format(struct sde_hw_wb *ctx,
 		write_config |= (ctx->mdp->highest_bank_bit << 8);
 		if (fmt->base.pixel_format == DRM_FORMAT_RGB565)
 			write_config |= 0x8;
-		if (IS_UBWC_20_SUPPORTED(ctx->catalog->ubwc_version))
+		if (IS_UBWC_20_SUPPORTED(ctx->catalog->ubwc_rev))
 			SDE_REG_WRITE(c, WB_UBWC_STATIC_CTRL,
 					(ctx->mdp->ubwc_swizzle << 0) |
 					(ctx->mdp->highest_bank_bit << 4));
-		if (IS_UBWC_10_SUPPORTED(ctx->catalog->ubwc_version))
+		if (IS_UBWC_10_SUPPORTED(ctx->catalog->ubwc_rev))
 			SDE_REG_WRITE(c, WB_UBWC_STATIC_CTRL,
 					(ctx->mdp->ubwc_swizzle << 0) |
 					BIT(8) |

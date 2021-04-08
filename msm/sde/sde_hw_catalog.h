@@ -1557,11 +1557,11 @@ struct sde_perf_cfg {
  * this HW version. Contains number of instances,
  * register offsets, capabilities of all the MDSS HW sub-blocks.
  *
- * @hwversion           MDSS HW version
- * @ubwc_version        UBWC feature version (0x0 for not supported)
- * @ubwc_bw_calc_version        indicates how UBWC BW has to be calculated
+ * @hw_rev              MDSS HW revision
+ * @ubwc_rev            UBWC feature version (0x0 for not supported)
+ * @ubwc_bw_calc_rev    indicates how UBWC BW has to be calculated
  * @qseed_sw_lib_rev    qseed SW library version
- * @qseed_hw_version    qseed HW block version
+ * @qseed_hw_rev        qseed HW block version
  * @smart_dma_rev       smartDMA block version
  * @ctl_rev             control path block version
  * @ts_prefill_rev      prefill traffic shaper feature revision
@@ -1651,12 +1651,12 @@ struct sde_perf_cfg {
  * @inline_rot_restricted_formats       restricted formats for inline rotation
  */
 struct sde_mdss_cfg {
-	/* Versions */
-	u32 hwversion;
-	u32 ubwc_version;
-	u32 ubwc_bw_calc_version;
+	/* Block Revisions */
+	u32 hw_rev;
+	u32 ubwc_rev;
+	u32 ubwc_bw_calc_rev;
 	u32 qseed_sw_lib_rev;
-	u32 qseed_hw_version;
+	u32 qseed_hw_rev;
 	u32 smart_dma_rev;
 	u32 ctl_rev;
 	u32 ts_prefill_rev;

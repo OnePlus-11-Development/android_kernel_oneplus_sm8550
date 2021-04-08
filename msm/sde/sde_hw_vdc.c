@@ -368,7 +368,7 @@ static struct sde_vdc_cfg *_vdc_offset(enum sde_vdc vdc,
 			b->base_off = addr;
 			b->blk_off = m->vdc[i].base;
 			b->length = m->vdc[i].len;
-			b->hwversion = m->hwversion;
+			b->hw_rev = m->hw_rev;
 			b->log_mask = SDE_DBG_MASK_VDC;
 			return &m->vdc[i];
 		}

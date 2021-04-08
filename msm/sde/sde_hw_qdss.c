@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2019, 2021, The Linux Foundation. All rights reserved.
  */
 
 #define pr_fmt(fmt)     "[drm:%s:%d] " fmt, __func__, __LINE__
@@ -26,7 +26,7 @@ static struct sde_qdss_cfg *_qdss_offset(enum sde_qdss qdss,
 			b->base_off = addr;
 			b->blk_off = m->qdss[i].base;
 			b->length = m->qdss[i].len;
-			b->hwversion = m->hwversion;
+			b->hw_rev = m->hw_rev;
 			b->log_mask = SDE_DBG_MASK_QDSS;
 			return &m->qdss[i];
 		}

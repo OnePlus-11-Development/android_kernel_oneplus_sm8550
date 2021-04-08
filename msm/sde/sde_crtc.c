@@ -5671,7 +5671,7 @@ static void sde_crtc_setup_capabilities_blob(struct sde_kms_info *info,
 {
 	sde_kms_info_reset(info);
 
-	sde_kms_info_add_keyint(info, "hw_version", catalog->hwversion);
+	sde_kms_info_add_keyint(info, "hw_version", catalog->hw_rev);
 	sde_kms_info_add_keyint(info, "max_linewidth",
 			catalog->max_mixer_width);
 	sde_kms_info_add_keyint(info, "max_blendstages",
@@ -5684,9 +5684,8 @@ static void sde_crtc_setup_capabilities_blob(struct sde_kms_info *info,
 	if (catalog->qseed_sw_lib_rev == SDE_SSPP_SCALER_QSEED3LITE)
 		sde_kms_info_add_keystr(info, "qseed_type", "qseed3lite");
 
-	if (catalog->ubwc_version) {
-		sde_kms_info_add_keyint(info, "UBWC version",
-				catalog->ubwc_version);
+	if (catalog->ubwc_rev) {
+		sde_kms_info_add_keyint(info, "UBWC version", catalog->ubwc_rev);
 		sde_kms_info_add_keyint(info, "UBWC macrotile_mode",
 				catalog->macrotile_mode);
 		sde_kms_info_add_keyint(info, "UBWC highest banking bit",
@@ -5760,9 +5759,8 @@ static void sde_crtc_setup_capabilities_blob(struct sde_kms_info *info,
 	sde_kms_info_add_keyint(info, "sec_ui_blendstage",
 			catalog->sui_supported_blendstage);
 
-	if (catalog->ubwc_bw_calc_version)
-		sde_kms_info_add_keyint(info, "ubwc_bw_calc_ver",
-				catalog->ubwc_bw_calc_version);
+	if (catalog->ubwc_bw_calc_rev)
+		sde_kms_info_add_keyint(info, "ubwc_bw_calc_ver", catalog->ubwc_bw_calc_rev);
 }
 
 /**

@@ -27,14 +27,14 @@ struct sde_format_extended;
  * @blk_off:      pipe offset relative to mdss offset
  * @length        length of register block offset
  * @xin_id        xin id
- * @hwversion     mdss hw version number
+ * @hw_rev     mdss hw revision
  */
 struct sde_hw_blk_reg_map {
 	void __iomem *base_off;
 	u32 blk_off;
 	u32 length;
 	u32 xin_id;
-	u32 hwversion;
+	u32 hw_rev;
 	u32 log_mask;
 };
 

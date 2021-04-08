@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
 #include "sde_hw_ds.h"
@@ -71,7 +71,7 @@ static struct sde_ds_cfg *_ds_offset(enum sde_ds ds,
 			b->base_off = addr;
 			b->blk_off = m->ds[i].top->base;
 			b->length = m->ds[i].top->len;
-			b->hwversion = m->hwversion;
+			b->hw_rev = m->hw_rev;
 			b->log_mask = SDE_DBG_MASK_DS;
 			return &m->ds[i];
 		}
@@ -112,8 +112,8 @@ struct sde_hw_ds *sde_hw_ds_init(enum sde_ds idx,
 	hw_ds->scl = cfg;
 	_setup_ds_ops(&hw_ds->ops, hw_ds->scl->features);
 
-	if (m->qseed_hw_version)
-		hw_ds->scl->version = m->qseed_hw_version;
+	if (m->qseed_hw_rev)
+		hw_ds->scl->version = m->qseed_hw_rev;
 
 	rc = sde_hw_blk_init(&hw_ds->base, SDE_HW_BLK_DS, idx, &sde_hw_ops);
 	if (rc) {

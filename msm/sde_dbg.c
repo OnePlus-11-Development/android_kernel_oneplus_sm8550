@@ -2312,7 +2312,7 @@ static void _sde_dbg_debugfs_destroy(void)
 {
 }
 
-void sde_dbg_init_dbg_buses(u32 hwversion)
+void sde_dbg_init_dbg_buses(u32 hw_rev)
 {
 	static struct sde_dbg_base *dbg = &sde_dbg_base;
 

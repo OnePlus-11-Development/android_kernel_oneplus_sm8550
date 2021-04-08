@@ -320,20 +320,19 @@ static void sde_hw_sspp_setup_ubwc(struct sde_hw_pipe *ctx, struct sde_hw_blk_re
 	else
 		ubwc_ctrl_off = SSPP_UBWC_STATIC_CTRL_REC1;
 
-	if (IS_UBWC_40_SUPPORTED(ctx->catalog->ubwc_version)) {
-		SDE_REG_WRITE(c, ubwc_ctrl_off,
-			SDE_FORMAT_IS_YUV(fmt) ? 0 : BIT(30));
-	} else if (IS_UBWC_30_SUPPORTED(ctx->catalog->ubwc_version)) {
+	if (IS_UBWC_40_SUPPORTED(ctx->catalog->ubwc_rev)) {
+		SDE_REG_WRITE(c, ubwc_ctrl_off, SDE_FORMAT_IS_YUV(fmt) ? 0 : BIT(30));
+	} else if (IS_UBWC_30_SUPPORTED(ctx->catalog->ubwc_rev)) {
 		color_en_mask = const_color_en ? BIT(30) : 0;
 		SDE_REG_WRITE(c, ubwc_ctrl_off,
 			color_en_mask | (ctx->mdp->ubwc_swizzle) |
 			(ctx->mdp->highest_bank_bit << 4));
-	} else if (IS_UBWC_20_SUPPORTED(ctx->catalog->ubwc_version)) {
+	} else if (IS_UBWC_20_SUPPORTED(ctx->catalog->ubwc_rev)) {
 		alpha_en_mask = const_alpha_en ? BIT(31) : 0;
 		SDE_REG_WRITE(c, ubwc_ctrl_off,
 			alpha_en_mask | (ctx->mdp->ubwc_swizzle) |
 			(ctx->mdp->highest_bank_bit << 4));
-	} else if (IS_UBWC_10_SUPPORTED(ctx->catalog->ubwc_version)) {
+	} else if (IS_UBWC_10_SUPPORTED(ctx->catalog->ubwc_rev)) {
 		alpha_en_mask = const_alpha_en ? BIT(31) : 0;
 		SDE_REG_WRITE(c, ubwc_ctrl_off,
 			alpha_en_mask | (ctx->mdp->ubwc_swizzle & 0x1) |
@@ -1490,7 +1489,7 @@ static struct sde_sspp_cfg *_sspp_offset(enum sde_sspp sspp,
 				b->base_off = addr;
 				b->blk_off = catalog->sspp[i].base;
 				b->length = catalog->sspp[i].len;
-				b->hwversion = catalog->hwversion;
+				b->hw_rev = catalog->hw_rev;
 				b->log_mask = SDE_DBG_MASK_SSPP;
 
 				/* Only shallow copy is needed */
@@ -1541,9 +1540,9 @@ struct sde_hw_pipe *sde_hw_sspp_init(enum sde_sspp idx,
 	_setup_layer_ops(hw_pipe, hw_pipe->cap->features,
 		hw_pipe->cap->perf_features, is_virtual_pipe);
 
-	if (catalog->qseed_hw_version)
+	if (catalog->qseed_hw_rev)
 		sde_init_scaler_blk(&hw_pipe->cap->sblk->scaler_blk,
-			catalog->qseed_hw_version);
+			catalog->qseed_hw_rev);
 
 	rc = sde_hw_blk_init(&hw_pipe->base, SDE_HW_BLK_SSPP, idx, &sde_hw_ops);
 	if (rc) {

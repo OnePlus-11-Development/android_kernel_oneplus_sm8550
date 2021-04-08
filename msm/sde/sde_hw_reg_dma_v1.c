@@ -31,7 +31,7 @@
 			break; \
 		(hw).base_off = (reg_dma)->addr; \
 		(hw).blk_off = (reg_dma)->caps->reg_dma_blks[(i)].base; \
-		(hw).hwversion = (reg_dma)->caps->version; \
+		(hw).hw_rev = (reg_dma)->caps->version; \
 		(hw).log_mask = SDE_DBG_MASK_REGDMA; \
 } while (0)
 
@@ -677,7 +677,7 @@ static int write_kick_off_v1(struct sde_reg_dma_kickoff_cfg *cfg)
 	else if (cfg->dma_type == REG_DMA_TYPE_SB)
 		SET_UP_REG_DMA_REG(hw, reg_dma, REG_DMA_TYPE_SB);
 
-	if (hw.hwversion == 0) {
+	if (hw.hw_rev == 0) {
 		DRM_ERROR("DMA type %d is unsupported\n", cfg->dma_type);
 		return -EOPNOTSUPP;
 	}
@@ -964,7 +964,7 @@ int reset_v1(struct sde_hw_ctl *ctl)
 	for (k = 0; k < REG_DMA_TYPE_MAX; k++) {
 		memset(&hw, 0, sizeof(hw));
 		SET_UP_REG_DMA_REG(hw, reg_dma, k);
-		if (hw.hwversion == 0)
+		if (hw.hw_rev == 0)
 			continue;
 
 		SDE_REG_WRITE(&hw, reg_dma_opmode_offset, BIT(0));
@@ -1263,7 +1263,7 @@ static void dump_regs_v1(void)
 	for (k = 0; k < REG_DMA_TYPE_MAX; k++) {
 		memset(&hw, 0, sizeof(hw));
 		SET_UP_REG_DMA_REG(hw, reg_dma, k);
-		if (hw.hwversion == 0)
+		if (hw.hw_rev == 0)
 			continue;
 
 		for (i = 0; i < reg_dma_register_count; i++) {

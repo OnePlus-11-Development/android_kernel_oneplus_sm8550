@@ -2611,7 +2611,7 @@ static int _sde_plane_sspp_atomic_check_helper(struct sde_plane *psde,
 				dst.x, dst.y, dst.w, dst.h);
 		ret = -EINVAL;
 	} else if (SDE_FORMAT_IS_UBWC(fmt) &&
-		!psde->catalog->ubwc_version) {
+		!psde->catalog->ubwc_rev) {
 		SDE_ERROR_PLANE(psde, "ubwc not supported\n");
 		ret = -EINVAL;
 	}
@@ -3685,9 +3685,8 @@ static void _sde_plane_setup_capabilities_blob(struct sde_plane *psde,
 		sde_kms_info_stop(info);
 	}
 
-	if (psde->pipe_hw && catalog->qseed_hw_version)
-		sde_kms_info_add_keyint(info, "scaler_step_ver",
-			catalog->qseed_hw_version);
+	if (psde->pipe_hw && catalog->qseed_hw_rev)
+		sde_kms_info_add_keyint(info, "scaler_step_ver", catalog->qseed_hw_rev);
 
 	sde_kms_info_add_keyint(info, "max_linewidth",
 			psde->pipe_sblk->maxlinewidth);

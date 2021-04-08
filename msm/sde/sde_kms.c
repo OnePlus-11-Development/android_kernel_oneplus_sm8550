@@ -4624,7 +4624,7 @@ static int _sde_kms_hw_init_blocks(struct sde_kms *sde_kms,
 		sde_kms->catalog = NULL;
 		goto power_error;
 	}
-	sde_kms->core_rev = sde_kms->catalog->hwversion;
+	sde_kms->core_rev = sde_kms->catalog->hw_rev;
 
 	pr_info("sde hardware revision:0x%x\n", sde_kms->core_rev);
 

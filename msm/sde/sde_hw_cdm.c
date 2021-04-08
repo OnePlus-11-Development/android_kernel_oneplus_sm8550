@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
 #include "sde_hw_mdss.h"
@@ -77,7 +77,7 @@ static struct sde_cdm_cfg *_cdm_offset(enum sde_cdm cdm,
 			b->base_off = addr;
 			b->blk_off = m->cdm[i].base;
 			b->length = m->cdm[i].len;
-			b->hwversion = m->hwversion;
+			b->hw_rev = m->hw_rev;
 			b->log_mask = SDE_DBG_MASK_CDM;
 			return &m->cdm[i];
 		}

@@ -900,7 +900,7 @@ static struct sde_mdss_base_cfg *__intr_offset(struct sde_mdss_cfg *m,
 
 	hw->base_off = addr;
 	hw->blk_off = m->mdss[0].base;
-	hw->hwversion = m->hwversion;
+	hw->hw_rev = m->hw_rev;
 	return &m->mdss[0];
 }
 

@@ -52,7 +52,7 @@ static struct sde_merge_3d_cfg *_merge_3d_offset(enum sde_merge_3d idx,
 			b->base_off = addr;
 			b->blk_off = m->merge_3d[i].base;
 			b->length = m->merge_3d[i].len;
-			b->hwversion = m->hwversion;
+			b->hw_rev = m->hw_rev;
 			b->log_mask = SDE_DBG_MASK_PINGPONG;
 			return &m->merge_3d[i];
 		}
@@ -146,7 +146,7 @@ static struct sde_pingpong_cfg *_pingpong_offset(enum sde_pingpong pp,
 			b->base_off = addr;
 			b->blk_off = m->pingpong[i].base;
 			b->length = m->pingpong[i].len;
-			b->hwversion = m->hwversion;
+			b->hw_rev = m->hw_rev;
 			b->log_mask = SDE_DBG_MASK_PINGPONG;
 			return &m->pingpong[i];
 		}
