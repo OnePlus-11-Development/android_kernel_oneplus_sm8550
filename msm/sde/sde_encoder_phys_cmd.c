@@ -1708,13 +1708,10 @@ static void _sde_encoder_autorefresh_disable_seq1(
 	/*
 	 * If autorefresh is enabled, disable it and make sure it is safe to
 	 * proceed with current frame commit/push. Sequence fallowed is,
-	 * 1. Disable TE - caller will take care of it
-	 * 2. Disable autorefresh config
-	 * 4. Poll for frame transfer ongoing to be false
-	 * 5. Enable TE back - caller will take care of it
+	 * 1. Disable TE & autorefresh - caller will take care of it
+	 * 2. Poll for frame transfer ongoing to be false
+	 * 3. Enable TE back - caller will take care of it
 	 */
-	_sde_encoder_phys_cmd_config_autorefresh(phys_enc, 0);
-
 	do {
 		udelay(AUTOREFRESH_SEQ1_POLL_TIME);
 		if ((trial * AUTOREFRESH_SEQ1_POLL_TIME)
@@ -1806,13 +1803,10 @@ static void _sde_encoder_autorefresh_disable_seq2(
 static void sde_encoder_phys_cmd_prepare_commit(
 		struct sde_encoder_phys *phys_enc)
 {
-	struct sde_encoder_phys_cmd *cmd_enc =
-		to_sde_encoder_phys_cmd(phys_enc);
+	struct sde_encoder_phys_cmd *cmd_enc = to_sde_encoder_phys_cmd(phys_enc);
+	struct sde_kms *sde_kms = phys_enc->sde_kms;
 
-	if (!phys_enc)
-		return;
-
-	if (!sde_encoder_phys_cmd_is_master(phys_enc))
+	if (!phys_enc || !sde_encoder_phys_cmd_is_master(phys_enc))
 		return;
 
 	SDE_EVT32(DRMID(phys_enc->parent), phys_enc->intf_idx - INTF_0,
@@ -1822,8 +1816,12 @@ static void sde_encoder_phys_cmd_prepare_commit(
 		return;
 
 	sde_encoder_phys_cmd_connect_te(phys_enc, false);
-	_sde_encoder_autorefresh_disable_seq1(phys_enc);
-	_sde_encoder_autorefresh_disable_seq2(phys_enc);
+	_sde_encoder_phys_cmd_config_autorefresh(phys_enc, 0);
+	if (sde_kms && sde_kms->catalog &&
+			(sde_kms->catalog->autorefresh_disable_seq == AUTOREFRESH_DISABLE_SEQ1)) {
+		_sde_encoder_autorefresh_disable_seq1(phys_enc);
+		_sde_encoder_autorefresh_disable_seq2(phys_enc);
+	}
 	sde_encoder_phys_cmd_connect_te(phys_enc, true);
 
 	SDE_DEBUG_CMDENC(cmd_enc, "autorefresh disabled successfully\n");

@@ -5114,6 +5114,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		set_bit(SDE_FEATURE_AVR_STEP, sde_cfg->features);
 		set_bit(SDE_FEATURE_VBIF_CLK_SPLIT, sde_cfg->features);
 		sde_cfg->allowed_dsc_reservation_switch = SDE_DP_DSC_RESERVATION_SWITCH;
+		sde_cfg->autorefresh_disable_seq = AUTOREFRESH_DISABLE_SEQ2;
 		sde_cfg->perf.min_prefill_lines = 40;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;

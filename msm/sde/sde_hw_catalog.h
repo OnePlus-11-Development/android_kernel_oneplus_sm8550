@@ -1519,6 +1519,17 @@ struct sde_sc_cfg {
 };
 
 /**
+ * autorefresh_disable_sequence - defines autorefresh disable sequences
+ * followed during bootup with continuous splash
+ * @AUTOREFRESH_DISABLE_SEQ1 - disable TE / disable autorefresh / Wait for tx-complete / enable TE
+ * @AUTOREFRESH_DISABLE_SEQ2 - disable TE / Disable autorefresh / enable TE
+ */
+enum autorefresh_disable_sequence {
+	AUTOREFRESH_DISABLE_SEQ1,
+	AUTOREFRESH_DISABLE_SEQ2,
+};
+
+/**
  * struct sde_perf_cfg - performance control settings
  * @max_bw_low         low threshold of maximum bandwidth (kbps)
  * @max_bw_high        high threshold of maximum bandwidth (kbps)
@@ -1675,6 +1686,7 @@ struct sde_perf_cfg {
  * @pipe_order_type     indicates if it is required to specify pipe order
  * @csc_type            csc or csc_10bit support
  * @allowed_dsc_reservation_switch      intf to which dsc reservation switch is supported
+ * @autorefresh_disable_seq    indicates the autorefresh disable sequence; default is seq1
  * @sc_cfg              system cache configuration
  * @perf                performance control settings
  * @uidle_cfg           settings for uidle feature
@@ -1778,6 +1790,7 @@ struct sde_mdss_cfg {
 	u32 pipe_order_type;
 	u32 csc_type;
 	u32 allowed_dsc_reservation_switch;
+	enum autorefresh_disable_sequence autorefresh_disable_seq;
 	struct sde_sc_cfg sc_cfg[SDE_SYS_CACHE_MAX];
 	struct sde_perf_cfg perf;
 	struct sde_uidle_cfg uidle_cfg;
