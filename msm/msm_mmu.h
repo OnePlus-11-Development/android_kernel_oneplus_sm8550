@@ -72,16 +72,8 @@ static inline void msm_mmu_init(struct msm_mmu *mmu, struct device *dev,
 	mmu->funcs = funcs;
 }
 
-struct msm_mmu *msm_iommu_new(struct device *dev, struct iommu_domain *domain);
 struct msm_mmu *msm_smmu_new(struct device *dev,
 	enum msm_mmu_domain_type domain);
-
-static inline void msm_mmu_set_fault_handler(struct msm_mmu *mmu, void *arg,
-		int (*handler)(void *arg, unsigned long iova, int flags))
-{
-	mmu->arg = arg;
-	mmu->handler = handler;
-}
 
 /* SDE smmu driver initialize and cleanup functions */
 int __init msm_smmu_driver_init(void);

@@ -208,7 +208,6 @@ msm_drm-$(CONFIG_THERMAL_OF) += msm_cooling_device.o
 
 msm_drm-$(CONFIG_DRM_MSM) += msm_atomic.o \
 			     msm_fb.o \
-			     msm_iommu.o \
 			     msm_drv.o \
 			     msm_gem.o \
 			     msm_gem_prime.o \

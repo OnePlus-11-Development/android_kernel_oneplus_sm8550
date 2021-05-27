@@ -78,14 +78,6 @@ void msm_gem_prime_unpin(struct drm_gem_object *obj)
 		msm_gem_put_pages(obj);
 }
 
-struct dma_resv *msm_gem_prime_res_obj(struct drm_gem_object *obj)
-{
-	struct msm_gem_object *msm_obj = to_msm_bo(obj);
-
-	return msm_obj->resv;
-}
-
-
 struct drm_gem_object *msm_gem_prime_import(struct drm_device *dev,
 					    struct dma_buf *dma_buf)
 {

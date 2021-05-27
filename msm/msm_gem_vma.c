@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2019, 2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2016 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
  *
@@ -285,31 +285,6 @@ static const struct msm_gem_aspace_ops msm_iommu_aspace_ops = {
 	.unmap = iommu_aspace_unmap_vma,
 	.destroy = iommu_aspace_destroy,
 };
-
-struct msm_gem_address_space *
-msm_gem_address_space_create(struct device *dev, struct iommu_domain *domain,
-		const char *name)
-{
-	struct msm_gem_address_space *aspace;
-	u64 size = domain->geometry.aperture_end -
-		domain->geometry.aperture_start;
-
-	aspace = kzalloc(sizeof(*aspace), GFP_KERNEL);
-	if (!aspace)
-		return ERR_PTR(-ENOMEM);
-
-	spin_lock_init(&aspace->lock);
-	aspace->name = name;
-	aspace->mmu = msm_iommu_new(dev, domain);
-	aspace->ops = &msm_iommu_aspace_ops;
-
-	drm_mm_init(&aspace->mm, (domain->geometry.aperture_start >> PAGE_SHIFT),
-		size >> PAGE_SHIFT);
-
-	kref_init(&aspace->kref);
-
-	return aspace;
-}
 
 int
 msm_gem_map_vma(struct msm_gem_address_space *aspace,

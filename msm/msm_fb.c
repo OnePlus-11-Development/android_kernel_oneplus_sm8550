@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
  *
@@ -37,63 +37,6 @@ static const struct drm_framebuffer_funcs msm_framebuffer_funcs = {
 	.destroy = drm_gem_fb_destroy,
 	.dirty = drm_atomic_helper_dirtyfb,
 };
-
-#ifdef CONFIG_DEBUG_FS
-void msm_framebuffer_describe(struct drm_framebuffer *fb, struct seq_file *m)
-{
-	struct msm_framebuffer *msm_fb;
-	int i, n;
-
-	if (!fb) {
-		DRM_ERROR("from:%pS null fb\n", __builtin_return_address(0));
-		return;
-	}
-
-	msm_fb = to_msm_framebuffer(fb);
-	n = fb->format->num_planes;
-	seq_printf(m, "fb: %dx%d@%4.4s (%2d, ID:%d)\n",
-			fb->width, fb->height, (char *)&fb->format->format,
-			drm_framebuffer_read_refcount(fb), fb->base.id);
-
-	for (i = 0; i < n; i++) {
-		seq_printf(m, "   %d: offset=%d pitch=%d, obj: ",
-				i, fb->offsets[i], fb->pitches[i]);
-		msm_gem_describe(fb->obj[i], m);
-	}
-}
-#endif
-
-void msm_framebuffer_set_keepattrs(struct drm_framebuffer *fb, bool enable)
-{
-	struct msm_framebuffer *msm_fb;
-	int i, n;
-	struct drm_gem_object *bo;
-	struct msm_gem_object *msm_obj;
-
-	if (!fb) {
-		DRM_ERROR("from:%pS null fb\n", __builtin_return_address(0));
-		return;
-	}
-
-	if (!fb->format) {
-		DRM_ERROR("from:%pS null fb->format\n",
-				__builtin_return_address(0));
-		return;
-	}
-
-	msm_fb = to_msm_framebuffer(fb);
-	n = fb->format->num_planes;
-	for (i = 0; i < n; i++) {
-		bo = msm_framebuffer_bo(fb, i);
-		if (bo) {
-			msm_obj = to_msm_bo(bo);
-			if (enable)
-				msm_obj->flags |= MSM_BO_KEEPATTRS;
-			else
-				msm_obj->flags &= ~MSM_BO_KEEPATTRS;
-		}
-	}
-}
 
 /* prepare/pin all the fb's bo's for scanout.  Note that it is not valid
  * to prepare an fb more multiple different initiator 'id's.  But that
@@ -338,44 +281,3 @@ fail:
 	return ERR_PTR(ret);
 }
 
-struct drm_framebuffer *
-msm_alloc_stolen_fb(struct drm_device *dev, int w, int h, int p, uint32_t format)
-{
-	struct drm_mode_fb_cmd2 mode_cmd = {
-		.pixel_format = format,
-		.width = w,
-		.height = h,
-		.pitches = { p },
-	};
-	struct drm_gem_object *bo;
-	struct drm_framebuffer *fb;
-	int size;
-
-	/* allocate backing bo */
-	size = mode_cmd.pitches[0] * mode_cmd.height;
-	DBG("allocating %d bytes for fb %d", size, dev->primary->index);
-	bo = msm_gem_new(dev, size, MSM_BO_SCANOUT | MSM_BO_WC | MSM_BO_STOLEN);
-	if (IS_ERR(bo)) {
-		dev_warn(dev->dev, "could not allocate stolen bo\n");
-		/* try regular bo: */
-		bo = msm_gem_new(dev, size, MSM_BO_SCANOUT | MSM_BO_WC);
-	}
-	if (IS_ERR(bo)) {
-		dev_err(dev->dev, "failed to allocate buffer object\n");
-		return ERR_CAST(bo);
-	}
-
-	msm_gem_object_set_name(bo, "stolenfb");
-
-	fb = msm_framebuffer_init(dev, &mode_cmd, &bo);
-	if (IS_ERR(fb)) {
-		dev_err(dev->dev, "failed to allocate fb\n");
-		/* note: if fb creation failed, we can't rely on fb destroy
-		 * to unref the bo:
-		 */
-		drm_gem_object_put(bo);
-		return ERR_CAST(fb);
-	}
-
-	return fb;
-}
