@@ -10,7 +10,6 @@
 #include "sde_hw_util.h"
 #include "sde_hw_catalog.h"
 #include "sde_hw_sspp.h"
-#include "sde_hw_blk.h"
 
 #define INVALID_CTL_STATUS 0xfffff88e
 #define CTL_MAX_DSPP_COUNT (DSPP_MAX - DSPP_0)
@@ -478,7 +477,6 @@ struct sde_hw_ctl_ops {
  * @ops: operation list
  */
 struct sde_hw_ctl {
-	struct sde_hw_blk base;
 	struct sde_hw_blk_reg_map hw;
 
 	/* ctl path */
@@ -493,13 +491,13 @@ struct sde_hw_ctl {
 };
 
 /**
- * sde_hw_ctl - convert base object sde_hw_base to container
- * @hw: Pointer to base hardware block
+ * to_sde_hw_ctl - convert base hw object to sde_hw_ctl container
+ * @hw: Pointer to hardware block register map object
  * return: Pointer to hardware block container
  */
-static inline struct sde_hw_ctl *to_sde_hw_ctl(struct sde_hw_blk *hw)
+static inline struct sde_hw_ctl *to_sde_hw_ctl(struct sde_hw_blk_reg_map *hw)
 {
-	return container_of(hw, struct sde_hw_ctl, base);
+	return container_of(hw, struct sde_hw_ctl, hw);
 }
 
 /**
@@ -509,14 +507,14 @@ static inline struct sde_hw_ctl *to_sde_hw_ctl(struct sde_hw_blk *hw)
  * @addr: mapped register io address of MDP
  * @m :   pointer to mdss catalog data
  */
-struct sde_hw_ctl *sde_hw_ctl_init(enum sde_ctl idx,
+struct sde_hw_blk_reg_map *sde_hw_ctl_init(enum sde_ctl idx,
 		void __iomem *addr,
 		struct sde_mdss_cfg *m);
 
 /**
  * sde_hw_ctl_destroy(): Destroys ctl driver context
- * should be called to free the context
+ * @hw: Pointer to hardware block register map object
  */
-void sde_hw_ctl_destroy(struct sde_hw_ctl *ctx);
+void sde_hw_ctl_destroy(struct sde_hw_blk_reg_map *hw);
 
 #endif /*_SDE_HW_CTL_H */

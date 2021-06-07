@@ -400,18 +400,12 @@ static void _setup_mixer_ops(struct sde_mdss_cfg *m,
 		ops->setup_noise_layer = sde_hw_lm_setup_noise_layer;
 };
 
-static struct sde_hw_blk_ops sde_hw_ops = {
-	.start = NULL,
-	.stop = NULL,
-};
-
-struct sde_hw_mixer *sde_hw_lm_init(enum sde_lm idx,
+struct sde_hw_blk_reg_map *sde_hw_lm_init(enum sde_lm idx,
 		void __iomem *addr,
 		struct sde_mdss_cfg *m)
 {
 	struct sde_hw_mixer *c;
 	struct sde_lm_cfg *cfg;
-	int rc;
 
 	c = kzalloc(sizeof(*c), GFP_KERNEL);
 	if (!c)
@@ -427,32 +421,21 @@ struct sde_hw_mixer *sde_hw_lm_init(enum sde_lm idx,
 	c->idx = idx;
 	c->cap = cfg;
 
-	rc = sde_hw_blk_init(&c->base, SDE_HW_BLK_LM, idx, &sde_hw_ops);
-	if (rc) {
-		SDE_ERROR("failed to init hw blk %d\n", rc);
-		goto blk_init_error;
-	}
-
-	/* Dummy mixers should not setup ops and not be added to dump range */
+	/* Dummy mixers should not setup ops nor add to dump ranges */
 	if (cfg->dummy_mixer)
-		return c;
+		goto done;
 
 	_setup_mixer_ops(m, &c->ops, c->cap->features);
 
 	sde_dbg_reg_register_dump_range(SDE_DBG_NAME, cfg->name, c->hw.blk_off,
 			c->hw.blk_off + c->hw.length, c->hw.xin_id);
 
-	return c;
-
-blk_init_error:
-	kfree(c);
-
-	return ERR_PTR(rc);
+done:
+	return &c->hw;
 }
 
-void sde_hw_lm_destroy(struct sde_hw_mixer *lm)
+void sde_hw_lm_destroy(struct sde_hw_blk_reg_map *hw)
 {
-	if (lm)
-		sde_hw_blk_destroy(&lm->base);
-	kfree(lm);
+	if (hw)
+		kfree(to_sde_hw_mixer(hw));
 }

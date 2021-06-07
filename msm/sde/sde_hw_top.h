@@ -9,7 +9,6 @@
 #include "sde_hw_catalog.h"
 #include "sde_hw_mdss.h"
 #include "sde_hw_util.h"
-#include "sde_hw_blk.h"
 
 struct sde_hw_mdp;
 
@@ -204,7 +203,6 @@ struct sde_hw_mdp_ops {
 };
 
 struct sde_hw_mdp {
-	struct sde_hw_blk base;
 	struct sde_hw_blk_reg_map hw;
 
 	/* top */
@@ -249,16 +247,6 @@ void sde_hw_set_sspp_sid(struct sde_hw_sid *sid, u32 pipe, u32 vm);
  * vm: vm id to set for SIDs
  */
 void sde_hw_set_lutdma_sid(struct sde_hw_sid *sid, u32 vm);
-
-/**
- * to_sde_hw_mdp - convert base object sde_hw_base to container
- * @hw: Pointer to base hardware block
- * return: Pointer to hardware block container
- */
-static inline struct sde_hw_mdp *to_sde_hw_mdp(struct sde_hw_blk *hw)
-{
-	return container_of(hw, struct sde_hw_mdp, base);
-}
 
 /**
  * sde_hw_mdptop_init - initializes the top driver for the passed idx

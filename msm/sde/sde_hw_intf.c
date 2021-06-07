@@ -905,18 +905,12 @@ static void _setup_intf_ops(struct sde_hw_intf_ops *ops,
 		ops->get_vsync_timestamp = sde_hw_intf_get_vsync_timestamp;
 }
 
-static struct sde_hw_blk_ops sde_hw_ops = {
-	.start = NULL,
-	.stop = NULL,
-};
-
-struct sde_hw_intf *sde_hw_intf_init(enum sde_intf idx,
+struct sde_hw_blk_reg_map *sde_hw_intf_init(enum sde_intf idx,
 		void __iomem *addr,
 		struct sde_mdss_cfg *m)
 {
 	struct sde_hw_intf *c;
 	struct sde_intf_cfg *cfg;
-	int rc;
 
 	c = kzalloc(sizeof(*c), GFP_KERNEL);
 	if (!c)
@@ -937,27 +931,15 @@ struct sde_hw_intf *sde_hw_intf_init(enum sde_intf idx,
 	c->mdss = m;
 	_setup_intf_ops(&c->ops, c->cap->features);
 
-	rc = sde_hw_blk_init(&c->base, SDE_HW_BLK_INTF, idx, &sde_hw_ops);
-	if (rc) {
-		SDE_ERROR("failed to init hw blk %d\n", rc);
-		goto blk_init_error;
-	}
-
 	sde_dbg_reg_register_dump_range(SDE_DBG_NAME, cfg->name, c->hw.blk_off,
 			c->hw.blk_off + c->hw.length, c->hw.xin_id);
 
-	return c;
-
-blk_init_error:
-	kfree(c);
-
-	return ERR_PTR(rc);
+	return &c->hw;
 }
 
-void sde_hw_intf_destroy(struct sde_hw_intf *intf)
+void sde_hw_intf_destroy(struct sde_hw_blk_reg_map *hw)
 {
-	if (intf)
-		sde_hw_blk_destroy(&intf->base);
-	kfree(intf);
+	if (hw)
+		kfree(to_sde_hw_intf(hw));
 }
 

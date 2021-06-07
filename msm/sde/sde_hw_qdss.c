@@ -52,18 +52,12 @@ static void _setup_qdss_ops(struct sde_hw_qdss_ops *ops)
 	ops->enable_qdss_events = sde_hw_qdss_enable_qdss_events;
 }
 
-static struct sde_hw_blk_ops sde_hw_ops = {
-	.start = NULL,
-	.stop = NULL,
-};
-
-struct sde_hw_qdss *sde_hw_qdss_init(enum sde_qdss idx,
+struct sde_hw_blk_reg_map *sde_hw_qdss_init(enum sde_qdss idx,
 			void __iomem *addr,
 			struct sde_mdss_cfg *m)
 {
 	struct sde_hw_qdss *c;
 	struct sde_qdss_cfg *cfg;
-	int rc;
 
 	c = kzalloc(sizeof(*c), GFP_KERNEL);
 	if (!c)
@@ -79,22 +73,14 @@ struct sde_hw_qdss *sde_hw_qdss_init(enum sde_qdss idx,
 	c->caps = cfg;
 	_setup_qdss_ops(&c->ops);
 
-	rc = sde_hw_blk_init(&c->base, SDE_HW_BLK_QDSS, idx, &sde_hw_ops);
-	if (rc) {
-		SDE_ERROR("failed to init hw blk %d\n", rc);
-		kfree(c);
-		return ERR_PTR(rc);
-	}
-
 	sde_dbg_reg_register_dump_range(SDE_DBG_NAME, cfg->name, c->hw.blk_off,
 			c->hw.blk_off + c->hw.length, c->hw.xin_id);
 
-	return c;
+	return &c->hw;
 }
 
-void sde_hw_qdss_destroy(struct sde_hw_qdss *qdss)
+void sde_hw_qdss_destroy(struct sde_hw_blk_reg_map *hw)
 {
-	if (qdss)
-		sde_hw_blk_destroy(&qdss->base);
-	kfree(qdss);
+	if (hw)
+		kfree(to_sde_hw_qdss(hw));
 }

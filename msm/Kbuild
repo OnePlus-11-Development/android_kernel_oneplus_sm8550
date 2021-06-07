@@ -159,7 +159,6 @@ msm_drm-$(CONFIG_DRM_MSM_SDE) += sde/sde_crtc.o \
 				 sde/sde_hw_top.o \
 				 sde/sde_hw_interrupts.o \
 				 sde/sde_hw_vbif.o \
-				 sde/sde_hw_blk.o \
 				 sde/sde_formats.o \
 				 sde_power_handle.o \
 				 sde/sde_hw_color_processing_v1_7.o \

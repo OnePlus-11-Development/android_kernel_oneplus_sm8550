@@ -385,18 +385,12 @@ static void _setup_vdc_ops(struct sde_hw_vdc_ops *ops,
 	ops->bind_pingpong_blk = sde_hw_vdc_bind_pingpong_blk;
 }
 
-static struct sde_hw_blk_ops sde_hw_ops = {
-	.start = NULL,
-	.stop = NULL,
-};
-
-struct sde_hw_vdc *sde_hw_vdc_init(enum sde_vdc idx,
+struct sde_hw_blk_reg_map *sde_hw_vdc_init(enum sde_vdc idx,
 		void __iomem *addr,
 		struct sde_mdss_cfg *m)
 {
 	struct sde_hw_vdc *c;
 	struct sde_vdc_cfg *cfg;
-	int rc;
 	u32 vdc_ctl_reg;
 	char blk_name[32];
 
@@ -414,12 +408,6 @@ struct sde_hw_vdc *sde_hw_vdc_init(enum sde_vdc idx,
 	c->caps = cfg;
 
 	_setup_vdc_ops(&c->ops, c->caps->features);
-
-	rc = sde_hw_blk_init(&c->base, SDE_HW_BLK_VDC, idx, &sde_hw_ops);
-	if (rc) {
-		SDE_ERROR("failed to init hw blk %d\n", rc);
-		goto blk_init_error;
-	}
 
 	if (_vdc_subblk_offset(c, SDE_VDC_CTL, &vdc_ctl_reg)) {
 		SDE_ERROR("vdc ctl not found\n");
@@ -450,18 +438,12 @@ struct sde_hw_vdc *sde_hw_vdc_init(enum sde_vdc idx,
 			c->caps->sblk->ctl.len,
 			c->hw.xin_id);
 
-	return c;
-
-blk_init_error:
-	kfree(c);
-
-	return ERR_PTR(rc);
+	return &c->hw;
 }
 
-void sde_hw_vdc_destroy(struct sde_hw_vdc *vdc)
+void sde_hw_vdc_destroy(struct sde_hw_blk_reg_map *hw)
 {
-	if (vdc) {
-		sde_hw_blk_destroy(&vdc->base);
-		kfree(vdc);
+	if (hw) {
+		kfree(to_sde_hw_vdc(hw));
 	}
 }

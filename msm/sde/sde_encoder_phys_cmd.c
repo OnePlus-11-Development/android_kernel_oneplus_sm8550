@@ -428,7 +428,7 @@ static void sde_encoder_phys_cmd_mode_set(
 	sde_rm_init_hw_iter(&iter, phys_enc->parent->base.id, SDE_HW_BLK_CTL);
 	for (i = 0; i <= instance; i++) {
 		if (sde_rm_get_hw(rm, &iter))
-			phys_enc->hw_ctl = (struct sde_hw_ctl *)iter.hw;
+			phys_enc->hw_ctl = to_sde_hw_ctl(iter.hw);
 	}
 
 	if (IS_ERR_OR_NULL(phys_enc->hw_ctl)) {
@@ -441,7 +441,7 @@ static void sde_encoder_phys_cmd_mode_set(
 	sde_rm_init_hw_iter(&iter, phys_enc->parent->base.id, SDE_HW_BLK_INTF);
 	for (i = 0; i <= instance; i++) {
 		if (sde_rm_get_hw(rm, &iter))
-			phys_enc->hw_intf = (struct sde_hw_intf *)iter.hw;
+			phys_enc->hw_intf = to_sde_hw_intf(iter.hw);
 	}
 
 	if (IS_ERR_OR_NULL(phys_enc->hw_intf)) {

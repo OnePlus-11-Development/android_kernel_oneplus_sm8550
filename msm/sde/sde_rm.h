@@ -196,7 +196,7 @@ struct sde_rm_hw_blk;
  * @type: Hardware Block Type client wishes to search for.
  */
 struct sde_rm_hw_iter {
-	void *hw;
+	struct sde_hw_blk_reg_map *hw;
 	struct sde_rm_hw_blk *blk;
 	uint32_t enc_id;
 	enum sde_hw_blk_type type;
@@ -209,7 +209,7 @@ struct sde_rm_hw_iter {
  * @id: Hardware block id
  */
 struct sde_rm_hw_request {
-	void *hw;
+	struct sde_hw_blk_reg_map *hw;
 	enum sde_hw_blk_type type;
 	int id;
 };
@@ -404,16 +404,6 @@ static inline int sde_rm_topology_get_num_lm(struct sde_rm *rm,
 bool sde_rm_topology_is_group(struct sde_rm *rm,
 		struct drm_crtc_state *state,
 		enum sde_rm_topology_group group);
-
-/**
- * sde_rm_ext_blk_destroy - Given the encoder for the display chain, release
- *	external HW blocks created for that.
- * @rm: SDE Resource Manager handle
- * @enc: DRM Encoder handle
- * @Return: 0 on Success otherwise -ERROR
- */
-int sde_rm_ext_blk_destroy(struct sde_rm *rm,
-				struct drm_encoder *enc);
 
 /**
  * sde_rm_get_resource_info - returns avail hw resource info

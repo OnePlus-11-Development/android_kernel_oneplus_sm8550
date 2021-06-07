@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
 #ifndef _SDE_HW_DS_H
@@ -9,7 +9,6 @@
 #include "sde_hw_mdss.h"
 #include "sde_hw_util.h"
 #include "sde_hw_catalog.h"
-#include "sde_hw_blk.h"
 
 struct sde_hw_ds;
 
@@ -71,12 +70,21 @@ struct sde_hw_ds_ops {
  * @ops  : Pointer to operations for this DS
  */
 struct sde_hw_ds {
-	struct sde_hw_blk base;
 	struct sde_hw_blk_reg_map hw;
 	enum sde_ds idx;
 	struct sde_ds_cfg *scl;
 	struct sde_hw_ds_ops ops;
 };
+
+/**
+ * to_sde_hw_ds - convert base hw object to sde_hw_ds container
+ * @hw: Pointer to hardware block register map object
+ * return: Pointer to hardware block container
+ */
+static inline struct sde_hw_ds *to_sde_hw_ds(struct sde_hw_blk_reg_map *hw)
+{
+	return container_of(hw, struct sde_hw_ds, hw);
+}
 
 /**
  * sde_hw_ds_init - initializes the destination scaler
@@ -87,15 +95,14 @@ struct sde_hw_ds {
  * @m   : MDSS catalog information
  * @Return: pointer to structure or ERR_PTR
  */
-struct sde_hw_ds *sde_hw_ds_init(enum sde_ds idx,
+struct sde_hw_blk_reg_map *sde_hw_ds_init(enum sde_ds idx,
 			void __iomem *addr,
 			struct sde_mdss_cfg *m);
 
 /**
- * sde_hw_ds_destroy - destroys destination scaler
- * driver context
- * @hw_ds:   Pointer to DS context
+ * sde_hw_ds_destroy - destroys destination scaler driver context
+ * @hw: Pointer to hardware block register map object
  */
-void sde_hw_ds_destroy(struct sde_hw_ds *hw_ds);
+void sde_hw_ds_destroy(struct sde_hw_blk_reg_map *hw);
 
 #endif /*_SDE_HW_DS_H */

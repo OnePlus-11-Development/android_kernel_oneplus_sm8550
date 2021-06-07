@@ -35,6 +35,7 @@
 #include "sde_encoder.h"
 #include "sde_encoder_phys.h"
 #include "sde_hw_dsc.h"
+#include "sde_hw_vdc.h"
 #include "sde_crtc.h"
 #include "sde_trace.h"
 #include "sde_core_irq.h"
@@ -2381,7 +2382,7 @@ static void _sde_encoder_virt_populate_hw_res(struct drm_encoder *drm_enc)
 		sde_enc->hw_pp[i] = NULL;
 		if (!sde_rm_get_hw(&sde_kms->rm, &pp_iter))
 			break;
-		sde_enc->hw_pp[i] = (struct sde_hw_pingpong *) pp_iter.hw;
+		sde_enc->hw_pp[i] = to_sde_hw_pingpong(pp_iter.hw);
 	}
 
 	for (i = 0; i < sde_enc->num_phys_encs; i++) {
@@ -2392,8 +2393,7 @@ static void _sde_encoder_virt_populate_hw_res(struct drm_encoder *drm_enc)
 						SDE_HW_BLK_QDSS);
 			for (j = 0; j < QDSS_MAX; j++) {
 				if (sde_rm_get_hw(&sde_kms->rm, &qdss_iter)) {
-					phys->hw_qdss =
-					(struct sde_hw_qdss *)qdss_iter.hw;
+					phys->hw_qdss = to_sde_hw_qdss(qdss_iter.hw);
 					break;
 				}
 			}
@@ -2405,7 +2405,7 @@ static void _sde_encoder_virt_populate_hw_res(struct drm_encoder *drm_enc)
 		sde_enc->hw_dsc[i] = NULL;
 		if (!sde_rm_get_hw(&sde_kms->rm, &dsc_iter))
 			break;
-		sde_enc->hw_dsc[i] = (struct sde_hw_dsc *) dsc_iter.hw;
+		sde_enc->hw_dsc[i] = to_sde_hw_dsc(dsc_iter.hw);
 	}
 
 	sde_rm_init_hw_iter(&vdc_iter, drm_enc->base.id, SDE_HW_BLK_VDC);
@@ -2413,7 +2413,7 @@ static void _sde_encoder_virt_populate_hw_res(struct drm_encoder *drm_enc)
 		sde_enc->hw_vdc[i] = NULL;
 		if (!sde_rm_get_hw(&sde_kms->rm, &vdc_iter))
 			break;
-		sde_enc->hw_vdc[i] = (struct sde_hw_vdc *) vdc_iter.hw;
+		sde_enc->hw_vdc[i] = to_sde_hw_vdc(vdc_iter.hw);
 	}
 
 	/* Get PP for DSC configuration */
@@ -2424,11 +2424,11 @@ static void _sde_encoder_virt_populate_hw_res(struct drm_encoder *drm_enc)
 		if (!sde_enc->hw_dsc[i])
 			continue;
 
-		request_hw.id = sde_enc->hw_dsc[i]->base.id;
+		request_hw.id = sde_enc->hw_dsc[i]->idx;
 		request_hw.type = SDE_HW_BLK_PINGPONG;
 		if (!sde_rm_request_hw_blk(&sde_kms->rm, &request_hw))
 			break;
-		pp = (struct sde_hw_pingpong *) request_hw.hw;
+		pp = to_sde_hw_pingpong(request_hw.hw);
 		features = pp->ops.get_hw_caps(pp);
 
 		if (test_bit(SDE_PINGPONG_DSC, &features))
@@ -4195,8 +4195,7 @@ static int _helper_flush_qsync(struct sde_encoder_phys *phys_enc)
 		sde_rm_init_hw_iter(&rm_iter, drm_enc->base.id,
 				SDE_HW_BLK_INTF);
 		while (sde_rm_get_hw(&phys_enc->sde_kms->rm, &rm_iter)) {
-			struct sde_hw_intf *hw_intf =
-				(struct sde_hw_intf *)rm_iter.hw;
+			struct sde_hw_intf *hw_intf = to_sde_hw_intf(rm_iter.hw);
 
 			if (!hw_intf)
 				continue;
@@ -4218,8 +4217,7 @@ static int _helper_flush_qsync(struct sde_encoder_phys *phys_enc)
 	} else {
 		sde_rm_init_hw_iter(&rm_iter, drm_enc->base.id, SDE_HW_BLK_LM);
 		while (sde_rm_get_hw(&phys_enc->sde_kms->rm, &rm_iter)) {
-			struct sde_hw_mixer *hw_lm =
-					(struct sde_hw_mixer *)rm_iter.hw;
+			struct sde_hw_mixer *hw_lm = to_sde_hw_mixer(rm_iter.hw);
 
 			if (!hw_lm)
 				continue;
@@ -4553,7 +4551,7 @@ int sde_encoder_helper_reset_mixers(struct sde_encoder_phys *phys_enc,
 
 	sde_rm_init_hw_iter(&lm_iter, drm_enc->base.id, SDE_HW_BLK_LM);
 	while (sde_rm_get_hw(&phys_enc->sde_kms->rm, &lm_iter)) {
-		struct sde_hw_mixer *hw_lm = (struct sde_hw_mixer *)lm_iter.hw;
+		struct sde_hw_mixer *hw_lm = to_sde_hw_mixer(lm_iter.hw);
 
 		if (!hw_lm)
 			continue;
@@ -5444,7 +5442,7 @@ static void _sde_encoder_cache_hw_res_cont_splash(
 		sde_enc->hw_pp[i] = NULL;
 		if (!sde_rm_get_hw(&sde_kms->rm, &pp_iter))
 			break;
-		sde_enc->hw_pp[i] = (struct sde_hw_pingpong *) pp_iter.hw;
+		sde_enc->hw_pp[i] = to_sde_hw_pingpong(pp_iter.hw);
 	}
 
 	sde_rm_init_hw_iter(&dsc_iter, encoder->base.id, SDE_HW_BLK_DSC);
@@ -5452,7 +5450,7 @@ static void _sde_encoder_cache_hw_res_cont_splash(
 		sde_enc->hw_dsc[i] = NULL;
 		if (!sde_rm_get_hw(&sde_kms->rm, &dsc_iter))
 			break;
-		sde_enc->hw_dsc[i] = (struct sde_hw_dsc *) dsc_iter.hw;
+		sde_enc->hw_dsc[i] = to_sde_hw_dsc(dsc_iter.hw);
 	}
 
 	/*
@@ -5467,8 +5465,7 @@ static void _sde_encoder_cache_hw_res_cont_splash(
 				SDE_HW_BLK_CTL);
 		for (i = 0; i < sde_enc->num_phys_encs; i++) {
 			if (sde_rm_get_hw(&sde_kms->rm, &ctl_iter)) {
-				phys_enc->hw_ctl =
-					(struct sde_hw_ctl *) ctl_iter.hw;
+				phys_enc->hw_ctl = to_sde_hw_ctl(ctl_iter.hw);
 				pr_debug("HW CTL intf_idx:%d hw_ctl:[0x%pK]\n",
 					phys_enc->intf_idx, phys_enc->hw_ctl);
 			}
@@ -5482,7 +5479,7 @@ static void _sde_encoder_cache_hw_res_cont_splash(
 		phys->hw_intf = NULL;
 		if (!sde_rm_get_hw(&sde_kms->rm, &intf_iter))
 			break;
-		phys->hw_intf = (struct sde_hw_intf *) intf_iter.hw;
+		phys->hw_intf = to_sde_hw_intf(intf_iter.hw);
 	}
 }
 

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
 #ifndef _SDE_HW_VDC_H
@@ -9,7 +9,6 @@
 #include "sde_hw_catalog.h"
 #include "sde_hw_mdss.h"
 #include "sde_hw_util.h"
-#include "sde_hw_blk.h"
 
 struct sde_hw_vdc;
 struct msm_display_vdc_info;
@@ -46,7 +45,6 @@ struct sde_hw_vdc_ops {
 };
 
 struct sde_hw_vdc {
-	struct sde_hw_blk base;
 	struct sde_hw_blk_reg_map hw;
 
 	/* vdc */
@@ -58,13 +56,13 @@ struct sde_hw_vdc {
 };
 
 /**
- * sde_hw_vdc - convert base object sde_hw_base to container
- * @hw: Pointer to base hardware block
+ * to_sde_hw_vdc - convert base hw object to sde_hw_vdc container
+ * @hw: Pointer to hardware block register map object
  * return: Pointer to hardware block container
  */
-static inline struct sde_hw_vdc *to_sde_hw_vdc(struct sde_hw_blk *hw)
+static inline struct sde_hw_vdc *to_sde_hw_vdc(struct sde_hw_blk_reg_map *hw)
 {
-	return container_of(hw, struct sde_hw_vdc, base);
+	return container_of(hw, struct sde_hw_vdc, hw);
 }
 
 /**
@@ -75,15 +73,15 @@ static inline struct sde_hw_vdc *to_sde_hw_vdc(struct sde_hw_blk *hw)
  * @m:    Pointer to mdss catalog data
  * Returns: Error code or allocated sde_hw_vdc context
  */
-struct sde_hw_vdc *sde_hw_vdc_init(enum sde_vdc idx,
+struct sde_hw_blk_reg_map *sde_hw_vdc_init(enum sde_vdc idx,
 		void __iomem *addr,
 		struct sde_mdss_cfg *m);
 
 /**
  * sde_hw_vdc_destroy - destroys vdc driver context
  *                      should be called to free the context
- * @vdc:   Pointer to vdc driver context returned by sde_hw_vdc_init
+ * @hw:   Pointer to hardware block register map object
  */
-void sde_hw_vdc_destroy(struct sde_hw_vdc *vdc);
+void sde_hw_vdc_destroy(struct sde_hw_blk_reg_map *hw);
 
 #endif /*_SDE_HW_VDC_H */

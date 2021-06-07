@@ -1506,18 +1506,12 @@ static struct sde_sspp_cfg *_sspp_offset(enum sde_sspp sspp,
 	return ERR_PTR(-ENOMEM);
 }
 
-static struct sde_hw_blk_ops sde_hw_ops = {
-	.start = NULL,
-	.stop = NULL,
-};
-
 struct sde_hw_pipe *sde_hw_sspp_init(enum sde_sspp idx,
 		void __iomem *addr, struct sde_mdss_cfg *catalog,
 		bool is_virtual_pipe)
 {
 	struct sde_hw_pipe *hw_pipe;
 	struct sde_sspp_cfg *cfg;
-	int rc;
 
 	if (!addr || !catalog)
 		return ERR_PTR(-EINVAL);
@@ -1543,12 +1537,6 @@ struct sde_hw_pipe *sde_hw_sspp_init(enum sde_sspp idx,
 	if (catalog->qseed_hw_rev)
 		sde_init_scaler_blk(&hw_pipe->cap->sblk->scaler_blk,
 			catalog->qseed_hw_rev);
-
-	rc = sde_hw_blk_init(&hw_pipe->base, SDE_HW_BLK_SSPP, idx, &sde_hw_ops);
-	if (rc) {
-		SDE_ERROR("failed to init hw blk %d\n", rc);
-		goto blk_init_error;
-	}
 
 	if (!is_virtual_pipe) {
 		sde_dbg_reg_register_dump_range(SDE_DBG_NAME, cfg->name,
@@ -1595,17 +1583,11 @@ struct sde_hw_pipe *sde_hw_sspp_init(enum sde_sspp idx,
 			hw_pipe->hw.xin_id);
 
 	return hw_pipe;
-
-blk_init_error:
-	kfree(hw_pipe);
-
-	return ERR_PTR(rc);
 }
 
 void sde_hw_sspp_destroy(struct sde_hw_pipe *ctx)
 {
 	if (ctx) {
-		sde_hw_blk_destroy(&ctx->base);
 		reg_dmav1_deinit_sspp_ops(ctx->idx);
 		kfree(ctx->cap);
 	}

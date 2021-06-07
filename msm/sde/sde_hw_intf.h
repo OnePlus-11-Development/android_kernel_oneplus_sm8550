@@ -9,7 +9,6 @@
 #include "sde_hw_catalog.h"
 #include "sde_hw_mdss.h"
 #include "sde_hw_util.h"
-#include "sde_hw_blk.h"
 #include "sde_kms.h"
 
 struct sde_hw_intf;
@@ -236,7 +235,6 @@ struct sde_hw_intf_ops {
 };
 
 struct sde_hw_intf {
-	struct sde_hw_blk base;
 	struct sde_hw_blk_reg_map hw;
 
 	/* intf */
@@ -250,13 +248,13 @@ struct sde_hw_intf {
 };
 
 /**
- * to_sde_hw_intf - convert base object sde_hw_base to container
- * @hw: Pointer to base hardware block
+ * to_sde_hw_intf - convert base hw object to sde_hw_intf container
+ * @hw: Pointer to hardware block register map object
  * return: Pointer to hardware block container
  */
-static inline struct sde_hw_intf *to_sde_hw_intf(struct sde_hw_blk *hw)
+static inline struct sde_hw_intf *to_sde_hw_intf(struct sde_hw_blk_reg_map *hw)
 {
-	return container_of(hw, struct sde_hw_intf, base);
+	return container_of(hw, struct sde_hw_intf, hw);
 }
 
 /**
@@ -266,14 +264,14 @@ static inline struct sde_hw_intf *to_sde_hw_intf(struct sde_hw_blk *hw)
  * @addr: mapped register io address of MDP
  * @m :   pointer to mdss catalog data
  */
-struct sde_hw_intf *sde_hw_intf_init(enum sde_intf idx,
+struct sde_hw_blk_reg_map *sde_hw_intf_init(enum sde_intf idx,
 		void __iomem *addr,
 		struct sde_mdss_cfg *m);
 
 /**
  * sde_hw_intf_destroy(): Destroys INTF driver context
- * @intf:   Pointer to INTF driver context
+ * @hw: Pointer to hardware block register map object
  */
-void sde_hw_intf_destroy(struct sde_hw_intf *intf);
+void sde_hw_intf_destroy(struct sde_hw_blk_reg_map *hw);
 
 #endif /*_SDE_HW_INTF_H */

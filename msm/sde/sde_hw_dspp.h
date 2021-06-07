@@ -6,7 +6,6 @@
 #ifndef _SDE_HW_DSPP_H
 #define _SDE_HW_DSPP_H
 
-#include "sde_hw_blk.h"
 
 struct sde_hw_dspp;
 
@@ -309,7 +308,6 @@ struct sde_hw_dspp_ops {
  * @ltm_checksum_support: flag to check if checksum present
  */
 struct sde_hw_dspp {
-	struct sde_hw_blk base;
 	struct sde_hw_blk_reg_map hw;
 
 	/* dspp top */
@@ -326,13 +324,13 @@ struct sde_hw_dspp {
 };
 
 /**
- * sde_hw_dspp - convert base object sde_hw_base to container
- * @hw: Pointer to base hardware block
+ * to_sde_hw_dspp - convert base hw object to sde_hw_dspp container
+ * @hw: Pointer to hardware block register map object
  * return: Pointer to hardware block container
  */
-static inline struct sde_hw_dspp *to_sde_hw_dspp(struct sde_hw_blk *hw)
+static inline struct sde_hw_dspp *to_sde_hw_dspp(struct sde_hw_blk_reg_map *hw)
 {
-	return container_of(hw, struct sde_hw_dspp, base);
+	return container_of(hw, struct sde_hw_dspp, hw);
 }
 
 /**
@@ -342,14 +340,14 @@ static inline struct sde_hw_dspp *to_sde_hw_dspp(struct sde_hw_blk *hw)
  * @addr: Mapped register io address of MDP
  * @Return: pointer to structure or ERR_PTR
  */
-struct sde_hw_dspp *sde_hw_dspp_init(enum sde_dspp idx,
+struct sde_hw_blk_reg_map *sde_hw_dspp_init(enum sde_dspp idx,
 			void __iomem *addr,
 			struct sde_mdss_cfg *m);
 
 /**
  * sde_hw_dspp_destroy(): Destroys DSPP driver context
- * @dspp:   Pointer to DSPP driver context
+ * @hw: Pointer to hardware block register map object
  */
-void sde_hw_dspp_destroy(struct sde_hw_dspp *dspp);
+void sde_hw_dspp_destroy(struct sde_hw_blk_reg_map *hw);
 
 #endif /*_SDE_HW_DSPP_H */

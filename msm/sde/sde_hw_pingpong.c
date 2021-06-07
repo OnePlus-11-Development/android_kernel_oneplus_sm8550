@@ -497,18 +497,12 @@ static void _setup_pingpong_ops(struct sde_hw_pingpong_ops *ops,
 	}
 };
 
-static struct sde_hw_blk_ops sde_hw_ops = {
-	.start = NULL,
-	.stop = NULL,
-};
-
-struct sde_hw_pingpong *sde_hw_pingpong_init(enum sde_pingpong idx,
+struct sde_hw_blk_reg_map *sde_hw_pingpong_init(enum sde_pingpong idx,
 		void __iomem *addr,
 		struct sde_mdss_cfg *m)
 {
 	struct sde_hw_pingpong *c;
 	struct sde_pingpong_cfg *cfg;
-	int rc;
 
 	c = kzalloc(sizeof(*c), GFP_KERNEL);
 	if (!c)
@@ -532,12 +526,6 @@ struct sde_hw_pingpong *sde_hw_pingpong_init(enum sde_pingpong idx,
 
 	_setup_pingpong_ops(&c->ops, c->caps);
 
-	rc = sde_hw_blk_init(&c->base, SDE_HW_BLK_PINGPONG, idx, &sde_hw_ops);
-	if (rc) {
-		SDE_ERROR("failed to init hw blk %d\n", rc);
-		goto blk_init_error;
-	}
-
 	sde_dbg_reg_register_dump_range(SDE_DBG_NAME, cfg->name, c->hw.blk_off,
 			c->hw.blk_off + c->hw.length, c->hw.xin_id);
 
@@ -550,18 +538,15 @@ struct sde_hw_pingpong *sde_hw_pingpong_init(enum sde_pingpong idx,
 			c->hw.xin_id);
 	}
 
-	return c;
-
-blk_init_error:
-	kfree(c);
-
-	return ERR_PTR(rc);
+	return &c->hw;
 }
 
-void sde_hw_pingpong_destroy(struct sde_hw_pingpong *pp)
+void sde_hw_pingpong_destroy(struct sde_hw_blk_reg_map *hw)
 {
-	if (pp) {
-		sde_hw_blk_destroy(&pp->base);
+	struct sde_hw_pingpong *pp;
+
+	if (hw) {
+		pp = to_sde_hw_pingpong(hw);
 		kfree(pp->merge_3d);
 		kfree(pp);
 	}

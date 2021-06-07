@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2019, 2021, The Linux Foundation. All rights reserved.
  */
 
 #ifndef _SDE_HW_CDM_H
@@ -8,7 +8,6 @@
 
 #include "sde_hw_mdss.h"
 #include "sde_hw_top.h"
-#include "sde_hw_blk.h"
 
 struct sde_hw_cdm;
 
@@ -99,7 +98,6 @@ struct sde_hw_cdm_ops {
 };
 
 struct sde_hw_cdm {
-	struct sde_hw_blk base;
 	struct sde_hw_blk_reg_map hw;
 
 	/* chroma down */
@@ -114,13 +112,13 @@ struct sde_hw_cdm {
 };
 
 /**
- * sde_hw_cdm - convert base object sde_hw_base to container
- * @hw: Pointer to base hardware block
+ * to_sde_hw_cdm - convert base hw object to sde_hw_cdm container
+ * @hw: Pointer to hardware block register map object
  * return: Pointer to hardware block container
  */
-static inline struct sde_hw_cdm *to_sde_hw_cdm(struct sde_hw_blk *hw)
+static inline struct sde_hw_cdm *to_sde_hw_cdm(struct sde_hw_blk_reg_map *hw)
 {
-	return container_of(hw, struct sde_hw_cdm, base);
+	return container_of(hw, struct sde_hw_cdm, hw);
 }
 
 /**
@@ -131,15 +129,15 @@ static inline struct sde_hw_cdm *to_sde_hw_cdm(struct sde_hw_blk *hw)
  * @m :   pointer to mdss catalog data
  * @hw_mdp:  pointer to mdp top hw driver object
  */
-struct sde_hw_cdm *sde_hw_cdm_init(enum sde_cdm idx,
+struct sde_hw_blk_reg_map *sde_hw_cdm_init(enum sde_cdm idx,
 		void __iomem *addr,
 		struct sde_mdss_cfg *m,
 		struct sde_hw_mdp *hw_mdp);
 
 /**
  * sde_hw_cdm_destroy - destroys CDM driver context
- * @cdm:   pointer to CDM driver context
+ * @hw: Pointer to hardware block register map object
  */
-void sde_hw_cdm_destroy(struct sde_hw_cdm *cdm);
+void sde_hw_cdm_destroy(struct sde_hw_blk_reg_map *hw);
 
 #endif /*_SDE_HW_CDM_H */

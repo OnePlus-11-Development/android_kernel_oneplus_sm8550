@@ -376,18 +376,12 @@ static void _setup_dspp_ops(struct sde_hw_dspp *c, unsigned long features)
 	}
 }
 
-static struct sde_hw_blk_ops sde_hw_ops = {
-	.start = NULL,
-	.stop = NULL,
-};
-
-struct sde_hw_dspp *sde_hw_dspp_init(enum sde_dspp idx,
+struct sde_hw_blk_reg_map *sde_hw_dspp_init(enum sde_dspp idx,
 			void __iomem *addr,
 			struct sde_mdss_cfg *m)
 {
 	struct sde_hw_dspp *c;
 	struct sde_dspp_cfg *cfg;
-	int rc;
 	char buf[256];
 
 	if (!addr || !m)
@@ -415,12 +409,6 @@ struct sde_hw_dspp *sde_hw_dspp_init(enum sde_dspp idx,
 	c->cap = cfg;
 	_init_dspp_ops();
 	_setup_dspp_ops(c, c->cap->features);
-
-	rc = sde_hw_blk_init(&c->base, SDE_HW_BLK_DSPP, idx, &sde_hw_ops);
-	if (rc) {
-		SDE_ERROR("failed to init hw blk %d\n", rc);
-		goto blk_init_error;
-	}
 
 	sde_dbg_reg_register_dump_range(SDE_DBG_NAME, cfg->name,
 			c->hw.blk_off + DSPP_VALID_START_OFF,
@@ -458,20 +446,18 @@ struct sde_hw_dspp *sde_hw_dspp_init(enum sde_dspp idx,
 				c->hw.blk_off + cfg->sblk->demura.base +
 				cfg->sblk->demura.len, c->hw.xin_id);
 	}
-	return c;
 
-blk_init_error:
-	kfree(c);
-
-	return ERR_PTR(rc);
+	return &c->hw;
 }
 
-void sde_hw_dspp_destroy(struct sde_hw_dspp *dspp)
+void sde_hw_dspp_destroy(struct sde_hw_blk_reg_map *hw)
 {
-	if (dspp) {
+	struct sde_hw_dspp *dspp;
+
+	if (hw) {
+		dspp = to_sde_hw_dspp(hw);
 		reg_dmav1_deinit_dspp_ops(dspp->idx);
 		reg_dmav1_deinit_ltm_ops(dspp->idx);
-		sde_hw_blk_destroy(&dspp->base);
+		kfree(dspp);
 	}
-	kfree(dspp);
 }

@@ -535,19 +535,13 @@ static void _setup_wb_ops(struct sde_hw_wb_ops *ops,
 		ops->program_cwb_dither_ctrl = sde_hw_wb_program_cwb_dither_ctrl;
 }
 
-static struct sde_hw_blk_ops sde_hw_ops = {
-	.start = NULL,
-	.stop = NULL,
-};
-
-struct sde_hw_wb *sde_hw_wb_init(enum sde_wb idx,
+struct sde_hw_blk_reg_map *sde_hw_wb_init(enum sde_wb idx,
 		void __iomem *addr,
 		struct sde_mdss_cfg *m,
 		struct sde_hw_mdp *hw_mdp)
 {
 	struct sde_hw_wb *c;
 	struct sde_wb_cfg *cfg;
-	int rc;
 
 	if (!addr || !m || !hw_mdp)
 		return ERR_PTR(-EINVAL);
@@ -571,12 +565,6 @@ struct sde_hw_wb *sde_hw_wb_init(enum sde_wb idx,
 	_setup_wb_ops(&c->ops, c->caps->features);
 	c->hw_mdp = hw_mdp;
 
-	rc = sde_hw_blk_init(&c->base, SDE_HW_BLK_WB, idx, &sde_hw_ops);
-	if (rc) {
-		SDE_ERROR("failed to init hw blk %d\n", rc);
-		goto blk_init_error;
-	}
-
 	sde_dbg_reg_register_dump_range(SDE_DBG_NAME, cfg->name, c->hw.blk_off,
 			c->hw.blk_off + c->hw.length, c->hw.xin_id);
 
@@ -588,17 +576,11 @@ struct sde_hw_wb *sde_hw_wb_init(enum sde_wb idx,
 		_sde_hw_dcwb_pp_ctrl_init(m, addr, c);
 	}
 
-	return c;
-
-blk_init_error:
-	kfree(c);
-
-	return ERR_PTR(rc);
+	return &c->hw;
 }
 
-void sde_hw_wb_destroy(struct sde_hw_wb *hw_wb)
+void sde_hw_wb_destroy(struct sde_hw_blk_reg_map *hw)
 {
-	if (hw_wb)
-		sde_hw_blk_destroy(&hw_wb->base);
-	kfree(hw_wb);
+	if (hw)
+		kfree(to_sde_hw_wb(hw));
 }

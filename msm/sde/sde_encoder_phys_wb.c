@@ -1378,7 +1378,7 @@ static void sde_encoder_phys_wb_mode_set(
 	for (i = 0; i <= instance; i++) {
 		sde_rm_get_hw(rm, &iter);
 		if (i == instance)
-			phys_enc->hw_ctl = (struct sde_hw_ctl *) iter.hw;
+			phys_enc->hw_ctl = to_sde_hw_ctl(iter.hw);
 	}
 
 	if (IS_ERR_OR_NULL(phys_enc->hw_ctl)) {
@@ -1394,7 +1394,7 @@ static void sde_encoder_phys_wb_mode_set(
 	for (i = 0; i <= instance; i++) {
 		sde_rm_get_hw(rm, &iter);
 		if (i == instance)
-			phys_enc->hw_cdm = (struct sde_hw_cdm *) iter.hw;
+			phys_enc->hw_cdm = to_sde_hw_cdm(iter.hw);
 	}
 
 	if (IS_ERR(phys_enc->hw_cdm)) {
@@ -2082,7 +2082,7 @@ struct sde_encoder_phys *sde_encoder_phys_wb_init(
 
 		sde_rm_init_hw_iter(&iter, 0, SDE_HW_BLK_WB);
 		while (sde_rm_get_hw(&p->sde_kms->rm, &iter)) {
-			struct sde_hw_wb *hw_wb = (struct sde_hw_wb *)iter.hw;
+			struct sde_hw_wb *hw_wb = to_sde_hw_wb(iter.hw);
 
 			if (hw_wb->idx == p->wb_idx) {
 				wb_enc->hw_wb = hw_wb;

@@ -178,7 +178,6 @@ struct sde_hw_wb_ops {
  * @dcwb_pp_hw: DCWB PingPong control hwio details
  */
 struct sde_hw_wb {
-	struct sde_hw_blk base;
 	struct sde_hw_blk_reg_map hw;
 	struct sde_mdss_cfg *catalog;
 	struct sde_mdp_cfg *mdp;
@@ -197,13 +196,13 @@ struct sde_hw_wb {
 };
 
 /**
- * sde_hw_wb - convert base object sde_hw_base to container
- * @hw: Pointer to base hardware block
+ * to_sde_hw_wb - convert base hw object to sde_hw_wb container
+ * @hw: Pointer to hardware block register map object
  * return: Pointer to hardware block container
  */
-static inline struct sde_hw_wb *to_sde_hw_wb(struct sde_hw_blk *hw)
+static inline struct sde_hw_wb *to_sde_hw_wb(struct sde_hw_blk_reg_map *hw)
 {
-	return container_of(hw, struct sde_hw_wb, base);
+	return container_of(hw, struct sde_hw_wb, hw);
 }
 
 /**
@@ -213,15 +212,15 @@ static inline struct sde_hw_wb *to_sde_hw_wb(struct sde_hw_blk *hw)
  * @m :   pointer to mdss catalog data
  * @hw_mdp: pointer to mdp top hw driver object
  */
-struct sde_hw_wb *sde_hw_wb_init(enum sde_wb idx,
+struct sde_hw_blk_reg_map *sde_hw_wb_init(enum sde_wb idx,
 		void __iomem *addr,
 		struct sde_mdss_cfg *m,
 		struct sde_hw_mdp *hw_mdp);
 
 /**
  * sde_hw_wb_destroy(): Destroy writeback hw driver object.
- * @hw_wb:  Pointer to writeback hw driver object
+ * @hw:  Pointer to hardware block register map object
  */
-void sde_hw_wb_destroy(struct sde_hw_wb *hw_wb);
+void sde_hw_wb_destroy(struct sde_hw_blk_reg_map *hw);
 
 #endif /*_SDE_HW_WB_H */

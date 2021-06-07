@@ -30,6 +30,7 @@
 #include "sde_kms.h"
 #include "sde_hw_lm.h"
 #include "sde_hw_ctl.h"
+#include "sde_hw_dspp.h"
 #include "sde_crtc.h"
 #include "sde_plane.h"
 #include "sde_hw_util.h"
@@ -3386,7 +3387,7 @@ static void _sde_crtc_setup_mixer_for_encoder(
 
 		if (!sde_rm_get_hw(rm, &lm_iter))
 			break;
-		mixer->hw_lm = (struct sde_hw_mixer *)lm_iter.hw;
+		mixer->hw_lm = to_sde_hw_mixer(lm_iter.hw);
 
 		/* CTL may be <= LMs, if <, multiple LMs controlled by 1 CTL */
 		if (!sde_rm_get_hw(rm, &ctl_iter)) {
@@ -3394,7 +3395,7 @@ static void _sde_crtc_setup_mixer_for_encoder(
 					mixer->hw_lm->idx - LM_0);
 			mixer->hw_ctl = last_valid_ctl;
 		} else {
-			mixer->hw_ctl = (struct sde_hw_ctl *)ctl_iter.hw;
+			mixer->hw_ctl = to_sde_hw_ctl(ctl_iter.hw);
 			last_valid_ctl = mixer->hw_ctl;
 			sde_crtc->num_ctls++;
 		}
@@ -3408,11 +3409,11 @@ static void _sde_crtc_setup_mixer_for_encoder(
 
 		/* Dspp may be null */
 		(void) sde_rm_get_hw(rm, &dspp_iter);
-		mixer->hw_dspp = (struct sde_hw_dspp *)dspp_iter.hw;
+		mixer->hw_dspp = to_sde_hw_dspp(dspp_iter.hw);
 
 		/* DS may be null */
 		(void) sde_rm_get_hw(rm, &ds_iter);
-		mixer->hw_ds = (struct sde_hw_ds *)ds_iter.hw;
+		mixer->hw_ds = to_sde_hw_ds(ds_iter.hw);
 
 		mixer->encoder = enc;
 

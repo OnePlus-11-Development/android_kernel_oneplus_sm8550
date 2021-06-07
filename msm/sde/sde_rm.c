@@ -173,7 +173,7 @@ struct sde_rm_hw_blk {
 	struct sde_rm_rsvp *rsvp_nxt;
 	enum sde_hw_blk_type type;
 	uint32_t id;
-	struct sde_hw_blk *hw;
+	struct sde_hw_blk_reg_map *hw;
 };
 
 /**
@@ -471,7 +471,7 @@ static bool _sde_rm_request_hw_blk_locked(struct sde_rm *rm,
 			return false;
 		}
 
-		if (blk->hw->id == hw_blk_info->id) {
+		if (blk->id == hw_blk_info->id) {
 			hw_blk_info->hw = blk->hw;
 			SDE_DEBUG("found type %d id %d\n",
 					blk->type, blk->id);
@@ -507,7 +507,7 @@ bool sde_rm_request_hw_blk(struct sde_rm *rm, struct sde_rm_hw_request *hw)
 	return ret;
 }
 
-static void _sde_rm_hw_destroy(enum sde_hw_blk_type type, void *hw)
+static void _sde_rm_hw_destroy(enum sde_hw_blk_type type, struct sde_hw_blk_reg_map *hw)
 {
 	switch (type) {
 	case SDE_HW_BLK_LM:
@@ -599,7 +599,7 @@ static int _sde_rm_hw_blk_create(
 {
 	struct sde_rm_hw_blk *blk;
 	struct sde_hw_mdp *hw_mdp;
-	void *hw;
+	struct sde_hw_blk_reg_map *hw;
 
 	hw_mdp = rm->hw_mdp;
 
@@ -2708,47 +2708,5 @@ end:
 	_sde_rm_print_rsvps(rm, SDE_RM_STAGE_FINAL);
 	mutex_unlock(&rm->rm_lock);
 
-	return ret;
-}
-
-int sde_rm_ext_blk_destroy(struct sde_rm *rm,
-		struct drm_encoder *enc)
-{
-	struct sde_rm_hw_blk *blk = NULL, *p;
-	struct sde_rm_rsvp *rsvp;
-	enum sde_hw_blk_type type;
-	int ret = 0;
-
-	if (!rm || !enc) {
-		SDE_ERROR("invalid parameters\n");
-		return -EINVAL;
-	}
-
-	mutex_lock(&rm->rm_lock);
-
-	rsvp = _sde_rm_get_rsvp_cur(rm, enc);
-	if (!rsvp) {
-		ret = -ENOENT;
-		SDE_ERROR("failed to find rsvp for enc %d\n", enc->base.id);
-		goto end;
-	}
-
-	for (type = 0; type < SDE_HW_BLK_MAX; type++) {
-		list_for_each_entry_safe(blk, p, &rm->hw_blks[type], list) {
-			if (blk->rsvp == rsvp) {
-				list_del(&blk->list);
-				SDE_DEBUG("del blk %d %d from rsvp %d enc %d\n",
-						blk->type, blk->id,
-						rsvp->seq, rsvp->enc_id);
-				kfree(blk);
-			}
-		}
-	}
-
-	SDE_DEBUG("del rsvp %d\n", rsvp->seq);
-	list_del(&rsvp->list);
-	kfree(rsvp);
-end:
-	mutex_unlock(&rm->rm_lock);
 	return ret;
 }

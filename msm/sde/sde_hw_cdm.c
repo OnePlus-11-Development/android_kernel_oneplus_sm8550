@@ -299,19 +299,13 @@ static void _setup_cdm_ops(struct sde_hw_cdm_ops *ops,
 		ops->bind_pingpong_blk = sde_hw_cdm_bind_pingpong_blk;
 }
 
-static struct sde_hw_blk_ops sde_hw_ops = {
-	.start = NULL,
-	.stop = NULL,
-};
-
-struct sde_hw_cdm *sde_hw_cdm_init(enum sde_cdm idx,
+struct sde_hw_blk_reg_map *sde_hw_cdm_init(enum sde_cdm idx,
 		void __iomem *addr,
 		struct sde_mdss_cfg *m,
 		struct sde_hw_mdp *hw_mdp)
 {
 	struct sde_hw_cdm *c;
 	struct sde_cdm_cfg *cfg;
-	int rc;
 
 	c = kzalloc(sizeof(*c), GFP_KERNEL);
 	if (!c)
@@ -328,12 +322,6 @@ struct sde_hw_cdm *sde_hw_cdm_init(enum sde_cdm idx,
 	_setup_cdm_ops(&c->ops, c->caps->features);
 	c->hw_mdp = hw_mdp;
 
-	rc = sde_hw_blk_init(&c->base, SDE_HW_BLK_CDM, idx, &sde_hw_ops);
-	if (rc) {
-		SDE_ERROR("failed to init hw blk %d\n", rc);
-		goto blk_init_error;
-	}
-
 	sde_dbg_reg_register_dump_range(SDE_DBG_NAME, cfg->name, c->hw.blk_off,
 			c->hw.blk_off + c->hw.length, c->hw.xin_id);
 
@@ -344,17 +332,11 @@ struct sde_hw_cdm *sde_hw_cdm_init(enum sde_cdm idx,
 	if (!m->trusted_vm_env)
 		sde_hw_cdm_setup_csc_10bit(c, &rgb2yuv_cfg);
 
-	return c;
-
-blk_init_error:
-	kfree(c);
-
-	return ERR_PTR(rc);
+	return &c->hw;
 }
 
-void sde_hw_cdm_destroy(struct sde_hw_cdm *cdm)
+void sde_hw_cdm_destroy(struct sde_hw_blk_reg_map *hw)
 {
-	if (cdm)
-		sde_hw_blk_destroy(&cdm->base);
-	kfree(cdm);
+	if (hw)
+		kfree(to_sde_hw_cdm(hw));
 }

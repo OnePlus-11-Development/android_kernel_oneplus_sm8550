@@ -10,7 +10,6 @@
 #include "sde_hw_mdss.h"
 #include "sde_hw_util.h"
 #include "sde_reg_dma.h"
-#include "sde_hw_blk.h"
 #include "sde_formats.h"
 #include "sde_color_processing.h"
 
@@ -691,7 +690,6 @@ struct sde_hw_sspp_ops {
  * @ops: pointer to operations possible for this pipe
  */
 struct sde_hw_pipe {
-	struct sde_hw_blk base;
 	struct sde_hw_blk_reg_map hw;
 	struct sde_mdss_cfg *catalog;
 	struct sde_mdp_cfg *mdp;
@@ -704,16 +702,6 @@ struct sde_hw_pipe {
 	struct sde_hw_sspp_ops ops;
 	struct sde_hw_ctl *ctl;
 };
-
-/**
- * sde_hw_pipe - convert base object sde_hw_base to container
- * @hw: Pointer to base hardware block
- * return: Pointer to hardware block container
- */
-static inline struct sde_hw_pipe *to_sde_hw_pipe(struct sde_hw_blk *hw)
-{
-	return container_of(hw, struct sde_hw_pipe, base);
-}
 
 /**
  * sde_hw_sspp_init - initializes the sspp hw driver object.
