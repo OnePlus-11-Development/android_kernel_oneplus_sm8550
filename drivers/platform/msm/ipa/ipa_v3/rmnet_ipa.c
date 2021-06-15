@@ -22,8 +22,10 @@
 #include <linux/workqueue.h>
 #include <linux/debugfs.h>
 #include <net/pkt_sched.h>
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 #include <soc/qcom/subsystem_restart.h>
 #include <soc/qcom/subsystem_notif.h>
+#endif
 #include <linux/remoteproc/qcom_rproc.h>
 #include "ipa_qmi_service.h"
 #include <linux/rmnet_ipa_fd_ioctl.h>
@@ -31,7 +33,11 @@
 #include <uapi/linux/ip.h>
 #include <uapi/linux/msm_rmnet.h>
 #include <net/ipv6.h>
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
+#include <linux/if_rmnet.h>
+#else
 #include <net/rmnet_config.h>
+#endif
 #include "ipa_mhi_proxy.h"
 
 #include "ipa_trace.h"
@@ -1439,7 +1445,12 @@ static netdev_tx_t ipa3_wwan_xmit(struct sk_buff *skb, struct net_device *dev)
 		return NETDEV_TX_OK;
 	}
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	qmap_check = RMNET_MAP_GET_CD_BIT(skb);
+#else
+	qmap_check = (((struct rmnet_map_header *)(void *)(skb->data))->flags & MAP_CMD_FLAG) ?
+			true : false;
+#endif
 	spin_lock_irqsave(&wwan_ptr->lock, flags);
 	/* There can be a race between enabling the wake queue and
 	 * suspend in progress. Check if suspend is pending and

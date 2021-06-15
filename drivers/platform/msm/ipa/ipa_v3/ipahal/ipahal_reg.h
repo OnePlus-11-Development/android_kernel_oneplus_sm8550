@@ -165,6 +165,7 @@ enum ipahal_reg_name {
 	IPA_ULSO_CFG_IP_ID_MIN_VALUE_n,
 	IPA_ULSO_CFG_IP_ID_MAX_VALUE_n,
 	IPA_ENDP_INIT_ULSO_CFG_n,
+	IPA_ENDP_INIT_NAT_EXC_SUPPRESS_n,
 	IPA_REG_MAX,
 };
 
@@ -752,12 +753,32 @@ struct ipahal_reg_state_coal_master {
 /*
  * struct ipahal_reg_coal_evict_lru - IPA_COAL_EVICT_LRU register
  * @coal_vp_lru_thrshld: Connection that is opened below  this val
- *			 will not get evicted
+ *			 will not get evicted. valid till v5_2.
  * @coal_eviction_en: Enable eviction
+ * @coal_vp_lru_gran_sel: select the appropiate granularity out of 4 options
+ * Valid from v5_5.
+ * @coal_vp_lru_udp_thrshld: Coalescing eviction threshold. LRU VP
+ * stickness/inactivity defined by this threshold fot UDP connectiom.
+ * 0 mean all UDP's non sticky. Valid from v5_5.
+ * @coal_vp_lru_tcp_thrshld: Coalescing eviction threshold. LRU VP
+ * stickness/inactivity defined by this threshold fot TCP connection.
+ * 0 mean all TCP's non sticky. Valid from v5_5.
+ * @coal_vp_lru_udp_thrshld_en: Coalescing eviction enable for UDP connections
+ * when UDP pacjet arrived. 0-disable these evictions. Valid from v5_5.
+ * @coal_vp_lru_tcp_thrshld_en: Coalescing eviction enable for TCP connections
+ * when TCP pacjet arrived. 0-disable these evictions. Valid from v5_5.
+ * @coal_vp_lru_tcp_num: configured TCP NUM value , SW define when TCP/UDP will
+ * treat as exceed during eviction process. Valid from v5_5.
  */
 struct ipahal_reg_coal_evict_lru {
 	u32 coal_vp_lru_thrshld;
 	bool coal_eviction_en;
+	u8 coal_vp_lru_gran_sel;
+	u8 coal_vp_lru_udp_thrshld;
+	u8 coal_vp_lru_tcp_thrshld;
+	bool coal_vp_lru_udp_thrshld_en;
+	bool coal_vp_lru_tcp_thrshld_en;
+	bool coal_vp_lru_tcp_num;
 };
 
 /*

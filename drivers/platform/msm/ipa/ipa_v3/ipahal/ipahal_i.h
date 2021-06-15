@@ -414,6 +414,61 @@ struct ipa_imm_cmd_hw_ip_packet_init_ex {
 } __packed;
 
 /*
+ * struct ipa_imm_cmd_hw_ip_packet_init_ex_v5_5 - IP_PACKET_INIT_EX command payload
+ *  in H/W format for IPA v5_5.
+ * @frag_disable: 1 - disabled. overrides IPA_ENDP_CONFIG_n:FRAG_OFFLOAD_EN
+ * @filter_disable: 1 - disabled, 0 enabled
+ * @nat_disable: 1 - disabled, 0 enabled
+ * @route_disable: 1 - disabled, 0 enabled
+ * @hdr_removal_insertion_disable: 1 - disabled, 0 enabled
+ * @cs_disable: 1 - disabled, 0 enabled
+ * @quota_tethering_stats_disable: 1 - disabled, 0 enabled
+ * @dpl_disable: 1 - disabled, 0 enabled
+ * fields @flt_rt_tbl_idx - @rsvd4 are a copy of ipa5_5_flt_rule_hw_hdr
+ * fields @rt_pipe_dest_idx - @rsvd5 are a copy of ipa5_5_rt_rule_hw_hdr
+ */
+struct ipa_imm_cmd_hw_ip_packet_init_ex_v5_5 {
+	u64 rsvd1 : 16;
+	u64 frag_disable : 1;
+	u64 filter_disable : 1;
+	u64 nat_disable : 1;
+	u64 route_disable : 1;
+	u64 hdr_removal_insertion_disable : 1;
+	u64 cs_disable : 1;
+	u64 quota_tethering_stats_disable : 1;
+	u64 dpl_disable : 1;
+	u64 rsvd2 : 40;
+	u64 flt_rt_tbl_idx : 8;
+	u64 flt_stats_cnt_idx : 8;
+	u64 flt_priority : 8;
+	u64 flt_ext_hdr : 1;
+	u64 flt_close_aggr_irq_mod : 1;
+	u64 flt_rule_id : 10;
+	u64 flt_action : 5;
+	u64 flt_pdn_idx : 4;
+	u64 flt_set_metadata : 1;
+	u64 flt_retain_hdr : 1;
+	u64 rsvd3 : 1;
+	u64 flt_ttl : 1;
+	u64 flt_qos_class : 6;
+	u64 rsvd4 : 9;
+	u64 rt_pipe_dest_idx : 8;
+	u64 rt_stats_cnt_idx : 8;
+	u64 rt_priority : 8;
+	u64 rt_ext_hdr : 1;
+	u64 rt_close_aggr_irq_mod : 1;
+	u64 rt_rule_id : 10;
+	u64 rt_hdr_offset : 9;
+	u64 rt_proc_ctx : 1;
+	u64 rt_retain_hdr : 1;
+	u64 rt_system : 1;
+	u64 rt_ttl : 1;
+	u64 rt_qos_class : 6;
+	u64 rt_skip_ingress : 1;
+	u64 rsvd5 : 8;
+} __packed;
+
+/*
  * struct ipa_imm_cmd_hw_register_write - REGISTER_WRITE command payload
  *  in H/W format.
  * Write value to register. Allows reg changes to be synced with data packet
@@ -882,6 +937,174 @@ struct ipa_frag_pkt_status_hw_v5_0 {
 	u64 reserved_5:8;
 } __packed;
 
+/*
+ * struct ipa_status_pkt_hw_v5_5 - IPA v5.5 status packet payload in H/W format.
+ *  This structure describes the status packet H/W structure for the
+ *   following statuses: IPA_STATUS_PACKET, IPA_STATUS_DROPPED_PACKET,
+ *   IPA_STATUS_SUSPENDED_PACKET.
+ *  Other statuses types has different status packet structure.
+ * @status_opcode: The Type of the status (Opcode).
+ * @exception: (not bitmask) - the first exception that took place.
+ *  In case of exception, src endp and pkt len are always valid.
+ * @status_mask: Bit mask specifying on which H/W blocks the pkt was processed.
+ * @pkt_len: Pkt pyld len including hdr, include retained hdr if used. Does
+ *  not include padding or checksum trailer len.
+ * @endp_src_idx: Source end point index.
+ * @reserved_1: reserved
+ * @rt_local: Route table location flag: Does matching rt rule belongs to
+ *  rt tbl that resides in lcl memory? (if not, then system mem)
+ * @rt_hash: Route hash hit flag: Does matching rt rule was in hash tbl?
+ *  Not valid in case of exception
+ * @reserved_2: reserved
+ * @metadata: meta data value used by packet
+ * @flt_local: Filter table location flag: Does matching flt rule belongs to
+ *  flt tbl that resides in lcl memory? (if not, then system mem)
+ * @flt_hash: Filter hash hit flag: Does matching flt rule was in hash tbl?
+ * @flt_global: Global filter rule flag: Does matching flt rule belongs to
+ *  the global flt tbl? (if not, then the per endp tables)
+ * @flt_ret_hdr: Retain header in filter rule flag: Does matching flt rule
+ *  specifies to retain header?
+ *  Starting IPA4.5, this will be true only if packet has L2 header.
+ * @flt_rule_id: The ID of the matching filter rule. This info can be combined
+ *  with endp_src_idx to locate the exact rule. ID=0x3FF reserved to specify
+ *  flt miss. In case of miss, all flt info to be ignored
+ * @rt_tbl_idx: Index of rt tbl that contains the rule on which was a match
+ * @rt_rule_id: The ID of the matching rt rule. This info can be combined
+ *  with rt_tbl_idx to locate the exact rule. ID=0x3FF reserved to specify
+ *  rt miss. In case of miss, all rt info to be ignored
+ * @nat_hit: NAT hit flag: Was their NAT hit?
+ * @nat_entry_idx: Index of the NAT entry used of NAT processing
+ * @nat_type: Defines the type of the NAT operation:
+ *	00: No NAT
+ *	01: Source NAT
+ *	10: Destination NAT
+ *	11: Reserved
+ * @tag_info: S/W defined value provided via immediate command
+ * @egress_tc: Egress traffic class index.
+ * @ingress_tc: Ingress traffic class index.
+ * @seq_num: Per source endp unique packet sequence number
+ * @time_of_day_ctr: running counter from IPA clock
+ * @hdr_local: Header table location flag: In header insertion, was the header
+ *  taken from the table resides in local memory? (If no, then system mem)
+ * @hdr_offset: Offset of used header in the header table
+ * @frag_hit: Frag hit flag: Was their frag rule hit in H/W frag table?
+ * @frag_rule: Frag rule index in H/W frag table in case of frag hit
+ * @endp_dest_idx: Destination end point index.
+ * @hw_specific: H/W specific reserved value
+ * @ucp: UC Processing flag.
+ * @nat_exc_suppress: nat exception supress flag, indicates whether
+ * nat exception is suppressed.
+ * @tsp: Traffic shaping policing flag, indicates traffic class info
+ * overwrites tag info.
+ * @ttl_dec: ttl update flag, indicates whether ttl is updated.
+ */
+struct ipa_gen_pkt_status_hw_v5_5 {
+	u64 status_opcode:8;
+	u64 exception:8;
+	u64 status_mask:16;
+	u64 pkt_len:16;
+	u64 endp_src_idx:8;
+	u64 reserved_1:3;
+	u64 rt_local:1;
+	u64 rt_hash:1;
+	u64 reserved_2:3;
+	u64 metadata:32;
+	u64 flt_local:1;
+	u64 flt_hash:1;
+	u64 flt_global:1;
+	u64 flt_ret_hdr:1;
+	u64 flt_rule_id:10;
+	u64 rt_tbl_idx:8;
+	u64 rt_rule_id:10;
+	u64 nat_hit:1;
+	u64 nat_entry_idx:13;
+	u64 nat_type:2;
+	u64 tag_info:36;
+	u64 egress_tc:6;
+	u64 ingress_tc:6;
+	u64 seq_num:8;
+	u64 time_of_day_ctr:24;
+	u64 hdr_local:1;
+	u64 hdr_offset:10;
+	u64 frag_hit:1;
+	u64 frag_rule:4;
+	u64 endp_dest_idx:8;
+	u64 hw_specific:4;
+	u64 nat_exc_suppress:1;
+	u64 tsp:1;
+	u64 ttl_dec:1;
+	u64 ucp:1;
+} __packed;
+
+/*
+ * struct ipa_frag_pkt_status_hw_v5_5 -
+ * IPA v5.5 status packet payload in H/W format.
+ *  This structure describes the frag status packet H/W structure for the
+ *   following statuses: IPA_NEW_FRAG_RULE.
+ * @status_opcode: The Type of the status (Opcode).
+ * @frag_rule_idx: Frag rule index value.
+ * @reserved_1: reserved
+ * @exception: (not bitmask) - the first exception that took place.
+ * @tbl_idx: Table index valid or not.
+ * @endp_src_idx: Source end point index.
+ *  In case of exception, src endp and pkt len are always valid.
+ * @seq_num: Packet sequence number.
+ * @src_ip_addr: Source packet IP address.
+ * @dest_ip_addr: Destination packet IP address.
+ * @ret: l2 header retained flag, indicates whether l2 header is retained
+ * or not.
+ * @ll: low latency indication.
+ * @ttl_dec: ttl update indication.
+ * @reserved_2: reserved
+ * @nat_type: Defines the type of the NAT operation:
+ *	00: No NAT
+ *	01: Source NAT
+ *	10: Destination NAT
+ *	11: Reserved
+ * @protocol: Protocal number.
+ * @ip_id: IP packet IP ID number.
+ * @tlated_ip_addr: IP address.
+ * @hdr_offset: Offset of used header in the header table
+ * @ingress_tc: ingress traffic class index
+ * @ip_cksum_diff: IP packet checksum difference.
+ * @metadata: meta data value used by packet
+ * @reserved_4: reserved
+ * @endp_dest_idx: Destination end point index.
+ * @egress_tc: egress traffic class index
+ * @pd: router disabled ingress policer.
+ * @hdr_local: Header table location flag: In header insertion, was the header
+ *  taken from the table resides in local memory? (If no, then system mem)
+ */
+struct ipa_frag_pkt_status_hw_v5_5 {
+	u64 status_opcode:8;
+	u64 frag_rule_idx:4;
+	u64 reserved_1:2;
+	u64 exception:1;
+	u64 tbl_idx:1;
+	u64 endp_src_idx:8;
+	u64 seq_num:8;
+	u64 src_ip_addr:32;
+	u64 dest_ip_addr:32;
+	u64 ret:1;
+	u64 ll:1;
+	u64 ttl_dec:1;
+	u64 reserved_2:3;
+	u64 nat_type:2;
+	u64 protocol:8;
+	u64 ip_id:16;
+	u64 tlated_ip_addr:32;
+	u64 hdr_offset:10;
+	u64 ingress_tc:6;
+	u64 ip_cksum_diff:16;
+	u64 metadata:32;
+	u64 reserved_4:16;
+	u64 endp_dest_idx:8;
+	u64 egress_tc:6;
+	u64 pd:1;
+	u64 hdr_local:1;
+} __packed;
+
+
 union ipa_pkt_status_hw {
 	struct ipa_gen_pkt_status_hw ipa_pkt;
 	struct ipa_frag_pkt_status_hw frag_pkt;
@@ -890,6 +1113,11 @@ union ipa_pkt_status_hw {
 union ipa_pkt_status_hw_v5_0 {
 	struct ipa_gen_pkt_status_hw_v5_0 ipa_pkt;
 	struct ipa_frag_pkt_status_hw_v5_0 frag_pkt;
+} __packed;
+
+union ipa_pkt_status_hw_v5_5 {
+	struct ipa_gen_pkt_status_hw_v5_5 ipa_pkt;
+	struct ipa_frag_pkt_status_hw_v5_5 frag_pkt;
 } __packed;
 
 /* Size of H/W Packet Status */

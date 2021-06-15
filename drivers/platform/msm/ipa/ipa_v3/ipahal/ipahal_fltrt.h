@@ -83,6 +83,9 @@ struct ipahal_rt_rule_gen_params {
  * @cnt_idx: stats counter index
  * @close_aggr_irq_mod: close aggregation/coalescing and close GSI
  *  interrupt moderation
+ * @ttl_update: bool to indicate whether TTL update is needed or not.
+ * @qos_class: QOS classification value.
+ * @skip_ingress: bool to skip ingress policing.
  * @eq_attrib: Equations and their params in the rule
  * @rule_size: Rule size in memory
  */
@@ -96,6 +99,9 @@ struct ipahal_rt_rule_entry {
 	u32 id;
 	u8 cnt_idx;
 	u8 close_aggr_irq_mod;
+	u8 ttl_update;
+	u8 qos_class;
+	u8 skip_ingress;
 	struct ipa_ipfltri_rule_eq eq_attrib;
 	u32 rule_size;
 };

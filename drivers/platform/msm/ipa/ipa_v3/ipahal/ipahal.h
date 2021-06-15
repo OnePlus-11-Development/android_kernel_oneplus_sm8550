@@ -241,9 +241,18 @@ struct ipahal_imm_cmd_ip_packet_init {
  * @cs_disable: true - disabled, false - enabled
  * @quota_tethering_stats_disable: true - disabled, false - enabled
  * fields @flt_rt_tbl_idx - @flt_retain_hdr are a logical software translation
- * of ipa5_0_flt_rule_hw_hdr.
+ * of ipa5_0_flt_rule_hw_hdr/ipa5_5_flt_rule_hw_hdr
  * fields @rt_pipe_dest_idx - @rt_system are a logical software translation
- * ipa5_0_rt_rule_hw_hdr
+ * ipa5_0_rt_rule_hw_hdr/ipa5_5_flt_rule_hw_hdr
+ * @dpl_disable: true - disabled, false - enabled, valid from IPAv5_5.
+ * @flt_ext_hdr: true - flt ext_hdr enabled, false - disabled. Note all fields of
+ * ext header are valid in immediate command irrespective of this flag.
+ * fields @flt_ttl - @flt_qos_class are a logical software translation
+ * of ipa5_5_flt_rule_hw_hdr_ext.
+ * @rt_ext_hdr: true - rt ext_hdr enabled, false - disabled. Note all fields of
+ * ext header are valid in immediate command irrespective of this flag.
+ * fields @rt_ttl - @rt_skip_ingress are a logical software translation
+ * ipa5_5_rt_rule_hw_hdr_ext
  */
 struct ipahal_imm_cmd_ip_packet_init_ex {
 	bool frag_disable;
@@ -269,6 +278,14 @@ struct ipahal_imm_cmd_ip_packet_init_ex {
 	bool rt_proc_ctx;
 	bool rt_retain_hdr;
 	bool rt_system;
+	bool dpl_disable;
+	bool flt_ext_hdr;
+	bool flt_ttl;
+	u8 flt_qos_class;
+	bool rt_ext_hdr;
+	bool rt_ttl;
+	u8 rt_qos_class;
+	bool rt_skip_ingress;
 };
 
 /*
@@ -513,6 +530,7 @@ enum ipahal_pkt_status_exception {
 	IPAHAL_PKT_STATUS_EXCEPTION_IPTYPE,
 	IPAHAL_PKT_STATUS_EXCEPTION_PACKET_LENGTH,
 	IPAHAL_PKT_STATUS_EXCEPTION_PACKET_THRESHOLD,
+	IPAHAL_PKT_STATUS_EXCEPTION_TTL,
 	IPAHAL_PKT_STATUS_EXCEPTION_FRAG_RULE_MISS,
 	IPAHAL_PKT_STATUS_EXCEPTION_SW_FILT,
 	/*
@@ -522,6 +540,7 @@ enum ipahal_pkt_status_exception {
 	IPAHAL_PKT_STATUS_EXCEPTION_NAT,
 	IPAHAL_PKT_STATUS_EXCEPTION_IPV6CT,
 	IPAHAL_PKT_STATUS_EXCEPTION_UCP,
+	IPAHAL_PKT_STATUS_EXCEPTION_RQOS,
 	IPAHAL_PKT_STATUS_EXCEPTION_CSUM,
 	IPAHAL_PKT_STATUS_EXCEPTION_MAX,
 };
@@ -567,11 +586,17 @@ enum ipahal_pkt_status_mask {
 	IPAHAL_PKT_STATUS_MASK_CKSUM_PROCESS_SHFT,
 	IPAHAL_PKT_STATUS_MASK_AGGR_PROCESS_SHFT,
 	IPAHAL_PKT_STATUS_MASK_DEST_EOT_SHFT,
+	IPAHAL_PKT_STATUS_MASK_OPENED_FRAME_SHFT =
+		IPAHAL_PKT_STATUS_MASK_DEST_EOT_SHFT,
 	IPAHAL_PKT_STATUS_MASK_DEAGGR_PROCESS_SHFT,
 	IPAHAL_PKT_STATUS_MASK_DEAGG_FIRST_SHFT,
 	IPAHAL_PKT_STATUS_MASK_SRC_EOT_SHFT,
 	IPAHAL_PKT_STATUS_MASK_PREV_EOT_SHFT,
+	IPAHAL_PKT_STATUS_MASK_RQOS_NAS_SHFT =
+		IPAHAL_PKT_STATUS_MASK_PREV_EOT_SHFT,
 	IPAHAL_PKT_STATUS_MASK_BYTE_LIMIT_SHFT,
+	IPAHAL_PKT_STATUS_MASK_RQOS_AS_SHFT =
+		IPAHAL_PKT_STATUS_MASK_BYTE_LIMIT_SHFT,
 };
 
 /*
@@ -648,6 +673,17 @@ enum ipahal_pkt_status_nat_type {
  * @ip_id: IP packet IP ID number.
  * @tlated_ip_addr: IP address.
  * @ip_cksum_diff: IP packet checksum difference.
+ * @hdr_ret: l2 header retained flag, indicates whether l2 header is retained
+ * or not.
+ * @ll: low latency indication.
+ * @tsp: Traffic shaping policing flag, indicates traffic class info
+ * overwrites tag info.
+ * @ttl_dec: ttl update flag, indicates whether ttl is updated.
+ * @nat_exc_suppress: nat exception supress flag, indicates whether
+ * nat exception is suppressed.
+ * @ingress_tc: Ingress traffic class index.
+ * @egress_tc: Egress traffic class index.
+ * @pd: router disabled ingress policer.
  */
 struct ipahal_pkt_status {
 	u64 tag_info;
@@ -687,7 +723,14 @@ struct ipahal_pkt_status {
 	u16 ip_id;
 	u32 tlated_ip_addr;
 	u16 ip_cksum_diff;
-
+	bool hdr_ret;
+	bool ll;
+	bool tsp;
+	bool ttl_dec;
+	bool nat_exc_suppress;
+	u8 ingress_tc;
+	u8 egress_tc;
+	bool pd;
 };
 
 /*

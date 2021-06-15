@@ -26,6 +26,16 @@ LINUXINCLUDE    += -include $(srctree)/../../vendor/qcom/opensource/dataipa/conf
 endif
 endif
 
+ifeq ($(CONFIG_ARCH_KALAMA), y)
+DATAIPADRVTOP = $(srctree)/../../vendor/qcom/opensource/dataipa/drivers/platform/msm
+LINUXINCLUDE    += -include $(srctree)/../../vendor/qcom/opensource/dataipa/config/dataipa_vendor.h
+include $(srctree)/../../vendor/qcom/opensource/dataipa/config/dataipa_GKI.conf
+ifeq ($(CONFIG_LOCALVERSION), "-gki-consolidate")
+include $(srctree)/../../vendor/qcom/opensource/dataipa/config/dataipa_debug.conf
+LINUXINCLUDE    += -include $(srctree)/../../vendor/qcom/opensource/dataipa/config/dataipa_debug.h
+endif
+endif
+
 #MDMs
 ifeq ($(CONFIG_ARCH_SDXLEMUR), y)
 LINUXINCLUDE    += -include $(srctree)/techpack/dataipa/config/dataipa.h

@@ -27,7 +27,6 @@
 #include <linux/hashtable.h>
 #include <linux/jhash.h>
 #include <linux/pci.h>
-#include <soc/qcom/subsystem_restart.h>
 #include <linux/soc/qcom/smem.h>
 #include <linux/qcom_scm.h>
 #include <asm/cacheflush.h>
@@ -37,6 +36,12 @@
 #include <linux/of_address.h>
 #include <linux/qcom_scm.h>
 #include <linux/soc/qcom/mdt_loader.h>
+#include <linux/version.h>
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
+#include <linux/panic_notifier.h>
+#else
+#include <soc/qcom/subsystem_restart.h>
+#endif
 #include "gsi.h"
 #include "ipa_stats.h"
 
@@ -7146,6 +7151,9 @@ static enum gsi_ver ipa3_get_gsi_ver(enum ipa_hw_type ipa_hw_type)
 	case IPA_HW_v5_1:
 		gsi_ver = GSI_VER_3_0;
 		break;
+	case IPA_HW_v5_5:
+		gsi_ver = GSI_VER_5_5;
+		break;
 	default:
 		IPAERR("No GSI version for ipa type %d\n", ipa_hw_type);
 		WARN_ON(1);
@@ -8667,7 +8675,8 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 			strlen(resource_p->uc_fw_file_name));
 	}
 
-	if (ipa3_ctx->secure_debug_check_action == USE_SCM) {
+	if (IPA_IS_REGULAR_CLK_MODE(ipa3_ctx->ipa3_hw_mode) &&
+		ipa3_ctx->secure_debug_check_action == USE_SCM) {
 		if (ipa_is_mem_dump_allowed())
 			ipa3_ctx->sd_state = SD_ENABLED;
 		else
@@ -10212,9 +10221,21 @@ static int ipa_smmu_perph_cb_probe(struct device *dev,
 	 * checks to see if they've been set in dtsi.  If so, the logic
 	 * further below acts accordingly...
 	 */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
+	int mapping_config;
+
+	mapping_config = qcom_iommu_get_mappings_configuration(cb->iommu_domain);
+
+	if (mapping_config < 0) {
+		IPAERR("No Mapping configuration found for CB %d\n", cb_type);
+	} else {
+		bypass = (mapping_config & QCOM_IOMMU_MAPPING_CONF_S1_BYPASS) ? 1 : 0;
+		fast = (mapping_config & QCOM_IOMMU_MAPPING_CONF_FAST) ? 1 : 0;
+	}
+#else
 	iommu_domain_get_attr(cb->iommu_domain, DOMAIN_ATTR_S1_BYPASS, &bypass);
 	iommu_domain_get_attr(cb->iommu_domain, DOMAIN_ATTR_FAST, &fast);
-
+#endif
 	IPADBG(
 	  "CB %d PROBE dev=%pK DOMAIN ATTRS bypass=%d fast=%d\n",
 	  cb_type, dev, bypass, fast);
@@ -10326,9 +10347,21 @@ static int ipa_smmu_uc_cb_probe(struct device *dev)
 	 * checks to see if they've been set in dtsi.  If so, the logic
 	 * further below acts accordingly...
 	 */
-	iommu_domain_get_attr(cb->iommu_domain, DOMAIN_ATTR_S1_BYPASS, &bypass);
-	iommu_domain_get_attr(cb->iommu_domain, DOMAIN_ATTR_FAST, &fast);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
+        int mapping_config;
 
+        mapping_config = qcom_iommu_get_mappings_configuration(cb->iommu_domain);
+
+        if (mapping_config < 0) {
+                IPAERR("No Mapping configuration found for UC CB\n");
+        } else {
+                bypass = (mapping_config & QCOM_IOMMU_MAPPING_CONF_S1_BYPASS) ? 1 : 0;
+                fast = (mapping_config & QCOM_IOMMU_MAPPING_CONF_FAST) ? 1 : 0;
+        }
+#else
+        iommu_domain_get_attr(cb->iommu_domain, DOMAIN_ATTR_S1_BYPASS, &bypass);
+        iommu_domain_get_attr(cb->iommu_domain, DOMAIN_ATTR_FAST, &fast);
+#endif
 	IPADBG("UC CB PROBE dev=%pK DOMAIN ATTRS bypass=%d fast=%d\n",
 		   dev, bypass, fast);
 
@@ -10418,9 +10451,21 @@ static int ipa_smmu_ap_cb_probe(struct device *dev)
 	 * checks to see if they've been set in dtsi.  If so, the logic
 	 * further below acts accordingly...
 	 */
-	iommu_domain_get_attr(cb->iommu_domain, DOMAIN_ATTR_S1_BYPASS, &bypass);
-	iommu_domain_get_attr(cb->iommu_domain, DOMAIN_ATTR_FAST, &fast);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
+        int mapping_config;
 
+        mapping_config = qcom_iommu_get_mappings_configuration(cb->iommu_domain);
+
+        if (mapping_config < 0) {
+                IPAERR("No Mapping configuration found for AP CB\n");
+        } else {
+                bypass = (mapping_config & QCOM_IOMMU_MAPPING_CONF_S1_BYPASS) ? 1 : 0;
+                fast = (mapping_config & QCOM_IOMMU_MAPPING_CONF_FAST) ? 1 : 0;
+        }
+#else
+        iommu_domain_get_attr(cb->iommu_domain, DOMAIN_ATTR_S1_BYPASS, &bypass);
+        iommu_domain_get_attr(cb->iommu_domain, DOMAIN_ATTR_FAST, &fast);
+#endif
 	IPADBG("AP CB PROBE dev=%pK DOMAIN ATTRS bypass=%d fast=%d\n",
 		   dev, bypass, fast);
 
@@ -10541,9 +10586,19 @@ static int ipa_smmu_11ad_cb_probe(struct device *dev)
 
 	IPADBG("11AD CB PROBE dev=%pK va_start=0x%x va_size=0x%x\n",
 		   dev, cb->va_start, cb->va_size);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
+        int mapping_config;
 
-	iommu_domain_get_attr(cb->iommu_domain, DOMAIN_ATTR_S1_BYPASS, &bypass);
+        mapping_config = qcom_iommu_get_mappings_configuration(cb->iommu_domain);
 
+        if (mapping_config < 0) {
+                IPAERR("No Mapping configuration found for 11AD CB\n");
+        } else {
+                bypass = (mapping_config & QCOM_IOMMU_MAPPING_CONF_S1_BYPASS) ? 1 : 0;
+        }
+#else
+        iommu_domain_get_attr(cb->iommu_domain, DOMAIN_ATTR_S1_BYPASS, &bypass);
+#endif
 	IPADBG("11AD CB PROBE dev=%pK DOMAIN ATTRS bypass=%d\n",
 		   dev, bypass);
 

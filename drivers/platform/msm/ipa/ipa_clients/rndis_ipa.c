@@ -2357,29 +2357,17 @@ static void rndis_ipa_debugfs_init(struct rndis_ipa_dev *rndis_ipa_ctx)
 		goto fail_directory;
 	}
 
-	file = debugfs_create_bool
+	debugfs_create_bool
 		("tx_filter", flags_read_write,
 		rndis_ipa_ctx->directory, &rndis_ipa_ctx->tx_filter);
-	if (!file) {
-		RNDIS_IPA_ERROR("could not create debugfs tx_filter file\n");
-		goto fail_file;
-	}
 
-	file = debugfs_create_bool
+	debugfs_create_bool
 		("rx_filter", flags_read_write,
 		rndis_ipa_ctx->directory, &rndis_ipa_ctx->rx_filter);
-	if (!file) {
-		RNDIS_IPA_ERROR("could not create debugfs rx_filter file\n");
-		goto fail_file;
-	}
 
-	file = debugfs_create_bool
+	debugfs_create_bool
 		("icmp_filter", flags_read_write,
 		rndis_ipa_ctx->directory, &rndis_ipa_ctx->icmp_filter);
-	if (!file) {
-		RNDIS_IPA_ERROR("could not create debugfs icmp_filter file\n");
-		goto fail_file;
-	}
 
 	debugfs_create_u32
 		("outstanding_high", flags_read_write,
@@ -2452,54 +2440,34 @@ static void rndis_ipa_debugfs_init(struct rndis_ipa_dev *rndis_ipa_ctx)
 		aggr_directory,
 		&ipa_to_usb_ep_cfg.aggr.aggr_pkt_limit);
 
-	file = debugfs_create_bool
+	debugfs_create_bool
 		("tx_dump_enable", flags_read_write,
 		rndis_ipa_ctx->directory,
 		&rndis_ipa_ctx->tx_dump_enable);
-	if (!file) {
-		RNDIS_IPA_ERROR("fail to create tx_dump_enable file\n");
-		goto fail_file;
-	}
 
-	file = debugfs_create_bool
+	debugfs_create_bool
 		("rx_dump_enable", flags_read_write,
 		rndis_ipa_ctx->directory,
 		&rndis_ipa_ctx->rx_dump_enable);
-	if (!file) {
-		RNDIS_IPA_ERROR("fail to create rx_dump_enable file\n");
-		goto fail_file;
-	}
 
-	file = debugfs_create_bool
+	debugfs_create_bool
 		("deaggregation_enable", flags_read_write,
 		rndis_ipa_ctx->directory,
 		&rndis_ipa_ctx->deaggregation_enable);
-	if (!file) {
-		RNDIS_IPA_ERROR("fail to create deaggregation_enable file\n");
-		goto fail_file;
-	}
 
 	debugfs_create_u32
 		("error_msec_sleep_time", flags_read_write,
 		rndis_ipa_ctx->directory,
 		&rndis_ipa_ctx->error_msec_sleep_time);
 
-	file = debugfs_create_bool
+	debugfs_create_bool
 		("during_xmit_error", flags_read_only,
 		rndis_ipa_ctx->directory,
 		&rndis_ipa_ctx->during_xmit_error);
-	if (!file) {
-		RNDIS_IPA_ERROR("fail to create during_xmit_error file\n");
-		goto fail_file;
-	}
 
-	file = debugfs_create_bool("is_vlan_mode", flags_read_only,
+	debugfs_create_bool("is_vlan_mode", flags_read_only,
 		rndis_ipa_ctx->directory,
 		&rndis_ipa_ctx->is_vlan_mode);
-	if (!file) {
-		RNDIS_IPA_ERROR("fail to create is_vlan_mode file\n");
-		goto fail_file;
-	}
 
 	RNDIS_IPA_DEBUG("debugfs entries were created\n");
 	RNDIS_IPA_LOG_EXIT();

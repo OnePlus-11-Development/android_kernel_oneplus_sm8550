@@ -4921,6 +4921,7 @@ fail_and_disable_clocks:
 fail_gen:
 	return result;
 }
+EXPORT_SYMBOL(ipa3_sys_setup);
 
 int ipa3_sys_teardown(u32 clnt_hdl)
 {
@@ -4946,6 +4947,7 @@ int ipa3_sys_teardown(u32 clnt_hdl)
 
 	return 0;
 }
+EXPORT_SYMBOL(ipa3_sys_teardown);
 
 int ipa3_sys_update_gsi_hdls(u32 clnt_hdl, unsigned long gsi_ch_hdl,
 	unsigned long gsi_ev_hdl)
@@ -4965,6 +4967,7 @@ int ipa3_sys_update_gsi_hdls(u32 clnt_hdl, unsigned long gsi_ch_hdl,
 
 	return 0;
 }
+EXPORT_SYMBOL(ipa3_sys_update_gsi_hdls);
 
 static void ipa_gsi_evt_ring_err_cb(struct gsi_evt_err_notify *notify)
 {
