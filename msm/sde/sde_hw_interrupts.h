@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2019, 2021, The Linux Foundation. All rights reserved.
  */
 
@@ -49,6 +50,7 @@
  * @SDE_IRQ_TYPE_PROG_LINE:		Programmable Line interrupt
  * @SDE_IRQ_TYPE_AD4_BL_DONE:		AD4 backlight
  * @SDE_IRQ_TYPE_CTL_START:		Control start
+ * @SDE_IRQ_TYPE_CTL_DONE:		Frame transfer complete
  * @SDE_IRQ_TYPE_INTF_TEAR_RD_PTR:	INTF Tear read pointer
  * @SDE_IRQ_TYPE_INTF_TEAR_WR_PTR:	INTF Tear write pointer
  * @SDE_IRQ_TYPE_INTF_TEAR_AUTO_REF:	INTF Tear auto refresh
@@ -87,6 +89,7 @@ enum sde_intr_type {
 	SDE_IRQ_TYPE_PROG_LINE,
 	SDE_IRQ_TYPE_AD4_BL_DONE,
 	SDE_IRQ_TYPE_CTL_START,
+	SDE_IRQ_TYPE_CTL_DONE,
 	SDE_IRQ_TYPE_INTF_TEAR_RD_PTR,
 	SDE_IRQ_TYPE_INTF_TEAR_WR_PTR,
 	SDE_IRQ_TYPE_INTF_TEAR_AUTO_REF,

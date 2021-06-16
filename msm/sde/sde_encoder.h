@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -182,6 +183,8 @@ enum sde_enc_rc_states {
  *				next update is triggered.
  * @autorefresh_solver_disable	It tracks if solver state is disabled from this
  *				encoder due to autorefresh concurrency.
+ * @ctl_done_supported          boolean flag to indicate the availability of
+ *                              ctl done irq support for the hardware
  */
 struct sde_encoder_virt {
 	struct drm_encoder base;
@@ -248,6 +251,7 @@ struct sde_encoder_virt {
 	struct msm_mode_info mode_info;
 	bool delay_kickoff;
 	bool autorefresh_solver_disable;
+	bool ctl_done_supported;
 };
 
 #define to_sde_encoder_virt(x) container_of(x, struct sde_encoder_virt, base)
@@ -523,6 +527,19 @@ bool sde_encoder_is_primary_display(struct drm_encoder *enc);
  * @Return:     true if it is a built in display. false otherwise
  */
 bool sde_encoder_is_built_in_display(struct drm_encoder *enc);
+
+/**
+ * sde_encoder_check_ctl_done_support - checks if ctl_done irq is available
+ *		for the display
+ * @drm_enc:    Pointer to drm encoder structure
+ * @Return:     true if scheduler update is enabled
+ */
+static inline bool sde_encoder_check_ctl_done_support(struct drm_encoder *drm_enc)
+{
+	struct sde_encoder_virt *sde_enc = to_sde_encoder_virt(drm_enc);
+
+	return sde_enc && sde_enc->ctl_done_supported;
+}
 
 /**
  * sde_encoder_is_dsi_display - checks if underlying display is DSI

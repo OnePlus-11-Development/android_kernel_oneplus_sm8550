@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -3504,7 +3505,8 @@ static void sde_encoder_frame_done_callback(
 
 	if (event & (SDE_ENCODER_FRAME_EVENT_DONE
 			| SDE_ENCODER_FRAME_EVENT_ERROR
-			| SDE_ENCODER_FRAME_EVENT_PANEL_DEAD) && is_cmd_mode) {
+			| SDE_ENCODER_FRAME_EVENT_PANEL_DEAD) && is_cmd_mode
+			&& !sde_encoder_check_ctl_done_support(drm_enc)) {
 
 		if (ready_phys->connector)
 			topology = sde_connector_get_topology_name(
@@ -5097,6 +5099,9 @@ static int sde_encoder_setup_display(struct sde_encoder_virt *sde_enc,
 	sde_enc->idle_pc_enabled = test_bit(SDE_FEATURE_IDLE_PC, sde_kms->catalog->features);
 
 	sde_enc->input_event_enabled = test_bit(SDE_FEATURE_TOUCH_WAKEUP,
+						sde_kms->catalog->features);
+
+	sde_enc->ctl_done_supported = test_bit(SDE_FEATURE_CTL_DONE,
 						sde_kms->catalog->features);
 
 	mutex_lock(&sde_enc->enc_lock);

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -195,6 +196,8 @@ struct sde_encoder_phys_ops {
  * @INTR_IDX_VSYNC:    Vsync interrupt for video mode panel
  * @INTR_IDX_PINGPONG: Pingpong done interrupt for cmd mode panel
  * @INTR_IDX_UNDERRUN: Underrun interrupt for video and cmd mode panel
+ * @INTR_IDX_CTL_START:Control start interrupt to indicate the frame start
+ * @INTR_IDX_CTL_DONE: Control done interrupt indicating the control path being idle
  * @INTR_IDX_RDPTR:    Readpointer done interrupt for cmd mode panel
  * @INTR_IDX_WB_DONE:  Writeback done interrupt for WB
  * @INTR_IDX_PP1_OVFL: Pingpong overflow interrupt on PP1 for Concurrent WB
@@ -213,6 +216,7 @@ enum sde_intr_idx {
 	INTR_IDX_PINGPONG,
 	INTR_IDX_UNDERRUN,
 	INTR_IDX_CTL_START,
+	INTR_IDX_CTL_DONE,
 	INTR_IDX_RDPTR,
 	INTR_IDX_AUTOREFRESH_DONE,
 	INTR_IDX_WB_DONE,
@@ -400,7 +404,7 @@ struct sde_encoder_phys_cmd_te_timestamp {
  *	mode specific operations
  * @base:	Baseclass physical encoder structure
  * @stream_sel:	Stream selection for multi-stream interfaces
- * @pp_timeout_report_cnt: number of pingpong done irq timeout errors
+ * @frame_tx_timeout_report_cnt: number of pp_done/ctl_done irq timeout errors
  * @autorefresh: autorefresh feature state
  * @pending_vblank_cnt: Atomic counter tracking pending wait for VBLANK
  * @pending_vblank_wq: Wait queue for blocking until VBLANK received
@@ -411,7 +415,7 @@ struct sde_encoder_phys_cmd_te_timestamp {
 struct sde_encoder_phys_cmd {
 	struct sde_encoder_phys base;
 	int stream_sel;
-	int pp_timeout_report_cnt;
+	int frame_tx_timeout_report_cnt;
 	struct sde_encoder_phys_cmd_autorefresh autorefresh;
 	atomic_t pending_vblank_cnt;
 	wait_queue_head_t pending_vblank_wq;

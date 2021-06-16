@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -170,30 +171,24 @@ static void _sde_encoder_phys_cmd_update_intf_cfg(
 	}
 }
 
-static void sde_encoder_phys_cmd_pp_tx_done_irq(void *arg, int irq_idx)
+static void _sde_encoder_phys_signal_frame_done(struct sde_encoder_phys *phys_enc)
 {
-	struct sde_encoder_phys *phys_enc = arg;
 	struct sde_encoder_phys_cmd *cmd_enc;
 	struct sde_hw_ctl *ctl;
 	u32 scheduler_status = INVALID_CTL_STATUS, event = 0;
 
-	if (!phys_enc || !phys_enc->hw_pp)
-		return;
-
 	cmd_enc = to_sde_encoder_phys_cmd(phys_enc);
 	ctl = phys_enc->hw_ctl;
 
-	SDE_ATRACE_BEGIN("pp_done_irq");
-
 	/* notify all synchronous clients first, then asynchronous clients */
 	if (phys_enc->parent_ops.handle_frame_done &&
-	    atomic_add_unless(&phys_enc->pending_kickoff_cnt, -1, 0)) {
+		atomic_add_unless(&phys_enc->pending_kickoff_cnt, -1, 0)) {
 		event = SDE_ENCODER_FRAME_EVENT_DONE |
 			SDE_ENCODER_FRAME_EVENT_SIGNAL_RELEASE_FENCE;
 		spin_lock(phys_enc->enc_spinlock);
 		phys_enc->parent_ops.handle_frame_done(phys_enc->parent,
 				phys_enc, event);
-		if (cmd_enc->pp_timeout_report_cnt)
+		if (cmd_enc->frame_tx_timeout_report_cnt)
 			phys_enc->recovered = true;
 		spin_unlock(phys_enc->enc_spinlock);
 	}
@@ -201,11 +196,38 @@ static void sde_encoder_phys_cmd_pp_tx_done_irq(void *arg, int irq_idx)
 	if (ctl && ctl->ops.get_scheduler_status)
 		scheduler_status = ctl->ops.get_scheduler_status(ctl);
 
-	SDE_EVT32_IRQ(DRMID(phys_enc->parent),
-			phys_enc->hw_pp->idx - PINGPONG_0, event, scheduler_status);
+	SDE_EVT32_IRQ(DRMID(phys_enc->parent), ctl->idx - CTL_0,
+		phys_enc->hw_pp->idx - PINGPONG_0, event, scheduler_status);
 
 	/* Signal any waiting atomic commit thread */
 	wake_up_all(&phys_enc->pending_kickoff_wq);
+}
+
+static void sde_encoder_phys_cmd_ctl_done_irq(void *arg, int irq_idx)
+{
+	struct sde_encoder_phys *phys_enc = arg;
+
+	if (!phys_enc)
+		return;
+
+	SDE_ATRACE_BEGIN("ctl_done_irq");
+
+	_sde_encoder_phys_signal_frame_done(phys_enc);
+
+	SDE_ATRACE_END("ctl_done_irq");
+}
+
+static void sde_encoder_phys_cmd_pp_tx_done_irq(void *arg, int irq_idx)
+{
+	struct sde_encoder_phys *phys_enc = arg;
+
+	if (!phys_enc || !phys_enc->hw_pp)
+		return;
+
+	SDE_ATRACE_BEGIN("pp_done_irq");
+
+	_sde_encoder_phys_signal_frame_done(phys_enc);
+
 	SDE_ATRACE_END("pp_done_irq");
 }
 
@@ -337,6 +359,9 @@ static void _sde_encoder_phys_cmd_setup_irq_hw_idx(
 	irq = &phys_enc->irq[INTR_IDX_CTL_START];
 	irq->hw_idx = phys_enc->hw_ctl->idx;
 
+	irq = &phys_enc->irq[INTR_IDX_CTL_DONE];
+	irq->hw_idx = phys_enc->hw_ctl->idx;
+
 	irq = &phys_enc->irq[INTR_IDX_PINGPONG];
 	irq->hw_idx = phys_enc->hw_pp->idx;
 
@@ -457,7 +482,7 @@ static void sde_encoder_phys_cmd_mode_set(
 		sde_encoder_helper_get_kickoff_timeout_ms(phys_enc->parent);
 }
 
-static int _sde_encoder_phys_cmd_handle_ppdone_timeout(
+static int _sde_encoder_phys_cmd_handle_framedone_timeout(
 		struct sde_encoder_phys *phys_enc)
 {
 	struct sde_encoder_phys_cmd *cmd_enc =
@@ -479,11 +504,11 @@ static int _sde_encoder_phys_cmd_handle_ppdone_timeout(
 	if (!atomic_add_unless(&phys_enc->pending_kickoff_cnt, -1, 0))
 		return 0;
 
-	cmd_enc->pp_timeout_report_cnt++;
+	cmd_enc->frame_tx_timeout_report_cnt++;
 	pending_kickoff_cnt = atomic_read(&phys_enc->pending_kickoff_cnt) + 1;
 
 	SDE_EVT32(DRMID(phys_enc->parent), phys_enc->hw_pp->idx - PINGPONG_0,
-			cmd_enc->pp_timeout_report_cnt,
+			cmd_enc->frame_tx_timeout_report_cnt,
 			pending_kickoff_cnt,
 			frame_event);
 
@@ -492,7 +517,7 @@ static int _sde_encoder_phys_cmd_handle_ppdone_timeout(
 		goto exit;
 
 	/* to avoid flooding, only log first time, and "dead" time */
-	if (cmd_enc->pp_timeout_report_cnt == 1) {
+	if (cmd_enc->frame_tx_timeout_report_cnt == 1) {
 		SDE_ERROR_CMDENC(cmd_enc,
 				"pp:%d kickoff timed out ctl %d koff_cnt %d\n",
 				phys_enc->hw_pp->idx - PINGPONG_0,
@@ -517,7 +542,7 @@ static int _sde_encoder_phys_cmd_handle_ppdone_timeout(
 	if (recovery_events)
 		sde_connector_event_notify(conn, DRM_EVENT_SDE_HW_RECOVERY,
 				sizeof(uint8_t), SDE_RECOVERY_CAPTURE);
-	else if (cmd_enc->pp_timeout_report_cnt)
+	else if (cmd_enc->frame_tx_timeout_report_cnt)
 		SDE_DBG_DUMP(0x0, "panic");
 
 	/* request a ctl reset before the next kickoff */
@@ -701,6 +726,7 @@ static int _sde_encoder_phys_cmd_wait_for_idle(
 		struct sde_encoder_phys *phys_enc)
 {
 	struct sde_encoder_wait_info wait_info = {0};
+	enum sde_intr_idx intr_idx;
 	int ret;
 
 	if (!phys_enc) {
@@ -722,13 +748,14 @@ static int _sde_encoder_phys_cmd_wait_for_idle(
 	if (_sde_encoder_phys_cmd_is_scheduler_idle(phys_enc))
 		return 0;
 
-	ret = sde_encoder_helper_wait_for_irq(phys_enc, INTR_IDX_PINGPONG,
-			&wait_info);
+	intr_idx = sde_encoder_check_ctl_done_support(phys_enc->parent) ?
+				INTR_IDX_CTL_DONE : INTR_IDX_PINGPONG;
+
+	ret = sde_encoder_helper_wait_for_irq(phys_enc, intr_idx, &wait_info);
 	if (ret == -ETIMEDOUT) {
 		if (_sde_encoder_phys_cmd_is_scheduler_idle(phys_enc))
 			return 0;
-
-		_sde_encoder_phys_cmd_handle_ppdone_timeout(phys_enc);
+		_sde_encoder_phys_cmd_handle_framedone_timeout(phys_enc);
 	}
 
 	return ret;
@@ -834,6 +861,7 @@ void sde_encoder_phys_cmd_irq_control(struct sde_encoder_phys *phys_enc,
 		bool enable)
 {
 	struct sde_encoder_phys_cmd *cmd_enc;
+	bool ctl_done_supported = false;
 
 	if (!phys_enc)
 		return;
@@ -851,8 +879,12 @@ void sde_encoder_phys_cmd_irq_control(struct sde_encoder_phys *phys_enc,
 	SDE_EVT32(DRMID(phys_enc->parent), phys_enc->hw_pp->idx - PINGPONG_0,
 			enable, atomic_read(&phys_enc->vblank_refcount));
 
+	ctl_done_supported = sde_encoder_check_ctl_done_support(phys_enc->parent);
+
 	if (enable) {
-		sde_encoder_helper_register_irq(phys_enc, INTR_IDX_PINGPONG);
+		if (!ctl_done_supported)
+			sde_encoder_helper_register_irq(phys_enc, INTR_IDX_PINGPONG);
+
 		sde_encoder_phys_cmd_control_vblank_irq(phys_enc, true);
 
 		if (sde_encoder_phys_cmd_is_master(phys_enc)) {
@@ -860,6 +892,8 @@ void sde_encoder_phys_cmd_irq_control(struct sde_encoder_phys *phys_enc,
 					INTR_IDX_WRPTR);
 			sde_encoder_helper_register_irq(phys_enc,
 					INTR_IDX_AUTOREFRESH_DONE);
+			if (ctl_done_supported)
+				sde_encoder_helper_register_irq(phys_enc, INTR_IDX_CTL_DONE);
 		}
 
 	} else {
@@ -868,10 +902,14 @@ void sde_encoder_phys_cmd_irq_control(struct sde_encoder_phys *phys_enc,
 					INTR_IDX_WRPTR);
 			sde_encoder_helper_unregister_irq(phys_enc,
 					INTR_IDX_AUTOREFRESH_DONE);
+			if (ctl_done_supported)
+				sde_encoder_helper_unregister_irq(phys_enc, INTR_IDX_CTL_DONE);
 		}
 
 		sde_encoder_phys_cmd_control_vblank_irq(phys_enc, false);
-		sde_encoder_helper_unregister_irq(phys_enc, INTR_IDX_PINGPONG);
+
+		if (!ctl_done_supported)
+			sde_encoder_helper_unregister_irq(phys_enc, INTR_IDX_PINGPONG);
 	}
 }
 
@@ -1337,13 +1375,13 @@ static int sde_encoder_phys_cmd_prepare_for_kickoff(
 	if (phys_enc->recovered) {
 		recovery_events = sde_encoder_recovery_events_enabled(
 				phys_enc->parent);
-		if (cmd_enc->pp_timeout_report_cnt && recovery_events)
+		if (cmd_enc->frame_tx_timeout_report_cnt && recovery_events)
 			sde_connector_event_notify(phys_enc->connector,
 					DRM_EVENT_SDE_HW_RECOVERY,
 					sizeof(uint8_t),
 					SDE_RECOVERY_SUCCESS);
 
-		cmd_enc->pp_timeout_report_cnt = 0;
+		cmd_enc->frame_tx_timeout_report_cnt = 0;
 		phys_enc->recovered = false;
 	}
 
@@ -1987,6 +2025,12 @@ struct sde_encoder_phys *sde_encoder_phys_cmd_init(
 	irq->intr_type = SDE_IRQ_TYPE_CTL_START;
 	irq->intr_idx = INTR_IDX_CTL_START;
 	irq->cb.func = NULL;
+
+	irq = &phys_enc->irq[INTR_IDX_CTL_DONE];
+	irq->name = "ctl_done";
+	irq->intr_type = SDE_IRQ_TYPE_CTL_DONE;
+	irq->intr_idx = INTR_IDX_CTL_DONE;
+	irq->cb.func = sde_encoder_phys_cmd_ctl_done_irq;
 
 	irq = &phys_enc->irq[INTR_IDX_PINGPONG];
 	irq->name = "pp_done";

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -676,6 +677,7 @@ enum {
  * @SDE_FEATURE_TRUSTED_VM     Trusted VM supported
  * @SDE_FEATURE_UBWC_STATS     UBWC statistics supported
  * @SDE_FEATURE_VBIF_CLK_SPLIT VBIF clock split supported
+ * @SDE_FEATURE_CTL_DONE       Support for CTL DONE irq
  * @SDE_FEATURE_MAX:             MAX features value
  */
 enum sde_mdss_features {
@@ -716,6 +718,7 @@ enum sde_mdss_features {
 	SDE_FEATURE_TRUSTED_VM,
 	SDE_FEATURE_UBWC_STATS,
 	SDE_FEATURE_VBIF_CLK_SPLIT,
+	SDE_FEATURE_CTL_DONE,
 	SDE_FEATURE_MAX
 };
 

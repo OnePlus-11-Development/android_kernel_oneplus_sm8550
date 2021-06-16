@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -90,6 +91,16 @@
 #define SDE_INTR_CTL_3_START BIT(12)
 #define SDE_INTR_CTL_4_START BIT(13)
 #define SDE_INTR_CTL_5_START BIT(23)
+
+/**
+ * Ctl done interrupt status bit definitions
+ */
+#define SDE_INTR_CTL_0_DONE BIT(0)
+#define SDE_INTR_CTL_1_DONE BIT(1)
+#define SDE_INTR_CTL_2_DONE BIT(2)
+#define SDE_INTR_CTL_3_DONE BIT(3)
+#define SDE_INTR_CTL_4_DONE BIT(4)
+#define SDE_INTR_CTL_5_DONE BIT(5)
 
 /**
  * Concurrent WB overflow interrupt status bit definitions
@@ -282,6 +293,19 @@ static struct sde_irq_type sde_irq_intr2_map[] = {
 		SDE_INTR_CTL_4_START, -1},
 	{ SDE_IRQ_TYPE_CTL_START, CTL_5,
 		SDE_INTR_CTL_5_START, -1},
+
+	{ SDE_IRQ_TYPE_CTL_DONE, CTL_0,
+		SDE_INTR_CTL_0_DONE, -1},
+	{ SDE_IRQ_TYPE_CTL_DONE, CTL_1,
+		SDE_INTR_CTL_1_DONE, -1},
+	{ SDE_IRQ_TYPE_CTL_DONE, CTL_2,
+		SDE_INTR_CTL_2_DONE, -1},
+	{ SDE_IRQ_TYPE_CTL_DONE, CTL_3,
+		SDE_INTR_CTL_3_DONE, -1},
+	{ SDE_IRQ_TYPE_CTL_DONE, CTL_4,
+		SDE_INTR_CTL_4_DONE, -1},
+	{ SDE_IRQ_TYPE_CTL_DONE, CTL_5,
+		SDE_INTR_CTL_5_DONE, -1},
 
 	{ SDE_IRQ_TYPE_CWB_OVERFLOW, PINGPONG_CWB_0, SDE_INTR_CWB_OVERFLOW, -1},
 
