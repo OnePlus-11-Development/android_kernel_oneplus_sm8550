@@ -1229,8 +1229,6 @@ static void _sde_encoder_phys_wb_frame_done_helper(void *arg, bool frame_error)
 	struct sde_hw_wb *hw_wb = wb_enc->hw_wb;
 	u32 event = frame_error ? SDE_ENCODER_FRAME_EVENT_ERROR : 0;
 
-	SDE_DEBUG("[wb:%d,%u]\n", hw_wb->idx - WB_0, wb_enc->frame_count);
-
 	/* don't notify upper layer for internal commit */
 	if (phys_enc->enable_state == SDE_ENC_DISABLING &&
 			!phys_enc->in_clone_mode)
@@ -1292,15 +1290,11 @@ static void sde_encoder_phys_wb_irq_ctrl(
 
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys);
 	const struct sde_wb_cfg *wb_cfg;
-	int index = 0, refcount;
-	int ret = 0, pp = 0;
+	int index = 0, pp = 0;
 	u32 max_num_of_irqs = 0;
 	const u32 *irq_table = NULL;
 
 	if (!wb_enc)
-		return;
-
-	if (wb_enc->bypass_irqreg)
 		return;
 
 	pp = phys->hw_pp->idx - PINGPONG_0;
@@ -1308,7 +1302,6 @@ static void sde_encoder_phys_wb_irq_ctrl(
 		SDE_ERROR("invalid pingpong index for WB or CWB\n");
 		return;
 	}
-	refcount = atomic_read(&phys->wbirq_refcount);
 
 	/*
 	 * For Dedicated CWB, only one overflow IRQ is used for
@@ -1326,23 +1319,16 @@ static void sde_encoder_phys_wb_irq_ctrl(
 
 	if (enable && atomic_inc_return(&phys->wbirq_refcount) == 1) {
 		sde_encoder_helper_register_irq(phys, INTR_IDX_WB_DONE);
-		if (ret)
-			atomic_dec_return(&phys->wbirq_refcount);
 
 		for (index = 0; index < max_num_of_irqs; index++)
 			if (irq_table[index + pp] != SDE_NONE)
-				sde_encoder_helper_register_irq(phys,
-					irq_table[index + pp]);
-	} else if (!enable &&
-			atomic_dec_return(&phys->wbirq_refcount) == 0) {
+				sde_encoder_helper_register_irq(phys, irq_table[index + pp]);
+	} else if (!enable && atomic_dec_return(&phys->wbirq_refcount) == 0) {
 		sde_encoder_helper_unregister_irq(phys, INTR_IDX_WB_DONE);
-		if (ret)
-			atomic_inc_return(&phys->wbirq_refcount);
 
 		for (index = 0; index < max_num_of_irqs; index++)
 			if (irq_table[index + pp] != SDE_NONE)
-				sde_encoder_helper_unregister_irq(phys,
-					irq_table[index + pp]);
+				sde_encoder_helper_unregister_irq(phys, irq_table[index + pp]);
 	}
 }
 
@@ -1455,20 +1441,6 @@ static void _sde_encoder_phys_wb_reset_state(
 {
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
 
-	/*
-	 * frame count and kickoff count are only used for debug purpose. Frame
-	 * count can be more than kickoff count at the end of disable call due
-	 * to extra frame_done wait. It does not cause any issue because
-	 * frame_done wait is based on retire_fence count. Leaving these
-	 * counters for debugging purpose.
-	 */
-	if (wb_enc->frame_count != wb_enc->kickoff_count) {
-		SDE_EVT32(DRMID(phys_enc->parent), WBID(wb_enc),
-			wb_enc->kickoff_count, wb_enc->frame_count,
-			phys_enc->in_clone_mode);
-		wb_enc->frame_count = wb_enc->kickoff_count;
-	}
-
 	phys_enc->enable_state = SDE_ENC_DISABLED;
 	wb_enc->crtc = NULL;
 	phys_enc->hw_cdm = NULL;
@@ -1481,7 +1453,6 @@ static int _sde_encoder_phys_wb_wait_for_commit_done(
 {
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
 	u32 event = 0;
-	u64 wb_time = 0;
 	int rc = 0;
 	struct sde_encoder_wait_info wait_info = {0};
 
@@ -1491,12 +1462,12 @@ static int _sde_encoder_phys_wb_wait_for_commit_done(
 		return -EWOULDBLOCK;
 	}
 
-	SDE_EVT32(DRMID(phys_enc->parent), WBID(wb_enc), wb_enc->frame_count,
-		wb_enc->kickoff_count, !!wb_enc->wb_fb, is_disable,
-		phys_enc->in_clone_mode);
+	SDE_EVT32(DRMID(phys_enc->parent), WBID(wb_enc), phys_enc->in_clone_mode,
+			atomic_read(&phys_enc->pending_retire_fence_cnt),
+			!!wb_enc->wb_fb, is_disable);
 
 	if (!is_disable && phys_enc->in_clone_mode &&
-	    (atomic_read(&phys_enc->pending_retire_fence_cnt) <= 1))
+			(atomic_read(&phys_enc->pending_retire_fence_cnt) <= 1))
 		goto skip_wait;
 
 	/* signal completion if commit with no framebuffer */
@@ -1518,8 +1489,9 @@ static int _sde_encoder_phys_wb_wait_for_commit_done(
 		rc = 0;
 	} else if (rc == -ETIMEDOUT) {
 		SDE_EVT32(DRMID(phys_enc->parent), WBID(wb_enc),
-			wb_enc->frame_count, SDE_EVTLOG_ERROR);
-		SDE_ERROR("wb:%d kickoff timed out\n", WBID(wb_enc));
+			atomic_read(&phys_enc->pending_retire_fence_cnt), SDE_EVTLOG_ERROR);
+		SDE_ERROR("wb:%d clone_mode:%d, kickoff timed out\n",
+				WBID(wb_enc), phys_enc->in_clone_mode);
 
 		event = sde_encoder_phys_wb_frame_timeout(phys_enc);
 	}
@@ -1533,15 +1505,7 @@ static int _sde_encoder_phys_wb_wait_for_commit_done(
 	}
 
 skip_wait:
-	/* remove vote for iommu/clk/bus */
-	wb_enc->frame_count++;
-
-	if (!rc) {
-		wb_enc->end_time = ktime_get();
-		wb_time = (u64)ktime_to_us(wb_enc->end_time) -
-				(u64)ktime_to_us(wb_enc->start_time);
-		SDE_DEBUG("wb:%d took %llu us\n", WBID(wb_enc), wb_time);
-	}
+	SDE_EVT32(DRMID(phys_enc->parent), WBID(wb_enc), event, rc);
 
 	/* cleanup previous buffer if pending */
 	if (wb_enc->cwb_old_fb && wb_enc->cwb_old_aspace) {
@@ -1550,9 +1514,6 @@ skip_wait:
 		wb_enc->cwb_old_fb = NULL;
 		wb_enc->cwb_old_aspace = NULL;
 	}
-
-	SDE_EVT32(DRMID(phys_enc->parent), WBID(wb_enc), wb_enc->frame_count,
-			wb_time, event, rc);
 
 	return rc;
 }
@@ -1593,21 +1554,15 @@ static int sde_encoder_phys_wb_wait_for_tx_complete(
  * @params:	kickoff parameters
  * Returns:	Zero on success
  */
-static int sde_encoder_phys_wb_prepare_for_kickoff(
-		struct sde_encoder_phys *phys_enc,
+static int sde_encoder_phys_wb_prepare_for_kickoff(struct sde_encoder_phys *phys_enc,
 		struct sde_encoder_kickoff_params *params)
 {
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
-
-	SDE_DEBUG("[wb:%d,%u]\n", wb_enc->hw_wb->idx - WB_0,
-			wb_enc->kickoff_count);
 
 	if (phys_enc->in_clone_mode) {
 		wb_enc->cwb_old_fb = wb_enc->wb_fb;
 		wb_enc->cwb_old_aspace = wb_enc->wb_aspace;
 	}
-
-	wb_enc->kickoff_count++;
 
 	/* set OT limit & enable traffic shaper */
 	sde_encoder_phys_wb_setup(phys_enc);
@@ -1616,12 +1571,8 @@ static int sde_encoder_phys_wb_prepare_for_kickoff(
 
 	_sde_encoder_phys_wb_update_cwb_flush(phys_enc, true);
 
-	/* vote for iommu/clk/bus */
-	wb_enc->start_time = ktime_get();
-
-	SDE_EVT32(DRMID(phys_enc->parent), WBID(wb_enc),
-		wb_enc->kickoff_count, wb_enc->frame_count,
-		phys_enc->in_clone_mode);
+	SDE_EVT32(DRMID(phys_enc->parent), WBID(wb_enc), phys_enc->in_clone_mode,
+			atomic_read(&phys_enc->pending_retire_fence_cnt));
 	return 0;
 }
 
@@ -1838,10 +1789,6 @@ static void sde_encoder_phys_wb_disable(struct sde_encoder_phys *phys_enc)
 		SDE_ERROR("encoder is already disabled\n");
 		return;
 	}
-
-	SDE_DEBUG("[wait_for_done: wb:%d, frame:%u, kickoff:%u]\n",
-			hw_wb->idx - WB_0, wb_enc->frame_count,
-			wb_enc->kickoff_count);
 
 	if (!phys_enc->in_clone_mode || !wb_enc->crtc->state->active)
 		_sde_encoder_phys_wb_wait_for_commit_done(phys_enc, true);
@@ -2111,7 +2058,6 @@ struct sde_encoder_phys *sde_encoder_phys_wb_init(
 	phys_enc->enc_spinlock = p->enc_spinlock;
 	phys_enc->vblank_ctl_lock = p->vblank_ctl_lock;
 	atomic_set(&phys_enc->pending_retire_fence_cnt, 0);
-	atomic_set(&phys_enc->wbirq_refcount, 0);
 	init_waitqueue_head(&phys_enc->pending_kickoff_wq);
 	wb_cfg = wb_enc->hw_wb->caps;
 
