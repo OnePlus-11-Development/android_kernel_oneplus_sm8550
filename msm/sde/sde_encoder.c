@@ -3603,8 +3603,10 @@ static inline void _sde_encoder_trigger_flush(struct drm_encoder *drm_enc,
 	/* update pending counts and trigger kickoff ctl flush atomically */
 	spin_lock_irqsave(&sde_enc->enc_spinlock, lock_flags);
 
-	if (phys->ops.is_master && phys->ops.is_master(phys) && config_changed)
+	if (phys->ops.is_master && phys->ops.is_master(phys) && config_changed) {
 		atomic_inc(&phys->pending_retire_fence_cnt);
+		atomic_inc(&phys->pending_ctl_start_cnt);
+	}
 
 	pend_ret_fence_cnt = atomic_read(&phys->pending_retire_fence_cnt);
 
@@ -4280,7 +4282,7 @@ int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 		struct sde_encoder_kickoff_params *params)
 {
 	struct sde_encoder_virt *sde_enc;
-	struct sde_encoder_phys *phys;
+	struct sde_encoder_phys *phys, *cur_master;
 	struct sde_kms *sde_kms = NULL;
 	struct sde_crtc *sde_crtc;
 	bool needs_hw_reset = false, is_cmd_mode;
@@ -4303,13 +4305,12 @@ int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 	SDE_DEBUG_ENC(sde_enc, "\n");
 	SDE_EVT32(DRMID(drm_enc));
 
-	is_cmd_mode = sde_encoder_check_curr_mode(drm_enc,
-				MSM_DISPLAY_CMD_MODE);
-	if (sde_enc->cur_master && sde_enc->cur_master->connector
-			&& is_cmd_mode)
-		sde_enc->frame_trigger_mode = sde_connector_get_property(
-			sde_enc->cur_master->connector->state,
-			CONNECTOR_PROP_CMD_FRAME_TRIGGER_MODE);
+	cur_master = sde_enc->cur_master;
+	is_cmd_mode = sde_encoder_check_curr_mode(drm_enc, MSM_DISPLAY_CMD_MODE);
+	if (cur_master && cur_master->connector)
+		sde_enc->frame_trigger_mode =
+				sde_connector_get_property(cur_master->connector->state,
+					CONNECTOR_PROP_CMD_FRAME_TRIGGER_MODE);
 
 	_sde_encoder_helper_hdr_plus_mempool_update(sde_enc);
 
