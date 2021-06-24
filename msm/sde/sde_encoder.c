@@ -3417,13 +3417,9 @@ void sde_encoder_register_vblank_callback(struct drm_encoder *drm_enc,
 		SDE_ERROR("invalid encoder\n");
 		return;
 	}
-	SDE_DEBUG_ENC(sde_enc, "\n");
-	SDE_EVT32(DRMID(drm_enc), enable);
 
-	if (sde_encoder_in_clone_mode(drm_enc)) {
-		SDE_EVT32(DRMID(drm_enc), SDE_EVTLOG_ERROR);
-		return;
-	}
+	SDE_DEBUG_ENC(sde_enc, "enable:%d\n", enable);
+	SDE_EVT32(DRMID(drm_enc), enable);
 
 	spin_lock_irqsave(&sde_enc->enc_spinlock, lock_flags);
 	sde_enc->crtc_vblank_cb = vbl_cb;

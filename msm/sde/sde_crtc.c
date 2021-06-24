@@ -4133,25 +4133,23 @@ static int _sde_crtc_vblank_enable(
 			return ret;
 
 		mutex_lock(&sde_crtc->crtc_lock);
-		drm_for_each_encoder_mask(enc, crtc->dev,
-				sde_crtc->cached_encoder_mask) {
-			SDE_EVT32(DRMID(crtc), DRMID(enc));
+		drm_for_each_encoder_mask(enc, crtc->dev, sde_crtc->cached_encoder_mask) {
+			if (sde_encoder_in_clone_mode(enc))
+				continue;
 
-			sde_encoder_register_vblank_callback(enc,
-					sde_crtc_vblank_cb, (void *)crtc);
+			sde_encoder_register_vblank_callback(enc, sde_crtc_vblank_cb, (void *)crtc);
 		}
-
 		mutex_unlock(&sde_crtc->crtc_lock);
 	} else {
 		mutex_lock(&sde_crtc->crtc_lock);
-		drm_for_each_encoder_mask(enc, crtc->dev,
-				sde_crtc->cached_encoder_mask) {
-			SDE_EVT32(DRMID(crtc), DRMID(enc));
+		drm_for_each_encoder_mask(enc, crtc->dev, sde_crtc->cached_encoder_mask) {
+			if (sde_encoder_in_clone_mode(enc))
+				continue;
 
 			sde_encoder_register_vblank_callback(enc, NULL, NULL);
 		}
-
 		mutex_unlock(&sde_crtc->crtc_lock);
+
 		pm_runtime_put_sync(crtc->dev->dev);
 	}
 
@@ -4478,6 +4476,7 @@ static void sde_crtc_disable(struct drm_crtc *crtc)
 	u32 power_on;
 	bool in_cont_splash = false;
 	int ret, i;
+	enum sde_intf_mode intf_mode;
 
 	if (!crtc || !crtc->dev || !crtc->dev->dev_private || !crtc->state) {
 		SDE_ERROR("invalid crtc\n");
@@ -4501,7 +4500,10 @@ static void sde_crtc_disable(struct drm_crtc *crtc)
 
 	SDE_DEBUG("crtc%d\n", crtc->base.id);
 
-	drm_crtc_vblank_off(crtc);
+	/* avoid vblank on/off for virtual display */
+	intf_mode = sde_crtc_get_intf_mode(crtc, crtc->state);
+	if ((intf_mode != INTF_MODE_WB_BLOCK) && (intf_mode != INTF_MODE_WB_LINE))
+		drm_crtc_vblank_off(crtc);
 
 	mutex_lock(&sde_crtc->crtc_lock);
 	SDE_EVT32_VERBOSE(DRMID(crtc));
@@ -4609,6 +4611,7 @@ static void sde_crtc_enable(struct drm_crtc *crtc,
 	int ret, i;
 	struct sde_crtc_state *cstate;
 	struct msm_display_mode *msm_mode;
+	enum sde_intf_mode intf_mode;
 
 	if (!crtc || !crtc->dev || !crtc->dev->dev_private) {
 		SDE_ERROR("invalid crtc\n");
@@ -4633,9 +4636,14 @@ static void sde_crtc_enable(struct drm_crtc *crtc,
 	if (!sde_crtc->enabled) {
 		/* cache the encoder mask now for vblank work */
 		sde_crtc->cached_encoder_mask = crtc->state->encoder_mask;
-		/* max possible vsync_cnt(atomic_t) soft counter */
-		drm_crtc_set_max_vblank_count(crtc, INT_MAX);
-		drm_crtc_vblank_on(crtc);
+
+		/* avoid vblank on/off for virtual display */
+		intf_mode = sde_crtc_get_intf_mode(crtc, crtc->state);
+		if ((intf_mode != INTF_MODE_WB_BLOCK) && (intf_mode != INTF_MODE_WB_LINE)) {
+			/* max possible vsync_cnt(atomic_t) soft counter */
+			drm_crtc_set_max_vblank_count(crtc, INT_MAX);
+			drm_crtc_vblank_on(crtc);
+		}
 	}
 
 	mutex_lock(&sde_crtc->crtc_lock);
