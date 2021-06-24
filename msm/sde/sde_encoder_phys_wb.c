@@ -1442,7 +1442,7 @@ static void _sde_encoder_phys_wb_reset_state(
 }
 
 static int _sde_encoder_phys_wb_wait_for_commit_done(
-		struct sde_encoder_phys *phys_enc, bool is_disable)
+		struct sde_encoder_phys *phys_enc, bool force_wait)
 {
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
 	u32 event = 0;
@@ -1457,9 +1457,9 @@ static int _sde_encoder_phys_wb_wait_for_commit_done(
 
 	SDE_EVT32(DRMID(phys_enc->parent), WBID(wb_enc), phys_enc->in_clone_mode,
 			atomic_read(&phys_enc->pending_retire_fence_cnt),
-			!!wb_enc->wb_fb, is_disable);
+			!!wb_enc->wb_fb, force_wait);
 
-	if (!is_disable && phys_enc->in_clone_mode &&
+	if (!force_wait && phys_enc->in_clone_mode &&
 			(atomic_read(&phys_enc->pending_retire_fence_cnt) <= 1))
 		goto skip_wait;
 
@@ -1515,30 +1515,28 @@ skip_wait:
  * sde_encoder_phys_wb_wait_for_commit_done - wait until request is committed
  * @phys_enc:	Pointer to physical encoder
  */
-static int sde_encoder_phys_wb_wait_for_commit_done(
-		struct sde_encoder_phys *phys_enc)
+static int sde_encoder_phys_wb_wait_for_commit_done(struct sde_encoder_phys *phys_enc)
 {
-	int rc;
-
-	if (phys_enc->enable_state == SDE_ENC_DISABLING &&
-			phys_enc->in_clone_mode) {
-		rc = _sde_encoder_phys_wb_wait_for_commit_done(phys_enc, true);
-		_sde_encoder_phys_wb_reset_state(phys_enc);
-		sde_encoder_phys_wb_irq_ctrl(phys_enc, false);
-	} else {
-		rc = _sde_encoder_phys_wb_wait_for_commit_done(phys_enc, false);
-	}
-
-	return rc;
+	return _sde_encoder_phys_wb_wait_for_commit_done(phys_enc, false);
 }
 
 static int sde_encoder_phys_wb_wait_for_tx_complete(
 		struct sde_encoder_phys *phys_enc)
 {
+	int rc;
+
 	if (!atomic_read(&phys_enc->pending_retire_fence_cnt))
 		return 0;
 
-	return _sde_encoder_phys_wb_wait_for_commit_done(phys_enc, true);
+	rc = _sde_encoder_phys_wb_wait_for_commit_done(phys_enc, true);
+
+	/* cleanup for cwb disable case */
+	if ((phys_enc->enable_state == SDE_ENC_DISABLING) && phys_enc->in_clone_mode) {
+		_sde_encoder_phys_wb_reset_state(phys_enc);
+		sde_encoder_phys_wb_irq_ctrl(phys_enc, false);
+	}
+
+	return rc;
 }
 
 /**
