@@ -70,6 +70,7 @@ static struct v4l2_ioctl_ops msm_v4l2_ioctl_ops_enc = {
 	.vidioc_querymenu               = msm_v4l2_querymenu,
 	.vidioc_subscribe_event         = msm_v4l2_subscribe_event,
 	.vidioc_unsubscribe_event       = msm_v4l2_unsubscribe_event,
+	.vidioc_try_encoder_cmd         = msm_v4l2_try_encoder_cmd,
 	.vidioc_encoder_cmd             = msm_v4l2_encoder_cmd,
 };
 
@@ -108,6 +109,7 @@ static struct v4l2_ioctl_ops msm_v4l2_ioctl_ops_dec = {
 	.vidioc_querymenu               = msm_v4l2_querymenu,
 	.vidioc_subscribe_event         = msm_v4l2_subscribe_event,
 	.vidioc_unsubscribe_event       = msm_v4l2_unsubscribe_event,
+	.vidioc_try_decoder_cmd         = msm_v4l2_try_decoder_cmd,
 	.vidioc_decoder_cmd             = msm_v4l2_decoder_cmd,
 };
 
