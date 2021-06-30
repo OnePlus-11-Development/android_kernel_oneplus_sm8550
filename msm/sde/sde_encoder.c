@@ -923,11 +923,11 @@ static int _sde_encoder_atomic_check_phys_enc(struct sde_encoder_virt *sde_enc,
 }
 
 static int _sde_encoder_atomic_check_pu_roi(struct sde_encoder_virt *sde_enc,
-	struct drm_crtc_state *crtc_state,
-	struct drm_connector_state *conn_state,
-	struct sde_connector_state *sde_conn_state,
-	struct sde_crtc_state *sde_crtc_state)
+	struct drm_crtc_state *crtc_state, struct drm_connector_state *conn_state,
+	struct sde_connector_state *sde_conn_state, struct sde_crtc_state *sde_crtc_state)
 {
+	struct sde_crtc *sde_crtc = to_sde_crtc(crtc_state->crtc);
+	struct drm_display_mode *mode = &crtc_state->adjusted_mode;
 	int ret = 0;
 
 	if (crtc_state->mode_changed || crtc_state->active_changed) {
@@ -935,12 +935,11 @@ static int _sde_encoder_atomic_check_pu_roi(struct sde_encoder_virt *sde_enc,
 
 		mode_roi.x = 0;
 		mode_roi.y = 0;
-		mode_roi.w = crtc_state->adjusted_mode.hdisplay;
-		mode_roi.h = crtc_state->adjusted_mode.vdisplay;
+		mode_roi.w = sde_crtc_get_width(sde_crtc, sde_crtc_state, mode);
+		mode_roi.h = sde_crtc_get_mixer_height(sde_crtc, sde_crtc_state, mode);
 
 		if (sde_conn_state->rois.num_rects) {
-			sde_kms_rect_merge_rectangles(
-					&sde_conn_state->rois, &roi);
+			sde_kms_rect_merge_rectangles(&sde_conn_state->rois, &roi);
 			if (!sde_kms_rect_is_equal(&mode_roi, &roi)) {
 				SDE_ERROR_ENC(sde_enc,
 					"roi (%d,%d,%d,%d) on connector invalid during modeset\n",
@@ -950,8 +949,7 @@ static int _sde_encoder_atomic_check_pu_roi(struct sde_encoder_virt *sde_enc,
 		}
 
 		if (sde_crtc_state->user_roi_list.num_rects) {
-			sde_kms_rect_merge_rectangles(
-					&sde_crtc_state->user_roi_list, &roi);
+			sde_kms_rect_merge_rectangles(&sde_crtc_state->user_roi_list, &roi);
 			if (!sde_kms_rect_is_equal(&mode_roi, &roi)) {
 				SDE_ERROR_ENC(sde_enc,
 					"roi (%d,%d,%d,%d) on crtc invalid during modeset\n",

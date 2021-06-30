@@ -830,10 +830,10 @@ static int _sde_crtc_set_crtc_roi(struct drm_crtc *crtc,
 	struct sde_crtc_state *crtc_state;
 	struct sde_rect *crtc_roi;
 	struct msm_mode_info mode_info;
-	int i = 0;
-	int rc;
-	bool is_crtc_roi_dirty;
-	bool is_conn_roi_dirty;
+	int i = 0, rc;
+	bool is_crtc_roi_dirty, is_conn_roi_dirty;
+	u32 crtc_width, crtc_height;
+	struct drm_display_mode *adj_mode;
 
 	if (!crtc || !state)
 		return -EINVAL;
@@ -904,15 +904,16 @@ static int _sde_crtc_set_crtc_roi(struct drm_crtc *crtc,
 	sde_kms_rect_merge_rectangles(&crtc_state->user_roi_list, crtc_roi);
 
 	/* clear the ROI to null if it matches full screen anyways */
+	adj_mode = &state->adjusted_mode;
+	crtc_width = sde_crtc_get_width(sde_crtc, crtc_state, adj_mode);
+	crtc_height = sde_crtc_get_mixer_height(sde_crtc, crtc_state, adj_mode);
 	if (crtc_roi->x == 0 && crtc_roi->y == 0 &&
-			crtc_roi->w == state->adjusted_mode.hdisplay &&
-			crtc_roi->h == state->adjusted_mode.vdisplay)
+			crtc_roi->w == crtc_width && crtc_roi->h == crtc_height)
 		memset(crtc_roi, 0, sizeof(*crtc_roi));
 
 	SDE_DEBUG("%s: crtc roi (%d,%d,%d,%d)\n", sde_crtc->name,
 			crtc_roi->x, crtc_roi->y, crtc_roi->w, crtc_roi->h);
-	SDE_EVT32_VERBOSE(DRMID(crtc), crtc_roi->x, crtc_roi->y, crtc_roi->w,
-			crtc_roi->h);
+	SDE_EVT32_VERBOSE(DRMID(crtc), crtc_roi->x, crtc_roi->y, crtc_roi->w, crtc_roi->h);
 
 	return 0;
 }
@@ -3299,7 +3300,7 @@ static int _sde_crtc_check_dest_scaler_data(struct drm_crtc *crtc,
 	}
 
 	/* Display resolution */
-	hdisplay = mode->hdisplay/sde_crtc->num_mixers;
+	hdisplay = mode->hdisplay / sde_crtc->num_mixers;
 
 	/* Validate the DS data */
 	ret = _sde_crtc_check_dest_scaler_validate_ds(crtc, sde_crtc, cstate,
@@ -3472,13 +3473,12 @@ static void _sde_crtc_setup_is_ppsplit(struct drm_crtc_state *state)
 	}
 }
 
-static void _sde_crtc_setup_lm_bounds(struct drm_crtc *crtc,
-		struct drm_crtc_state *state)
+static void _sde_crtc_setup_lm_bounds(struct drm_crtc *crtc, struct drm_crtc_state *state)
 {
 	struct sde_crtc *sde_crtc;
 	struct sde_crtc_state *cstate;
 	struct drm_display_mode *adj_mode;
-	u32 crtc_split_width;
+	u32 mixer_width, mixer_height;
 	int i;
 
 	if (!crtc || !state) {
@@ -3490,16 +3490,15 @@ static void _sde_crtc_setup_lm_bounds(struct drm_crtc *crtc,
 	cstate = to_sde_crtc_state(state);
 
 	adj_mode = &state->adjusted_mode;
-	crtc_split_width = sde_crtc_get_mixer_width(sde_crtc, cstate, adj_mode);
+	mixer_width = sde_crtc_get_mixer_width(sde_crtc, cstate, adj_mode);
+	mixer_height = sde_crtc_get_mixer_height(sde_crtc, cstate, adj_mode);
 
 	for (i = 0; i < sde_crtc->num_mixers; i++) {
-		cstate->lm_bounds[i].x = crtc_split_width * i;
+		cstate->lm_bounds[i].x = mixer_width * i;
 		cstate->lm_bounds[i].y = 0;
-		cstate->lm_bounds[i].w = crtc_split_width;
-		cstate->lm_bounds[i].h =
-			sde_crtc_get_mixer_height(sde_crtc, cstate, adj_mode);
-		memcpy(&cstate->lm_roi[i], &cstate->lm_bounds[i],
-				sizeof(cstate->lm_roi[i]));
+		cstate->lm_bounds[i].w = mixer_width;
+		cstate->lm_bounds[i].h = mixer_height;
+		memcpy(&cstate->lm_roi[i], &cstate->lm_bounds[i], sizeof(cstate->lm_roi[i]));
 		SDE_EVT32_VERBOSE(DRMID(crtc), i,
 				cstate->lm_bounds[i].x, cstate->lm_bounds[i].y,
 				cstate->lm_bounds[i].w, cstate->lm_bounds[i].h);
@@ -4720,28 +4719,27 @@ static int _sde_crtc_excl_dim_layer_check(struct drm_crtc_state *state,
 		struct plane_state pstates[], int cnt)
 {
 	struct sde_crtc_state *cstate = to_sde_crtc_state(state);
+	struct sde_crtc *sde_crtc = to_sde_crtc(state->crtc);
 	struct drm_display_mode *mode = &state->adjusted_mode;
 	const struct drm_plane_state *pstate;
 	struct sde_plane_state *sde_pstate;
 	int rc = 0, i;
+	struct sde_rect *rect;
+	u32 crtc_width, crtc_height;
+
+	crtc_width = sde_crtc_get_width(sde_crtc, cstate, mode);
+	crtc_height = sde_crtc_get_mixer_height(sde_crtc, cstate, mode);
 
 	/* Check dim layer rect bounds and stage */
 	for (i = 0; i < cstate->num_dim_layers; i++) {
-		if ((CHECK_LAYER_BOUNDS(cstate->dim_layer[i].rect.y,
-			cstate->dim_layer[i].rect.h, mode->vdisplay)) ||
-		    (CHECK_LAYER_BOUNDS(cstate->dim_layer[i].rect.x,
-			cstate->dim_layer[i].rect.w, mode->hdisplay)) ||
-		    (cstate->dim_layer[i].stage >= SDE_STAGE_MAX) ||
-		    (!cstate->dim_layer[i].rect.w) ||
-		    (!cstate->dim_layer[i].rect.h)) {
-			SDE_ERROR("invalid dim_layer:{%d,%d,%d,%d}, stage:%d\n",
-					cstate->dim_layer[i].rect.x,
-					cstate->dim_layer[i].rect.y,
-					cstate->dim_layer[i].rect.w,
-					cstate->dim_layer[i].rect.h,
+		rect = &cstate->dim_layer[i].rect;
+		if ((CHECK_LAYER_BOUNDS(rect->y, rect->h, crtc_height)) ||
+		    (CHECK_LAYER_BOUNDS(rect->x, rect->w, crtc_width)) ||
+		    (cstate->dim_layer[i].stage >= SDE_STAGE_MAX) || (!rect->w) || (!rect->h)) {
+			SDE_ERROR("crtc:%d wxh:%dx%d, invalid dim_layer:{%d,%d,%d,%d}, stage:%d\n",
+					DRMID(state->crtc), crtc_width, crtc_height,
+					rect->x, rect->y, rect->w, rect->h,
 					cstate->dim_layer[i].stage);
-			SDE_ERROR("display: %dx%d\n", mode->hdisplay,
-					mode->vdisplay);
 			rc = -E2BIG;
 			goto end;
 		}
@@ -4752,9 +4750,8 @@ static int _sde_crtc_excl_dim_layer_check(struct drm_crtc_state *state,
 		pstate = pstates[i].drm_pstate;
 		sde_pstate = to_sde_plane_state(pstate);
 		SDE_DEBUG("p %d z %d src{%d,%d,%d,%d} excl_rect{%d,%d,%d,%d}\n",
-			pstate->plane->base.id, pstates[i].stage,
-			pstate->crtc_x, pstate->crtc_y,
-			pstate->crtc_w, pstate->crtc_h,
+			DRMID(pstate->plane), pstates[i].stage,
+			pstate->crtc_x, pstate->crtc_y, pstate->crtc_w, pstate->crtc_h,
 			sde_pstate->excl_rect.x, sde_pstate->excl_rect.y,
 			sde_pstate->excl_rect.w, sde_pstate->excl_rect.h);
 	}
@@ -5034,7 +5031,7 @@ static int _sde_crtc_check_get_pstates(struct drm_crtc *crtc,
 	struct sde_crtc_state *cstate;
 	const struct drm_plane_state *pstate;
 	const struct drm_plane_state *pipe_staged[SSPP_MAX];
-	int rc = 0, multirect_count = 0, i, mixer_width, mixer_height;
+	int rc = 0, multirect_count = 0, i, crtc_width, crtc_height;
 	int inc_sde_stage = 0;
 	struct sde_kms *kms;
 	u32 blend_type;
@@ -5050,11 +5047,8 @@ static int _sde_crtc_check_get_pstates(struct drm_crtc *crtc,
 
 	memset(pipe_staged, 0, sizeof(pipe_staged));
 
-	mixer_width = sde_crtc_get_mixer_width(sde_crtc, cstate, mode);
-	mixer_height = sde_crtc_get_mixer_height(sde_crtc, cstate, mode);
-
-	if (cstate->num_ds_enabled)
-		mixer_width = mixer_width * cstate->num_ds_enabled;
+	crtc_width = sde_crtc_get_width(sde_crtc, cstate, mode);
+	crtc_height = sde_crtc_get_mixer_height(sde_crtc, cstate, mode);
 
 	drm_atomic_crtc_state_for_each_plane_state(plane, pstate, state) {
 		if (IS_ERR_OR_NULL(pstate)) {
@@ -5103,23 +5097,18 @@ static int _sde_crtc_check_get_pstates(struct drm_crtc *crtc,
 
 		(*cnt)++;
 
-		if (CHECK_LAYER_BOUNDS(pstate->crtc_y, pstate->crtc_h,
-				mode->vdisplay) ||
-		    CHECK_LAYER_BOUNDS(pstate->crtc_x, pstate->crtc_w,
-				mode->hdisplay)) {
-			SDE_ERROR("invalid vertical/horizontal destination\n");
-			SDE_ERROR("y:%d h:%d vdisp:%d x:%d w:%d hdisp:%d\n",
-				pstate->crtc_y, pstate->crtc_h, mode->vdisplay,
-				pstate->crtc_x, pstate->crtc_w, mode->hdisplay);
+		if (CHECK_LAYER_BOUNDS(pstate->crtc_y, pstate->crtc_h, crtc_height) ||
+				CHECK_LAYER_BOUNDS(pstate->crtc_x, pstate->crtc_w, crtc_width)) {
+			SDE_ERROR("invalid dest - y:%d h:%d crtc_h:%d x:%d w:%d crtc_w:%d\n",
+				pstate->crtc_y, pstate->crtc_h, crtc_height,
+				pstate->crtc_x, pstate->crtc_w, crtc_width);
 			return -E2BIG;
 		}
 
 		if (blend_type != SDE_DRM_BLEND_OP_SKIP && cstate->num_ds_enabled &&
-				((pstate->crtc_h > mixer_height) ||
-				(pstate->crtc_w > mixer_width))) {
+			    ((pstate->crtc_h > crtc_height) || (pstate->crtc_w > crtc_width))) {
 			SDE_ERROR("plane w/h:%x*%x > mixer w/h:%x*%x\n",
-					pstate->crtc_w, pstate->crtc_h,
-					mixer_width, mixer_height);
+				pstate->crtc_w, pstate->crtc_h, crtc_width, crtc_height);
 			return -E2BIG;
 		}
 	}
@@ -5303,6 +5292,9 @@ static int _sde_crtc_check_plane_layout(struct drm_crtc *crtc,
 	struct drm_plane *plane;
 	struct drm_plane_state *plane_state;
 	struct sde_plane_state *pstate;
+	struct drm_display_mode *mode;
+	struct sde_crtc *sde_crtc;
+	struct sde_crtc_state *cstate;
 	int layout_split;
 
 	kms = _sde_crtc_get_kms(crtc);
@@ -5316,6 +5308,9 @@ static int _sde_crtc_check_plane_layout(struct drm_crtc *crtc,
 			SDE_RM_TOPOLOGY_GROUP_QUADPIPE))
 		return 0;
 
+	mode = &crtc->state->adjusted_mode;
+	sde_crtc = to_sde_crtc(crtc);
+	cstate = to_sde_crtc_state(crtc->state);
 	drm_atomic_crtc_state_for_each_plane(plane, crtc_state) {
 		plane_state = drm_atomic_get_existing_plane_state(
 				crtc_state->state, plane);
@@ -5323,7 +5318,7 @@ static int _sde_crtc_check_plane_layout(struct drm_crtc *crtc,
 			continue;
 
 		pstate = to_sde_plane_state(plane_state);
-		layout_split = crtc_state->mode.hdisplay >> 1;
+		layout_split = sde_crtc_get_width(sde_crtc, cstate, mode) >> 1;
 
 		if (plane_state->crtc_x >= layout_split) {
 			plane_state->crtc_x -= layout_split;
@@ -6325,15 +6320,13 @@ static int _sde_debugfs_status_show(struct seq_file *s, void *data)
 	struct sde_crtc *sde_crtc;
 	struct sde_plane_state *pstate = NULL;
 	struct sde_crtc_mixer *m;
-
 	struct drm_crtc *crtc;
 	struct drm_plane *plane;
 	struct drm_display_mode *mode;
 	struct drm_framebuffer *fb;
 	struct drm_plane_state *state;
 	struct sde_crtc_state *cstate;
-
-	int i, out_width, out_height;
+	int i, mixer_width, mixer_height;
 
 	if (!s || !s->private)
 		return -EINVAL;
@@ -6344,11 +6337,11 @@ static int _sde_debugfs_status_show(struct seq_file *s, void *data)
 
 	mutex_lock(&sde_crtc->crtc_lock);
 	mode = &crtc->state->adjusted_mode;
-	out_width = sde_crtc_get_mixer_width(sde_crtc, cstate, mode);
-	out_height = sde_crtc_get_mixer_height(sde_crtc, cstate, mode);
+	mixer_width = sde_crtc_get_mixer_width(sde_crtc, cstate, mode);
+	mixer_height = sde_crtc_get_mixer_height(sde_crtc, cstate, mode);
 
-	seq_printf(s, "crtc:%d width:%d height:%d\n", crtc->base.id,
-				mode->hdisplay, mode->vdisplay);
+	seq_printf(s, "crtc:%d width:%d height:%d\n", DRMID(crtc),
+				mixer_width * sde_crtc->num_mixers, mixer_height);
 
 	seq_puts(s, "\n");
 
@@ -6361,7 +6354,7 @@ static int _sde_debugfs_status_show(struct seq_file *s, void *data)
 		else
 			seq_printf(s, "\tmixer:%d ctl:%d width:%d height:%d\n",
 				m->hw_lm->idx - LM_0, m->hw_ctl->idx - CTL_0,
-				out_width, out_height);
+				mixer_width, mixer_height);
 	}
 
 	seq_puts(s, "\n");

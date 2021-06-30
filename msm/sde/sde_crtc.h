@@ -600,6 +600,25 @@ static inline int sde_crtc_get_mixer_height(struct sde_crtc *sde_crtc,
 }
 
 /**
+ * sde_crtc_get_width - get the correct crtc width based on the features enabled
+ */
+static inline int sde_crtc_get_width(struct sde_crtc *sde_crtc,
+	struct sde_crtc_state *cstate, struct drm_display_mode *mode)
+{
+	u32 width;
+
+	if (!sde_crtc || !cstate || !mode)
+		return 0;
+
+	if (cstate->num_ds_enabled)
+		width = cstate->ds_cfg[0].lm_width * cstate->num_ds_enabled;
+	else
+		width = mode->hdisplay;
+
+	return width;
+}
+
+/**
  * sde_crtc_frame_pending - retun the number of pending frames
  * @crtc: Pointer to drm crtc object
  */
