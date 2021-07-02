@@ -540,13 +540,8 @@ enum {
  * @SDE_WB_CHROMA_DOWN,     Writeback chroma down block,
  * @SDE_WB_DOWNSCALE,       Writeback integer downscaler,
  * @SDE_WB_DITHER,          Dither block
- * @SDE_WB_TRAFFIC_SHAPER,  Writeback traffic shaper bloc
  * @SDE_WB_UBWC,            Writeback Universal bandwidth compression
- * @SDE_WB_YUV_CONFIG       Writeback supports output of YUV colorspace
  * @SDE_WB_PIPE_ALPHA       Writeback supports pipe alpha
- * @SDE_WB_XY_ROI_OFFSET    Writeback supports x/y-offset of out ROI in
- *                          the destination image
- * @SDE_WB_QOS,             Writeback supports QoS control, danger/safe/creq
  * @SDE_WB_QOS_8LVL,        Writeback supports 8-level QoS control
  * @SDE_WB_CDP              Writeback supports client driven prefetch
  * @SDE_WB_INPUT_CTRL       Writeback supports from which pp block input pixel
@@ -567,12 +562,8 @@ enum {
 	SDE_WB_CHROMA_DOWN,
 	SDE_WB_DOWNSCALE,
 	SDE_WB_DITHER,
-	SDE_WB_TRAFFIC_SHAPER,
 	SDE_WB_UBWC,
-	SDE_WB_YUV_CONFIG,
 	SDE_WB_PIPE_ALPHA,
-	SDE_WB_XY_ROI_OFFSET,
-	SDE_WB_QOS,
 	SDE_WB_QOS_8LVL,
 	SDE_WB_CDP,
 	SDE_WB_INPUT_CTRL,

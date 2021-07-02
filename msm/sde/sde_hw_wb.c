@@ -21,19 +21,7 @@
 #define WB_DST3_ADDR			0x018
 #define WB_DST_YSTRIDE0			0x01C
 #define WB_DST_YSTRIDE1			0x020
-#define WB_DST_YSTRIDE1			0x020
-#define WB_DST_DITHER_BITDEPTH		0x024
-#define WB_DST_MATRIX_ROW0		0x030
-#define WB_DST_MATRIX_ROW1		0x034
-#define WB_DST_MATRIX_ROW2		0x038
-#define WB_DST_MATRIX_ROW3		0x03C
 #define WB_DST_WRITE_CONFIG		0x048
-#define WB_ROTATION_DNSCALER		0x050
-#define WB_ROTATOR_PIPE_DOWNSCALER	0x054
-#define WB_N16_INIT_PHASE_X_C03		0x060
-#define WB_N16_INIT_PHASE_X_C12		0x064
-#define WB_N16_INIT_PHASE_Y_C03		0x068
-#define WB_N16_INIT_PHASE_Y_C12		0x06C
 #define WB_OUT_SIZE			0x074
 #define WB_ALPHA_X_VALUE		0x078
 #define WB_DANGER_LUT			0x084
@@ -198,8 +186,7 @@ static void sde_hw_wb_setup_format(struct sde_hw_wb *ctx,
 			dst_format |= BIT(14); /* DST_ALPHA_X */
 	}
 
-	if (SDE_FORMAT_IS_YUV(fmt) &&
-			(ctx->caps->features & BIT(SDE_WB_YUV_CONFIG)))
+	if (SDE_FORMAT_IS_YUV(fmt))
 		dst_format |= BIT(15);
 
 	if (SDE_FORMAT_IS_DX(fmt))
@@ -548,15 +535,11 @@ static void _setup_wb_ops(struct sde_hw_wb_ops *ops,
 {
 	ops->setup_outaddress = sde_hw_wb_setup_outaddress;
 	ops->setup_outformat = sde_hw_wb_setup_format;
-
-	if (test_bit(SDE_WB_XY_ROI_OFFSET, &features))
-		ops->setup_roi = sde_hw_wb_roi;
+	ops->setup_qos_lut = sde_hw_wb_setup_qos_lut;
+	ops->setup_roi = sde_hw_wb_roi;
 
 	if (test_bit(SDE_WB_CROP, &features))
 		ops->setup_crop = sde_hw_wb_crop;
-
-	if (test_bit(SDE_WB_QOS, &features))
-		ops->setup_qos_lut = sde_hw_wb_setup_qos_lut;
 
 	if (test_bit(SDE_WB_CDP, &features))
 		ops->setup_cdp = sde_hw_wb_setup_cdp;

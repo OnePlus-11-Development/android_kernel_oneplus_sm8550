@@ -880,14 +880,7 @@ static int sde_encoder_phys_wb_atomic_check(
 		return -EINVAL;
 	}
 
-	SDE_DEBUG("[fb_fmt:%x,%llx]\n", fb->format->format,
-			fb->modifier);
-
-	if (SDE_FORMAT_IS_YUV(fmt) &&
-			!(wb_cfg->features & BIT(SDE_WB_YUV_CONFIG))) {
-		SDE_ERROR("invalid output format %x\n", fmt->base.pixel_format);
-		return -EINVAL;
-	}
+	SDE_DEBUG("[fb_fmt:%x,%llx]\n", fb->format->format, fb->modifier);
 
 	if (fmt->chroma_sample == SDE_CHROMA_H2V1 ||
 		fmt->chroma_sample == SDE_CHROMA_H1V2) {

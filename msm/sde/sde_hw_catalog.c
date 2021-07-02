@@ -2539,13 +2539,10 @@ static int sde_wb_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
 			set_bit(SDE_WB_LINE_MODE, &wb->features);
 		else
 			set_bit(SDE_WB_BLOCK_MODE, &wb->features);
-		set_bit(SDE_WB_TRAFFIC_SHAPER, &wb->features);
-		set_bit(SDE_WB_YUV_CONFIG, &wb->features);
 
 		if (test_bit(SDE_FEATURE_CDP, sde_cfg->features))
 			set_bit(SDE_WB_CDP, &wb->features);
 
-		set_bit(SDE_WB_QOS, &wb->features);
 		if (sde_cfg->vbif_qos_nlvl == 8)
 			set_bit(SDE_WB_QOS_8LVL, &wb->features);
 
@@ -2554,8 +2551,6 @@ static int sde_wb_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
 
 		if (test_bit(SDE_FEATURE_CWB_CROP, sde_cfg->features))
 			set_bit(SDE_WB_CROP, &wb->features);
-
-		set_bit(SDE_WB_XY_ROI_OFFSET, &wb->features);
 
 		if (IS_SDE_CTL_REV_100(sde_cfg->ctl_rev))
 			set_bit(SDE_WB_INPUT_CTRL, &wb->features);
