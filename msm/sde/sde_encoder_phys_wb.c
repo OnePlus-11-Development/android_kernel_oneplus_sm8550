@@ -1267,6 +1267,7 @@ static void _sde_encoder_phys_wb_frame_done_helper(void *arg, bool frame_error)
 	struct sde_encoder_phys_wb *wb_enc = arg;
 	struct sde_encoder_phys *phys_enc = &wb_enc->base;
 	u32 event = frame_error ? SDE_ENCODER_FRAME_EVENT_ERROR : 0;
+	u32 ubwc_error = 0;
 
 	/* don't notify upper layer for internal commit */
 	if (phys_enc->enable_state == SDE_ENC_DISABLING && !phys_enc->in_clone_mode)
@@ -1301,10 +1302,15 @@ static void _sde_encoder_phys_wb_frame_done_helper(void *arg, bool frame_error)
 		phys_enc->parent_ops.handle_vblank_virt(phys_enc->parent, phys_enc);
 
 end:
+	if (frame_error && wb_enc->hw_wb->ops.get_ubwc_error
+			&& wb_enc->hw_wb->ops.clear_ubwc_error) {
+		wb_enc->hw_wb->ops.get_ubwc_error(wb_enc->hw_wb);
+		wb_enc->hw_wb->ops.clear_ubwc_error(wb_enc->hw_wb);
+	}
 	SDE_EVT32_IRQ(DRMID(phys_enc->parent), WBID(wb_enc), phys_enc->in_clone_mode,
 			phys_enc->enable_state, event, atomic_read(&phys_enc->pending_kickoff_cnt),
 			atomic_read(&phys_enc->pending_retire_fence_cnt),
-			frame_error);
+			ubwc_error, frame_error);
 
 	wake_up_all(&phys_enc->pending_kickoff_wq);
 }

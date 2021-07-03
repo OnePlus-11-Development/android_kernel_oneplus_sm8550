@@ -40,6 +40,7 @@
 #define WB_CSC_BASE			0x260
 #define WB_DST_ADDR_SW_STATUS		0x2B0
 #define WB_CDP_CNTL			0x2B4
+#define WB_UBWC_ERROR_STATUS		0x2BC
 #define WB_OUT_IMAGE_SIZE		0x2C0
 #define WB_OUT_XY			0x2C4
 
@@ -550,6 +551,24 @@ static void sde_hw_wb_set_prog_line_count(struct sde_hw_wb *ctx, u32 val)
 	SDE_REG_WRITE(c, WB_PROG_LINE_COUNT, val);
 }
 
+static u32 sde_hw_wb_get_ubwc_error(struct sde_hw_wb *ctx)
+{
+	struct sde_hw_blk_reg_map *c;
+
+	c = &ctx->hw;
+
+	return SDE_REG_READ(c, WB_UBWC_ERROR_STATUS) & 0xFF;
+}
+
+static void sde_hw_wb_clear_ubwc_error(struct sde_hw_wb *ctx)
+{
+	struct sde_hw_blk_reg_map *c;
+
+	c = &ctx->hw;
+
+	return SDE_REG_WRITE(c, WB_UBWC_ERROR_STATUS, BIT(31));
+}
+
 static void _setup_wb_ops(struct sde_hw_wb_ops *ops,
 	unsigned long features)
 {
@@ -557,6 +576,8 @@ static void _setup_wb_ops(struct sde_hw_wb_ops *ops,
 	ops->setup_outformat = sde_hw_wb_setup_format;
 	ops->setup_qos_lut = sde_hw_wb_setup_qos_lut;
 	ops->setup_roi = sde_hw_wb_roi;
+	ops->get_ubwc_error = sde_hw_wb_get_ubwc_error;
+	ops->clear_ubwc_error = sde_hw_wb_clear_ubwc_error;
 
 	if (test_bit(SDE_WB_CROP, &features))
 		ops->setup_crop = sde_hw_wb_crop;

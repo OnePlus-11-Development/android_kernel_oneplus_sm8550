@@ -175,6 +175,18 @@ struct sde_hw_wb_ops {
 	 * @line_count: programmable line-count value
 	 */
 	void (*set_prog_line_count)(struct sde_hw_wb *ctx, u32 line_count);
+
+	/**
+	 * get_ubwc_error - get ubwc error status
+	 * @ctx: Pointer to wb context
+	 */
+	u32 (*get_ubwc_error)(struct sde_hw_wb *ctx);
+
+	/**
+	 * clear_ubwc_error - clear ubwc error status
+	 * @ctx: Pointer to wb context
+	 */
+	void (*clear_ubwc_error)(struct sde_hw_wb *ctx);
 };
 
 /**
