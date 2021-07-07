@@ -1283,6 +1283,19 @@ static void sde_encoder_phys_wb_done_irq(void *arg, int irq_idx)
 	_sde_encoder_phys_wb_frame_done_helper(arg, false);
 }
 
+static void sde_encoder_phys_wb_lineptr_irq(void *arg, int irq_idx)
+{
+	struct sde_encoder_phys_wb *wb_enc = arg;
+	struct sde_encoder_phys *phys_enc;
+
+	if (!wb_enc)
+		return;
+
+	phys_enc = &wb_enc->base;
+
+	SDE_EVT32_IRQ(DRMID(phys_enc->parent), WBID(wb_enc));
+}
+
 /**
  * sde_encoder_phys_wb_irq_ctrl - irq control of WB
  * @phys:	Pointer to physical encoder
@@ -2132,6 +2145,13 @@ struct sde_encoder_phys *sde_encoder_phys_wb_init(
 	irq->intr_type = SDE_IRQ_TYPE_CTL_START;
 	irq->intr_idx = INTR_IDX_CTL_START;
 	irq->cb.func = sde_encoder_phys_wb_ctl_start_irq;
+
+	irq = &phys_enc->irq[INTR_IDX_WB_LINEPTR];
+	irq->name = "lineptr_irq";
+	irq->hw_idx =  wb_enc->hw_wb->idx;
+	irq->intr_type = SDE_IRQ_TYPE_WB_PROG_LINE;
+	irq->intr_idx = INTR_IDX_WB_LINEPTR;
+	irq->cb.func = sde_encoder_phys_wb_lineptr_irq;
 
 	if (wb_cfg && (wb_cfg->features & BIT(SDE_WB_HAS_DCWB))) {
 		irq = &phys_enc->irq[INTR_IDX_PP_CWB_OVFL];

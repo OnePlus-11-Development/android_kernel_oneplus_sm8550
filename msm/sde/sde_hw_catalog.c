@@ -1348,6 +1348,10 @@ static int _add_to_irq_offset_list(struct sde_mdss_cfg *sde_cfg,
 		if (instance >= LTM_MAX)
 			err = true;
 		break;
+	case SDE_INTR_HWBLK_WB:
+		if (instance >= WB_MAX)
+			err = true;
+		break;
 	default:
 		SDE_ERROR("invalid hwblk_type: %d", blk_type);
 		return -EINVAL;
@@ -2554,6 +2558,11 @@ static int sde_wb_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
 
 		if (IS_SDE_CTL_REV_100(sde_cfg->ctl_rev))
 			set_bit(SDE_WB_INPUT_CTRL, &wb->features);
+
+		if (SDE_HW_MAJOR(sde_cfg->hw_rev) >= SDE_HW_MAJOR(SDE_HW_VER_900))
+			set_bit(SDE_WB_PROG_LINE, &wb->features);
+
+		rc = _add_to_irq_offset_list(sde_cfg, SDE_INTR_HWBLK_WB, wb->id, wb->base);
 
 		if (test_bit(SDE_FEATURE_DEDICATED_CWB, sde_cfg->features)) {
 			set_bit(SDE_WB_HAS_DCWB, &wb->features);

@@ -196,6 +196,7 @@ enum sde_intr_hwblk_type {
 	SDE_INTR_HWBLK_AD4,
 	SDE_INTR_HWBLK_INTF_TEAR,
 	SDE_INTR_HWBLK_LTM,
+	SDE_INTR_HWBLK_WB,
 	SDE_INTR_HWBLK_MAX
 };
 
@@ -552,6 +553,7 @@ enum {
  * @SDE_WB_CWB_CTRL         Separate CWB control is available for configuring
  * @SDE_WB_DCWB_CTRL        Separate DCWB control is available for configuring
  * @SDE_WB_CWB_DITHER_CTRL  CWB dither is available for configuring
+ * @SDE_WB_PROG_LINE        Writeback block supports programmable line ptr
  * @SDE_WB_MAX              maximum value
  */
 enum {
@@ -573,6 +575,7 @@ enum {
 	SDE_WB_CWB_CTRL,
 	SDE_WB_DCWB_CTRL,
 	SDE_WB_CWB_DITHER_CTRL,
+	SDE_WB_PROG_LINE,
 	SDE_WB_MAX
 };
 

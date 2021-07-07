@@ -205,6 +205,7 @@ struct sde_encoder_phys_ops {
  * @INTR_IDX_AUTOREFRESH_DONE:  Autorefresh done for cmd mode panel meaning
  *                              autorefresh has triggered a double buffer flip
  * @INTR_IDX_WRPTR:    Writepointer start interrupt for cmd mode panel
+ * @INTR_IDX_WB_LINEPTR:  Programmable lineptr interrupt for WB
  */
 enum sde_intr_idx {
 	INTR_IDX_VSYNC,
@@ -221,6 +222,7 @@ enum sde_intr_idx {
 	INTR_IDX_PP5_OVFL,
 	INTR_IDX_PP_CWB_OVFL,
 	INTR_IDX_WRPTR,
+	INTR_IDX_WB_LINEPTR,
 	INTR_IDX_MAX,
 };
 

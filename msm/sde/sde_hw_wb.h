@@ -162,6 +162,19 @@ struct sde_hw_wb_ops {
 	 */
 	void (*program_cwb_dither_ctrl)(struct sde_hw_wb *ctx,
 		const enum sde_dcwb dcwb_idx, void *cfg, size_t len, bool enable);
+
+	/**
+	 * get_line_count - get current wb output linecount
+	 * @ctx: Pointer to wb context
+	 */
+	u32 (*get_line_count)(struct sde_hw_wb *ctx);
+
+	/**
+	 * set_prog_line_count - set wb programmable line
+	 * @ctx: Pointer to wb context
+	 * @line_count: programmable line-count value
+	 */
+	void (*set_prog_line_count)(struct sde_hw_wb *ctx, u32 line_count);
 };
 
 /**

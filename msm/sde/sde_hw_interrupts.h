@@ -56,6 +56,7 @@
  * @SDE_IRQ_TYPE_INTF_TEAR_TE_CHECK:	INTF Tear TE detection
  * @SDE_IRQ_TYPE_LTM_STATS_DONE:	LTM stats done interrupt
  * @SDE_IRQ_TYPE_LTM_STATS_WB_PB:	LTM stats WB push back interrupt
+ * @SDE_IRQ_TYPE_PROG_LINE:		Programmable Line interrupt for WB
  * @SDE_IRQ_TYPE_RESERVED:		Reserved for expansion
  */
 enum sde_intr_type {
@@ -93,6 +94,7 @@ enum sde_intr_type {
 	SDE_IRQ_TYPE_INTF_TEAR_TE_CHECK,
 	SDE_IRQ_TYPE_LTM_STATS_DONE,
 	SDE_IRQ_TYPE_LTM_STATS_WB_PB,
+	SDE_IRQ_TYPE_WB_PROG_LINE,
 	SDE_IRQ_TYPE_RESERVED,
 };
 
