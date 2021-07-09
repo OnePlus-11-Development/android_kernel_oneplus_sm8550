@@ -155,7 +155,8 @@
 #define SDE_UIDLE_FAL10_TARGET_IDLE 50
 #define SDE_UIDLE_FAL1_TARGET_IDLE 40
 #define SDE_UIDLE_FAL1_MAX_THRESHOLD 15
-#define SDE_UIDLE_REV102_FAL1_MAX_THRESHOLD 255
+#define SDE_UIDLE_FAL1_MAX_THRESHOLD_EXT_REV_102 255
+#define SDE_UIDLE_FAL1_MAX_THRESHOLD_EXT_REV_103 255
 #define SDE_UIDLE_FAL10_THRESHOLD_60 12
 #define SDE_UIDLE_FAL10_THRESHOLD_90 13
 #define SDE_UIDLE_MAX_DWNSCALE 1500
@@ -1838,8 +1839,11 @@ static void sde_sspp_set_features(struct sde_mdss_cfg *sde_cfg,
 					&sspp->perf_features);
 		}
 
-		if (sde_cfg->uidle_cfg.uidle_rev)
+		if (sde_cfg->uidle_cfg.uidle_rev) {
 			set_bit(SDE_PERF_SSPP_UIDLE, &sspp->perf_features);
+			if (sde_cfg->uidle_cfg.uidle_rev >= SDE_UIDLE_VERSION_1_0_3)
+				set_bit(SDE_PERF_SSPP_UIDLE_FILL_LVL_SCALE, &sspp->perf_features);
+		}
 
 		if (sde_cfg->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache)
 			set_bit(SDE_PERF_SSPP_SYS_CACHE, &sspp->perf_features);
@@ -4756,42 +4760,40 @@ static void _sde_hw_setup_uidle(struct sde_uidle_cfg *uidle_cfg)
 	if (!uidle_cfg->uidle_rev)
 		return;
 
-	if ((IS_SDE_UIDLE_REV_102(uidle_cfg->uidle_rev)) ||
-			(IS_SDE_UIDLE_REV_101(uidle_cfg->uidle_rev)) ||
-			(IS_SDE_UIDLE_REV_100(uidle_cfg->uidle_rev))) {
-		uidle_cfg->fal10_exit_cnt = SDE_UIDLE_FAL10_EXIT_CNT;
-		uidle_cfg->fal10_exit_danger = SDE_UIDLE_FAL10_EXIT_DANGER;
-		uidle_cfg->fal10_danger = SDE_UIDLE_FAL10_DANGER;
-		uidle_cfg->fal10_target_idle_time = SDE_UIDLE_FAL10_TARGET_IDLE;
-		uidle_cfg->fal1_target_idle_time = SDE_UIDLE_FAL1_TARGET_IDLE;
-		uidle_cfg->max_dwnscale = SDE_UIDLE_MAX_DWNSCALE;
-		uidle_cfg->debugfs_ctrl = true;
-		uidle_cfg->fal1_max_threshold = SDE_UIDLE_FAL1_MAX_THRESHOLD;
+	uidle_cfg->fal10_exit_cnt = SDE_UIDLE_FAL10_EXIT_CNT;
+	uidle_cfg->fal10_exit_danger = SDE_UIDLE_FAL10_EXIT_DANGER;
+	uidle_cfg->fal10_danger = SDE_UIDLE_FAL10_DANGER;
+	uidle_cfg->fal10_target_idle_time = SDE_UIDLE_FAL10_TARGET_IDLE;
+	uidle_cfg->fal1_target_idle_time = SDE_UIDLE_FAL1_TARGET_IDLE;
+	uidle_cfg->max_dwnscale = SDE_UIDLE_MAX_DWNSCALE;
+	uidle_cfg->debugfs_ctrl = true;
+	uidle_cfg->fal1_max_threshold = SDE_UIDLE_FAL1_MAX_THRESHOLD;
 
-		if (IS_SDE_UIDLE_REV_100(uidle_cfg->uidle_rev)) {
-			uidle_cfg->fal10_threshold =
-				SDE_UIDLE_FAL10_THRESHOLD_60;
-			uidle_cfg->max_fps = SDE_UIDLE_MAX_FPS_60;
-		} else if (IS_SDE_UIDLE_REV_101(uidle_cfg->uidle_rev)) {
-			set_bit(SDE_UIDLE_QACTIVE_OVERRIDE,
-					&uidle_cfg->features);
-			uidle_cfg->fal10_threshold =
-				SDE_UIDLE_FAL10_THRESHOLD_90;
-			uidle_cfg->max_fps = SDE_UIDLE_MAX_FPS_90;
-		} else if (IS_SDE_UIDLE_REV_102(uidle_cfg->uidle_rev)) {
-			set_bit(SDE_UIDLE_QACTIVE_OVERRIDE,
-					&uidle_cfg->features);
-			uidle_cfg->fal10_threshold =
-				SDE_UIDLE_FAL10_THRESHOLD_90;
-			uidle_cfg->max_fps = SDE_UIDLE_MAX_FPS_90;
-			uidle_cfg->max_fal1_fps = SDE_UIDLE_MAX_FPS_240;
-			uidle_cfg->fal1_max_threshold =
-					SDE_UIDLE_REV102_FAL1_MAX_THRESHOLD;
-		}
-	} else {
-		pr_err("invalid uidle rev:0x%x, disabling uidle\n",
-			uidle_cfg->uidle_rev);
-		uidle_cfg->uidle_rev = 0;
+	if (IS_SDE_UIDLE_REV_100(uidle_cfg->uidle_rev)) {
+		uidle_cfg->fal10_threshold =
+			SDE_UIDLE_FAL10_THRESHOLD_60;
+		uidle_cfg->max_fps = SDE_UIDLE_MAX_FPS_60;
+	} else if (IS_SDE_UIDLE_REV_101(uidle_cfg->uidle_rev)) {
+		set_bit(SDE_UIDLE_QACTIVE_OVERRIDE,
+				&uidle_cfg->features);
+		uidle_cfg->fal10_threshold =
+			SDE_UIDLE_FAL10_THRESHOLD_90;
+		uidle_cfg->max_fps = SDE_UIDLE_MAX_FPS_90;
+	} else if (IS_SDE_UIDLE_REV_102(uidle_cfg->uidle_rev)) {
+		set_bit(SDE_UIDLE_QACTIVE_OVERRIDE,
+				&uidle_cfg->features);
+		uidle_cfg->fal10_threshold =
+			SDE_UIDLE_FAL10_THRESHOLD_90;
+		uidle_cfg->max_fps = SDE_UIDLE_MAX_FPS_90;
+		uidle_cfg->max_fal1_fps = SDE_UIDLE_MAX_FPS_240;
+		uidle_cfg->fal1_max_threshold =
+				SDE_UIDLE_FAL1_MAX_THRESHOLD_EXT_REV_102;
+	} else if (IS_SDE_UIDLE_REV_103(uidle_cfg->uidle_rev)) {
+		set_bit(SDE_UIDLE_QACTIVE_OVERRIDE, &uidle_cfg->features);
+		uidle_cfg->max_fps = SDE_UIDLE_MAX_FPS_240;
+		uidle_cfg->max_fal1_fps = SDE_UIDLE_MAX_FPS_240;
+		uidle_cfg->fal1_max_threshold = SDE_UIDLE_FAL1_MAX_THRESHOLD_EXT_REV_103;
+		uidle_cfg->fal10_threshold = SDE_UIDLE_FAL10_THRESHOLD_60;
 	}
 }
 
@@ -5146,7 +5148,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		sde_cfg->ts_prefill_rev = 2;
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
 		sde_cfg->true_inline_rot_rev = SDE_INLINE_ROT_VERSION_2_0_1;
-		sde_cfg->uidle_cfg.uidle_rev = SDE_UIDLE_VERSION_1_0_2;
+		sde_cfg->uidle_cfg.uidle_rev = SDE_UIDLE_VERSION_1_0_3;
 		sde_cfg->mdss_hw_block_size = 0x158;
 		sde_cfg->demura_supported[SSPP_DMA1][0] = 0;
 		sde_cfg->demura_supported[SSPP_DMA1][1] = 1;

@@ -2942,6 +2942,28 @@ static void _sde_plane_setup_uidle(struct drm_crtc *crtc,
 			psde->catalog->uidle_cfg.fal1_max_threshold);
 		cfg.fal_allowed_threshold = fal10_threshold +
 			(fal10_target_idle_time_ns*1000/line_time*2)/1000;
+		cfg.fill_level_scale = 0;
+
+		/*
+		 * if uidle fill scale is supported, determing the scale value
+		 * and adjust fal10 thresholds to their scaled values.
+		 * fal1 thresholds and fal_allowed are not scaled.
+		 */
+		if (psde->pipe_hw->ops.setup_uidle_fill_scale) {
+			u32 fl_require0 = psde->catalog->qos_target_time_ns / line_time * 2;
+			u32 fl_require = max(fal10_threshold * 1000, fl_require0);
+			u32 fl_scale = fl_require / fal10_threshold;
+			u32 fal10_threshold_noscale;
+
+			cfg.fill_level_scale = (fl_scale <= 1) ? 0 : (32 / fl_scale);
+
+			if (cfg.fill_level_scale) {
+				fal10_threshold_noscale = fal10_threshold *
+					32/cfg.fill_level_scale;
+				cfg.fal_allowed_threshold = fal10_threshold_noscale +
+					(fal10_target_idle_time_ns * 1000 / line_time * 2) / 1000;
+			}
+		}
 	} else {
 		SDE_ERROR("invalid settings, will disable UIDLE %d %d %d %d\n",
 			line_time, fal10_threshold, fal10_target_idle_time_ns,
@@ -2950,9 +2972,10 @@ static void _sde_plane_setup_uidle(struct drm_crtc *crtc,
 	}
 
 	SDE_DEBUG_PLANE(psde,
-		"tholds: fal10=%d fal10_exit=%d fal1=%d fal_allowed=%d\n",
+		"tholds: fal10=%d fal10_exit=%d fal1=%d fal_allowed=%d fill_scale=%d\n",
 			cfg.fal10_threshold, cfg.fal10_exit_threshold,
-			cfg.fal1_threshold, cfg.fal_allowed_threshold);
+			cfg.fal1_threshold, cfg.fal_allowed_threshold,
+			cfg.fill_level_scale);
 	SDE_DEBUG_PLANE(psde,
 		"times: line:%d fal1_idle:%d fal10_idle:%d dwnscale:%d\n",
 			line_time, fal1_target_idle_time_ns,
@@ -2961,7 +2984,10 @@ static void _sde_plane_setup_uidle(struct drm_crtc *crtc,
 	SDE_EVT32_VERBOSE(cfg.enable,
 		cfg.fal10_threshold, cfg.fal10_exit_threshold,
 		cfg.fal1_threshold, cfg.fal_allowed_threshold,
-		psde->catalog->uidle_cfg.max_dwnscale);
+		cfg.fill_level_scale, psde->catalog->uidle_cfg.max_dwnscale);
+
+	if (psde->pipe_hw->ops.setup_uidle_fill_scale)
+		psde->pipe_hw->ops.setup_uidle_fill_scale(psde->pipe_hw, &cfg);
 
 	psde->pipe_hw->ops.setup_uidle(
 		psde->pipe_hw, &cfg,
