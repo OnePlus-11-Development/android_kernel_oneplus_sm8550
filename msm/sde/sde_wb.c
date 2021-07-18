@@ -564,6 +564,10 @@ int sde_wb_connector_post_init(struct drm_connector *connector, void *display)
 			ARRAY_SIZE(e_fb_translation_mode), 0,
 			CONNECTOR_PROP_FB_TRANSLATION_MODE);
 
+	if (wb_dev->wb_cfg->features & BIT(SDE_WB_PROG_LINE))
+		msm_property_install_range(&c_conn->property_info, "early_fence_line",
+			0x0, 0, UINT_MAX, 0, CONNECTOR_PROP_EARLY_FENCE_LINE);
+
 	sde_wb_connector_install_dither_property(wb_dev, c_conn);
 
 	return 0;

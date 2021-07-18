@@ -437,6 +437,7 @@ struct sde_encoder_phys_cmd {
  * @bo_disable:		Buffer object(s) to use during the disabling state
  * @fb_disable:		Frame buffer to use during the disabling state
  * @crtc		Pointer to drm_crtc
+ * @prog_line:		Cached programmable line value used to trigger early wb-fence
  */
 struct sde_encoder_phys_wb {
 	struct sde_encoder_phys base;
@@ -455,6 +456,7 @@ struct sde_encoder_phys_wb {
 	struct drm_gem_object *bo_disable[SDE_MAX_PLANES];
 	struct drm_framebuffer *fb_disable;
 	struct drm_crtc *crtc;
+	u32 prog_line;
 };
 
 /**

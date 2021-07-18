@@ -682,7 +682,7 @@ static int _sde_enc_phys_wb_validate_cwb(struct sde_encoder_phys *phys_enc,
 	int out_width = 0, out_height = 0;
 	int ds_srcw = 0, ds_srch = 0, ds_outw = 0, ds_outh = 0;
 	const struct sde_format *fmt;
-	int data_pt;
+	int data_pt, prog_line;
 	int ds_in_use = false;
 	int i = 0;
 	int ret = 0;
@@ -707,6 +707,12 @@ static int _sde_enc_phys_wb_validate_cwb(struct sde_encoder_phys *phys_enc,
 
 	if (!wb_roi.w || !wb_roi.h) {
 		SDE_ERROR("cwb roi is not set wxh:%dx%d\n", wb_roi.w, wb_roi.h);
+		return -EINVAL;
+	}
+
+	prog_line = sde_connector_get_property(conn_state, CONNECTOR_PROP_EARLY_FENCE_LINE);
+	if (prog_line) {
+		SDE_ERROR("early fence not supported with CWB, prog_line:%d\n", prog_line);
 		return -EINVAL;
 	}
 
@@ -1139,6 +1145,24 @@ static void _sde_encoder_phys_wb_update_flush(struct sde_encoder_phys *phys_enc)
 			hw_wb->idx - WB_0);
 }
 
+static void _sde_encoder_phys_wb_setup_prog_line(struct sde_encoder_phys *phys_enc)
+{
+	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
+	struct sde_wb_device *wb_dev = wb_enc->wb_dev;
+	struct drm_connector_state *state = wb_dev->connector->state;
+	struct sde_hw_wb *hw_wb = wb_enc->hw_wb;
+	u32 prog_line;
+
+	if (phys_enc->in_clone_mode || !hw_wb->ops.set_prog_line_count)
+		return;
+
+	prog_line = sde_connector_get_property(state, CONNECTOR_PROP_EARLY_FENCE_LINE);
+	if (wb_enc->prog_line != prog_line) {
+		wb_enc->prog_line = prog_line;
+		hw_wb->ops.set_prog_line_count(hw_wb, prog_line);
+	}
+}
+
 /**
  * sde_encoder_phys_wb_setup - setup writeback encoder
  * @phys_enc:	Pointer to physical encoder
@@ -1213,12 +1237,16 @@ static void sde_encoder_phys_wb_setup(
 	sde_encoder_phys_wb_setup_cdp(phys_enc, wb_enc->wb_fmt);
 
 	_sde_encoder_phys_wb_setup_cwb(phys_enc, true);
+
+	_sde_encoder_phys_wb_setup_prog_line(phys_enc);
 }
 
 static void sde_encoder_phys_wb_ctl_start_irq(void *arg, int irq_idx)
 {
 	struct sde_encoder_phys_wb *wb_enc = arg;
 	struct sde_encoder_phys *phys_enc;
+	struct sde_hw_wb *hw_wb;
+	u32 line_cnt = 0;
 
 	if (!wb_enc)
 		return;
@@ -1227,7 +1255,11 @@ static void sde_encoder_phys_wb_ctl_start_irq(void *arg, int irq_idx)
 	if (atomic_add_unless(&phys_enc->pending_ctl_start_cnt, -1, 0))
 		wake_up_all(&phys_enc->pending_kickoff_wq);
 
-	SDE_EVT32_IRQ(DRMID(phys_enc->parent), WBID(wb_enc));
+	hw_wb = wb_enc->hw_wb;
+	if (hw_wb->ops.get_line_count)
+		line_cnt = hw_wb->ops.get_line_count(hw_wb);
+
+	SDE_EVT32_IRQ(DRMID(phys_enc->parent), WBID(wb_enc), line_cnt);
 }
 
 static void _sde_encoder_phys_wb_frame_done_helper(void *arg, bool frame_error)
@@ -1242,11 +1274,23 @@ static void _sde_encoder_phys_wb_frame_done_helper(void *arg, bool frame_error)
 
 	if (phys_enc->parent_ops.handle_frame_done &&
 			atomic_add_unless(&phys_enc->pending_kickoff_cnt, -1, 0)) {
-		event |= SDE_ENCODER_FRAME_EVENT_DONE
-				| SDE_ENCODER_FRAME_EVENT_SIGNAL_RETIRE_FENCE;
+		event |= SDE_ENCODER_FRAME_EVENT_DONE;
+
+		/*
+		 * signal retire-fence during wb-done
+		 * - when prog_line is not configured
+		 * - when prog_line is configured and line-ptr-irq is missed
+		 */
+		if (!wb_enc->prog_line || (wb_enc->prog_line &&
+				(atomic_read(&phys_enc->pending_kickoff_cnt) <
+					atomic_read(&phys_enc->pending_retire_fence_cnt)))) {
+			atomic_add_unless(&phys_enc->pending_retire_fence_cnt, -1, 0);
+			event |= SDE_ENCODER_FRAME_EVENT_SIGNAL_RETIRE_FENCE;
+		}
 
 		if (phys_enc->in_clone_mode)
-			event |= SDE_ENCODER_FRAME_EVENT_CWB_DONE;
+			event |= SDE_ENCODER_FRAME_EVENT_CWB_DONE
+					| SDE_ENCODER_FRAME_EVENT_SIGNAL_RETIRE_FENCE;
 		else
 			event |= SDE_ENCODER_FRAME_EVENT_SIGNAL_RELEASE_FENCE;
 
@@ -1258,7 +1302,9 @@ static void _sde_encoder_phys_wb_frame_done_helper(void *arg, bool frame_error)
 
 end:
 	SDE_EVT32_IRQ(DRMID(phys_enc->parent), WBID(wb_enc), phys_enc->in_clone_mode,
-			phys_enc->enable_state, event, frame_error);
+			phys_enc->enable_state, event, atomic_read(&phys_enc->pending_kickoff_cnt),
+			atomic_read(&phys_enc->pending_retire_fence_cnt),
+			frame_error);
 
 	wake_up_all(&phys_enc->pending_kickoff_wq);
 }
@@ -1287,13 +1333,24 @@ static void sde_encoder_phys_wb_lineptr_irq(void *arg, int irq_idx)
 {
 	struct sde_encoder_phys_wb *wb_enc = arg;
 	struct sde_encoder_phys *phys_enc;
+	struct sde_hw_wb *hw_wb;
+	u32 event = 0, line_cnt = 0;
 
-	if (!wb_enc)
+	if (!wb_enc || !wb_enc->prog_line)
 		return;
 
 	phys_enc = &wb_enc->base;
+	if (phys_enc->parent_ops.handle_frame_done &&
+			atomic_add_unless(&phys_enc->pending_retire_fence_cnt, -1, 0)) {
+		event = SDE_ENCODER_FRAME_EVENT_SIGNAL_RETIRE_FENCE;
+		phys_enc->parent_ops.handle_frame_done(phys_enc->parent, phys_enc, event);
+	}
 
-	SDE_EVT32_IRQ(DRMID(phys_enc->parent), WBID(wb_enc));
+	hw_wb = wb_enc->hw_wb;
+	if (hw_wb->ops.get_line_count)
+		line_cnt = hw_wb->ops.get_line_count(hw_wb);
+
+	SDE_EVT32_IRQ(DRMID(phys_enc->parent), WBID(wb_enc), event, wb_enc->prog_line, line_cnt);
 }
 
 /**
@@ -1338,12 +1395,18 @@ static void sde_encoder_phys_wb_irq_ctrl(
 		sde_encoder_helper_register_irq(phys, INTR_IDX_WB_DONE);
 		sde_encoder_helper_register_irq(phys, INTR_IDX_CTL_START);
 
+		if (test_bit(SDE_WB_PROG_LINE, &wb_cfg->features))
+			sde_encoder_helper_register_irq(phys, INTR_IDX_WB_LINEPTR);
+
 		for (index = 0; index < max_num_of_irqs; index++)
 			if (irq_table[index + pp] != SDE_NONE)
 				sde_encoder_helper_register_irq(phys, irq_table[index + pp]);
 	} else if (!enable && atomic_dec_return(&phys->wbirq_refcount) == 0) {
 		sde_encoder_helper_unregister_irq(phys, INTR_IDX_WB_DONE);
 		sde_encoder_helper_unregister_irq(phys, INTR_IDX_CTL_START);
+
+		if (test_bit(SDE_WB_PROG_LINE, &wb_cfg->features))
+			sde_encoder_helper_unregister_irq(phys, INTR_IDX_WB_LINEPTR);
 
 		for (index = 0; index < max_num_of_irqs; index++)
 			if (irq_table[index + pp] != SDE_NONE)
@@ -1522,6 +1585,7 @@ static int _sde_encoder_phys_wb_wait_for_ctl_start(struct sde_encoder_phys *phys
 
 	SDE_EVT32(DRMID(phys_enc->parent), WBID(wb_enc), phys_enc->in_clone_mode,
 			atomic_read(&phys_enc->pending_kickoff_cnt),
+			atomic_read(&phys_enc->pending_retire_fence_cnt),
 			atomic_read(&phys_enc->pending_ctl_start_cnt));
 
 	wait_info.wq = &phys_enc->pending_kickoff_wq;
