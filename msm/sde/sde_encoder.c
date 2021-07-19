@@ -5094,10 +5094,7 @@ static int sde_encoder_setup_display(struct sde_encoder_virt *sde_enc,
 
 	SDE_DEBUG("dsi_info->num_of_h_tiles %d\n", disp_info->num_of_h_tiles);
 
-	if ((disp_info->capabilities & MSM_DISPLAY_CAP_CMD_MODE) ||
-	    (disp_info->capabilities & MSM_DISPLAY_CAP_VID_MODE))
-		sde_enc->idle_pc_enabled = test_bit(SDE_FEATURE_IDLE_PC,
-						    sde_kms->catalog->features);
+	sde_enc->idle_pc_enabled = test_bit(SDE_FEATURE_IDLE_PC, sde_kms->catalog->features);
 
 	sde_enc->input_event_enabled = test_bit(SDE_FEATURE_TOUCH_WAKEUP,
 						sde_kms->catalog->features);
