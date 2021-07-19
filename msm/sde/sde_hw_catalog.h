@@ -127,6 +127,13 @@
 #define IS_SDE_INLINE_ROT_REV_201(rev) \
 	((rev) == SDE_INLINE_ROT_VERSION_2_0_1)
 
+/**
+ * Downscale Blur supported versions
+ */
+#define SDE_DNSC_BLUR_VERSION_1_0_0	0x100
+
+#define IS_SDE_DNSC_BLUR_REV_100(rev) \
+	((rev) == SDE_DNSC_BLUR_VERSION_1_0_0)
 
 /*
  * UIDLE supported versions
@@ -1345,10 +1352,12 @@ struct sde_cdm_cfg   {
  * @base               register offset of this block
  * @features           bit mask identifying sub-blocks/features
  * @sblk               sub-blocks associated with Downscale Blur
+ * @wb_connect:        Bitmask of Writeback IDs this CDM can connect to
  */
 struct sde_dnsc_blur_cfg   {
 	SDE_HW_BLK_INFO;
 	struct sde_dnsc_blur_sub_blks *sblk;
+	unsigned long wb_connect;
 };
 
 /**
@@ -1660,6 +1669,7 @@ struct sde_perf_cfg {
  * @ctl_rev             control path block version
  * @ts_prefill_rev      prefill traffic shaper feature revision
  * @true_inline_rot_rev inline rotator feature revision
+ * @dnsc_blur_rev       downscale blur HW block version
  * @mdss_count          number of valid MDSS HW blocks
  * @mdss                array of pointers to MDSS HW blocks
  * @mdss_hw_block_size  max offset of MDSS_HW block (0 offset), used for debug
@@ -1684,6 +1694,8 @@ struct sde_perf_cfg {
  * @vdc                 array of pointers to VDC blocks
  * @cdm_count           number of valid chroma-down modules available
  * @cdm                 array of pointers to CDM blocks
+ * @dnsc_blur_count     number of valid Downscale Blur modules available
+ * @dnsc_blur           array of pointers to Downscale Blur blocks
  * @intf_count          number of valid INTF blocks available
  * @intf                array of pointers to INTF blocks
  * @wb_count            number of valid writeback blocks available
@@ -1756,6 +1768,7 @@ struct sde_mdss_cfg {
 	u32 ctl_rev;
 	u32 ts_prefill_rev;
 	u32 true_inline_rot_rev;
+	u32 dnsc_blur_rev;
 
 	/* HW Blocks */
 	u32 mdss_count;

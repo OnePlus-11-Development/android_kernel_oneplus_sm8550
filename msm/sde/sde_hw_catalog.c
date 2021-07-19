@@ -370,6 +370,17 @@ enum {
 };
 
 enum {
+	DNSC_BLUR_OFF,
+	DNSC_BLUR_LEN,
+	DNSC_BLUR_VERSION,
+	DNSC_BLUR_GAUS_LUT_OFF,
+	DNSC_BLUR_GAUS_LUT_LEN,
+	DNSC_BLUR_DITHER_OFF,
+	DNSC_BLUR_DITHER_LEN,
+	DNSC_BLUR_PROP_MAX,
+};
+
+enum {
 	DS_TOP_OFF,
 	DS_TOP_LEN,
 	DS_TOP_INPUT_LINEWIDTH,
@@ -903,6 +914,16 @@ static struct sde_prop_type wb_prop[] = {
 		PROP_TYPE_BIT_OFFSET_ARRAY},
 	{WB_CLK_STATUS, "qcom,sde-wb-clk-status", false,
 		PROP_TYPE_BIT_OFFSET_ARRAY},
+};
+
+static struct sde_prop_type dnsc_blur_prop[] = {
+	{DNSC_BLUR_OFF, "qcom,sde-dnsc-blur-off", false, PROP_TYPE_U32_ARRAY},
+	{DNSC_BLUR_LEN, "qcom,sde-dnsc-blur-size", false, PROP_TYPE_U32},
+	{DNSC_BLUR_VERSION, "qcom,sde-dnsc-blur-version", false, PROP_TYPE_U32},
+	{DNSC_BLUR_GAUS_LUT_OFF, "qcom,sde-dnsc-blur-gaus-lut-off", false, PROP_TYPE_U32_ARRAY},
+	{DNSC_BLUR_GAUS_LUT_LEN, "qcom,sde-dnsc-blur-gaus-lut-size", false, PROP_TYPE_U32},
+	{DNSC_BLUR_DITHER_OFF, "qcom,sde-dnsc-blur-dither-off", false, PROP_TYPE_U32_ARRAY},
+	{DNSC_BLUR_DITHER_LEN, "qcom,sde-dnsc-blur-dither-size", false, PROP_TYPE_U32},
 };
 
 static struct sde_prop_type vbif_prop[] = {
@@ -3423,6 +3444,76 @@ end:
 	return rc;
 }
 
+static int sde_dnsc_blur_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
+{
+	int rc, prop_count[DNSC_BLUR_PROP_MAX], i, j;
+	struct sde_prop_value *prop_value = NULL;
+	bool prop_exists[DNSC_BLUR_PROP_MAX];
+	u32 off_count;
+	struct sde_dnsc_blur_cfg *dnsc_blur;
+	struct sde_dnsc_blur_sub_blks *sblk;
+
+	if (!sde_cfg) {
+		SDE_ERROR("invalid argument\n");
+		rc = -EINVAL;
+		goto end;
+	}
+
+	prop_value = kzalloc(DNSC_BLUR_PROP_MAX * sizeof(struct sde_prop_value), GFP_KERNEL);
+	if (!prop_value) {
+		rc = -ENOMEM;
+		goto end;
+	}
+
+	rc = _validate_dt_entry(np, dnsc_blur_prop, ARRAY_SIZE(dnsc_blur_prop),
+			prop_count, &off_count);
+	if (rc)
+		goto end;
+
+	sde_cfg->dnsc_blur_count = off_count;
+
+	rc = _read_dt_entry(np, dnsc_blur_prop, ARRAY_SIZE(dnsc_blur_prop), prop_count,
+		prop_exists, prop_value);
+	if (rc)
+		goto end;
+
+	for (i = 0; i < sde_cfg->dnsc_blur_count; i++) {
+		dnsc_blur = sde_cfg->dnsc_blur + i;
+
+		sblk = kzalloc(sizeof(*sblk), GFP_KERNEL);
+		if (!sblk) {
+			rc = -ENOMEM;
+			/* catalog deinit will release the allocated blocks */
+			goto end;
+		}
+		dnsc_blur->sblk = sblk;
+
+		dnsc_blur->base = PROP_VALUE_ACCESS(prop_value, DNSC_BLUR_OFF, i);
+		dnsc_blur->id = DNSC_BLUR_0 + i;
+		dnsc_blur->len = PROP_VALUE_ACCESS(prop_value, DNSC_BLUR_LEN, 0);
+		snprintf(dnsc_blur->name, SDE_HW_BLK_NAME_LEN, "dnsc_blur_%u",
+				dnsc_blur->id - DNSC_BLUR_0);
+		sde_cfg->dnsc_blur_rev = PROP_VALUE_ACCESS(prop_value, DNSC_BLUR_VERSION, 0);
+
+		sblk->gaus_lut.base = PROP_VALUE_ACCESS(prop_value, DNSC_BLUR_GAUS_LUT_OFF, i);
+		sblk->gaus_lut.len = PROP_VALUE_ACCESS(prop_value, DNSC_BLUR_GAUS_LUT_LEN, 0);
+		snprintf(sblk->gaus_lut.name, SDE_HW_BLK_NAME_LEN, "dnsc_blur_lut_%u",
+				dnsc_blur->id - DNSC_BLUR_0);
+
+		sblk->dither.base = PROP_VALUE_ACCESS(prop_value, DNSC_BLUR_DITHER_OFF, i);
+		sblk->dither.len = PROP_VALUE_ACCESS(prop_value, DNSC_BLUR_DITHER_LEN, 0);
+		snprintf(sblk->dither.name, SDE_HW_BLK_NAME_LEN, "dnsc_blur_dit_%u",
+				dnsc_blur->id - DNSC_BLUR_0);
+
+		for (j = 0; j < sde_cfg->wb_count; j++)
+			dnsc_blur->wb_connect |= BIT(sde_cfg->wb[j].id);
+	}
+
+end:
+	kfree(prop_value);
+	return rc;
+}
+
 static int sde_uidle_parse_dt(struct device_node *np,
 				struct sde_mdss_cfg *sde_cfg)
 {
@@ -5242,6 +5333,9 @@ void sde_hw_catalog_deinit(struct sde_mdss_cfg *sde_cfg)
 	for (i = 0; i < sde_cfg->vdc_count; i++)
 		kfree(sde_cfg->vdc[i].sblk);
 
+	for (i = 0; i < sde_cfg->dnsc_blur_count; i++)
+		kfree(sde_cfg->dnsc_blur[i].sblk);
+
 	for (i = 0; i < sde_cfg->vbif_count; i++) {
 		kfree(sde_cfg->vbif[i].dynamic_ot_rd_tbl.cfg);
 		kfree(sde_cfg->vbif[i].dynamic_ot_wr_tbl.cfg);
@@ -5401,6 +5495,11 @@ struct sde_mdss_cfg *sde_hw_catalog_init(struct drm_device *dev)
 
 	/* cdm parsing should be done after intf and wb for mapping setup */
 	rc = sde_cdm_parse_dt(np, sde_cfg);
+	if (rc)
+		goto end;
+
+	/* dnsc_blur parsing should be done after wb for mapping setup */
+	rc = sde_dnsc_blur_parse_dt(np, sde_cfg);
 	if (rc)
 		goto end;
 
