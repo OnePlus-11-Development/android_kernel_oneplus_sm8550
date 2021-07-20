@@ -9,6 +9,9 @@
 #include <linux/kernel.h>
 #include <linux/err.h>
 
+#include <drm/sde_drm.h>
+#include <drm/msm_drm_pp.h>
+
 #include "msm_drv.h"
 
 #define SDE_DBG_NAME			"sde"
@@ -121,6 +124,7 @@ enum sde_hw_blk_type {
 	SDE_HW_BLK_VDC,
 	SDE_HW_BLK_MERGE_3D,
 	SDE_HW_BLK_QDSS,
+	SDE_HW_BLK_DNSC_BLUR,
 	SDE_HW_BLK_MAX,
 };
 
@@ -249,6 +253,11 @@ enum sde_cdm {
 	CDM_0 = 1,
 	CDM_1,
 	CDM_MAX
+};
+
+enum sde_dnsc_blur {
+	DNSC_BLUR_0 = 1,
+	DNSC_BLUR__MAX
 };
 
 enum sde_pingpong {
@@ -598,6 +607,7 @@ struct sde_mdss_color {
 #define SDE_DBG_MASK_SID      (1 << 15)
 #define SDE_DBG_MASK_QDSS     (1 << 16)
 #define SDE_DBG_MASK_VDC      (1 << 17)
+#define SDE_DBG_MASK_DNSC_BLUR  (1 << 18)
 
 /**
  * struct sde_hw_cp_cfg: hardware dspp/lm feature payload.

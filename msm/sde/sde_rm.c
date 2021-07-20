@@ -20,6 +20,7 @@
 #include "sde_crtc.h"
 #include "sde_hw_qdss.h"
 #include "sde_vbif.h"
+#include "sde_hw_dnsc_blur.h"
 
 #define RESERVED_BY_OTHER(h, r) \
 	(((h)->rsvp && ((h)->rsvp->enc_id != (r)->enc_id)) ||\
@@ -120,6 +121,7 @@ char sde_hw_blk_str[SDE_HW_BLK_MAX][SDE_HW_BLK_NAME_LEN] = {
 	"vdc",
 	"merge_3d",
 	"qdss",
+	"dnsc_blur"
 };
 
 /**
@@ -544,6 +546,9 @@ static void _sde_rm_hw_destroy(enum sde_hw_blk_type type, struct sde_hw_blk_reg_
 	case SDE_HW_BLK_QDSS:
 		sde_hw_qdss_destroy(hw);
 		break;
+	case SDE_HW_BLK_DNSC_BLUR:
+		sde_hw_dnsc_blur_destroy(hw);
+		break;
 	case SDE_HW_BLK_SSPP:
 		/* SSPPs are not managed by the resource manager */
 	case SDE_HW_BLK_TOP:
@@ -640,6 +645,9 @@ static int _sde_rm_hw_blk_create(
 		break;
 	case SDE_HW_BLK_QDSS:
 		hw = sde_hw_qdss_init(id, mmio, cat);
+		break;
+	case SDE_HW_BLK_DNSC_BLUR:
+		hw = sde_hw_dnsc_blur_init(id, mmio, cat);
 		break;
 	case SDE_HW_BLK_SSPP:
 		/* SSPPs are not managed by the resource manager */
@@ -772,6 +780,15 @@ static int _sde_rm_hw_blk_create_new(struct sde_rm *rm,
 				cat->cdm[i].id, &cat->cdm[i]);
 		if (rc) {
 			SDE_ERROR("failed: cdm hw not available\n");
+			goto fail;
+		}
+	}
+
+	for (i = 0; i < cat->dnsc_blur_count; i++) {
+		rc = _sde_rm_hw_blk_create(rm, cat, mmio, SDE_HW_BLK_DNSC_BLUR,
+				cat->dnsc_blur[i].id, &cat->dnsc_blur[i]);
+		if (rc) {
+			SDE_ERROR("failed: dnsc_blur hw not available\n");
 			goto fail;
 		}
 	}

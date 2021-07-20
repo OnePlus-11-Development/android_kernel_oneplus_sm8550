@@ -487,6 +487,18 @@ enum {
 };
 
 /**
+ * Downscale Blur sub-blocks/features
+ * @SDE_DNSC_BLUR_GAUS_LUT      Downscale Blur Gaussian LUT sub block
+ * @SDE_DNSC_BLUR_DITHER        Downscale Blur Dither sub block
+ * @SDE_DNSC_BLUR_MAX
+ */
+enum {
+	SDE_DNSC_BLUR_GAUS_LUT,
+	SDE_DNSC_BLUR_DITHER,
+	SDE_DNSC_BLUR_MAX
+};
+
+/**
  * CTL sub-blocks
  * @SDE_CTL_SPLIT_DISPLAY       CTL supports video mode split display
  * @SDE_CTL_PINGPONG_SPLIT      CTL supports pingpong split
@@ -789,6 +801,14 @@ struct sde_vdc_blk {
 };
 
 /**
+ * struct sde_dnsc_blur_blk : Downscale Blur sub-blk information
+ * @info:   HW register and features supported by this sub-blk
+ */
+struct sde_dnsc_blur_blk {
+	SDE_HW_SUBBLK_INFO;
+};
+
+/**
  * struct sde_format_extended - define sde specific pixel format+modifier
  * @fourcc_format: Base FOURCC pixel format code
  * @modifier: 64-bit drm format modifier, same modifier must be applied to all
@@ -997,6 +1017,16 @@ struct sde_dsc_sub_blks {
 struct sde_vdc_sub_blks {
 	struct sde_vdc_blk enc;
 	struct sde_vdc_blk ctl;
+};
+
+/**
+ * struct sde_dnsc_blur_sub_blks : Downscale Blur sub-blks
+ * @gaus_lut: Gaussian coef LUT register offset(relative to Downscale Blur base)
+ * @dither: Dither register offset(relative to Downscale Blur base)
+ */
+struct sde_dnsc_blur_sub_blks {
+	struct sde_dnsc_blur_blk gaus_lut;
+	struct sde_dnsc_blur_blk dither;
 };
 
 struct sde_wb_sub_blocks {
@@ -1307,6 +1337,18 @@ struct sde_cdm_cfg   {
 	SDE_HW_BLK_INFO;
 	unsigned long intf_connect;
 	unsigned long wb_connect;
+};
+
+/**
+ * struct sde_dnsc_blur_cfg - information of Downscale Blur blocks
+ * @id                 enum identifying this block
+ * @base               register offset of this block
+ * @features           bit mask identifying sub-blocks/features
+ * @sblk               sub-blocks associated with Downscale Blur
+ */
+struct sde_dnsc_blur_cfg   {
+	SDE_HW_BLK_INFO;
+	struct sde_dnsc_blur_sub_blks *sblk;
 };
 
 /**
@@ -1740,6 +1782,8 @@ struct sde_mdss_cfg {
 	struct sde_vdc_cfg vdc[MAX_BLOCKS];
 	u32 cdm_count;
 	struct sde_cdm_cfg cdm[MAX_BLOCKS];
+	u32 dnsc_blur_count;
+	struct sde_dnsc_blur_cfg dnsc_blur[MAX_BLOCKS];
 	u32 intf_count;
 	struct sde_intf_cfg intf[MAX_BLOCKS];
 	u32 wb_count;
