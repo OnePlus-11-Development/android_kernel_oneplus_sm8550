@@ -1186,6 +1186,10 @@ void msm_gem_object_set_name(struct drm_gem_object *bo, const char *fmt, ...);
 
 int msm_gem_delayed_import(struct drm_gem_object *obj);
 
+#define MSM_FB_CACHE_NONE	0x0
+#define MSM_FB_CACHE_WRITE_EN	0x1
+#define MSM_FB_CACHE_READ_EN	0x2
+
 int msm_framebuffer_prepare(struct drm_framebuffer *fb,
 		struct msm_gem_address_space *aspace);
 void msm_framebuffer_cleanup(struct drm_framebuffer *fb,
@@ -1200,6 +1204,8 @@ struct drm_framebuffer *msm_framebuffer_init(struct drm_device *dev,
 		struct drm_gem_object **bos);
 struct drm_framebuffer *msm_framebuffer_create(struct drm_device *dev,
 		struct drm_file *file, const struct drm_mode_fb_cmd2 *mode_cmd);
+void msm_framebuffer_set_cache_hint(struct drm_framebuffer *fb, u32 flags, u32 type);
+void msm_framebuffer_get_cache_hint(struct drm_framebuffer *fb, u32 *flags, u32 *type);
 
 struct drm_fb_helper *msm_fbdev_init(struct drm_device *dev);
 void msm_fbdev_free(struct drm_device *dev);

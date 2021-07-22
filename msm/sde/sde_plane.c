@@ -2782,32 +2782,44 @@ void sde_plane_set_error(struct drm_plane *plane, bool error)
 static void _sde_plane_sspp_setup_sys_cache(struct sde_plane *psde,
 		struct sde_plane_state *pstate)
 {
+	struct drm_plane_state *state = psde->base.state;
 	struct sde_sc_cfg *sc_cfg = psde->catalog->sc_cfg;
 	struct sde_hw_pipe_sc_cfg *cfg = &pstate->sc_cfg;
 	bool prev_rd_en = cfg->rd_en;
+	u32 fb_cache_flag, fb_cache_type;
 
-	if (!sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache)
-		return;
+	msm_framebuffer_get_cache_hint(state->fb, &fb_cache_flag, &fb_cache_type);
 
 	cfg->rd_en = false;
 	cfg->rd_scid = 0x0;
 	cfg->flags = SYS_CACHE_EN_FLAG | SYS_CACHE_SCID;
 	cfg->type = SDE_SYS_CACHE_NONE;
 
-	if ((pstate->static_cache_state == CACHE_STATE_FRAME_WRITE)
-			|| (pstate->static_cache_state == CACHE_STATE_FRAME_READ)) {
+	if ((sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache)
+			&& ((pstate->static_cache_state == CACHE_STATE_FRAME_WRITE)
+				|| (pstate->static_cache_state == CACHE_STATE_FRAME_READ))) {
 		cfg->rd_en = true;
 		cfg->rd_scid = sc_cfg[SDE_SYS_CACHE_DISP].llcc_scid;
 		cfg->rd_noallocate = (pstate->static_cache_state == CACHE_STATE_FRAME_READ);
 		cfg->flags |= SYS_CACHE_NO_ALLOC;
 		cfg->type = SDE_SYS_CACHE_DISP;
+
+	} else if ((sc_cfg[fb_cache_type].has_sys_cache)
+			&& (fb_cache_flag & MSM_FB_CACHE_WRITE_EN)) {
+		cfg->rd_en = true;
+		cfg->rd_scid = sc_cfg[fb_cache_type].llcc_scid;
+		cfg->rd_noallocate = true;
+		cfg->flags |= SYS_CACHE_NO_ALLOC;
+		cfg->type = fb_cache_type;
+
+		msm_framebuffer_set_cache_hint(state->fb, MSM_FB_CACHE_READ_EN, fb_cache_type);
 	}
 
 	if (!cfg->rd_en && !prev_rd_en)
 		return;
 
-	SDE_EVT32(DRMID(&psde->base), cfg->rd_scid, cfg->rd_en, cfg->rd_noallocate, cfg->flags);
-
+	SDE_EVT32(DRMID(&psde->base), cfg->rd_scid, cfg->rd_en, cfg->rd_noallocate, cfg->flags,
+			fb_cache_flag, fb_cache_type);
 	psde->pipe_hw->ops.setup_sys_cache(psde->pipe_hw, cfg);
 }
 

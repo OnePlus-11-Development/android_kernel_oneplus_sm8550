@@ -961,7 +961,8 @@ static int sde_encoder_phys_wb_atomic_check(
 	return rc;
 }
 
-static void _sde_encoder_phys_wb_setup_cache(struct sde_encoder_phys_wb *wb_enc)
+static void _sde_encoder_phys_wb_setup_cache(struct sde_encoder_phys_wb *wb_enc,
+		struct drm_framebuffer *fb)
 {
 	struct sde_wb_device *wb_dev = wb_enc->wb_dev;
 	struct drm_connector_state *state = wb_dev->connector->state;
@@ -992,9 +993,11 @@ static void _sde_encoder_phys_wb_setup_cache(struct sde_encoder_phys_wb *wb_enc)
 	if (cache_enable) {
 		cfg->wr_scid = sc_cfg->llcc_scid;
 		cfg->type = SDE_SYS_CACHE_DISP_WB;
+		msm_framebuffer_set_cache_hint(fb, MSM_FB_CACHE_WRITE_EN, SDE_SYS_CACHE_DISP_WB);
 	} else {
 		cfg->wr_scid = 0x0;
 		cfg->type = SDE_SYS_CACHE_NONE;
+		msm_framebuffer_set_cache_hint(fb, MSM_FB_CACHE_NONE, SDE_SYS_CACHE_NONE);
 	}
 
 	sde_crtc->new_perf.llcc_active[SDE_SYS_CACHE_DISP_WB] = cache_enable;
@@ -1279,7 +1282,7 @@ static void sde_encoder_phys_wb_setup(
 
 	sde_encoder_phys_wb_setup_cdp(phys_enc, wb_enc->wb_fmt);
 
-	_sde_encoder_phys_wb_setup_cache(wb_enc);
+	_sde_encoder_phys_wb_setup_cache(wb_enc, fb);
 
 	_sde_encoder_phys_wb_setup_cwb(phys_enc, true);
 

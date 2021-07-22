@@ -29,6 +29,8 @@
 struct msm_framebuffer {
 	struct drm_framebuffer base;
 	const struct msm_format *format;
+	u32 cache_flags;
+	u32 cache_type;
 };
 #define to_msm_framebuffer(x) container_of(x, struct msm_framebuffer, base)
 
@@ -281,3 +283,29 @@ fail:
 	return ERR_PTR(ret);
 }
 
+void msm_framebuffer_set_cache_hint(struct drm_framebuffer *fb, u32 flags, u32 type)
+{
+	struct msm_framebuffer *msm_fb;
+
+	if (!fb)
+		return;
+
+	msm_fb = to_msm_framebuffer(fb);
+	msm_fb->cache_flags = flags;
+	msm_fb->cache_type = type;
+}
+
+void msm_framebuffer_get_cache_hint(struct drm_framebuffer *fb, u32 *flags, u32 *type)
+{
+	struct msm_framebuffer *msm_fb;
+
+	if (!fb) {
+		*flags = 0;
+		*type = 0;
+		return;
+	}
+
+	msm_fb = to_msm_framebuffer(fb);
+	*flags = msm_fb->cache_flags;
+	*type = msm_fb->cache_type;
+}
