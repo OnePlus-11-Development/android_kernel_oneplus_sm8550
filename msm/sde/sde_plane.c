@@ -2783,48 +2783,32 @@ static void _sde_plane_sspp_setup_sys_cache(struct sde_plane *psde,
 		struct sde_plane_state *pstate)
 {
 	struct sde_sc_cfg *sc_cfg = psde->catalog->sc_cfg;
-	bool prev_rd_en;
+	struct sde_hw_pipe_sc_cfg *cfg = &pstate->sc_cfg;
+	bool prev_rd_en = cfg->rd_en;
 
-	/* Only display system cache is currently supported */
 	if (!sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache)
 		return;
 
-	prev_rd_en = pstate->sc_cfg.rd_en;
+	cfg->rd_en = false;
+	cfg->rd_scid = 0x0;
+	cfg->flags = SYS_CACHE_EN_FLAG | SYS_CACHE_SCID;
+	cfg->type = SDE_SYS_CACHE_NONE;
 
-	SDE_DEBUG_PLANE(psde, "features:0x%x\n", psde->features);
-
-	pstate->sc_cfg.rd_en = false;
-	pstate->sc_cfg.rd_scid = 0x0;
-	pstate->sc_cfg.flags = SSPP_SYS_CACHE_EN_FLAG |
-			SSPP_SYS_CACHE_SCID;
-	pstate->sc_cfg.type = SDE_SYS_CACHE_NONE;
-
-	if (pstate->static_cache_state == CACHE_STATE_FRAME_WRITE) {
-		pstate->sc_cfg.rd_en = true;
-		pstate->sc_cfg.rd_scid =
-				sc_cfg[SDE_SYS_CACHE_DISP].llcc_scid;
-		pstate->sc_cfg.rd_noallocate = false;
-		pstate->sc_cfg.flags = SSPP_SYS_CACHE_EN_FLAG |
-				SSPP_SYS_CACHE_SCID | SSPP_SYS_CACHE_NO_ALLOC;
-		pstate->sc_cfg.type = SDE_SYS_CACHE_DISP;
-	} else if (pstate->static_cache_state == CACHE_STATE_FRAME_READ) {
-		pstate->sc_cfg.rd_en = true;
-		pstate->sc_cfg.rd_scid =
-				sc_cfg[SDE_SYS_CACHE_DISP].llcc_scid;
-		pstate->sc_cfg.rd_noallocate = true;
-		pstate->sc_cfg.flags = SSPP_SYS_CACHE_EN_FLAG |
-				SSPP_SYS_CACHE_SCID | SSPP_SYS_CACHE_NO_ALLOC;
-		pstate->sc_cfg.type = SDE_SYS_CACHE_DISP;
+	if ((pstate->static_cache_state == CACHE_STATE_FRAME_WRITE)
+			|| (pstate->static_cache_state == CACHE_STATE_FRAME_READ)) {
+		cfg->rd_en = true;
+		cfg->rd_scid = sc_cfg[SDE_SYS_CACHE_DISP].llcc_scid;
+		cfg->rd_noallocate = (pstate->static_cache_state == CACHE_STATE_FRAME_READ);
+		cfg->flags |= SYS_CACHE_NO_ALLOC;
+		cfg->type = SDE_SYS_CACHE_DISP;
 	}
 
-	if (!pstate->sc_cfg.rd_en && !prev_rd_en)
+	if (!cfg->rd_en && !prev_rd_en)
 		return;
 
-	SDE_EVT32(DRMID(&psde->base), pstate->sc_cfg.rd_scid,
-			pstate->sc_cfg.rd_en, pstate->sc_cfg.rd_noallocate);
+	SDE_EVT32(DRMID(&psde->base), cfg->rd_scid, cfg->rd_en, cfg->rd_noallocate, cfg->flags);
 
-	psde->pipe_hw->ops.setup_sys_cache(
-		psde->pipe_hw, &pstate->sc_cfg);
+	psde->pipe_hw->ops.setup_sys_cache(psde->pipe_hw, cfg);
 }
 
 void sde_plane_static_img_control(struct drm_plane *plane,

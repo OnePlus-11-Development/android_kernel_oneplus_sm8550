@@ -166,13 +166,13 @@ enum {
 		IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_UBWC_VER_40)
 
 /**
- * Supported SSPP system cache settings
+ * Supported system cache settings
  */
-#define SSPP_SYS_CACHE_EN_FLAG	BIT(0)
-#define SSPP_SYS_CACHE_SCID		BIT(1)
-#define SSPP_SYS_CACHE_OP_MODE	BIT(2)
-#define SSPP_SYS_CACHE_OP_TYPE	BIT(3)
-#define SSPP_SYS_CACHE_NO_ALLOC	BIT(4)
+#define SYS_CACHE_EN_FLAG	BIT(0)
+#define SYS_CACHE_SCID		BIT(1)
+#define SYS_CACHE_OP_MODE	BIT(2)
+#define SYS_CACHE_OP_TYPE	BIT(3)
+#define SYS_CACHE_NO_ALLOC	BIT(4)
 
 /**
  * sde_sys_cache_type: Types of system cache supported
@@ -182,6 +182,7 @@ enum {
  */
 enum sde_sys_cache_type {
 	SDE_SYS_CACHE_DISP,
+	SDE_SYS_CACHE_DISP_WB,
 	SDE_SYS_CACHE_MAX,
 	SDE_SYS_CACHE_NONE = SDE_SYS_CACHE_MAX
 };
@@ -550,6 +551,7 @@ enum {
  * @SDE_WB_HAS_CWB          Writeback block supports concurrent writeback
  * @SDE_WB_HAS_DCWB         Writeback block supports dedicated CWB
  * @SDE_WB_CROP             CWB supports cropping
+ * @SDE_WB_SYS_CACHE        Writeback block supports system cache usage
  * @SDE_WB_CWB_CTRL         Separate CWB control is available for configuring
  * @SDE_WB_DCWB_CTRL        Separate DCWB control is available for configuring
  * @SDE_WB_CWB_DITHER_CTRL  CWB dither is available for configuring
@@ -572,6 +574,7 @@ enum {
 	SDE_WB_HAS_CWB,
 	SDE_WB_HAS_DCWB,
 	SDE_WB_CROP,
+	SDE_WB_SYS_CACHE,
 	SDE_WB_CWB_CTRL,
 	SDE_WB_DCWB_CTRL,
 	SDE_WB_CWB_DITHER_CTRL,

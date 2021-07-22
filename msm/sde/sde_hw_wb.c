@@ -43,6 +43,7 @@
 #define WB_UBWC_ERROR_STATUS		0x2BC
 #define WB_OUT_IMAGE_SIZE		0x2C0
 #define WB_OUT_XY			0x2C4
+#define WB_SYS_CACHE_MODE		0x094
 
 #define CWB_CTRL_SRC_SEL		0x0
 #define CWB_CTRL_MODE			0x4
@@ -399,6 +400,28 @@ static void sde_hw_wb_program_cwb_ctrl(struct sde_hw_wb *ctx,
 	}
 }
 
+static void sde_hw_wb_setup_sys_cache(struct sde_hw_wb *ctx, struct sde_hw_wb_sc_cfg *cfg)
+{
+	u32 val = 0;
+
+	if (!ctx || !cfg)
+		return;
+
+	if (cfg->flags & SYS_CACHE_EN_FLAG)
+		val |= BIT(15);
+
+	if (cfg->flags & SYS_CACHE_SCID)
+		val |= ((cfg->wr_scid & 0x1f) << 8);
+
+	if (cfg->flags & SYS_CACHE_OP_TYPE)
+		val |= ((cfg->wr_op_type & 0xf) << 0);
+
+	if (cfg->flags & SYS_CACHE_NO_ALLOC)
+		val |= ((cfg->wr_noallocate & 0x1) << 4);
+
+	SDE_REG_WRITE(&ctx->hw, WB_SYS_CACHE_MODE, val);
+}
+
 static void sde_hw_wb_program_cwb_dither_ctrl(struct sde_hw_wb *ctx,
 		const enum sde_dcwb dcwb_idx, void *cfg, size_t len, bool enable)
 {
@@ -595,6 +618,9 @@ static void _setup_wb_ops(struct sde_hw_wb_ops *ops,
 		ops->program_dcwb_ctrl = sde_hw_wb_program_dcwb_ctrl;
 		ops->bind_dcwb_pp_blk = sde_hw_wb_bind_dcwb_pp_blk;
 	}
+
+	if (test_bit(SDE_WB_SYS_CACHE, &features))
+		ops->setup_sys_cache = sde_hw_wb_setup_sys_cache;
 
 	if (test_bit(SDE_WB_CWB_DITHER_CTRL, &features))
 		ops->program_cwb_dither_ctrl = sde_hw_wb_program_cwb_dither_ctrl;

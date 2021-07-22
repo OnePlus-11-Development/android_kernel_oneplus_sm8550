@@ -62,6 +62,24 @@ struct sde_hw_wb_qos_cfg {
 };
 
 /**
+ * struct sde_hw_wb_sc_cfg - system cache configuration
+ * @wr_en: system cache read enable
+ * @wr_scid: system cache read block id
+ * @wr_noallocate: system cache read no allocate attribute
+ * @wr_op_type: system cache read operation type
+ * @flags: dirty flags to change the configuration
+ * @type: sys cache type
+ */
+struct sde_hw_wb_sc_cfg {
+	bool wr_en;
+	u32 wr_scid;
+	bool wr_noallocate;
+	u32 wr_op_type;
+	u32 flags;
+	enum sde_sys_cache_type type;
+};
+
+/**
  *
  * struct sde_hw_wb_ops : Interface to the wb Hw driver functions
  *  Assumption is these functions will be called after clocks are enabled
@@ -151,6 +169,13 @@ struct sde_hw_wb_ops {
 	 */
 	void (*program_dcwb_ctrl)(struct sde_hw_wb *ctx, const enum sde_dcwb cwb,
 		const enum sde_cwb data_src, int tap_location, bool enable);
+
+	/**
+	 * setup_sys_cache - setup system cache configuration
+	 * @ctx: Pointer to wb context
+	 * @cfg: Pointer to wb system cache configuration
+	 */
+	void (*setup_sys_cache)(struct sde_hw_wb *ctx, struct sde_hw_wb_sc_cfg *cfg);
 
 	/**
 	 * program_cwb_dither_ctrl - program cwb dither block config

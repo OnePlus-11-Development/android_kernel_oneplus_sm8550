@@ -5882,7 +5882,7 @@ static void sde_crtc_install_properties(struct drm_crtc *crtc,
 			ARRAY_SIZE(e_secure_level), 0,
 			CRTC_PROP_SECURITY_LEVEL);
 
-	if (test_bit(SDE_FEATURE_SYSCACHE, catalog->features))
+	if (catalog->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache)
 		msm_property_install_enum(&sde_crtc->property_info, "cache_state",
 			0x0, 0, e_cache_state,
 			ARRAY_SIZE(e_cache_state), 0,
@@ -7020,8 +7020,8 @@ void sde_crtc_static_img_control(struct drm_crtc *crtc,
 		return;
 	}
 
-	if (!test_bit(SDE_FEATURE_SYSCACHE, sde_kms->catalog->features)) {
-		SDE_DEBUG("syscache not supported\n");
+	if (!sde_kms->catalog->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache) {
+		SDE_DEBUG("DISP syscache not supported\n");
 		return;
 	}
 
