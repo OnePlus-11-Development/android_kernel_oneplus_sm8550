@@ -468,6 +468,24 @@ enum sde_3d_blend_mode {
 	BLEND_3D_MAX
 };
 
+/**
+ * enum sde_sys_cache_state: states of disp system cache
+ * CACHE_STATE_DISABLED: sys cache has been disabled
+ * CACHE_STATE_ENABLED: sys cache has been enabled
+ * CACHE_STATE_NORMAL: sys cache is normal state
+ * CACHE_STATE_PRE_CACHE: frame cache is being prepared
+ * CACHE_STATE_FRAME_WRITE: sys cache is being written to
+ * CACHE_STATE_FRAME_READ: sys cache is being read
+ */
+enum sde_sys_cache_state {
+	CACHE_STATE_DISABLED,
+	CACHE_STATE_ENABLED,
+	CACHE_STATE_NORMAL,
+	CACHE_STATE_PRE_CACHE,
+	CACHE_STATE_FRAME_WRITE,
+	CACHE_STATE_FRAME_READ
+};
+
 /** struct sde_format - defines the format configuration which
  * allows SDE HW to correctly fetch and decode the format
  * @base: base msm_format struture containing fourcc code

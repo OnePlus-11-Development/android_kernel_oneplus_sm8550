@@ -436,6 +436,7 @@ struct sde_encoder_phys_cmd {
  * @wb_dev:		Pointer to writeback device
  * @bo_disable:		Buffer object(s) to use during the disabling state
  * @fb_disable:		Frame buffer to use during the disabling state
+ * @sc_cfg:		Stores wb system cache config
  * @crtc		Pointer to drm_crtc
  * @prog_line:		Cached programmable line value used to trigger early wb-fence
  */
@@ -455,6 +456,7 @@ struct sde_encoder_phys_wb {
 	struct sde_wb_device *wb_dev;
 	struct drm_gem_object *bo_disable[SDE_MAX_PLANES];
 	struct drm_framebuffer *fb_disable;
+	struct sde_hw_wb_sc_cfg sc_cfg;
 	struct drm_crtc *crtc;
 	u32 prog_line;
 };

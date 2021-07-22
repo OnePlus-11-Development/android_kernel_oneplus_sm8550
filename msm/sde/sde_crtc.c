@@ -7004,7 +7004,7 @@ static int _sde_crtc_init_events(struct sde_crtc *sde_crtc)
 }
 
 void sde_crtc_static_img_control(struct drm_crtc *crtc,
-		enum sde_crtc_cache_state state,
+		enum sde_sys_cache_state state,
 		bool is_vidmode)
 {
 	struct drm_plane *plane;

@@ -2812,7 +2812,7 @@ static void _sde_plane_sspp_setup_sys_cache(struct sde_plane *psde,
 }
 
 void sde_plane_static_img_control(struct drm_plane *plane,
-		enum sde_crtc_cache_state state)
+		enum sde_sys_cache_state state)
 {
 	struct sde_plane *psde;
 	struct sde_plane_state *pstate;

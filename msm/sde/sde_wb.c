@@ -530,19 +530,42 @@ int sde_wb_connector_post_init(struct drm_connector *connector, void *display)
 {
 	struct sde_connector *c_conn;
 	struct sde_wb_device *wb_dev = display;
+	struct msm_drm_private *priv;
+	struct sde_kms *sde_kms;
+	struct sde_mdss_cfg *catalog;
+	struct sde_sc_cfg *sde_cfg;
 	static const struct drm_prop_enum_list e_fb_translation_mode[] = {
 		{SDE_DRM_FB_NON_SEC, "non_sec"},
 		{SDE_DRM_FB_SEC, "sec"},
 	};
+	static const struct drm_prop_enum_list e_cache_state[] = {
+		{CACHE_STATE_DISABLED, "cache_state_disabled"},
+		{CACHE_STATE_ENABLED, "cache_state_enabled"},
+	};
 
-	if (!connector || !display || !wb_dev->wb_cfg) {
+	if (!connector || !display || !wb_dev->wb_cfg || !wb_dev->drm_dev->dev_private) {
 		SDE_ERROR("invalid params\n");
 		return -EINVAL;
 	}
 
+	priv = wb_dev->drm_dev->dev_private;
+	sde_kms = to_sde_kms(priv->kms);
+	if (!sde_kms || !sde_kms->catalog) {
+		SDE_ERROR("invalid sde_kms\n");
+		return -EINVAL;
+	}
+
+	catalog = sde_kms->catalog;
+	sde_cfg = &catalog->sc_cfg[SDE_SYS_CACHE_DISP_WB];
+
 	c_conn = to_sde_connector(connector);
 	wb_dev->connector = connector;
 	wb_dev->detect_status = connector_status_connected;
+
+	if (sde_cfg->has_sys_cache)
+		msm_property_install_enum(&c_conn->property_info, "cache_state",
+			0x0, 0, e_cache_state, ARRAY_SIZE(e_cache_state),
+			0, CONNECTOR_PROP_CACHE_STATE);
 
 	/*
 	 * Add extra connector properties

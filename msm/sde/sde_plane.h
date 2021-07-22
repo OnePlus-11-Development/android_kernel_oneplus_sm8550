@@ -356,7 +356,7 @@ bool sde_plane_is_cache_required(struct drm_plane *plane,
  * @state: state to set
  */
 void sde_plane_static_img_control(struct drm_plane *plane,
-		enum sde_crtc_cache_state state);
+		enum sde_sys_cache_state state);
 
 void sde_plane_add_data_to_minidump_va(struct drm_plane *plane);
 #endif /* _SDE_PLANE_H_ */

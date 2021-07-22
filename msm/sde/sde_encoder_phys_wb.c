@@ -961,6 +961,49 @@ static int sde_encoder_phys_wb_atomic_check(
 	return rc;
 }
 
+static void _sde_encoder_phys_wb_setup_cache(struct sde_encoder_phys_wb *wb_enc)
+{
+	struct sde_wb_device *wb_dev = wb_enc->wb_dev;
+	struct drm_connector_state *state = wb_dev->connector->state;
+	struct sde_hw_wb *hw_wb = wb_enc->hw_wb;
+	struct sde_crtc *sde_crtc = to_sde_crtc(wb_enc->crtc);
+	struct sde_sc_cfg *sc_cfg = &hw_wb->catalog->sc_cfg[SDE_SYS_CACHE_DISP_WB];
+	struct sde_hw_wb_sc_cfg *cfg  = &wb_enc->sc_cfg;
+	u32 cache_enable;
+
+	if (!sc_cfg->has_sys_cache) {
+		SDE_DEBUG("sys cache feature not enabled\n");
+		return;
+	}
+
+	if (!hw_wb || !hw_wb->ops.setup_sys_cache) {
+		SDE_DEBUG("unsupported ops: setup_sys_cache WB %d\n", WBID(wb_enc));
+		return;
+	}
+
+	cache_enable = sde_connector_get_property(state, CONNECTOR_PROP_CACHE_STATE);
+
+	if (!cfg->wr_en && !cache_enable)
+		return;
+
+	cfg->wr_en = cache_enable;
+	cfg->flags = SYS_CACHE_EN_FLAG | SYS_CACHE_SCID;
+
+	if (cache_enable) {
+		cfg->wr_scid = sc_cfg->llcc_scid;
+		cfg->type = SDE_SYS_CACHE_DISP_WB;
+	} else {
+		cfg->wr_scid = 0x0;
+		cfg->type = SDE_SYS_CACHE_NONE;
+	}
+
+	sde_crtc->new_perf.llcc_active[SDE_SYS_CACHE_DISP_WB] = cache_enable;
+	sde_core_perf_crtc_update_llcc(wb_enc->crtc);
+
+	hw_wb->ops.setup_sys_cache(hw_wb, cfg);
+	SDE_EVT32(WBID(wb_enc), cfg->wr_scid, cfg->flags, cfg->type, cache_enable);
+}
+
 static void _sde_encoder_phys_wb_update_cwb_flush(
 		struct sde_encoder_phys *phys_enc, bool enable)
 {
@@ -1235,6 +1278,8 @@ static void sde_encoder_phys_wb_setup(
 	sde_encoder_phys_wb_setup_fb(phys_enc, fb, wb_roi);
 
 	sde_encoder_phys_wb_setup_cdp(phys_enc, wb_enc->wb_fmt);
+
+	_sde_encoder_phys_wb_setup_cache(wb_enc);
 
 	_sde_encoder_phys_wb_setup_cwb(phys_enc, true);
 
@@ -1915,6 +1960,8 @@ static void sde_encoder_phys_wb_disable(struct sde_encoder_phys *phys_enc)
 {
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
 	struct sde_hw_wb *hw_wb = wb_enc->hw_wb;
+	struct sde_crtc *sde_crtc = to_sde_crtc(wb_enc->crtc);
+	int i;
 
 	if (phys_enc->enable_state == SDE_ENC_DISABLED) {
 		SDE_ERROR("encoder is already disabled\n");
@@ -1929,6 +1976,17 @@ static void sde_encoder_phys_wb_disable(struct sde_encoder_phys *phys_enc)
 			!phys_enc->sde_kms || !wb_enc->fb_disable) {
 		SDE_DEBUG("invalid enc, skipping extra commit\n");
 		goto exit;
+	}
+
+	/* reset system cache properties */
+	if (wb_enc->sc_cfg.wr_en) {
+		memset(&wb_enc->sc_cfg, 0, sizeof(struct sde_hw_wb_sc_cfg));
+		if (hw_wb->ops.setup_sys_cache)
+			hw_wb->ops.setup_sys_cache(hw_wb, &wb_enc->sc_cfg);
+
+		for (i = 0; i < SDE_SYS_CACHE_MAX; i++)
+			sde_crtc->new_perf.llcc_active[i] = 0;
+		sde_core_perf_crtc_update_llcc(wb_enc->crtc);
 	}
 
 	if (phys_enc->in_clone_mode) {

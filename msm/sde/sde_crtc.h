@@ -76,24 +76,6 @@ enum sde_crtc_idle_pc_state {
 };
 
 /**
- * enum sde_crtc_cache_state: states of disp system cache
- * CACHE_STATE_DISABLED: sys cache has been disabled
- * CACHE_STATE_ENABLED: sys cache has been enabled
- * CACHE_STATE_NORMAL: sys cache is normal state
- * CACHE_STATE_PRE_CACHE: frame cache is being prepared
- * CACHE_STATE_FRAME_WRITE: sys cache is being written to
- * CACHE_STATE_FRAME_READ: sys cache is being read
- */
-enum sde_crtc_cache_state {
-	CACHE_STATE_DISABLED,
-	CACHE_STATE_ENABLED,
-	CACHE_STATE_NORMAL,
-	CACHE_STATE_PRE_CACHE,
-	CACHE_STATE_FRAME_WRITE,
-	CACHE_STATE_FRAME_READ
-};
-
-/**
  * enum sde_crtc_vm_req: request for VM operations
  * @VM_REQ_NONE: no request. Normal VM operations.
  * @VM_REQ_RELEASE: request to release the HW resources from the current VM
@@ -426,7 +408,7 @@ struct sde_crtc {
 	int target_bpp;
 
 	struct kthread_delayed_work static_cache_read_work;
-	enum sde_crtc_cache_state cache_state;
+	enum sde_sys_cache_state cache_state;
 
 	struct drm_property_blob *dspp_blob_info;
 	u32 cached_encoder_mask;
@@ -1031,7 +1013,7 @@ static inline void sde_crtc_set_bpp(struct sde_crtc *sde_crtc, int src_bpp,
  * @is_vidmode: if encoder is video mode
  */
 void sde_crtc_static_img_control(struct drm_crtc *crtc,
-		enum sde_crtc_cache_state state, bool is_vidmode);
+		enum sde_sys_cache_state state, bool is_vidmode);
 
 /**
  * sde_crtc_static_cache_read_kickoff - kickoff cache read work
