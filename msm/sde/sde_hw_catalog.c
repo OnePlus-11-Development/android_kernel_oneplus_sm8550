@@ -4206,15 +4206,18 @@ static int sde_parse_reg_dma_dt(struct device_node *np,
 	sde_cfg->dma_cfg.clk_ctrl = SDE_CLK_CTRL_LUTDMA;
 	sde_cfg->dma_cfg.vbif_idx = VBIF_RT;
 
-	for (i = 0; i < sde_cfg->mdp_count; i++) {
-		sde_cfg->mdp[i].clk_ctrls[sde_cfg->dma_cfg.clk_ctrl].reg_off =
-			PROP_BITVALUE_ACCESS(prop_value,
-					REG_DMA_CLK_CTRL, 0, 0);
-		sde_cfg->mdp[i].clk_ctrls[sde_cfg->dma_cfg.clk_ctrl].bit_off =
-			PROP_BITVALUE_ACCESS(prop_value,
-					REG_DMA_CLK_CTRL, 0, 1);
+	if (test_bit(SDE_FEATURE_VBIF_CLK_SPLIT, sde_cfg->features)) {
+		sde_cfg->dma_cfg.split_vbif_supported = true;
+	} else {
+		for (i = 0; i < sde_cfg->mdp_count; i++) {
+			sde_cfg->mdp[i].clk_ctrls[sde_cfg->dma_cfg.clk_ctrl].reg_off =
+				PROP_BITVALUE_ACCESS(prop_value,
+						REG_DMA_CLK_CTRL, 0, 0);
+			sde_cfg->mdp[i].clk_ctrls[sde_cfg->dma_cfg.clk_ctrl].bit_off =
+				PROP_BITVALUE_ACCESS(prop_value,
+						REG_DMA_CLK_CTRL, 0, 1);
+		}
 	}
-
 end:
 	kfree(prop_value);
 	/* reg dma is optional feature hence return 0 */

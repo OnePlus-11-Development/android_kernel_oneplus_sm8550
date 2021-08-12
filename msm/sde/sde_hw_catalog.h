@@ -1607,6 +1607,7 @@ struct sde_reg_dma_blk_info {
  * @version            version of lutdma hw blocks
  * @trigger_sel_off    offset to trigger select registers of lutdma
  * @broadcast_disabled flag indicating if broadcast usage should be avoided
+ * @split_vbif_supported indicates if VBIF clock split is supported
  * @xin_id             VBIF xin client-id for LUTDMA
  * @vbif_idx           VBIF id (RT/NRT)
  * @base_off           Base offset of LUTDMA from the MDSS root
@@ -1617,6 +1618,7 @@ struct sde_reg_dma_cfg {
 	u32 version;
 	u32 trigger_sel_off;
 	u32 broadcast_disabled;
+	u32 split_vbif_supported;
 	u32 xin_id;
 	u32 vbif_idx;
 	u32 base_off;
