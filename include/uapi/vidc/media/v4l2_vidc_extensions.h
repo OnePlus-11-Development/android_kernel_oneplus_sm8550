@@ -237,6 +237,24 @@ enum v4l2_mpeg_video_av1_tier {
 #define V4L2_CID_MPEG_VIDC_METADATA_PICTURE_TYPE                             \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x3B)
 
+/* Encoder Slice Delivery Mode
+ * set format has a dependency on this control
+ * and gets invoked when this control is updated.
+ */
+#define V4L2_CID_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE                          \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x3C)
+enum v4l2_hevc_encode_delivery_mode {
+	V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_FRAME_BASED = 0,
+	V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_SLICE_BASED = 1,
+};
+
+#define V4L2_CID_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE                          \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x3D)
+enum v4l2_h264_encode_delivery_mode {
+	V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_FRAME_BASED = 0,
+	V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_SLICE_BASED = 1,
+};
+
 /* add new controls above this line */
 /* Deprecate below controls once availble in gki and gsi bionic header */
 #ifndef V4L2_CID_MPEG_VIDEO_BASELAYER_PRIORITY_ID

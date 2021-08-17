@@ -1617,7 +1617,7 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 		HFI_PROP_DPB_TAG_LIST,
 		CAP_FLAG_BITMASK},
 
-	{META_SUBFRAME_OUTPUT, ENC, HEIC,
+	{META_SUBFRAME_OUTPUT, ENC, HEIC | H264 | HEVC,
 		V4L2_MPEG_VIDC_META_DISABLE,
 		V4L2_MPEG_VIDC_META_ENABLE | V4L2_MPEG_VIDC_META_RX_OUTPUT,
 		0, V4L2_MPEG_VIDC_META_DISABLE,
@@ -1684,6 +1684,26 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 		V4L2_CID_MPEG_VIDC_METADATA_MAX_NUM_REORDER_FRAMES,
 		HFI_PROP_MAX_NUM_REORDER_FRAMES,
 		CAP_FLAG_BITMASK},
+
+	{DELIVERY_MODE, ENC, HEVC,
+		V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_FRAME_BASED,
+		V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_SLICE_BASED,
+		BIT(V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_FRAME_BASED) |
+		BIT(V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_SLICE_BASED),
+		V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_FRAME_BASED,
+		V4L2_CID_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE,
+		HFI_PROP_ENABLE_SLICE_DELIVERY,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
+
+	{DELIVERY_MODE, ENC, H264,
+		V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_FRAME_BASED,
+		V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_SLICE_BASED,
+		BIT(V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_FRAME_BASED) |
+		BIT(V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_SLICE_BASED),
+		V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_FRAME_BASED,
+		V4L2_CID_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE,
+		HFI_PROP_ENABLE_SLICE_DELIVERY,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 };
 
 static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kalama[] = {
@@ -1867,7 +1887,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kala
 		msm_vidc_set_csc_custom_matrix},
 
 	{LOWLATENCY_MODE, ENC, H264 | HEVC,
-		{BITRATE_MODE},
+		{BITRATE_MODE, DELIVERY_MODE},
 		{STAGE},
 		msm_vidc_adjust_enc_lowlatency_mode,
 		NULL},
@@ -2135,7 +2155,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kala
 
 	{SLICE_MODE, ENC, H264|HEVC,
 		{BITRATE_MODE, ALL_INTRA},
-		{STAGE},
+		{STAGE, DELIVERY_MODE},
 		msm_vidc_adjust_slice_count,
 		msm_vidc_set_slice_count},
 
@@ -2188,7 +2208,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kala
 		msm_vidc_set_u32},
 
 	{OUTPUT_BUF_HOST_MAX_COUNT, ENC, H264|HEVC,
-		{SUPER_FRAME},
+		{SUPER_FRAME, DELIVERY_MODE},
 		{0},
 		msm_vidc_adjust_output_buf_host_max_count,
 		msm_vidc_set_u32},
@@ -2291,6 +2311,11 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kala
 		{0},
 		{0},
 		NULL,
+		msm_vidc_set_u32},
+
+	{DELIVERY_MODE, ENC, H264|HEVC,
+		{SLICE_MODE}, {LOWLATENCY_MODE, OUTPUT_BUF_HOST_MAX_COUNT},
+		msm_vidc_adjust_delivery_mode,
 		msm_vidc_set_u32},
 };
 

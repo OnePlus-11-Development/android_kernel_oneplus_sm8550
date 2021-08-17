@@ -150,6 +150,12 @@ static const char *const mpeg_video_vidc_ir_type[] = {
 	NULL,
 };
 
+static const char *const mpeg_vidc_delivery_modes[] = {
+	"Frame Based Delivery Mode",
+	"Slice Based Delivery Mode",
+	NULL,
+};
+
 u32 msm_vidc_get_port_info(struct msm_vidc_inst *inst,
 	enum msm_vidc_inst_capability_type cap_id)
 {
@@ -193,6 +199,10 @@ static const char * const * msm_vidc_get_qmenu_type(
 		return av1_tier;
 	case V4L2_CID_MPEG_VIDEO_VIDC_INTRA_REFRESH_TYPE:
 		return mpeg_video_vidc_ir_type;
+	case V4L2_CID_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE:
+		return mpeg_vidc_delivery_modes;
+	case V4L2_CID_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE:
+		return mpeg_vidc_delivery_modes;
 	default:
 		i_vpr_e(inst, "%s: No available qmenu for ctrl %#x\n",
 			__func__, control_id);
@@ -1074,6 +1084,16 @@ static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
 			return rc;
 	}
 
+	if (ctrl->id == V4L2_CID_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE ||
+		ctrl->id == V4L2_CID_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE) {
+		struct v4l2_format *output_fmt;
+
+		output_fmt = &inst->fmts[OUTPUT_PORT];
+		rc = msm_venc_s_fmt_output(inst, output_fmt);
+		if (rc)
+			return rc;
+	}
+
 	if (ctrl->id == V4L2_CID_MPEG_VIDC_MIN_BITSTREAM_SIZE_OVERWRITE) {
 		rc = msm_vidc_update_bitstream_buffer_size(inst);
 		if (rc)
@@ -1600,7 +1620,8 @@ int msm_vidc_adjust_output_buf_host_max_count(void *instance, struct v4l2_ctrl *
 	adjusted_value = ctrl ? ctrl->val :
 		capability->cap[OUTPUT_BUF_HOST_MAX_COUNT].value;
 
-	if (msm_vidc_is_super_buffer(inst) || is_image_session(inst))
+	if (msm_vidc_is_super_buffer(inst) || is_image_session(inst) ||
+		is_enc_slice_delivery_mode(inst))
 		adjusted_value = DEFAULT_MAX_HOST_BURST_BUF_COUNT;
 
 	msm_vidc_update_cap_value(inst, OUTPUT_BUF_HOST_MAX_COUNT,
@@ -2759,7 +2780,8 @@ int msm_vidc_adjust_enc_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl)
 		return -EINVAL;
 
 	if (rc_type == HFI_RC_CBR_CFR ||
-		rc_type == HFI_RC_CBR_VFR)
+		rc_type == HFI_RC_CBR_VFR ||
+		is_enc_slice_delivery_mode(inst))
 		adjusted_value = 1;
 
 	msm_vidc_update_cap_value(inst, LOWLATENCY_MODE,
@@ -2944,6 +2966,43 @@ int msm_vidc_adjust_dec_outbuf_fence(void *instance, struct v4l2_ctrl *ctrl)
 	}
 
 	msm_vidc_update_cap_value(inst, META_OUTBUF_FENCE,
+		adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_delivery_mode(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst_capability *capability;
+	s32 adjusted_value;
+	s32 slice_mode = -1;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	if (is_decode_session(inst))
+		return 0;
+
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val : capability->cap[DELIVERY_MODE].value;
+
+	if (msm_vidc_get_parent_value(inst, DELIVERY_MODE, SLICE_MODE,
+		&slice_mode, __func__))
+		return -EINVAL;
+
+	/* Slice encode delivery mode is only supported for Max MB slice mode */
+	if (slice_mode != V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_MAX_MB) {
+		if (inst->codec == MSM_VIDC_HEVC)
+			adjusted_value = V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_FRAME_BASED;
+		else if (inst->codec == MSM_VIDC_H264)
+			adjusted_value = V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_FRAME_BASED;
+	}
+
+	msm_vidc_update_cap_value(inst, DELIVERY_MODE,
 		adjusted_value, __func__);
 
 	return 0;
@@ -4347,6 +4406,32 @@ int msm_vidc_v4l2_menu_to_hfi(struct msm_vidc_inst *inst,
 			break;
 		default:
 			*value = 1;
+			goto set_default;
+		}
+		return 0;
+	case V4L2_CID_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE:
+		switch (capability->cap[cap_id].value) {
+		case V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_FRAME_BASED:
+			*value = 0;
+			break;
+		case V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_SLICE_BASED:
+			*value = 1;
+			break;
+		default:
+			*value = 0;
+			goto set_default;
+		}
+		return 0;
+	case V4L2_CID_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE:
+		switch (capability->cap[cap_id].value) {
+		case V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_FRAME_BASED:
+			*value = 0;
+			break;
+		case V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_SLICE_BASED:
+			*value = 1;
+			break;
+		default:
+			*value = 0;
 			goto set_default;
 		}
 		return 0;

@@ -302,6 +302,21 @@ static inline bool is_secure_region(enum msm_vidc_buffer_region region)
 			region == MSM_VIDC_NON_SECURE_PIXEL);
 }
 
+static inline bool is_enc_slice_delivery_mode(struct msm_vidc_inst *inst)
+{
+	if (is_decode_session(inst))
+		return false;
+
+	return (inst->capabilities->cap[SLICE_MODE].value ==
+			V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_MAX_MB &&
+			((inst->codec == MSM_VIDC_H264 &&
+			inst->capabilities->cap[DELIVERY_MODE].value ==
+			V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_SLICE_BASED) ||
+			(inst->codec == MSM_VIDC_HEVC &&
+			inst->capabilities->cap[DELIVERY_MODE].value ==
+			V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_SLICE_BASED)));
+}
+
 const char *cap_name(enum msm_vidc_inst_capability_type cap_id);
 const char *v4l2_pixelfmt_name(u32 pixelfmt);
 const char *v4l2_type_name(u32 port);

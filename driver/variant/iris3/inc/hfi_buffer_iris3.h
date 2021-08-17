@@ -1201,6 +1201,64 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		size = HFI_ALIGN(bitstream_size, HFI_ALIGNMENT_4096); \
 	} while (0)
 
+#define HFI_IRIS3_ENC_TILE_SIZE_INFO(tile_size, tile_count, last_tile_size, \
+				frame_width_coded, codec_standard) \
+	do \
+	{ \
+		HFI_U32 without_tile_enc_width; \
+		HFI_U32 min_tile_size = 352, fixed_tile_width = 960; \
+		without_tile_enc_width = min_tile_size + fixed_tile_width; \
+		if ((codec_standard == HFI_CODEC_ENCODE_HEVC) && \
+			(frame_width_coded > without_tile_enc_width)) \
+		{ \
+			tile_size = fixed_tile_width; \
+			tile_count = (frame_width_coded + tile_size - 1) / tile_size; \
+			last_tile_size = (frame_width_coded - (tile_size * (tile_count - 1))); \
+			if (last_tile_size < min_tile_size) \
+			{ \
+				tile_count -= 1; \
+				last_tile_size = (tile_size + min_tile_size); \
+			} \
+		} \
+		else \
+		{ \
+			tile_size = frame_width_coded; \
+			tile_count = 1; \
+			last_tile_size = 0; \
+		} \
+	} while (0)
+
+#define HFI_IRIS3_ENC_MB_BASED_MULTI_SLICE_COUNT(total_slice_count, frame_width, frame_height, \
+			codec_standard, multi_slice_max_mb_count) \
+	do \
+	{ \
+		HFI_U32 tile_size, tile_count, last_tile_size, \
+			slice_count_per_tile, slice_count_in_last_tile; \
+		HFI_U32 mbs_in_one_tile, mbs_in_last_tile; \
+		HFI_U32 frame_width_coded, frame_height_coded, lcu_size; \
+		lcu_size = (codec_standard == HFI_CODEC_ENCODE_HEVC) ? 32 : 16; \
+		frame_width_coded = HFI_ALIGN(frame_width, lcu_size); \
+		frame_height_coded = HFI_ALIGN(frame_height, lcu_size); \
+		HFI_IRIS3_ENC_TILE_SIZE_INFO(tile_size, tile_count, last_tile_size, \
+			frame_width_coded, codec_standard); \
+		mbs_in_one_tile = (tile_size * frame_height_coded) / (lcu_size * lcu_size); \
+		slice_count_per_tile = \
+			(mbs_in_one_tile + multi_slice_max_mb_count - 1) / (multi_slice_max_mb_count); \
+		if (last_tile_size) \
+		{ \
+			mbs_in_last_tile = \
+				(last_tile_size * frame_height_coded) / (lcu_size * lcu_size); \
+			slice_count_in_last_tile = \
+				(mbs_in_last_tile + multi_slice_max_mb_count - 1) / (multi_slice_max_mb_count); \
+			total_slice_count = \
+				(slice_count_per_tile * (tile_count - 1)) + slice_count_in_last_tile; \
+		} \
+		else \
+		{ \
+			total_slice_count = (slice_count_per_tile * tile_count); \
+		} \
+	} while (0)
+
 #define SIZE_ROI_METADATA_ENC(size_roi, frame_width, frame_height, lcu_size)\
 	do                                                \
 	{                                                               \
