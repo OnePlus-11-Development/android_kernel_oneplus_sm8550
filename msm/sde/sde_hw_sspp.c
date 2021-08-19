@@ -11,6 +11,7 @@
 #include "sde_dbg.h"
 #include "sde_kms.h"
 #include "sde_hw_reg_dma_v1_color_proc.h"
+#include "sde_hw_vbif.h"
 
 #define SDE_FETCH_CONFIG_RESET_VALUE   0x00000087
 
@@ -110,6 +111,8 @@
 #define SSPP_VIG_OP_MODE                   0x0
 #define SSPP_VIG_CSC_10_OP_MODE            0x0
 #define SSPP_TRAFFIC_SHAPER_BPC_MAX        0xFF
+#define SSPP_CLK_CTRL                      0x330
+#define SSPP_CLK_STATUS                    0x334
 
 /* SSPP_QOS_CTRL */
 #define SSPP_QOS_CTRL_VBLANK_EN            BIT(16)
@@ -1382,6 +1385,44 @@ static void sde_hw_sspp_setup_dgm_csc(struct sde_hw_pipe *ctx,
 	SDE_REG_WRITE(&ctx->hw, offset, op_mode);
 }
 
+static bool sde_hw_sspp_setup_clk_force_ctrl(struct sde_hw_blk_reg_map *hw,
+		enum sde_clk_ctrl_type clk_ctrl, bool enable)
+{
+	u32 reg_val, new_val;
+
+	if (!hw)
+		return false;
+
+	if (!SDE_CLK_CTRL_SSPP_VALID(clk_ctrl))
+		return false;
+
+	reg_val = SDE_REG_READ(hw, SSPP_CLK_CTRL);
+
+	if (enable)
+		new_val = reg_val | BIT(0);
+	else
+		new_val = reg_val & ~BIT(0);
+
+	SDE_REG_WRITE(hw, SSPP_CLK_CTRL, new_val);
+	wmb(); /* ensure write finished before progressing */
+
+	return !(reg_val & BIT(0));
+}
+
+static int sde_hw_sspp_get_clk_ctrl_status(struct sde_hw_blk_reg_map *hw,
+		enum sde_clk_ctrl_type clk_ctrl, bool *status)
+{
+	if (!hw)
+		return -EINVAL;
+
+	if (!SDE_CLK_CTRL_SSPP_VALID(clk_ctrl))
+		return -EINVAL;
+
+	*status = SDE_REG_READ(hw, SSPP_CLK_STATUS) & BIT(0);
+
+	return 0;
+}
+
 static void _setup_layer_ops(struct sde_hw_pipe *c,
 		unsigned long features, unsigned long perf_features,
 		bool is_virtual_pipe)
@@ -1508,7 +1549,7 @@ static struct sde_sspp_cfg *_sspp_offset(enum sde_sspp sspp,
 
 struct sde_hw_pipe *sde_hw_sspp_init(enum sde_sspp idx,
 		void __iomem *addr, struct sde_mdss_cfg *catalog,
-		bool is_virtual_pipe)
+		bool is_virtual_pipe, struct sde_vbif_clk_client *clk_client)
 {
 	struct sde_hw_pipe *hw_pipe;
 	struct sde_sspp_cfg *cfg;
@@ -1581,6 +1622,17 @@ struct sde_hw_pipe *sde_hw_sspp_init(enum sde_sspp idx,
 			hw_pipe->hw.blk_off + cfg->sblk->scaler_blk.base +
 				cfg->sblk->scaler_blk.len,
 			hw_pipe->hw.xin_id);
+
+	if (test_bit(SDE_FEATURE_VBIF_CLK_SPLIT, catalog->features)) {
+		if (SDE_CLK_CTRL_SSPP_VALID(cfg->clk_ctrl)) {
+			clk_client->hw = &hw_pipe->hw;
+			clk_client->clk_ctrl = cfg->clk_ctrl;
+			clk_client->ops.get_clk_ctrl_status = sde_hw_sspp_get_clk_ctrl_status;
+			clk_client->ops.setup_clk_force_ctrl = sde_hw_sspp_setup_clk_force_ctrl;
+		} else {
+			SDE_ERROR("invalid sspp clk ctrl type %d\n", cfg->clk_ctrl);
+		}
+	}
 
 	return hw_pipe;
 }

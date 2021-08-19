@@ -12,6 +12,7 @@
 #include "sde_reg_dma.h"
 #include "sde_formats.h"
 #include "sde_color_processing.h"
+#include "sde_hw_vbif.h"
 
 struct sde_hw_pipe;
 
@@ -710,10 +711,11 @@ struct sde_hw_pipe {
  * @addr: Mapped register io address of MDP
  * @catalog : Pointer to mdss catalog data
  * @is_virtual_pipe: is this pipe virtual pipe
+ * @client: Pointer to VBIF clock client info
  */
 struct sde_hw_pipe *sde_hw_sspp_init(enum sde_sspp idx,
 		void __iomem *addr, struct sde_mdss_cfg *catalog,
-		bool is_virtual_pipe);
+		bool is_virtual_pipe, struct sde_vbif_clk_client *client);
 
 /**
  * sde_hw_sspp_destroy(): Destroys SSPP driver context
