@@ -431,6 +431,13 @@ struct sde_connector_ops {
 	 */
 	int (*get_num_lm_from_mode)(void *display, const struct drm_display_mode *mode);
 
+	/*
+	 * update_transfer_time - Update transfer time
+	 * @display: Pointer to private display structure
+	 * @transfer_time: new transfer time to be updated
+	 */
+	int (*update_transfer_time)(void *display, u32 transfer_time);
+
 };
 
 /**

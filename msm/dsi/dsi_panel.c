@@ -782,6 +782,7 @@ static int dsi_panel_parse_timing(struct dsi_mode_info *mode,
 	u64 tmp64 = 0;
 	struct dsi_display_mode *display_mode;
 	struct dsi_display_mode_priv_info *priv_info;
+	u32 usecs_fps = 0;
 
 	display_mode = container_of(mode, struct dsi_display_mode, timing);
 
@@ -804,11 +805,22 @@ static int dsi_panel_parse_timing(struct dsi_mode_info *mode,
 
 	rc = utils->read_u32(utils->data, "qcom,mdss-mdp-transfer-time-us",
 				&mode->mdp_transfer_time_us);
-	if (!rc)
-		display_mode->priv_info->mdp_transfer_time_us =
-			mode->mdp_transfer_time_us;
-	else
-		display_mode->priv_info->mdp_transfer_time_us = 0;
+	if (rc)
+		mode->mdp_transfer_time_us = 0;
+
+	rc = utils->read_u32(utils->data, "qcom,mdss-mdp-transfer-time-us-min",
+				&priv_info->mdp_transfer_time_us_min);
+	if (rc)
+		priv_info->mdp_transfer_time_us_min = 0;
+	else if (!rc && mode->mdp_transfer_time_us < priv_info->mdp_transfer_time_us_min)
+		mode->mdp_transfer_time_us = priv_info->mdp_transfer_time_us_min;
+
+	rc = utils->read_u32(utils->data, "qcom,mdss-mdp-transfer-time-us-max",
+				&priv_info->mdp_transfer_time_us_max);
+	if (rc)
+		priv_info->mdp_transfer_time_us_max = 0;
+	else if (!rc && mode->mdp_transfer_time_us > priv_info->mdp_transfer_time_us_max)
+		mode->mdp_transfer_time_us = priv_info->mdp_transfer_time_us_max;
 
 	priv_info->disable_rsc_solver = utils->read_bool(utils->data, "qcom,disable-rsc-solver");
 
@@ -820,6 +832,11 @@ static int dsi_panel_parse_timing(struct dsi_mode_info *mode,
 		       rc);
 		goto error;
 	}
+
+	usecs_fps = DIV_ROUND_UP((1 * 1000 * 1000), mode->refresh_rate);
+	if (mode->mdp_transfer_time_us > usecs_fps)
+		mode->mdp_transfer_time_us = 0;
+	priv_info->mdp_transfer_time_us = mode->mdp_transfer_time_us;
 
 	rc = utils->read_u32(utils->data, "qcom,mdss-dsi-panel-width",
 				  &mode->h_active);

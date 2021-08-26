@@ -831,4 +831,13 @@ int dsi_display_restore_bit_clk(struct dsi_display *display, struct dsi_display_
 bool dsi_display_mode_match(const struct dsi_display_mode *mode1,
 		struct dsi_display_mode *mode2, unsigned int match_flags);
 
+/**
+ * dsi_display_update_transfer_time() - update DSI transfer time and clocks
+ * @display:     handle to display
+ * @transfer_time: transfer time value to be updated
+ *
+ * Return: error code
+ */
+int dsi_display_update_transfer_time(void *display, u32 transfer_time);
+
 #endif /* _DSI_DISPLAY_H_ */
