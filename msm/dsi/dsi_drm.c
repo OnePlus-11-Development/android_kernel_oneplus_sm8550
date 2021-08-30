@@ -638,6 +638,7 @@ int dsi_conn_get_mode_info(struct drm_connector *connector,
 		dsi_mode->priv_info->mdp_transfer_time_us;
 	mode_info->disable_rsc_solver = dsi_mode->priv_info->disable_rsc_solver;
 	mode_info->qsync_min_fps = dsi_mode->timing.qsync_min_fps;
+	mode_info->wd_jitter = dsi_mode->priv_info->wd_jitter;
 
 	memcpy(&mode_info->topology, &dsi_mode->priv_info->topology,
 			sizeof(struct msm_display_topology));
