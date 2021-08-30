@@ -609,6 +609,7 @@ enum hdr_total_len_or_pad_type {
 
 struct ipa_ep_cfg_nat {
 	enum ipa_nat_en_type nat_en;
+	bool nat_exc_suppress;
 };
 
 struct ipa_ep_cfg_conn_track {
@@ -654,6 +655,7 @@ struct ipa_ep_cfg_aggr {
 	bool aggr_sw_eof_active;
 	uint8_t pulse_generator;
 	uint8_t scaled_time;
+	bool aggr_coal_l2;
 };
 
 struct ipa_ep_cfg_route {
@@ -682,6 +684,7 @@ struct ipa_ep_cfg_cfg {
 	uint8_t cs_metadata_hdr_offset;
 	uint8_t gen_qmb_master_sel;
 	uint8_t tx_instance;
+	bool pipe_replicate_en;
 };
 
 struct ipa_ep_cfg_metadata_mask {
@@ -716,6 +719,16 @@ struct ipa_pkt_init_ex_hdr_ofst_set {
 	enum ipa_client_type ep;
 };
 
+struct ipa_ep_cfg_prod_cfg {
+	uint8_t tx_instance;
+	bool tsp_enable;
+	bool max_output_size_drop_enable;
+	uint8_t tsp_idx;
+	uint8_t max_output_size;
+	uint8_t egress_tc_lowest;
+	uint8_t egress_tc_highest;
+};
+
 /*
  * This struct is a mirroring of the ipa struct
  * the test module expect to get from user-space the
@@ -737,6 +750,7 @@ struct test_ipa_ep_cfg {
 	struct ipa_ep_cfg_metadata meta;
 	struct ipa_ep_cfg_seq seq;
 	struct ipa_ep_cfg_ulso ulso;
+	struct ipa_ep_cfg_prod_cfg prod_cfg;
 };
 
 /*! @brief Struct for the IPAv3.0 UL packet status header */
@@ -806,5 +820,41 @@ struct ipa3_hw_pkt_status_hw_v5_0 {
 	uint64_t ucp : 1;
 };
 
-
+struct ipa3_hw_pkt_status_hw_v5_5 {
+	uint64_t status_opcode:8;
+	uint64_t exception:8;
+	uint64_t status_mask:16;
+	uint64_t pkt_len:16;
+	uint64_t endp_src_idx:8;
+	uint64_t reserved_1:3;
+	uint64_t rt_local:1;
+	uint64_t rt_hash:1;
+	uint64_t reserved_2:3;
+	uint64_t metadata:32;
+	uint64_t flt_local:1;
+	uint64_t flt_hash:1;
+	uint64_t flt_global:1;
+	uint64_t flt_ret_hdr:1;
+	uint64_t flt_rule_id:10;
+	uint64_t rt_tbl_idx:8;
+	uint64_t rt_rule_id:10;
+	uint64_t nat_hit:1;
+	uint64_t nat_entry_idx:13;
+	uint64_t nat_type:2;
+	uint64_t tag_info:36;
+	uint64_t egress_tc:6;
+	uint64_t ingress_tc:6;
+	uint64_t seq_num:8;
+	uint64_t time_of_day_ctr:24;
+	uint64_t hdr_local:1;
+	uint64_t hdr_offset:10;
+	uint64_t frag_hit:1;
+	uint64_t frag_rule:4;
+	uint64_t endp_dest_idx:8;
+	uint64_t hw_specific:4;
+	uint64_t nat_exc_suppress:1;
+	uint64_t tsp:1;
+	uint64_t ttl_dec:1;
+	uint64_t ucp:1;
+};
 #endif
