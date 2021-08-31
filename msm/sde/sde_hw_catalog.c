@@ -3295,7 +3295,8 @@ static int sde_dsc_parse_dt(struct device_node *np,
 			if (PROP_VALUE_ACCESS(prop_value, DSC_422, i))
 					set_bit(SDE_DSC_NATIVE_422_EN,
 						&dsc->features);
-
+			if (SDE_HW_MAJOR(sde_cfg->hw_rev) >= SDE_HW_MAJOR(SDE_HW_VER_900))
+				set_bit(SDE_DSC_4HS, &dsc->features);
 		} else {
 			set_bit(SDE_DSC_HW_REV_1_1, &dsc->features);
 		}
