@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
-KDIR := $(TOP)/kernel_platform/common
+KDIR := $(TOP)/kernel_platform/msm-kernel
 
 ifeq ($(CONFIG_ARCH_WAIPIO), y)
 ifeq ($(CONFIG_ARCH_QTI_VM), y)
@@ -11,6 +11,11 @@ else
 	LINUX_INC +=	-include $(DISPLAY_ROOT)/config/gki_waipiodispconf.h
 endif
 endif
+
+#ifeq ($(CONFIG_ARCH_KALAMA), y)
+	include $(DISPLAY_ROOT)/config/gki_kalamadisp.conf
+	LINUX_INC += -include $(DISPLAY_ROOT)/config/gki_kalamadispconf.h
+#endif
 
 LINUX_INC +=	-Iinclude/linux \
 		-Iinclude/linux/drm
