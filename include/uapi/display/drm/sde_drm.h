@@ -792,6 +792,95 @@ struct drm_msm_noise_layer_cfg {
 	__u32 alpha_noise;
 };
 
+#define FEATURE_DNSC_BLUR
+/* Downscale Blur - number of gaussian coefficient LUTs */
+#define DNSC_BLUR_COEF_NUM		64
+
+/* Downscale Blur flags */
+#define DNSC_BLUR_EN			(1 << 0)
+#define DNSC_BLUR_RND_8B_EN		(1 << 1)
+#define DNSC_BLUR_DITHER_EN		(1 << 2)
+
+#define DNSC_BLUR_MIRROR_BLK_CFG	(1 << 16)
+#define DNSC_BLUR_INDEPENDENT_BLK_CFG	(1 << 17)
+
+/* Downscale Blur horizontal/vertical filter flags */
+#define DNSC_BLUR_GAUS_FILTER		(1 << 0)
+#define DNSC_BLUR_PCMN_FILTER		(1 << 1)
+
+/* Downscale Blur Dither matrix size */
+#define DNSC_BLUR_DITHER_MATRIX_SZ	16
+
+/* Downscale Blur Dither flags */
+#define DNSC_BLUR_DITHER_LUMA_MODE	(1 << 0)
+
+/**
+ * struct sde_drm_dnsc_blur_cfg - Downscale Blur config structure
+ * @flags: Flags to indicate features enabled, values are
+ *          based on "Downscale Blur flags"
+ * @num_blocks: Active dnsc_blur blocks used for the display
+ * @src_width: Source width configuration
+ * @src_height: Source height configuration
+ * @dst_width: Destination width configuration
+ * @dst_height: Destination height configuration
+ * @flags_h: Flags for horizontal downscaling, values are
+ *            based on "Downscale Blur horizontal/vertical filter flags"
+ * @flags_v: Flags for veritcal downscaling
+ * @phase_init_h: Initial phase value for horizontal downscaling
+ * @phase_step_h: Phase step value for horizontal downscaling
+ * @phase_init_v: Initial phase value for vertical downscaling
+ * @phase_step_v: Phase step value for vertical downscaling
+ * @norm_h: Horizontal downscale normalization downshift value
+ * @ratio_h: Horizontal downscale ratio value
+ * @norm_v: Vertical downscale normalization downshift value
+ * @ratio_v: Vertical downscale ratio value
+ * @coef_hori: Horizontal downscale LUT coefficients
+ * @coef_vert: Vertical downscale LUT coefficients
+ * @dither_flags: Flags for dither customization, values are
+ *                 based on "Downscale Blur Dither flags"
+ * @temporal_en: Temperal dither enable
+ * @c0_bitdepth: c0 component bit depth
+ * @c1_bitdepth: c1 component bit depth
+ * @c2_bitdepth: c2 component bit depth
+ * @c3_bitdepth: c2 component bit depth
+ * @dither_matrix: Dither strength matrix
+ */
+struct sde_drm_dnsc_blur_cfg {
+	__u64 flags;
+	__u32 num_blocks;
+
+	__u32 src_width;
+	__u32 src_height;
+	__u32 dst_width;
+	__u32 dst_height;
+
+	__u32 flags_h;
+	__u32 flags_v;
+
+	/* pcmn filter parameters */
+	__u32 phase_init_h;
+	__u32 phase_step_h;
+	__u32 phase_init_v;
+	__u32 phase_step_v;
+
+	/* gaussian filter parameters */
+	__u32 norm_h;
+	__u32 ratio_h;
+	__u32 norm_v;
+	__u32 ratio_v;
+	__u32 coef_hori[DNSC_BLUR_COEF_NUM];
+	__u32 coef_vert[DNSC_BLUR_COEF_NUM];
+
+	/* dither configs */
+	__u64 dither_flags;
+	__u32 temporal_en;
+	__u32 c0_bitdepth;
+	__u32 c1_bitdepth;
+	__u32 c2_bitdepth;
+	__u32 c3_bitdepth;
+	__u32 dither_matrix[DNSC_BLUR_DITHER_MATRIX_SZ];
+};
+
 #define DRM_SDE_WB_CONFIG              0x40
 #define DRM_MSM_REGISTER_EVENT         0x41
 #define DRM_MSM_DEREGISTER_EVENT       0x42
