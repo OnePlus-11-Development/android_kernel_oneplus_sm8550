@@ -135,6 +135,8 @@
 #define IS_SDE_DNSC_BLUR_REV_100(rev) \
 	((rev) == SDE_DNSC_BLUR_VERSION_1_0_0)
 
+#define DNSC_BLUR_MAX_RATIO_COUNT	7
+
 /*
  * UIDLE supported versions
  */
@@ -1361,6 +1363,32 @@ struct sde_dnsc_blur_cfg   {
 };
 
 /**
+ * struct sde_dnsc_blur_filter_info - information of support downscale filter/ratios
+ * @filter:		type of filter used
+ * @src_min:		min src width/height supported
+ * @src_max:		max src width/height supported
+ * @dst_min:		min dst width/height supported
+ * @dst_max:		max dst width/height supported
+ * @min_ratio:		min downscale ratio supported
+ * @max_ratio:		max downscale ratio supported
+ * @fraction_support:	supports fractional downscale ratio
+ * @ratio_count:	valid count of ratios in @ratio array
+ * @ratio:		array of supported downscale ratios
+ */
+struct sde_dnsc_blur_filter_info {
+	u32 filter;
+	u32 src_min;
+	u32 src_max;
+	u32 dst_min;
+	u32 dst_max;
+	u32 min_ratio;
+	u32 max_ratio;
+	bool fraction_support;
+	u32 ratio_count;
+	u32 ratio[DNSC_BLUR_MAX_RATIO_COUNT];
+};
+
+/**
  * struct sde_intf_cfg - information of timing engine blocks
  * @id                 enum identifying this block
  * @base               register offset of this block
@@ -1756,6 +1784,8 @@ struct sde_perf_cfg {
  * @virt_vig_formats    supported formats for virtual vig pipe
  * @inline_rot_formats  supported formats for inline rotation
  * @inline_rot_restricted_formats       restricted formats for inline rotation
+ * @dnsc_blur_filters        supported filters for downscale blur
+ * @dnsc_blur_filter_count   supported filter count for downscale blur
  */
 struct sde_mdss_cfg {
 	/* Block Revisions */
@@ -1865,6 +1895,8 @@ struct sde_mdss_cfg {
 	struct sde_format_extended *virt_vig_formats;
 	struct sde_format_extended *inline_rot_formats;
 	struct sde_format_extended *inline_rot_restricted_formats;
+	struct sde_dnsc_blur_filter_info *dnsc_blur_filters;
+	u32 dnsc_blur_filter_count;
 };
 
 struct sde_mdss_hw_cfg_handler {

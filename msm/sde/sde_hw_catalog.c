@@ -5254,6 +5254,38 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 	return rc;
 }
 
+static int _sde_hw_dnsc_blur_filter_caps(struct sde_mdss_cfg *sde_cfg)
+{
+	const struct sde_dnsc_blur_filter_info *filters = NULL;
+	u32 size;
+	int rc = 0;
+
+	if (!sde_cfg->dnsc_blur_count || !sde_cfg->dnsc_blur_rev)
+		return 0;
+
+	if (IS_SDE_DNSC_BLUR_REV_100(sde_cfg->dnsc_blur_rev)) {
+		filters = dnsc_blur_v100_filters;
+		size = ARRAY_SIZE(dnsc_blur_v100_filters);
+	}
+
+	if (filters) {
+		sde_cfg->dnsc_blur_filters = kcalloc(size,
+				sizeof(struct sde_dnsc_blur_filter_info), GFP_KERNEL);
+		if (!sde_cfg->dnsc_blur_filters) {
+			SDE_ERROR("failed to alloc dnsc_blur filter list\n");
+			rc = -ENOMEM;
+			goto end;
+		}
+		memcpy(sde_cfg->dnsc_blur_filters, filters,
+				sizeof(struct sde_dnsc_blur_filter_info) * size);
+		sde_cfg->dnsc_blur_filter_count = size;
+
+	}
+
+end:
+	return rc;
+}
+
 static int _sde_hardware_post_caps(struct sde_mdss_cfg *sde_cfg,
 	uint32_t hw_rev)
 {
@@ -5299,6 +5331,8 @@ static int _sde_hardware_post_caps(struct sde_mdss_cfg *sde_cfg,
 
 	sde_cfg->min_display_height = MIN_DISPLAY_HEIGHT;
 	sde_cfg->min_display_width = MIN_DISPLAY_WIDTH;
+
+	rc = _sde_hw_dnsc_blur_filter_caps(sde_cfg);
 
 	return rc;
 }
@@ -5355,6 +5389,8 @@ void sde_hw_catalog_deinit(struct sde_mdss_cfg *sde_cfg)
 	kfree(sde_cfg->wb_formats);
 	kfree(sde_cfg->virt_vig_formats);
 	kfree(sde_cfg->inline_rot_formats);
+
+	kfree(sde_cfg->dnsc_blur_filters);
 
 	kfree(sde_cfg);
 }
