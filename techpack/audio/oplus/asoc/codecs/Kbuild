@@ -84,6 +84,3 @@ endif
 ifeq ($(KERNEL_BUILD), 1)
 	obj-y	+= tfa98xx-v6/
 endif
-
-# inject some build related information
-DEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
