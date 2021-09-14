@@ -732,6 +732,29 @@ struct sde_connector_state {
 	((S) ? to_sde_connector_state((S))->out_fb : 0)
 
 /**
+ * sde_connector_get_kms - helper to get sde_kms from connector
+ * @conn: Pointer to drm connector
+ * Returns: Pointer to sde_kms or NULL
+ */
+static inline struct sde_kms *sde_connector_get_kms(struct drm_connector *conn)
+{
+	struct msm_drm_private *priv;
+
+	if (!conn || !conn->dev || !conn->dev->dev_private) {
+		SDE_ERROR("invalid connector\n");
+		return NULL;
+	}
+
+	priv = conn->dev->dev_private;
+	if (!priv->kms) {
+		SDE_ERROR("invalid kms\n");
+		return NULL;
+	}
+
+	return to_sde_kms(priv->kms);
+}
+
+/**
  * sde_connector_get_topology_name - helper accessor to retrieve topology_name
  * @connector: pointer to drm connector
  * Returns: value of the CONNECTOR_PROP_TOPOLOGY_NAME property or 0

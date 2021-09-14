@@ -416,40 +416,36 @@ int sde_wb_connector_set_info_blob(struct drm_connector *connector,
 {
 	struct sde_wb_device *wb_dev = display;
 	const struct sde_format_extended *format_list;
-	struct msm_drm_private *priv = NULL;
-	struct sde_kms *sde_kms = NULL;
+	struct sde_kms *sde_kms;
+	struct sde_mdss_cfg *catalog;
+	int i;
 
 	if (!connector || !info || !display || !wb_dev->wb_cfg) {
 		SDE_ERROR("invalid params\n");
 		return -EINVAL;
 	}
 
+	sde_kms = sde_connector_get_kms(connector);
+	if (!sde_kms)
+		return -EINVAL;
+	catalog = sde_kms->catalog;
+
 	format_list = wb_dev->wb_cfg->format_list;
 
-	/*
-	 * Populate info buffer
-	 */
+	/* Populate info buffer */
 	if (format_list) {
 		sde_kms_info_start(info, "pixel_formats");
 		while (format_list->fourcc_format) {
-			sde_kms_info_append_format(info,
-					format_list->fourcc_format,
+			sde_kms_info_append_format(info, format_list->fourcc_format,
 					format_list->modifier);
 			++format_list;
 		}
 		sde_kms_info_stop(info);
 	}
 
-	sde_kms_info_add_keyint(info,
-			"wb_intf_index",
-			wb_dev->wb_idx - WB_0);
-
-	sde_kms_info_add_keyint(info,
-			"maxlinewidth",
-			wb_dev->wb_cfg->sblk->maxlinewidth);
-
-	sde_kms_info_add_keyint(info,
-			"maxlinewidth_linear",
+	sde_kms_info_add_keyint(info, "wb_intf_index", wb_dev->wb_idx - WB_0);
+	sde_kms_info_add_keyint(info, "maxlinewidth", wb_dev->wb_cfg->sblk->maxlinewidth);
+	sde_kms_info_add_keyint(info, "maxlinewidth_linear",
 			wb_dev->wb_cfg->sblk->maxlinewidth_linear);
 
 	sde_kms_info_start(info, "features");
@@ -457,64 +453,39 @@ int sde_wb_connector_set_info_blob(struct drm_connector *connector,
 		sde_kms_info_append(info, "wb_ubwc");
 	sde_kms_info_stop(info);
 
-	if (wb_dev->drm_dev && wb_dev->drm_dev->dev_private) {
-		priv = wb_dev->drm_dev->dev_private;
-		if (!priv->kms) {
-			SDE_ERROR("invalid kms reference\n");
-			return -EINVAL;
-		}
+	sde_kms_info_add_keyint(info, "has_cwb_dither", test_bit(SDE_FEATURE_CWB_DITHER,
+				catalog->features));
 
-		sde_kms = to_sde_kms(priv->kms);
-		sde_kms_info_add_keyint(info, "has_cwb_dither", test_bit(SDE_FEATURE_CWB_DITHER,
-				sde_kms->catalog->features));
-	} else {
-		SDE_ERROR("invalid params %pK\n", wb_dev->drm_dev);
-		return -EINVAL;
+	if (catalog->dnsc_blur_count && catalog->dnsc_blur_filters) {
+		sde_kms_info_add_keyint(info, "dnsc_blur_count", catalog->dnsc_blur_count);
+
+		sde_kms_info_start(info, "dnsc_blur_info");
+		for (i = 0; i < catalog->dnsc_blur_filter_count; i++)
+			sde_kms_info_append_dnsc_blur_filter_info(info,
+						&catalog->dnsc_blur_filters[i]);
+		sde_kms_info_stop(info);
 	}
 
 	return 0;
 }
 
-static void sde_wb_connector_install_dither_property(struct sde_wb_device *wb_dev,
-					struct sde_connector *c_conn)
+static void _sde_wb_connector_install_dither_property(struct sde_wb_device *wb_dev)
 {
+	struct sde_connector *c_conn = to_sde_connector(wb_dev->connector);
+	struct sde_kms *sde_kms = sde_connector_get_kms(wb_dev->connector);
+	struct sde_mdss_cfg *catalog;
 	char prop_name[DRM_PROP_NAME_LEN];
-	struct sde_kms *sde_kms = NULL;
-	struct msm_drm_private *priv = NULL;
-	struct sde_mdss_cfg *catalog = NULL;
 	u32 version = 0;
 
-	if (!wb_dev || !c_conn) {
-		SDE_ERROR("invalid args (s), wb_dev %pK, c_conn %pK\n", wb_dev, c_conn);
+	if (!sde_kms || !sde_kms->catalog)
 		return;
-	}
-
-	if (!wb_dev->drm_dev) {
-		SDE_ERROR("invalid drm_dev is null\n");
-		return;
-	}
-
-	if (!wb_dev->drm_dev->dev_private) {
-		SDE_ERROR("invalid dev_private is null\n");
-		return;
-	}
-
-	priv = wb_dev->drm_dev->dev_private;
-	if (!priv->kms) {
-		SDE_ERROR("invalid kms reference is null\n");
-		return;
-	}
-
-	sde_kms = to_sde_kms(priv->kms);
 	catalog = sde_kms->catalog;
 
 	if (!test_bit(SDE_FEATURE_CWB_DITHER, catalog->features))
 		return;
 
-	version = SDE_COLOR_PROCESS_MAJOR(
-			catalog->pingpong[0].sblk->dither.version);
-	snprintf(prop_name, ARRAY_SIZE(prop_name), "%s%d",
-			"SDE_PP_CWB_DITHER_V", version);
+	version = SDE_COLOR_PROCESS_MAJOR(catalog->pingpong[0].sblk->dither.version);
+	snprintf(prop_name, ARRAY_SIZE(prop_name), "%s%d", "SDE_PP_CWB_DITHER_V", version);
 	switch (version) {
 	case 2:
 		msm_property_install_blob(&c_conn->property_info, prop_name,
@@ -591,7 +562,12 @@ int sde_wb_connector_post_init(struct drm_connector *connector, void *display)
 		msm_property_install_range(&c_conn->property_info, "early_fence_line",
 			0x0, 0, UINT_MAX, 0, CONNECTOR_PROP_EARLY_FENCE_LINE);
 
-	sde_wb_connector_install_dither_property(wb_dev, c_conn);
+	if (catalog->dnsc_blur_count && catalog->dnsc_blur_filters)
+		msm_property_install_range(&c_conn->property_info, "dnsc_blur",
+			0x0, 0, ~0, 0, CONNECTOR_PROP_DNSC_BLUR);
+
+	_sde_wb_connector_install_dither_property(wb_dev);
+
 
 	return 0;
 }

@@ -585,6 +585,19 @@ void sde_kms_info_append_format(struct sde_kms_info *info,
 		uint64_t modifier);
 
 /**
+ * sde_kms_info_append_dnsc_blur_filter_info - append dnsc_blur filters code to 'sde_kms_info'
+ * Usage:
+ *      sde_kms_info_start(key)
+ *      sde_kms_info_append_dnsc_blur_filter_info(info, ratio)
+ *      ...
+ *      sde_kms_info_stop
+ * @info: Pointer to sde_kms_info structure
+ * @filter: Pointer to dnsc_blur filter info
+ */
+void sde_kms_info_append_dnsc_blur_filter_info(struct sde_kms_info *info,
+		struct sde_dnsc_blur_filter_info *filter);
+
+/**
  * sde_kms_info_stop - finish adding key to 'sde_kms_info'
  * Usage:
  *      sde_kms_info_start(key)

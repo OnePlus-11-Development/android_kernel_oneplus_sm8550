@@ -84,23 +84,6 @@ static const struct drm_prop_enum_list e_panel_mode[] = {
 	{MSM_DISPLAY_MODE_MAX, "none"},
 };
 
-static inline struct sde_kms *_sde_connector_get_kms(struct drm_connector *conn)
-{
-	struct msm_drm_private *priv;
-
-	if (!conn || !conn->dev || !conn->dev->dev_private) {
-		SDE_ERROR("invalid connector\n");
-		return NULL;
-	}
-	priv = conn->dev->dev_private;
-	if (!priv || !priv->kms) {
-		SDE_ERROR("invalid kms\n");
-		return NULL;
-	}
-
-	return to_sde_kms(priv->kms);
-}
-
 static void sde_dimming_bl_notify(struct sde_connector *conn, struct dsi_backlight_config *config)
 {
 	struct drm_event event;
@@ -140,7 +123,7 @@ static int sde_backlight_device_update_status(struct backlight_device *bd)
 	int rc = 0;
 	struct sde_kms *sde_kms;
 
-	sde_kms = _sde_connector_get_kms(&c_conn->base);
+	sde_kms = sde_connector_get_kms(&c_conn->base);
 	if (!sde_kms) {
 		SDE_ERROR("invalid kms\n");
 		return -EINVAL;
@@ -234,7 +217,7 @@ static int sde_backlight_setup(struct sde_connector *c_conn,
 	static int display_count;
 	char bl_node_name[BL_NODE_NAME_SIZE];
 
-	sde_kms = _sde_connector_get_kms(&c_conn->base);
+	sde_kms = sde_connector_get_kms(&c_conn->base);
 	if (!sde_kms) {
 		SDE_ERROR("invalid kms\n");
 		return -EINVAL;
@@ -445,7 +428,7 @@ static void sde_connector_get_avail_res_info(struct drm_connector *conn,
 	struct drm_encoder *drm_enc = NULL;
 	struct sde_connector *sde_conn;
 
-	sde_kms = _sde_connector_get_kms(conn);
+	sde_kms = sde_connector_get_kms(conn);
 	if (!sde_kms) {
 		SDE_ERROR("invalid kms\n");
 		return;
@@ -1103,7 +1086,7 @@ void sde_connector_helper_bridge_disable(struct drm_connector *connector)
 	bool poms_pending = false;
 	struct sde_kms *sde_kms;
 
-	sde_kms = _sde_connector_get_kms(connector);
+	sde_kms = sde_connector_get_kms(connector);
 	if (!sde_kms) {
 		SDE_ERROR("invalid kms\n");
 		return;
@@ -1149,7 +1132,7 @@ void sde_connector_helper_bridge_enable(struct drm_connector *connector)
 	struct dsi_display *display;
 	struct sde_kms *sde_kms;
 
-	sde_kms = _sde_connector_get_kms(connector);
+	sde_kms = sde_connector_get_kms(connector);
 	if (!sde_kms) {
 		SDE_ERROR("invalid kms\n");
 		return;
@@ -2182,7 +2165,7 @@ static ssize_t _sde_debugfs_conn_cmd_tx_write(struct file *file,
 	}
 	c_conn = to_sde_connector(connector);
 
-	sde_kms = _sde_connector_get_kms(&c_conn->base);
+	sde_kms = sde_connector_get_kms(&c_conn->base);
 	if (!sde_kms) {
 		SDE_ERROR("invalid kms\n");
 		return -EINVAL;
@@ -2704,7 +2687,7 @@ const char *sde_conn_get_topology_name(struct drm_connector *conn,
 	struct sde_kms *sde_kms;
 	int topology_idx = 0;
 
-	sde_kms = _sde_connector_get_kms(conn);
+	sde_kms = sde_connector_get_kms(conn);
 	if (!sde_kms) {
 		SDE_ERROR("invalid kms\n");
 		return NULL;
@@ -2831,7 +2814,7 @@ static int sde_connector_populate_mode_info(struct drm_connector *conn,
 	const char *topo_name = NULL;
 	int rc = 0;
 
-	sde_kms = _sde_connector_get_kms(conn);
+	sde_kms = sde_connector_get_kms(conn);
 	if (!sde_kms) {
 		SDE_ERROR("invalid kms\n");
 		return -EINVAL;

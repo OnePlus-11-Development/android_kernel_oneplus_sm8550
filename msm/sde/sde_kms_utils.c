@@ -167,6 +167,40 @@ void sde_kms_info_stop(struct sde_kms_info *info)
 	}
 }
 
+void sde_kms_info_append_dnsc_blur_filter_info(struct sde_kms_info *info,
+		struct sde_dnsc_blur_filter_info *filter_info)
+{
+	int i;
+	uint32_t len, cur_len;
+
+	if (!info)
+		return;
+
+	len = snprintf(info->data + info->staged_len, SDE_KMS_INFO_MAX_SIZE - info->staged_len,
+			info->start ?
+				"%c/%c/%c/%c/%c/%c/%c/%c/%c/" : " %c/%c/%c/%c/%c/%c/%c/%c/%c/",
+			filter_info->filter & 0xFF, filter_info->src_min & 0xFF,
+			filter_info->src_max & 0xFF, filter_info->dst_min & 0xFF,
+			filter_info->dst_max & 0xFF, filter_info->min_ratio & 0xFF,
+			filter_info->max_ratio & 0xFF, filter_info->fraction_support & 0xFF,
+			filter_info->ratio_count & 0xFF);
+
+	cur_len = len;
+	for (i = 0; i < filter_info->ratio_count; i++) {
+		len = snprintf(info->data + (info->staged_len + cur_len),
+				SDE_KMS_INFO_MAX_SIZE - (info->staged_len + cur_len),
+				(i == filter_info->ratio_count - 1) ? "%c" : "%c,",
+				filter_info->ratio[i]);
+		cur_len += len;
+	}
+
+	/* check if snprintf truncated the string */
+	if ((info->staged_len + cur_len) < SDE_KMS_INFO_MAX_SIZE) {
+		info->staged_len += cur_len;
+		info->start = false;
+	}
+}
+
 void sde_kms_rect_intersect(const struct sde_rect *r1,
 		const struct sde_rect *r2,
 		struct sde_rect *result)
