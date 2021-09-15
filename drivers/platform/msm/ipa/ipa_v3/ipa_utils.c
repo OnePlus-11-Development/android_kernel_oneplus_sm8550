@@ -6534,6 +6534,43 @@ const char *ipa_clients_strings[IPA_CLIENT_MAX] = {
 };
 EXPORT_SYMBOL(ipa_clients_strings);
 
+int ipa3_set_evict_policy(
+	struct ipa_ioc_coal_evict_policy *evict_pol)
+{
+	if (!evict_pol) {
+		IPAERR_RL("Bad arg evict_pol(%p)\n", evict_pol);
+		return -1;
+	}
+
+	if ( ipa3_ctx->ipa_hw_type >= IPA_HW_v4_5 )
+	{
+		struct ipahal_reg_coal_evict_lru evict_lru_reg;
+
+		memset(&evict_lru_reg, 0, sizeof(evict_lru_reg));
+
+		evict_lru_reg.coal_vp_lru_thrshld =
+			evict_pol->coal_vp_thrshld;
+		evict_lru_reg.coal_eviction_en =
+			evict_pol->coal_eviction_en;
+		evict_lru_reg.coal_vp_lru_gran_sel =
+			evict_pol->coal_vp_gran_sel;
+		evict_lru_reg.coal_vp_lru_udp_thrshld =
+			evict_pol->coal_vp_udp_thrshld;
+		evict_lru_reg.coal_vp_lru_tcp_thrshld =
+			evict_pol->coal_vp_tcp_thrshld;
+		evict_lru_reg.coal_vp_lru_udp_thrshld_en =
+			evict_pol->coal_vp_udp_thrshld_en;
+		evict_lru_reg.coal_vp_lru_tcp_thrshld_en =
+			evict_pol->coal_vp_tcp_thrshld_en;
+		evict_lru_reg.coal_vp_lru_tcp_num =
+			evict_pol->coal_vp_tcp_num;
+
+		ipahal_write_reg_fields(IPA_COAL_EVICT_LRU, &evict_lru_reg);
+	}
+
+	return 0;
+}
+
 /**
  * ipa_get_version_string() - Get string representation of IPA version
  * @ver: IPA version
@@ -13463,6 +13500,7 @@ void ipa3_update_mhi_ctrl_state(u8 state, bool set)
 	ipa_send_mhi_endp_ind_to_modem();
 }
 EXPORT_SYMBOL(ipa3_update_mhi_ctrl_state);
+
 /**
  * ipa3_setup_uc_act_tbl() - IPA setup uc_act_tbl
  *
@@ -13683,6 +13721,24 @@ int ipa3_add_socksv5_conn(struct ipa_socksv5_info *info)
 error:
 	mutex_unlock(&ipa3_ctx->act_tbl_lock);
 	return res;
+}
+
+void ipa3_default_evict_register( void )
+{
+	struct ipahal_reg_coal_evict_lru evict_lru;
+
+	if ( ipa3_ctx->ipa_hw_type >= IPA_HW_v4_5
+		 &&
+		 ipa3_ctx->set_evict_reg == false )
+	{
+		ipa3_ctx->set_evict_reg = true;
+
+		IPADBG("Setting COAL eviction register with default values\n");
+
+		ipa3_get_default_evict_values(&evict_lru);
+
+		ipahal_write_reg_fields(IPA_COAL_EVICT_LRU, &evict_lru);
+	}
 }
 
 /**

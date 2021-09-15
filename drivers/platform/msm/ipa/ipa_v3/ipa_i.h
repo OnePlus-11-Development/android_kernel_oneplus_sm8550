@@ -434,6 +434,9 @@ enum {
 #define IPA_MEM_INIT_VAL 0xFFFFFFFF
 
 #ifdef CONFIG_COMPAT
+#define IPA_IOC_COAL_EVICT_POLICY32 _IOWR(IPA_IOC_MAGIC, \
+					IPA_IOCTL_COAL_EVICT_POLICY, \
+					compat_uptr_t)
 #define IPA_IOC_ADD_HDR32 _IOWR(IPA_IOC_MAGIC, \
 					IPA_IOCTL_ADD_HDR, \
 					compat_uptr_t)
@@ -2215,6 +2218,7 @@ struct ipa3_context {
 	u32 ipa_wrapper_base;
 	u32 ipa_wrapper_size;
 	u32 ipa_cfg_offset;
+	bool set_evict_reg;
 	struct ipa3_hdr_tbl hdr_tbl[HDR_TBLS_TOTAL];
 	struct ipa3_hdr_proc_ctx_tbl hdr_proc_ctx_tbl;
 	struct ipa3_rt_tbl_set rt_tbl_set[IPA_IP_MAX];
@@ -2960,6 +2964,11 @@ int ipa3_allocate_ipv6ct_table(
 	struct ipa_ioc_nat_ipv6ct_table_alloc *table_alloc);
 int ipa3_nat_get_sram_info(struct ipa_nat_in_sram_info *info_ptr);
 int ipa3_app_clk_vote(enum ipa_app_clock_vote_type vote_type);
+void ipa3_get_default_evict_values(
+	struct ipahal_reg_coal_evict_lru *evict_lru);
+void ipa3_default_evict_register( void );
+int ipa3_set_evict_policy(
+	struct ipa_ioc_coal_evict_policy *evict_pol);
 
 /*
  * Messaging
@@ -3636,6 +3645,34 @@ static inline void *alloc_and_init(u32 size, u32 init_val)
 
 	return ptr;
 }
+
+/**
+ * The following used as defaults for struct ipa_ioc_coal_evict_policy.
+ */
+#define IPA_COAL_VP_LRU_THRSHLD        0
+#define IPA_COAL_EVICTION_EN           true
+#define IPA_COAL_VP_LRU_GRAN_SEL       IPA_EVICT_TIME_GRAN_10_USEC
+#define IPA_COAL_VP_LRU_UDP_THRSHLD    0
+#define IPA_COAL_VP_LRU_TCP_THRSHLD    0
+#define IPA_COAL_VP_LRU_UDP_THRSHLD_EN 1
+#define IPA_COAL_VP_LRU_TCP_THRSHLD_EN 1
+#define IPA_COAL_VP_LRU_TCP_NUM        0
+
+/**
+ * enum ipa_evict_time_gran_type - Time granularity to be used with
+ * eviction timers.
+ */
+enum ipa_evict_time_gran_type {
+	IPA_EVICT_TIME_GRAN_10_USEC,
+	IPA_EVICT_TIME_GRAN_20_USEC,
+	IPA_EVICT_TIME_GRAN_50_USEC,
+	IPA_EVICT_TIME_GRAN_100_USEC,
+	IPA_EVICT_TIME_GRAN_1_MSEC,
+	IPA_EVICT_TIME_GRAN_10_MSEC,
+	IPA_EVICT_TIME_GRAN_100_MSEC,
+	IPA_EVICT_TIME_GRAN_NEAR_HALF_SEC, /* 0.65536s */
+	IPA_EVICT_TIME_GRAN_MAX,
+};
 
 /* query ipa APQ mode*/
 bool ipa3_is_apq(void);

@@ -545,6 +545,155 @@ static struct {
 
 static char *active_clients_table_buf;
 
+void ipa3_get_default_evict_values(
+	struct ipahal_reg_coal_evict_lru *evict_lru )
+{
+	if (evict_lru) {
+
+		struct device *dev = &ipa3_ctx->master_pdev->dev;
+
+		u32 val;
+		int result;
+
+		memset(evict_lru, 0, sizeof(*evict_lru));
+
+		/*
+		 * Get coal_vp_lru_thrshld
+		 */
+		result =
+			of_property_read_u32(
+				dev->of_node,
+				"qcom,coal-vp-lru-thrshld",
+				&val);
+		if ( result == 0 ) {
+			evict_lru->coal_vp_lru_thrshld = val;
+		} else {
+			IPADBG(
+				"Error reading qcom,coal-vp-lru-thrshld...will use default\n");
+			evict_lru->coal_vp_lru_thrshld = IPA_COAL_VP_LRU_THRSHLD;
+		}
+		IPADBG(": coal_vp_lru_thrshld = %u", evict_lru->coal_vp_lru_thrshld);
+
+		/*
+		 * Get coal_eviction_en
+		 */
+		evict_lru->coal_eviction_en =
+			of_property_read_bool(
+				dev->of_node,
+				"qcom,coal-eviction-en");
+		if ( evict_lru->coal_eviction_en == false ) {
+			evict_lru->coal_eviction_en = IPA_COAL_EVICTION_EN;
+		}
+		IPADBG(": coal_eviction_en = %s",
+			   (evict_lru->coal_eviction_en) ? "true" : "false");
+
+		/*
+		 * Get coal_vp_lru_gran_sel
+		 */
+		result =
+			of_property_read_u32(
+				dev->of_node,
+				"qcom,coal_vp_lru_gran_sel",
+				&val);
+		if ( result == 0 ) {
+			evict_lru->coal_vp_lru_gran_sel = val;
+		} else {
+			IPADBG(
+				"Error reading qcom,coal_vp_lru_gran_sel...will use default\n");
+			evict_lru->coal_vp_lru_gran_sel = IPA_COAL_VP_LRU_GRAN_SEL;
+		}
+		IPADBG(": coal_vp_lru_gran_sel = %u\n",
+			   evict_lru->coal_vp_lru_gran_sel);
+
+		/*
+		 * Get coal_vp_lru_udp_thrshld
+		 */
+		result =
+			of_property_read_u32(
+				dev->of_node,
+				"qcom,coal-vp-lru-udp-thrshld",
+				&val);
+		if ( result == 0 ) {
+			evict_lru->coal_vp_lru_udp_thrshld = val;
+		} else {
+			IPADBG(
+				"Error reading qcom,coal-vp-lru-udp-thrshld...will use default\n");
+			evict_lru->coal_vp_lru_udp_thrshld = IPA_COAL_VP_LRU_UDP_THRSHLD;
+		}
+		IPADBG(": coal_vp_lru_udp_thrshld = %u", evict_lru->coal_vp_lru_udp_thrshld);
+
+		/*
+		 * Get coal_vp_lru_tcp_thrshld
+		 */
+		result =
+			of_property_read_u32(
+				dev->of_node,
+				"qcom,coal-vp-lru-tcp-thrshld",
+				&val);
+		if ( result == 0 ) {
+			evict_lru->coal_vp_lru_tcp_thrshld = val;
+		} else {
+			IPADBG(
+				"Error reading qcom,coal-vp-lru-tcp-thrshld...will use default\n");
+			evict_lru->coal_vp_lru_tcp_thrshld = IPA_COAL_VP_LRU_TCP_THRSHLD;
+		}
+		IPADBG(": coal_vp_lru_tcp_thrshld = %u", evict_lru->coal_vp_lru_tcp_thrshld);
+
+		/*
+		 * Get coal_vp_lru_udp_thrshld_en
+		 */
+		result =
+			of_property_read_u32(
+				dev->of_node,
+				"qcom,coal-vp-lru-udp-thrshld-en",
+				&val);
+		if ( result == 0 ) {
+			evict_lru->coal_vp_lru_udp_thrshld_en = val;
+		} else {
+			IPADBG(
+				"Error reading qcom,coal-vp-lru-udp-thrshld-en...will use default\n");
+			evict_lru->coal_vp_lru_udp_thrshld_en = IPA_COAL_VP_LRU_UDP_THRSHLD_EN;
+		}
+		IPADBG(": coal_vp_lru_udp_thrshld_en = %u",
+			   evict_lru->coal_vp_lru_udp_thrshld_en);
+
+		/*
+		 * Get coal_vp_lru_tcp_thrshld_en
+		 */
+		result =
+			of_property_read_u32(
+				dev->of_node,
+				"qcom,coal-vp-lru-tcp-thrshld-en",
+				&val);
+		if ( result == 0 ) {
+			evict_lru->coal_vp_lru_tcp_thrshld_en = val;
+		} else {
+			IPADBG(
+				"Error reading qcom,coal-vp-lru-tcp-thrshld-en...will use default\n");
+			evict_lru->coal_vp_lru_tcp_thrshld_en = IPA_COAL_VP_LRU_TCP_THRSHLD_EN;
+		}
+		IPADBG(": coal_vp_lru_tcp_thrshld_en = %u",
+			   evict_lru->coal_vp_lru_tcp_thrshld_en);
+
+		/*
+		 * Get coal_vp_lru_tcp_num
+		 */
+		result =
+			of_property_read_u32(
+				dev->of_node,
+				"qcom,coal-vp-lru-tcp-num",
+				&val);
+		if ( result == 0 ) {
+			evict_lru->coal_vp_lru_tcp_num = val;
+		} else {
+			IPADBG(
+				"Error reading qcom,coal-vp-lru-tcp-num...will use default\n");
+			evict_lru->coal_vp_lru_tcp_num = IPA_COAL_VP_LRU_TCP_NUM;
+		}
+		IPADBG(": coal_vp_lru_tcp_num = %u", evict_lru->coal_vp_lru_tcp_num);
+	}
+}
+
 int ipa3_active_clients_log_print_buffer(char *buf, int size)
 {
 	int i;
@@ -2666,6 +2815,7 @@ static long ipa3_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	u8 header[256] = { 0 };
 	u8 *param = NULL;
 	bool is_vlan_mode;
+	struct ipa_ioc_coal_evict_policy evict_pol;
 	struct ipa_ioc_nat_alloc_mem nat_mem;
 	struct ipa_ioc_nat_ipv6ct_table_alloc table_alloc;
 	struct ipa_ioc_v4_nat_init nat_init;
@@ -2699,6 +2849,17 @@ static long ipa3_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	IPA_ACTIVE_CLIENTS_INC_SIMPLE();
 
 	switch (cmd) {
+	case IPA_IOC_COAL_EVICT_POLICY:
+		if (copy_from_user(
+				&evict_pol,
+				(const void __user *) arg,
+				sizeof(struct ipa_ioc_coal_evict_policy))) {
+			IPAERR_RL("copy_from_user fails\n");
+			retval = -EFAULT;
+			break;
+		}
+		retval = ipa3_set_evict_policy(&evict_pol);
+		break;
 	case IPA_IOC_ALLOC_NAT_MEM:
 		if (copy_from_user(&nat_mem, (const void __user *)arg,
 			sizeof(struct ipa_ioc_nat_alloc_mem))) {
@@ -8071,7 +8232,7 @@ static void ipa3_load_ipa_fw(struct work_struct *work)
 	IPADBG("Entry\n");
 
 	IPA_ACTIVE_CLIENTS_INC_SIMPLE();
-	
+
 	result = ipa3_attach_to_smmu();
 	if (result) {
 		IPAERR("IPA attach to smmu failed %d\n", result);
