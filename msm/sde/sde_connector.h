@@ -18,6 +18,7 @@
 #define SDE_CONNECTOR_NAME_SIZE	16
 #define SDE_CONNECTOR_DHDR_MEMPOOL_MAX_SIZE	SZ_32
 #define MAX_CMD_RECEIVE_SIZE       256
+#define DNSC_BLUR_MAX_COUNT	1
 
 struct sde_connector;
 struct sde_connector_state;
@@ -678,6 +679,9 @@ struct sde_connector {
  * @old_topology_name: topology of previous atomic state. remove this in later
  *	kernel versions which provide drm_atomic_state old_state pointers
  * @cont_splash_populated: State was populated as part of cont. splash
+ * @dnsc_blur_count: Number of downscale blur blocks used
+ * @dnsc_blur_cfg: Configs for the downscale blur block
+ * @dnsc_blur_lut: LUT idx used for the Gaussian filter LUTs in downscale blur block
  */
 struct sde_connector_state {
 	struct drm_connector_state base;
@@ -694,6 +698,10 @@ struct sde_connector_state {
 	enum sde_rm_topology_name old_topology_name;
 
 	bool cont_splash_populated;
+
+	u32 dnsc_blur_count;
+	struct sde_drm_dnsc_blur_cfg dnsc_blur_cfg[DNSC_BLUR_MAX_COUNT];
+	u32 dnsc_blur_lut;
 };
 
 /**

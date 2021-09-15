@@ -304,44 +304,132 @@ error:
 	return ret;
 }
 
-int sde_wb_connector_set_property(struct drm_connector *connector,
-		struct drm_connector_state *state,
-		int property_index,
-		uint64_t value,
-		void *display)
+static void _sde_wb_connector_clear_dnsc_blur(struct drm_connector_state *state)
 {
-	struct sde_wb_device *wb_dev = display;
-	struct drm_framebuffer *out_fb;
-	int rc = 0;
+	struct sde_connector_state *cstate = to_sde_connector_state(state);
+	int i;
 
-	SDE_DEBUG("\n");
+	for (i = 0; i < cstate->dnsc_blur_count; i++)
+		memset(&cstate->dnsc_blur_cfg[i], 0, sizeof(struct sde_drm_dnsc_blur_cfg));
+	cstate->dnsc_blur_count = 0;
+}
 
-	if (state && (property_index == CONNECTOR_PROP_OUT_FB)) {
-		const struct sde_format *sde_format;
+static int _sde_wb_connector_set_dnsc_blur(struct sde_wb_device *wb_dev,
+		struct drm_connector_state *state, void __user *usr_ptr)
+{
+	struct sde_connector_state *cstate = to_sde_connector_state(state);
+	struct sde_kms *sde_kms = sde_connector_get_kms(wb_dev->connector);
+	struct sde_drm_dnsc_blur_cfg *dnsc_blur_cfg = &cstate->dnsc_blur_cfg[0];
+	u32 copy_count;
+	int ret = 0, i;
 
-		out_fb = sde_connector_get_out_fb(state);
-		if (!out_fb)
-			goto done;
+	if (!sde_kms || !sde_kms->catalog)
+		return -EINVAL;
 
-		sde_format = sde_get_sde_format_ext(out_fb->format->format,
-				out_fb->modifier);
-		if (!sde_format) {
-			SDE_ERROR("failed to get sde format\n");
-			rc = -EINVAL;
-			goto done;
+	if (!usr_ptr)
+		goto disable;
+
+	/* copy only the first block */
+	if (copy_from_user(dnsc_blur_cfg, usr_ptr, sizeof(struct sde_drm_dnsc_blur_cfg))) {
+		SDE_ERROR("failed to copy dnsc_blur block 0 data\n");
+		ret = -EINVAL;
+		goto disable;
+	}
+
+	if (dnsc_blur_cfg->num_blocks > sde_kms->catalog->dnsc_blur_count) {
+		SDE_ERROR("invalid number of dnsc_blur blocks:%d\n", dnsc_blur_cfg->num_blocks);
+		ret = -EINVAL;
+		goto disable;
+	}
+
+	/* no further data required */
+	if (dnsc_blur_cfg->num_blocks <= 1)
+		goto end;
+
+	dnsc_blur_cfg++;
+	usr_ptr += sizeof(struct sde_drm_dnsc_blur_cfg);
+	copy_count = dnsc_blur_cfg->num_blocks - 1;
+
+	/* copy rest of the blocks */
+	if ((dnsc_blur_cfg->flags & DNSC_BLUR_INDEPENDENT_BLK_CFG)) {
+		if (copy_from_user(dnsc_blur_cfg, usr_ptr,
+				copy_count * sizeof(struct sde_drm_dnsc_blur_cfg))) {
+			SDE_ERROR("failed to copy dnsc_blur data\n");
+			ret = -EINVAL;
+			goto disable;
 		}
 
-		if (!sde_wb_is_format_valid(wb_dev, out_fb->format->format,
-				out_fb->modifier)) {
-			SDE_ERROR("unsupported writeback format 0x%x/0x%llx\n",
-					out_fb->format->format,
-					out_fb->modifier);
-			rc = -EINVAL;
-			goto done;
+	/* duplicate rest of the blocks */
+	} else if (dnsc_blur_cfg->flags & DNSC_BLUR_MIRROR_BLK_CFG) {
+		for (i = 0; i < copy_count; i++) {
+			memcpy(dnsc_blur_cfg, &cstate->dnsc_blur_cfg[0],
+					sizeof(struct sde_drm_dnsc_blur_cfg));
+			dnsc_blur_cfg++;
 		}
 	}
 
-done:
+end:
+	cstate->dnsc_blur_count = dnsc_blur_cfg->num_blocks;
+	return 0;
+
+disable:
+	_sde_wb_connector_clear_dnsc_blur(state);
+	return ret;
+}
+
+static int _sde_wb_connector_set_out_fb(struct sde_wb_device *wb_dev,
+		struct drm_connector_state *state)
+{
+	struct drm_framebuffer *out_fb;
+	const struct sde_format *sde_format;
+	int rc = 0;
+
+	out_fb = sde_connector_get_out_fb(state);
+	if (!out_fb)
+		goto end;
+
+	sde_format = sde_get_sde_format_ext(out_fb->format->format, out_fb->modifier);
+	if (!sde_format) {
+		SDE_ERROR("failed to get sde format\n");
+		rc = -EINVAL;
+		goto end;
+	}
+
+	if (!sde_wb_is_format_valid(wb_dev, out_fb->format->format, out_fb->modifier)) {
+		SDE_ERROR("unsupported writeback format 0x%x/0x%llx\n",
+				out_fb->format->format, out_fb->modifier);
+		rc = -EINVAL;
+		goto end;
+	}
+
+end:
+	return rc;
+}
+
+int sde_wb_connector_set_property(struct drm_connector *connector,
+		struct drm_connector_state *state, int idx, uint64_t value, void *display)
+{
+	struct sde_wb_device *wb_dev = display;
+	int rc = 0;
+
+	if (!connector || !state || !wb_dev) {
+		SDE_ERROR("invalid argument(s)\n");
+		return -EINVAL;
+	}
+
+	switch (idx) {
+	case CONNECTOR_PROP_OUT_FB:
+		rc = _sde_wb_connector_set_out_fb(wb_dev, state);
+		break;
+	case CONNECTOR_PROP_DNSC_BLUR:
+		rc = _sde_wb_connector_set_dnsc_blur(wb_dev, state,
+				(void __user *)(uintptr_t)value);
+		break;
+	default:
+		/* nothing to do */
+		break;
+	}
+
 	return rc;
 }
 

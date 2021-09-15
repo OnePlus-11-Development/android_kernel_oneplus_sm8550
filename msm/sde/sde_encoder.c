@@ -3222,6 +3222,15 @@ void sde_encoder_helper_phys_disable(struct sde_encoder_phys *phys_enc,
 					phys_enc->hw_cdm->idx, true);
 	}
 
+	if (phys_enc->hw_dnsc_blur && phys_enc->hw_dnsc_blur->ops.bind_pingpong_blk &&
+			phys_enc->hw_pp) {
+		phys_enc->hw_dnsc_blur->ops.bind_pingpong_blk(phys_enc->hw_dnsc_blur,
+				false, phys_enc->hw_pp->idx);
+
+		if (ctl->ops.update_dnsc_blur_bitmask)
+			ctl->ops.update_dnsc_blur_bitmask(ctl, phys_enc->hw_dnsc_blur->idx, true);
+	}
+
 	if (phys_enc == sde_enc->cur_master && phys_enc->hw_pp &&
 			ctl->ops.reset_post_disable)
 		ctl->ops.reset_post_disable(ctl, &phys_enc->intf_cfg_v1,

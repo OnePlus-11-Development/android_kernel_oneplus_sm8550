@@ -16,6 +16,7 @@
 #include "sde_hw_top.h"
 #include "sde_hw_wb.h"
 #include "sde_hw_cdm.h"
+#include "sde_hw_dnsc_blur.h"
 #include "sde_encoder.h"
 #include "sde_connector.h"
 
@@ -260,6 +261,7 @@ struct sde_encoder_irq {
  * @hw_qdss:		Hardware interface to the qdss registers
  * @cdm_cfg:		Chroma-down hardware configuration
  * @hw_pp:		Hardware interface to the ping pong registers
+ * @hw_dnsc_blur:	Hardware interface to the downscale blur registers
  * @sde_kms:		Pointer to the sde_kms top level
  * @cached_mode:	DRM mode cached at mode_set time, acted on in enable
  * @enabled:		Whether the encoder has enabled and running a mode
@@ -316,6 +318,7 @@ struct sde_encoder_phys {
 	struct sde_hw_qdss *hw_qdss;
 	struct sde_hw_cdm_cfg cdm_cfg;
 	struct sde_hw_pingpong *hw_pp;
+	struct sde_hw_dnsc_blur *hw_dnsc_blur;
 	struct sde_kms *sde_kms;
 	struct drm_display_mode cached_mode;
 	enum sde_enc_split_role split_role;

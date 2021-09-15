@@ -15,6 +15,7 @@
 #include "sde_wb.h"
 #include "sde_vbif.h"
 #include "sde_crtc.h"
+#include "sde_hw_dnsc_blur.h"
 
 #define to_sde_encoder_phys_wb(x) \
 	container_of(x, struct sde_encoder_phys_wb, base)
@@ -509,6 +510,7 @@ static void _sde_encoder_phys_wb_setup_cwb(struct sde_encoder_phys *phys_enc,
 	struct sde_hw_ctl *hw_ctl = phys_enc->hw_ctl;
 	struct sde_crtc *crtc = to_sde_crtc(wb_enc->crtc);
 	struct sde_hw_pingpong *hw_pp = phys_enc->hw_pp;
+	struct sde_hw_dnsc_blur *hw_dnsc_blur = phys_enc->hw_dnsc_blur;
 	bool need_merge = (crtc->num_mixers > 1);
 	int i = 0;
 
@@ -537,6 +539,9 @@ static void _sde_encoder_phys_wb_setup_cwb(struct sde_encoder_phys *phys_enc,
 				MAX_MERGE_3D_PER_CTL_V1) && need_merge)
 			intf_cfg.merge_3d[intf_cfg.merge_3d_count++] =
 				hw_pp->merge_3d->idx;
+
+		if (hw_dnsc_blur)
+			intf_cfg.dnsc_blur[intf_cfg.dnsc_blur_count++] = hw_dnsc_blur->idx;
 
 		if (hw_pp->ops.setup_3d_mode)
 			hw_pp->ops.setup_3d_mode(hw_pp, (enable && need_merge) ?
@@ -573,16 +578,13 @@ static void _sde_encoder_phys_wb_setup_cwb(struct sde_encoder_phys *phys_enc,
 	}
 }
 
-/**
- * sde_encoder_phys_wb_setup_cdp - setup chroma down prefetch block
- * @phys_enc:	Pointer to physical encoder
- */
-static void sde_encoder_phys_wb_setup_cdp(struct sde_encoder_phys *phys_enc,
+static void _sde_encoder_phys_wb_setup_ctl(struct sde_encoder_phys *phys_enc,
 		const struct sde_format *format)
 {
 	struct sde_encoder_phys_wb *wb_enc;
 	struct sde_hw_wb *hw_wb;
 	struct sde_hw_cdm *hw_cdm;
+	struct sde_hw_dnsc_blur *hw_dnsc_blur;
 	struct sde_hw_ctl *ctl;
 	const int num_wb = 1;
 
@@ -599,6 +601,7 @@ static void sde_encoder_phys_wb_setup_cdp(struct sde_encoder_phys *phys_enc,
 	wb_enc = to_sde_encoder_phys_wb(phys_enc);
 	hw_wb = wb_enc->hw_wb;
 	hw_cdm = phys_enc->hw_cdm;
+	hw_dnsc_blur = phys_enc->hw_dnsc_blur;
 	ctl = phys_enc->hw_ctl;
 
 	if (test_bit(SDE_CTL_ACTIVE_CFG, &ctl->caps->features) &&
@@ -617,6 +620,11 @@ static void sde_encoder_phys_wb_setup_cdp(struct sde_encoder_phys *phys_enc,
 		if (SDE_FORMAT_IS_YUV(format)) {
 			intf_cfg_v1->cdm_count = num_wb;
 			intf_cfg_v1->cdm[0] = hw_cdm->idx;
+		}
+
+		if (hw_dnsc_blur) {
+			intf_cfg_v1->dnsc_blur_count = num_wb;
+			intf_cfg_v1->dnsc_blur[0] = hw_dnsc_blur->idx;
 		}
 
 		if (mode_3d && hw_pp && hw_pp->merge_3d &&
@@ -1015,6 +1023,7 @@ static void _sde_encoder_phys_wb_update_cwb_flush(
 	struct sde_hw_ctl *hw_ctl;
 	struct sde_hw_cdm *hw_cdm;
 	struct sde_hw_pingpong *hw_pp;
+	struct sde_hw_dnsc_blur *hw_dnsc_blur;
 	struct sde_crtc *crtc;
 	struct sde_crtc_state *crtc_state;
 	int i = 0;
@@ -1043,6 +1052,7 @@ static void _sde_encoder_phys_wb_update_cwb_flush(
 	hw_pp = phys_enc->hw_pp;
 	hw_wb = wb_enc->hw_wb;
 	hw_cdm = phys_enc->hw_cdm;
+	hw_dnsc_blur = phys_enc->hw_dnsc_blur;
 
 	/* In CWB mode, program actual source master sde_hw_ctl from crtc */
 	hw_ctl = crtc->mixers[0].hw_ctl;
@@ -1079,6 +1089,9 @@ static void _sde_encoder_phys_wb_update_cwb_flush(
 	if (hw_ctl->ops.update_bitmask && hw_cdm)
 		hw_ctl->ops.update_bitmask(hw_ctl, SDE_HW_FLUSH_CDM,
 				hw_cdm->idx, 1);
+
+	if (hw_ctl->ops.update_dnsc_blur_bitmask && hw_dnsc_blur)
+		hw_ctl->ops.update_dnsc_blur_bitmask(hw_ctl, hw_dnsc_blur->idx, 1);
 
 	if (test_bit(SDE_WB_CWB_CTRL, &hw_wb->caps->features) ||
 			test_bit(SDE_WB_DCWB_CTRL, &hw_wb->caps->features)) {
@@ -1147,6 +1160,7 @@ static void _sde_encoder_phys_wb_update_flush(struct sde_encoder_phys *phys_enc)
 	struct sde_hw_ctl *hw_ctl;
 	struct sde_hw_cdm *hw_cdm;
 	struct sde_hw_pingpong *hw_pp;
+	struct sde_hw_dnsc_blur *hw_dnsc_blur;
 	struct sde_ctl_flush_cfg pending_flush = {0,};
 
 	if (!phys_enc)
@@ -1157,6 +1171,7 @@ static void _sde_encoder_phys_wb_update_flush(struct sde_encoder_phys *phys_enc)
 	hw_cdm = phys_enc->hw_cdm;
 	hw_pp = phys_enc->hw_pp;
 	hw_ctl = phys_enc->hw_ctl;
+	hw_dnsc_blur = phys_enc->hw_dnsc_blur;
 
 	SDE_DEBUG("[wb:%d]\n", hw_wb->idx - WB_0);
 
@@ -1182,6 +1197,9 @@ static void _sde_encoder_phys_wb_update_flush(struct sde_encoder_phys *phys_enc)
 		hw_ctl->ops.update_bitmask(hw_ctl, SDE_HW_FLUSH_MERGE_3D,
 				hw_pp->merge_3d->idx, 1);
 
+	if (hw_ctl->ops.update_dnsc_blur_bitmask && hw_dnsc_blur)
+		hw_ctl->ops.update_dnsc_blur_bitmask(hw_ctl, hw_dnsc_blur->idx, 1);
+
 	if (hw_ctl->ops.get_pending_flush)
 		hw_ctl->ops.get_pending_flush(hw_ctl,
 				&pending_flush);
@@ -1189,6 +1207,43 @@ static void _sde_encoder_phys_wb_update_flush(struct sde_encoder_phys *phys_enc)
 	SDE_DEBUG("Pending flush mask for CTL_%d is 0x%x, WB %d\n",
 			hw_ctl->idx - CTL_0, pending_flush.pending_flush_mask,
 			hw_wb->idx - WB_0);
+}
+
+static void _sde_encoder_phys_wb_setup_dnsc_blur(struct sde_encoder_phys *phys_enc)
+{
+	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
+	struct sde_wb_device *wb_dev = wb_enc->wb_dev;
+	struct sde_kms *sde_kms = phys_enc->sde_kms;
+	struct sde_hw_dnsc_blur *hw_dnsc_blur = phys_enc->hw_dnsc_blur;
+	struct sde_hw_pingpong *hw_pp = phys_enc->hw_pp;
+	struct sde_connector *sde_conn;
+	struct sde_connector_state *sde_conn_state;
+	struct sde_drm_dnsc_blur_cfg *cfg;
+	int i;
+	bool enable;
+
+	if (!sde_kms->catalog->dnsc_blur_count || !hw_dnsc_blur || !hw_pp
+			|| !hw_dnsc_blur->ops.setup_dnsc_blur)
+		return;
+
+	sde_conn = to_sde_connector(wb_dev->connector);
+	sde_conn_state = to_sde_connector_state(wb_dev->connector->state);
+
+	/* swap between 0 & 1 lut idx on each config change for gaussian lut */
+	sde_conn_state->dnsc_blur_lut = 1 - sde_conn_state->dnsc_blur_lut;
+
+	for (i = 0; i < sde_conn_state->dnsc_blur_count; i++) {
+		cfg = &sde_conn_state->dnsc_blur_cfg[i];
+
+		enable = (cfg->flags & DNSC_BLUR_EN);
+		hw_dnsc_blur->ops.setup_dnsc_blur(hw_dnsc_blur, cfg, sde_conn_state->dnsc_blur_lut);
+
+		if (hw_dnsc_blur->ops.setup_dither)
+			hw_dnsc_blur->ops.setup_dither(hw_dnsc_blur, cfg);
+
+		if (hw_dnsc_blur->ops.bind_pingpong_blk)
+			hw_dnsc_blur->ops.bind_pingpong_blk(hw_dnsc_blur, enable, hw_pp->idx);
+	}
 }
 
 static void _sde_encoder_phys_wb_setup_prog_line(struct sde_encoder_phys *phys_enc)
@@ -1280,13 +1335,15 @@ static void sde_encoder_phys_wb_setup(
 
 	sde_encoder_phys_wb_setup_fb(phys_enc, fb, wb_roi);
 
-	sde_encoder_phys_wb_setup_cdp(phys_enc, wb_enc->wb_fmt);
+	_sde_encoder_phys_wb_setup_ctl(phys_enc, wb_enc->wb_fmt);
 
 	_sde_encoder_phys_wb_setup_cache(wb_enc, fb);
 
 	_sde_encoder_phys_wb_setup_cwb(phys_enc, true);
 
 	_sde_encoder_phys_wb_setup_prog_line(phys_enc);
+
+	_sde_encoder_phys_wb_setup_dnsc_blur(phys_enc);
 }
 
 static void sde_encoder_phys_wb_ctl_start_irq(void *arg, int irq_idx)
@@ -1495,6 +1552,7 @@ static void sde_encoder_phys_wb_mode_set(
 
 	phys_enc->hw_ctl = NULL;
 	phys_enc->hw_cdm = NULL;
+	phys_enc->hw_dnsc_blur = NULL;
 
 	/* Retrieve previously allocated HW Resources. CTL shouldn't fail */
 	sde_rm_init_hw_iter(&iter, phys_enc->parent->base.id, SDE_HW_BLK_CTL);
@@ -1524,6 +1582,20 @@ static void sde_encoder_phys_wb_mode_set(
 		SDE_ERROR("CDM required but not allocated: %ld\n",
 			PTR_ERR(phys_enc->hw_cdm));
 		phys_enc->hw_cdm = NULL;
+	}
+
+	/* Downscale Blur is optional */
+	sde_rm_init_hw_iter(&iter, phys_enc->parent->base.id, SDE_HW_BLK_DNSC_BLUR);
+	for (i = 0; i <= instance; i++) {
+		sde_rm_get_hw(rm, &iter);
+		if (i == instance)
+			phys_enc->hw_dnsc_blur =  to_sde_hw_dnsc_blur(iter.hw);
+	}
+
+	if (IS_ERR(phys_enc->hw_dnsc_blur)) {
+		SDE_ERROR("Downscale Blur required but not allocated: %ld\n",
+			PTR_ERR(phys_enc->hw_dnsc_blur));
+		phys_enc->hw_dnsc_blur = NULL;
 	}
 
 	phys_enc->kickoff_timeout_ms =
