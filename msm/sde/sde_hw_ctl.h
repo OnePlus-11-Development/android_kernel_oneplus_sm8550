@@ -109,6 +109,8 @@ struct sde_hw_intf_cfg {
  * @dsc:                      Id of active dsc blocks
  * @vdc_count:                No. of active vdc blocks
  * @vdc:                      Id of active vdc blocks
+ * @dnsc_blur_count:          No. of active downscale blur blocks
+ * @dnsc_blur:                Id of active downscale blur blocks
  */
 struct sde_hw_intf_cfg_v1 {
 	uint32_t intf_count;
@@ -133,6 +135,9 @@ struct sde_hw_intf_cfg_v1 {
 
 	uint32_t vdc_count;
 	enum sde_vdc vdc[MAX_VDC_PER_CTL_V1];
+
+	uint32_t dnsc_blur_count;
+	enum sde_dnsc_blur dnsc_blur[MAX_VDC_PER_CTL_V1];
 };
 
 /**
@@ -378,6 +383,14 @@ struct sde_hw_ctl_ops {
 	 */
 	int (*update_bitmask)(struct sde_hw_ctl *ctx,
 			enum ctl_hw_flush_type type, u32 blk_idx, bool enable);
+
+	/**
+	 * update_dnsc_blur_bitmask: updates dnsc_blur flush mask
+	 * @type              : blk type to flush
+	 * @blk_idx           : blk idx
+	 * @enable            : true to enable, 0 to disable
+	 */
+	void (*update_dnsc_blur_bitmask)(struct sde_hw_ctl *ctx, u32 blk_idx, bool enable);
 
 	/**
 	 * get interfaces for the active CTL .

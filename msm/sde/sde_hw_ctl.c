@@ -71,6 +71,8 @@
 
 #define UPDATE_ACTIVE(r, idx, en)  UPDATE_MASK((r), (idx), (en))
 
+#define DNSC_BLUR_IDX(i) (i + 16)
+
 /**
  * List of SSPP bits in CTL_FLUSH
  */
@@ -583,6 +585,17 @@ static inline int sde_hw_ctl_update_bitmask_v1(struct sde_hw_ctl *ctx,
 	return 0;
 }
 
+static inline void sde_hw_ctl_update_dnsc_blur_bitmask(struct sde_hw_ctl *ctx,
+		u32 blk_idx, bool enable)
+{
+	if (enable)
+		ctx->flush.pending_hw_flush_mask[SDE_HW_FLUSH_WB] |=
+					BIT(DNSC_BLUR_IDX(blk_idx) - DNSC_BLUR_0);
+	else
+		ctx->flush.pending_hw_flush_mask[SDE_HW_FLUSH_WB] &=
+					~BIT(DNSC_BLUR_IDX(blk_idx) - DNSC_BLUR_0);
+}
+
 static inline int sde_hw_ctl_update_pending_flush_v1(
 		struct sde_hw_ctl *ctx,
 		struct sde_ctl_flush_cfg *cfg)
@@ -1003,6 +1016,11 @@ static int sde_hw_ctl_intf_cfg_v1(struct sde_hw_ctl *ctx,
 			wb_active |= BIT(cfg->wb[i] - WB_0);
 	}
 
+	for (i = 0; i < cfg->dnsc_blur_count; i++) {
+		if (cfg->dnsc_blur[i])
+			wb_active |= BIT(DNSC_BLUR_IDX(cfg->dnsc_blur[i] - DNSC_BLUR_0));
+	}
+
 	for (i = 0; i < cfg->merge_3d_count; i++) {
 		if (cfg->merge_3d[i])
 			merge_3d_active |= BIT(cfg->merge_3d[i] - MERGE_3D_0);
@@ -1056,6 +1074,13 @@ static int sde_hw_ctl_reset_post_disable(struct sde_hw_ctl *ctx,
 		if (cfg->wb[i]) {
 			wb_active &= ~BIT(cfg->wb[i] - WB_0);
 			wb_flush |= BIT(cfg->wb[i] - WB_0);
+		}
+	}
+
+	for (i = 0; i < cfg->dnsc_blur_count; i++) {
+		if (cfg->dnsc_blur[i]) {
+			wb_active &= ~BIT(DNSC_BLUR_IDX(cfg->dnsc_blur[i] - DNSC_BLUR_0));
+			wb_flush |= BIT(DNSC_BLUR_IDX(cfg->dnsc_blur[i] - DNSC_BLUR_0));
 		}
 	}
 
@@ -1113,6 +1138,17 @@ static int sde_hw_ctl_update_intf_cfg(struct sde_hw_ctl *ctx,
 
 		wb_active = enable ? BIT(2) : 0;
 		SDE_REG_WRITE(c, CTL_CWB_ACTIVE, cwb_active);
+		SDE_REG_WRITE(c, CTL_WB_ACTIVE, wb_active);
+	}
+
+	if (cfg->dnsc_blur_count) {
+		wb_active = SDE_REG_READ(c, CTL_WB_ACTIVE);
+		for (i = 0; i < cfg->dnsc_blur_count; i++) {
+			if (cfg->dnsc_blur[i])
+				UPDATE_ACTIVE(wb_active,
+					DNSC_BLUR_IDX(cfg->dnsc_blur[i] - DNSC_BLUR_0),
+					enable);
+		}
 		SDE_REG_WRITE(c, CTL_WB_ACTIVE, wb_active);
 	}
 
@@ -1286,6 +1322,7 @@ static void _setup_ctl_ops(struct sde_hw_ctl_ops *ops,
 		ops->update_intf_cfg = sde_hw_ctl_update_intf_cfg;
 
 		ops->update_bitmask = sde_hw_ctl_update_bitmask_v1;
+		ops->update_dnsc_blur_bitmask = sde_hw_ctl_update_dnsc_blur_bitmask;
 		ops->get_ctl_intf = sde_hw_ctl_get_intf_v1;
 
 		ops->reset_post_disable = sde_hw_ctl_reset_post_disable;
