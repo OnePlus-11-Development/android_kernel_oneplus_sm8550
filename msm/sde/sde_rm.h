@@ -113,6 +113,7 @@ enum sde_rm_topology_group {
  * @SDE_RM_TOPCTL_DS  : Require layer mixers with DS capabilities
  * @SDE_RM_TOPCTL_CWB  : Require layer mixers with CWB capabilities
  * @SDE_RM_TOPCTL_DCWB : Require layer mixers with DCWB capabilities
+ * @SDE_RM_TOPCTL_DNSC_BLUR : Require writeback with downscale blur capabilities
  */
 enum sde_rm_topology_control {
 	SDE_RM_TOPCTL_RESERVE_LOCK,
@@ -121,6 +122,7 @@ enum sde_rm_topology_control {
 	SDE_RM_TOPCTL_DS,
 	SDE_RM_TOPCTL_CWB,
 	SDE_RM_TOPCTL_DCWB,
+	SDE_RM_TOPCTL_DNSC_BLUR,
 };
 
 /**

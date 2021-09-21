@@ -35,6 +35,7 @@
 #define RM_RQ_DS(r) ((r)->top_ctrl & BIT(SDE_RM_TOPCTL_DS))
 #define RM_RQ_CWB(r) ((r)->top_ctrl & BIT(SDE_RM_TOPCTL_CWB))
 #define RM_RQ_DCWB(r) ((r)->top_ctrl & BIT(SDE_RM_TOPCTL_DCWB))
+#define RM_RQ_DNSC_BLUR(r) ((r)->top_ctrl & BIT(SDE_RM_TOPCTL_DNSC_BLUR))
 #define RM_IS_TOPOLOGY_MATCH(t, r) ((t).num_lm == (r).num_lm && \
 				(t).num_comp_enc == (r).num_enc && \
 				(t).num_intf == (r).num_intf && \
@@ -1695,6 +1696,41 @@ static int _sde_rm_reserve_qdss(
 	return 0;
 }
 
+static int _sde_rm_reserve_dnsc_blur(struct sde_rm *rm, struct sde_rm_rsvp *rsvp,
+		uint32_t id, enum sde_hw_blk_type type)
+{
+	struct sde_rm_hw_iter iter;
+
+	sde_rm_init_hw_iter(&iter, 0, SDE_HW_BLK_DNSC_BLUR);
+	while (_sde_rm_get_hw_locked(rm, &iter)) {
+		struct sde_hw_dnsc_blur *dnsc_blur = to_sde_hw_dnsc_blur(iter.blk->hw);
+		bool match = false;
+
+		if (RESERVED_BY_OTHER(iter.blk, rsvp))
+			continue;
+
+		if ((type == SDE_HW_BLK_WB) && (id != WB_MAX))
+			match = test_bit(id, &dnsc_blur->caps->wb_connect);
+
+		SDE_DEBUG("type %d id %d, dnsc_blur wbs %lu match %d\n",
+				type, id, dnsc_blur->caps->wb_connect, match);
+
+		if (!match)
+			continue;
+
+		iter.blk->rsvp_nxt = rsvp;
+		SDE_EVT32(iter.blk->type, rsvp->enc_id, iter.blk->id);
+		break;
+	}
+
+	if (!iter.hw) {
+		SDE_ERROR("couldn't reserve dnsc_blur for type %d id %d\n", type, id);
+		return -ENAVAIL;
+	}
+
+	return 0;
+}
+
 static int _sde_rm_reserve_cdm(
 		struct sde_rm *rm,
 		struct sde_rm_rsvp *rsvp,
@@ -1737,13 +1773,10 @@ static int _sde_rm_reserve_cdm(
 	return 0;
 }
 
-static int _sde_rm_reserve_intf_or_wb(
-		struct sde_rm *rm,
-		struct sde_rm_rsvp *rsvp,
-		uint32_t id,
-		enum sde_hw_blk_type type,
-		bool needs_cdm)
+static int _sde_rm_reserve_intf_or_wb(struct sde_rm *rm, struct sde_rm_rsvp *rsvp,
+		uint32_t id, enum sde_hw_blk_type type, struct sde_rm_requirements *reqs)
 {
+	struct sde_encoder_hw_resources *hw_res = &reqs->hw_res;
 	struct sde_rm_hw_iter iter;
 	int ret = 0;
 
@@ -1770,17 +1803,19 @@ static int _sde_rm_reserve_intf_or_wb(
 	}
 
 	/* Expected only one intf or wb will request cdm */
-	if (needs_cdm)
+	if (hw_res->needs_cdm)
 		ret = _sde_rm_reserve_cdm(rm, rsvp, id, type);
+
+	if (RM_RQ_DNSC_BLUR(reqs))
+		ret = _sde_rm_reserve_dnsc_blur(rm, rsvp, id, type);
 
 	return ret;
 }
 
-static int _sde_rm_reserve_intf_related_hw(
-		struct sde_rm *rm,
-		struct sde_rm_rsvp *rsvp,
-		struct sde_encoder_hw_resources *hw_res)
+static int _sde_rm_reserve_intf_related_hw(struct sde_rm *rm,
+		struct sde_rm_rsvp *rsvp, struct sde_rm_requirements *reqs)
 {
+	struct sde_encoder_hw_resources *hw_res = &reqs->hw_res;
 	int i, ret = 0;
 	u32 id;
 
@@ -1788,8 +1823,7 @@ static int _sde_rm_reserve_intf_related_hw(
 		if (hw_res->intfs[i] == INTF_MODE_NONE)
 			continue;
 		id = i + INTF_0;
-		ret = _sde_rm_reserve_intf_or_wb(rm, rsvp, id,
-				SDE_HW_BLK_INTF, hw_res->needs_cdm);
+		ret = _sde_rm_reserve_intf_or_wb(rm, rsvp, id, SDE_HW_BLK_INTF, reqs);
 		if (ret)
 			return ret;
 	}
@@ -1798,8 +1832,7 @@ static int _sde_rm_reserve_intf_related_hw(
 		if (hw_res->wbs[i] == INTF_MODE_NONE)
 			continue;
 		id = i + WB_0;
-		ret = _sde_rm_reserve_intf_or_wb(rm, rsvp, id,
-				SDE_HW_BLK_WB, hw_res->needs_cdm);
+		ret = _sde_rm_reserve_intf_or_wb(rm, rsvp, id, SDE_HW_BLK_WB, reqs);
 		if (ret)
 			return ret;
 	}
@@ -2008,7 +2041,7 @@ static int _sde_rm_make_next_rsvp(struct sde_rm *rm, struct drm_encoder *enc,
 	}
 
 	/* Assign INTFs, WBs, and blks whose usage is tied to them: CTL & CDM */
-	ret = _sde_rm_reserve_intf_related_hw(rm, rsvp, &reqs->hw_res);
+	ret = _sde_rm_reserve_intf_related_hw(rm, rsvp, reqs);
 	if (ret)
 		return ret;
 
