@@ -546,61 +546,6 @@ struct sde_crtc_irq_info {
 	((S) && ((X) < CRTC_PROP_COUNT) ? ((S)->property_values[(X)].value) : 0)
 
 /**
- * sde_crtc_get_mixer_width - get the mixer width
- * Mixer width will be same as panel width(/2 for split)
- * unless destination scaler feature is enabled
- */
-static inline int sde_crtc_get_mixer_width(struct sde_crtc *sde_crtc,
-	struct sde_crtc_state *cstate, struct drm_display_mode *mode)
-{
-	u32 mixer_width;
-
-	if (!sde_crtc || !cstate || !mode)
-		return 0;
-
-	if (cstate->num_ds_enabled)
-		mixer_width = cstate->ds_cfg[0].lm_width;
-	else
-		mixer_width = mode->hdisplay / sde_crtc->num_mixers;
-
-	return mixer_width;
-}
-
-/**
- * sde_crtc_get_mixer_height - get the mixer height
- * Mixer height will be same as panel height unless
- * destination scaler feature is enabled
- */
-static inline int sde_crtc_get_mixer_height(struct sde_crtc *sde_crtc,
-		struct sde_crtc_state *cstate, struct drm_display_mode *mode)
-{
-	if (!sde_crtc || !cstate || !mode)
-		return 0;
-
-	return (cstate->num_ds_enabled ?
-			cstate->ds_cfg[0].lm_height : mode->vdisplay);
-}
-
-/**
- * sde_crtc_get_width - get the correct crtc width based on the features enabled
- */
-static inline int sde_crtc_get_width(struct sde_crtc *sde_crtc,
-	struct sde_crtc_state *cstate, struct drm_display_mode *mode)
-{
-	u32 width;
-
-	if (!sde_crtc || !cstate || !mode)
-		return 0;
-
-	if (cstate->num_ds_enabled)
-		width = cstate->ds_cfg[0].lm_width * cstate->num_ds_enabled;
-	else
-		width = mode->hdisplay;
-
-	return width;
-}
-
-/**
  * sde_crtc_frame_pending - retun the number of pending frames
  * @crtc: Pointer to drm crtc object
  */
@@ -657,6 +602,32 @@ static inline int sde_crtc_request_frame_reset(struct drm_crtc *crtc,
 
 	return 0;
 }
+
+/**
+ * sde_crtc_get_mixer_resolution - Get the mixer resolution based on the features enabled.
+ *     Mixer width will be same as panel width(/2 for split) or src_width of
+ *     destination scaler or downscale-blur.
+ * @drm_crtc: Pointer to drm crtc object
+ * @crtc_state: Pointer to drm crtc state object
+ * @mode: Pointer to drm display mode object
+ * @width: Pointer to width object populated with mixer width by this function
+ * @height: Pointer to height object populated with mixer height by this function
+ */
+void sde_crtc_get_mixer_resolution(struct drm_crtc *sde_crtc, struct drm_crtc_state *crtc_state,
+		struct drm_display_mode *mode, u32 *width, u32 *height);
+
+/**
+ * sde_crtc_get_resolution - Get the crtc resolution based on the features enabled.
+ *     Crtc width will be same as panel width or (src_width of
+ *     destination scaler or downscale-blur) * num_blocks.
+ * @drm_crtc: Pointer to drm crtc object
+ * @crtc_state: Pointer to drm crtc state object
+ * @mode: Pointer to drm display mode object
+ * @width: Pointer to width object populated with crtc width by this function
+ * @height: Pointer to height object populated with crtc height by this function
+ */
+void sde_crtc_get_resolution(struct drm_crtc *sde_crtc, struct drm_crtc_state *crtc_state,
+		struct drm_display_mode *mode, u32 *width, u32 *height);
 
 /**
  * sde_crtc_vblank - enable or disable vblanks for this crtc

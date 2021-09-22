@@ -135,6 +135,100 @@ static inline struct sde_kms *_sde_crtc_get_kms(struct drm_crtc *crtc)
 	return to_sde_kms(priv->kms);
 }
 
+static inline struct drm_connector_state *_sde_crtc_get_virt_conn_state(
+		struct drm_crtc *crtc, struct drm_crtc_state *crtc_state)
+{
+	struct drm_connector *conn;
+	struct drm_connector_state *conn_state, *virt_conn_state = NULL;
+	struct drm_connector_list_iter conn_iter;
+	int i;
+
+	if (crtc_state->state) {
+		for_each_new_connector_in_state(crtc_state->state, conn, conn_state, i) {
+			if (conn_state && (conn_state->crtc == crtc)
+					&& (conn->connector_type == DRM_MODE_CONNECTOR_VIRTUAL)) {
+				virt_conn_state = conn_state;
+				break;
+			}
+		}
+	} else {
+		drm_connector_list_iter_begin(crtc->dev, &conn_iter);
+		drm_for_each_connector_iter(conn, &conn_iter) {
+			if (conn->state && (conn->state->crtc == crtc)
+					&& (conn->connector_type == DRM_MODE_CONNECTOR_VIRTUAL)) {
+				virt_conn_state = conn->state;
+				break;
+			}
+		}
+		drm_connector_list_iter_end(&conn_iter);
+	}
+
+	return virt_conn_state;
+}
+
+void sde_crtc_get_mixer_resolution(struct drm_crtc *crtc, struct drm_crtc_state *crtc_state,
+		struct drm_display_mode *mode, u32 *width, u32 *height)
+{
+	struct sde_crtc *sde_crtc;
+	struct sde_crtc_state *cstate;
+	struct drm_connector_state *virt_conn_state;
+	struct sde_connector_state *virt_cstate;
+
+	*width = 0;
+	*height = 0;
+
+	if (!crtc || !crtc_state || !mode)
+		return;
+
+	sde_crtc = to_sde_crtc(crtc);
+	cstate = to_sde_crtc_state(crtc_state);
+	virt_conn_state = _sde_crtc_get_virt_conn_state(crtc, crtc_state);
+	virt_cstate = virt_conn_state ? to_sde_connector_state(virt_conn_state) : NULL;
+
+	if (cstate->num_ds_enabled) {
+		*width = cstate->ds_cfg[0].lm_width;
+		*height = cstate->ds_cfg[0].lm_height;
+	} else if (virt_cstate && virt_cstate->dnsc_blur_count) {
+		*width = (virt_cstate->dnsc_blur_cfg[0].src_width
+				* virt_cstate->dnsc_blur_count) / sde_crtc->num_mixers;
+		*height = virt_cstate->dnsc_blur_cfg[0].src_height;
+	} else {
+		*width = mode->hdisplay / sde_crtc->num_mixers;
+		*height = mode->vdisplay;
+	}
+}
+
+void sde_crtc_get_resolution(struct drm_crtc *crtc, struct drm_crtc_state *crtc_state,
+		struct drm_display_mode *mode, u32 *width, u32 *height)
+{
+	struct sde_crtc *sde_crtc;
+	struct sde_crtc_state *cstate;
+	struct drm_connector_state *virt_conn_state;
+	struct sde_connector_state *virt_cstate;
+
+	*width = 0;
+	*height = 0;
+
+	if (!crtc || !crtc_state || !mode)
+		return;
+
+	sde_crtc = to_sde_crtc(crtc);
+	cstate = to_sde_crtc_state(crtc_state);
+	virt_conn_state = _sde_crtc_get_virt_conn_state(crtc, crtc_state);
+	virt_cstate = virt_conn_state ? to_sde_connector_state(virt_conn_state) : NULL;
+
+	if (cstate->num_ds_enabled) {
+		*width = cstate->ds_cfg[0].lm_width * cstate->num_ds_enabled;
+		*height = cstate->ds_cfg[0].lm_height;
+	} else if (virt_cstate && virt_cstate->dnsc_blur_count) {
+		*width = virt_cstate->dnsc_blur_cfg[0].src_width * virt_cstate->dnsc_blur_count;
+		*height = virt_cstate->dnsc_blur_cfg[0].src_height;
+	} else {
+		*width = mode->hdisplay;
+		*height = mode->vdisplay;
+	}
+}
+
 /**
  * sde_crtc_calc_fps() - Calculates fps value.
  * @sde_crtc   : CRTC structure
@@ -501,6 +595,23 @@ static void sde_crtc_destroy(struct drm_crtc *crtc)
 	drm_crtc_cleanup(crtc);
 	mutex_destroy(&sde_crtc->crtc_lock);
 	kfree(sde_crtc);
+}
+
+struct sde_connector_state *_sde_crtc_get_sde_connector_state(struct drm_crtc *crtc,
+		struct drm_atomic_state *state)
+{
+	struct drm_connector *conn;
+	struct drm_connector_state *conn_state;
+	int i;
+
+	for_each_new_connector_in_state(state, conn, conn_state, i) {
+		if (!conn_state || conn_state->crtc != crtc)
+			continue;
+
+		return to_sde_connector_state(conn_state);
+	}
+
+	return NULL;
 }
 
 struct msm_display_mode *sde_crtc_get_msm_mode(struct drm_crtc_state *c_state)
@@ -906,8 +1017,7 @@ static int _sde_crtc_set_crtc_roi(struct drm_crtc *crtc,
 
 	/* clear the ROI to null if it matches full screen anyways */
 	adj_mode = &state->adjusted_mode;
-	crtc_width = sde_crtc_get_width(sde_crtc, crtc_state, adj_mode);
-	crtc_height = sde_crtc_get_mixer_height(sde_crtc, crtc_state, adj_mode);
+	sde_crtc_get_resolution(crtc, state, adj_mode, &crtc_width, &crtc_height);
 	if (crtc_roi->x == 0 && crtc_roi->y == 0 &&
 			crtc_roi->w == crtc_width && crtc_roi->h == crtc_height)
 		memset(crtc_roi, 0, sizeof(*crtc_roi));
@@ -3489,10 +3599,9 @@ static void _sde_crtc_setup_lm_bounds(struct drm_crtc *crtc, struct drm_crtc_sta
 
 	sde_crtc = to_sde_crtc(crtc);
 	cstate = to_sde_crtc_state(state);
-
 	adj_mode = &state->adjusted_mode;
-	mixer_width = sde_crtc_get_mixer_width(sde_crtc, cstate, adj_mode);
-	mixer_height = sde_crtc_get_mixer_height(sde_crtc, cstate, adj_mode);
+
+	sde_crtc_get_mixer_resolution(crtc, state, adj_mode, &mixer_width, &mixer_height);
 
 	for (i = 0; i < sde_crtc->num_mixers; i++) {
 		cstate->lm_bounds[i].x = mixer_width * i;
@@ -4733,11 +4842,10 @@ static void sde_crtc_enable(struct drm_crtc *crtc,
 }
 
 /* no input validation - caller API has all the checks */
-static int _sde_crtc_excl_dim_layer_check(struct drm_crtc_state *state,
+static int _sde_crtc_excl_dim_layer_check(struct drm_crtc *crtc, struct drm_crtc_state *state,
 		struct plane_state pstates[], int cnt)
 {
 	struct sde_crtc_state *cstate = to_sde_crtc_state(state);
-	struct sde_crtc *sde_crtc = to_sde_crtc(state->crtc);
 	struct drm_display_mode *mode = &state->adjusted_mode;
 	const struct drm_plane_state *pstate;
 	struct sde_plane_state *sde_pstate;
@@ -4745,8 +4853,7 @@ static int _sde_crtc_excl_dim_layer_check(struct drm_crtc_state *state,
 	struct sde_rect *rect;
 	u32 crtc_width, crtc_height;
 
-	crtc_width = sde_crtc_get_width(sde_crtc, cstate, mode);
-	crtc_height = sde_crtc_get_mixer_height(sde_crtc, cstate, mode);
+	sde_crtc_get_resolution(crtc, state, mode, &crtc_width, &crtc_height);
 
 	/* Check dim layer rect bounds and stage */
 	for (i = 0; i < cstate->num_dim_layers; i++) {
@@ -5065,8 +5172,7 @@ static int _sde_crtc_check_get_pstates(struct drm_crtc *crtc,
 
 	memset(pipe_staged, 0, sizeof(pipe_staged));
 
-	crtc_width = sde_crtc_get_width(sde_crtc, cstate, mode);
-	crtc_height = sde_crtc_get_mixer_height(sde_crtc, cstate, mode);
+	sde_crtc_get_resolution(crtc, state, mode, &crtc_width, &crtc_height);
 
 	drm_atomic_crtc_state_for_each_plane_state(plane, pstate, state) {
 		if (IS_ERR_OR_NULL(pstate)) {
@@ -5200,7 +5306,7 @@ static int _sde_crtc_check_zpos(struct drm_crtc_state *state,
 
 	sort(pstates, cnt, sizeof(pstates[0]), pstate_cmp, NULL);
 
-	rc = _sde_crtc_excl_dim_layer_check(state, pstates, cnt);
+	rc = _sde_crtc_excl_dim_layer_check(crtc, state, pstates, cnt);
 	if (rc)
 		return rc;
 
@@ -5311,9 +5417,8 @@ static int _sde_crtc_check_plane_layout(struct drm_crtc *crtc,
 	struct drm_plane_state *plane_state;
 	struct sde_plane_state *pstate;
 	struct drm_display_mode *mode;
-	struct sde_crtc *sde_crtc;
-	struct sde_crtc_state *cstate;
 	int layout_split;
+	u32 crtc_width, crtc_height;
 
 	kms = _sde_crtc_get_kms(crtc);
 
@@ -5327,8 +5432,8 @@ static int _sde_crtc_check_plane_layout(struct drm_crtc *crtc,
 		return 0;
 
 	mode = &crtc->state->adjusted_mode;
-	sde_crtc = to_sde_crtc(crtc);
-	cstate = to_sde_crtc_state(crtc->state);
+	sde_crtc_get_resolution(crtc, crtc_state, mode, &crtc_width, &crtc_height);
+
 	drm_atomic_crtc_state_for_each_plane(plane, crtc_state) {
 		plane_state = drm_atomic_get_existing_plane_state(
 				crtc_state->state, plane);
@@ -5336,7 +5441,7 @@ static int _sde_crtc_check_plane_layout(struct drm_crtc *crtc,
 			continue;
 
 		pstate = to_sde_plane_state(plane_state);
-		layout_split = sde_crtc_get_width(sde_crtc, cstate, mode) >> 1;
+		layout_split = crtc_width >> 1;
 
 		if (plane_state->crtc_x >= layout_split) {
 			plane_state->crtc_x -= layout_split;
@@ -6362,8 +6467,7 @@ static int _sde_debugfs_status_show(struct seq_file *s, void *data)
 
 	mutex_lock(&sde_crtc->crtc_lock);
 	mode = &crtc->state->adjusted_mode;
-	mixer_width = sde_crtc_get_mixer_width(sde_crtc, cstate, mode);
-	mixer_height = sde_crtc_get_mixer_height(sde_crtc, cstate, mode);
+	sde_crtc_get_mixer_resolution(crtc, crtc->state, mode, &mixer_width, &mixer_height);
 
 	seq_printf(s, "crtc:%d width:%d height:%d\n", DRMID(crtc),
 				mixer_width * sde_crtc->num_mixers, mixer_height);
