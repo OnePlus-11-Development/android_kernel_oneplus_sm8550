@@ -875,6 +875,32 @@ static inline bool sde_crtc_state_in_clone_mode(struct drm_encoder *encoder,
 }
 
 /**
+ * sde_crtc_get_ds_io_res - populates the destination scaler src/dst w/h
+ * @state: pointer to drm crtc state
+ * @res: pointer to the output struct to populate the src/dst
+ */
+static inline void sde_crtc_get_ds_io_res(struct drm_crtc_state *state, struct sde_io_res *res)
+{
+	struct sde_crtc_state *cstate;
+	int i;
+
+	if (!state || !res)
+		return;
+
+	cstate = to_sde_crtc_state(state);
+	memset(res, 0, sizeof(struct sde_io_res));
+	for (i = 0; i < cstate->num_ds; i++) {
+		if (cstate->ds_cfg[i].scl3_cfg.enable) {
+			res->enabled = true;
+			res->src_w += cstate->ds_cfg[i].lm_width;
+			res->dst_w += cstate->ds_cfg[i].scl3_cfg.dst_width;
+			res->src_h = cstate->ds_cfg[i].lm_height;
+			res->dst_h = cstate->ds_cfg[i].scl3_cfg.dst_height;
+		}
+	}
+}
+
+/**
  * sde_crtc_get_secure_transition - determines the operations to be
  * performed before transitioning to secure state
  * This function should be called after swapping the new state

@@ -308,6 +308,34 @@ void sde_encoder_phys_setup_cdm(struct sde_encoder_phys *phys_enc,
 	}
 }
 
+static void _sde_enc_phys_wb_get_out_resolution(struct drm_crtc_state *crtc_state,
+			struct drm_connector_state *conn_state, u32 *out_width, u32 *out_height)
+{
+	struct sde_crtc_state *cstate = to_sde_crtc_state(crtc_state);
+	const struct drm_display_mode *mode = &crtc_state->mode;
+	struct sde_io_res ds_res = {0, }, dnsc_blur_res = {0, };
+	u32 ds_tap_pt = sde_crtc_get_property(cstate, CRTC_PROP_CAPTURE_OUTPUT);
+
+	sde_crtc_get_ds_io_res(crtc_state, &ds_res);
+	sde_connector_get_dnsc_blur_io_res(conn_state, &dnsc_blur_res);
+
+	if (ds_res.enabled) {
+		if (ds_tap_pt == CAPTURE_DSPP_OUT) {
+			*out_width = ds_res.dst_w;
+			*out_height = ds_res.dst_h;
+		} else if (ds_tap_pt == CAPTURE_MIXER_OUT) {
+			*out_width = ds_res.src_w;
+			*out_height = ds_res.src_h;
+		}
+	} else if (dnsc_blur_res.enabled) {
+		*out_width = dnsc_blur_res.dst_w;
+		*out_height = dnsc_blur_res.dst_h;
+	} else {
+		*out_width = mode->hdisplay;
+		*out_height = mode->vdisplay;
+	}
+}
+
 /**
  * sde_encoder_phys_wb_setup_fb - setup output framebuffer
  * @phys_enc:	Pointer to physical encoder
@@ -315,7 +343,8 @@ void sde_encoder_phys_setup_cdm(struct sde_encoder_phys *phys_enc,
  * @wb_roi:	Pointer to output region of interest
  */
 static void sde_encoder_phys_wb_setup_fb(struct sde_encoder_phys *phys_enc,
-		struct drm_framebuffer *fb, struct sde_rect *wb_roi)
+		struct drm_framebuffer *fb, struct sde_rect *wb_roi,
+		u32 out_width, u32 out_height)
 {
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
 	struct sde_hw_wb *hw_wb;
@@ -323,12 +352,11 @@ static void sde_encoder_phys_wb_setup_fb(struct sde_encoder_phys *phys_enc,
 	struct sde_hw_wb_cdp_cfg *cdp_cfg;
 	const struct msm_format *format;
 	struct sde_crtc_state *cstate;
+	struct drm_connector_state *conn_state;
+	struct drm_crtc_state *crtc_state;
 	const struct drm_display_mode *mode;
 	struct sde_rect pu_roi = {0,};
-	int i, ret;
-	u32 out_width, out_height, data_pt;
-	bool ds_in_use = false;
-	u32 ds_srcw = 0, ds_srch = 0, ds_outw = 0, ds_outh = 0;
+	int ret;
 	struct msm_gem_address_space *aspace;
 	u32 fb_mode;
 
@@ -338,7 +366,9 @@ static void sde_encoder_phys_wb_setup_fb(struct sde_encoder_phys *phys_enc,
 		return;
 	}
 
-	cstate = to_sde_crtc_state(wb_enc->crtc->state);
+	conn_state = phys_enc->connector->state;
+	crtc_state = wb_enc->crtc->state;
+	cstate = to_sde_crtc_state(crtc_state);
 	mode = &wb_enc->crtc->state->mode;
 
 	hw_wb = wb_enc->hw_wb;
@@ -402,30 +432,6 @@ static void sde_encoder_phys_wb_setup_fb(struct sde_encoder_phys *phys_enc,
 	if (hw_wb->ops.setup_crop && phys_enc->in_clone_mode) {
 		wb_cfg->crop.x = wb_cfg->roi.x;
 		wb_cfg->crop.y = wb_cfg->roi.y;
-
-		data_pt = sde_crtc_get_property(cstate, CRTC_PROP_CAPTURE_OUTPUT);
-
-		/* compute cumulative ds output dimensions if in use */
-		for (i = 0; i < cstate->num_ds; i++) {
-			if (cstate->ds_cfg[i].scl3_cfg.enable) {
-				ds_in_use = true;
-				ds_outw += cstate->ds_cfg[i].scl3_cfg.dst_width;
-				ds_outh = cstate->ds_cfg[i].scl3_cfg.dst_height;
-				ds_srcw +=  cstate->ds_cfg[i].lm_width;
-				ds_srch =  cstate->ds_cfg[i].lm_height;
-			}
-		}
-
-		if (ds_in_use && data_pt == CAPTURE_DSPP_OUT) {
-			out_width = ds_outw;
-			out_height = ds_outh;
-		} else if (ds_in_use) {
-			out_width = ds_srcw;
-			out_height = ds_srch;
-		} else {
-			out_width = mode->hdisplay;
-			out_height = mode->vdisplay;
-		}
 
 		if (cstate->user_roi_list.num_rects) {
 			sde_kms_rect_merge_rectangles(&cstate->user_roi_list, &pu_roi);
@@ -678,22 +684,129 @@ static void _sde_enc_phys_wb_detect_cwb(struct sde_encoder_phys *phys_enc,
 		 cstate->cwb_enc_mask, phys_enc->enable_state, phys_enc->in_clone_mode);
 }
 
+static int _sde_enc_phys_wb_validate_dnsc_blur_filter(
+		struct sde_dnsc_blur_filter_info *filter_info, u32 src, u32 dst)
+{
+	u32 dnsc_ratio;
+
+	if (!src || !dst || (src < dst)) {
+		SDE_ERROR("invalid dnsc_blur src:%u, dst:%u\n", src, dst);
+		return -EINVAL;
+	}
+
+	dnsc_ratio = DIV_ROUND_UP(src, dst);
+
+	if ((src < filter_info->src_min) || (src > filter_info->src_max)
+			|| (dst < filter_info->dst_min) || (dst > filter_info->dst_max)) {
+		SDE_ERROR(
+		  "invalid dnsc_blur size, fil:%d, src/dst:%u/%u, [min/max-src:%u/%u, dst:%u/%u]\n",
+				filter_info->filter, src, dst, filter_info->src_min,
+				filter_info->src_max, filter_info->dst_min, filter_info->dst_max);
+		return -EINVAL;
+	}  else if ((dnsc_ratio < filter_info->min_ratio)
+			|| (dnsc_ratio > filter_info->max_ratio)) {
+		SDE_ERROR(
+		  "invalid dnsc_blur ratio, fil:%d, src/dst:%u/%u, ratio:%u, ratio-min/max:%u/%u\n",
+				filter_info->filter, src, dst, dnsc_ratio,
+				filter_info->min_ratio, filter_info->max_ratio);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int _sde_enc_phys_wb_validate_dnsc_blur_ds(struct drm_crtc_state *crtc_state,
+			struct drm_connector_state *conn_state, const struct sde_format *fmt)
+{
+	struct sde_crtc_state *cstate = to_sde_crtc_state(crtc_state);
+	struct sde_connector_state *sde_conn_state = to_sde_connector_state(conn_state);
+	struct sde_kms *sde_kms;
+	struct sde_drm_dnsc_blur_cfg *cfg;
+	struct sde_dnsc_blur_filter_info *filter_info;
+	struct sde_io_res ds_res = {0, }, dnsc_blur_res = {0, };
+	u32 ds_tap_pt = sde_crtc_get_property(cstate, CRTC_PROP_CAPTURE_OUTPUT);
+	int ret = 0, i, j;
+
+	sde_kms = sde_connector_get_kms(conn_state->connector);
+	if (!sde_kms) {
+		SDE_ERROR("invalid kms\n");
+		return -EINVAL;
+	}
+
+	sde_crtc_get_ds_io_res(crtc_state, &ds_res);
+	sde_connector_get_dnsc_blur_io_res(conn_state, &dnsc_blur_res);
+
+	if ((ds_res.enabled && (!ds_res.src_w || !ds_res.src_h
+					|| !ds_res.dst_w || !ds_res.dst_h))) {
+		SDE_ERROR("invalid ds cfg src:%ux%u dst:%ux%u\n",
+				ds_res.src_w, ds_res.src_h, ds_res.dst_w, ds_res.dst_h);
+		return -EINVAL;
+	}
+
+	if (!dnsc_blur_res.enabled)
+		return 0;
+
+	if (!dnsc_blur_res.src_w || !dnsc_blur_res.src_h
+			|| !dnsc_blur_res.dst_w || !dnsc_blur_res.dst_h) {
+		SDE_ERROR("invalid dnsc_blur cfg src:%ux%u dst:%ux%u\n",
+				dnsc_blur_res.src_w, dnsc_blur_res.src_h,
+				dnsc_blur_res.dst_w, dnsc_blur_res.dst_h);
+		return -EINVAL;
+	} else if (ds_res.enabled && (ds_tap_pt == CAPTURE_DSPP_OUT)
+			&& ((ds_res.dst_w  != dnsc_blur_res.src_w)
+				|| (ds_res.dst_h != dnsc_blur_res.src_h))) {
+		SDE_ERROR("invalid DSPP OUT cfg: ds dst:%ux%u dnsc_blur src:%ux%u\n",
+				ds_res.dst_w, ds_res.dst_h,
+				dnsc_blur_res.src_w, dnsc_blur_res.src_h);
+		return -EINVAL;
+	} else if (ds_res.enabled && (ds_tap_pt == CAPTURE_MIXER_OUT)
+			&& ((ds_res.src_w  != dnsc_blur_res.src_w)
+				|| (ds_res.src_h != dnsc_blur_res.src_h))) {
+		SDE_ERROR("invalid MIXER OUT cfg: ds src:%ux%u dnsc_blur src:%ux%u\n",
+				ds_res.dst_w, ds_res.dst_h,
+				dnsc_blur_res.src_w, dnsc_blur_res.src_h);
+		return -EINVAL;
+	} else if (cstate->user_roi_list.num_rects) {
+		SDE_ERROR("PU with dnsc_blur not supported\n");
+		return -EINVAL;
+	} else if (SDE_FORMAT_IS_YUV(fmt)) {
+		SDE_ERROR("YUV output not supported with dnsc_blur\n");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < sde_conn_state->dnsc_blur_count; i++) {
+		cfg = &sde_conn_state->dnsc_blur_cfg[i];
+
+		for (j = 0; j < sde_kms->catalog->dnsc_blur_filter_count; j++) {
+			filter_info = &sde_kms->catalog->dnsc_blur_filters[i];
+			if (cfg->flags_h == filter_info->filter) {
+				ret = _sde_enc_phys_wb_validate_dnsc_blur_filter(filter_info,
+						cfg->src_width, cfg->dst_width);
+				if (ret)
+					break;
+			}
+			if (cfg->flags_v == filter_info->filter) {
+				ret = _sde_enc_phys_wb_validate_dnsc_blur_filter(filter_info,
+						cfg->src_height, cfg->dst_height);
+				if (ret)
+					break;
+			}
+		}
+	}
+
+	return ret;
+}
+
 static int _sde_enc_phys_wb_validate_cwb(struct sde_encoder_phys *phys_enc,
 			struct drm_crtc_state *crtc_state,
 			struct drm_connector_state *conn_state)
 {
 	struct drm_framebuffer *fb;
 	struct sde_crtc_state *cstate = to_sde_crtc_state(crtc_state);
-	const struct drm_display_mode *mode = &crtc_state->mode;
-	struct sde_rect wb_roi = {0,};
-	struct sde_rect pu_roi = {0,};
-	int out_width = 0, out_height = 0;
-	int ds_srcw = 0, ds_srch = 0, ds_outw = 0, ds_outh = 0;
+	struct sde_rect wb_roi = {0,}, pu_roi = {0,};
+	u32  out_width = 0, out_height = 0;
 	const struct sde_format *fmt;
-	int data_pt, prog_line;
-	int ds_in_use = false;
-	int i = 0;
-	int ret = 0;
+	int prog_line, ret = 0;
 
 	fb = sde_wb_connector_state_get_output_fb(conn_state);
 	if (!fb) {
@@ -724,26 +837,8 @@ static int _sde_enc_phys_wb_validate_cwb(struct sde_encoder_phys *phys_enc,
 		return -EINVAL;
 	}
 
-	data_pt = sde_crtc_get_property(cstate, CRTC_PROP_CAPTURE_OUTPUT);
-
-	/* compute cumulative ds output dimensions if in use */
-	for (i = 0; i < cstate->num_ds; i++) {
-		if (cstate->ds_cfg[i].scl3_cfg.enable) {
-			ds_in_use = true;
-			ds_outw += cstate->ds_cfg[i].scl3_cfg.dst_width;
-			ds_outh = cstate->ds_cfg[i].scl3_cfg.dst_height;
-			ds_srcw +=  cstate->ds_cfg[i].lm_width;
-			ds_srch =  cstate->ds_cfg[i].lm_height;
-		}
-	}
-
-	if ((ds_in_use && (!ds_outw || !ds_outh || !ds_srcw || !ds_srch))) {
-		SDE_ERROR("invalid ds cfg src:%dx%d dst:%dx%d\n",
-				ds_srcw, ds_srch, ds_outw, ds_outh);
-		return -EINVAL;
-	}
-
-	/* 1) No DS case: same restrictions for LM & DSSPP tap point
+	/*
+	 * 1) No DS case: same restrictions for LM & DSSPP tap point
 	 *	a) wb-roi should be inside FB
 	 *	b) mode resolution & wb-roi should be same
 	 * 2) With DS case: restrictions would change based on tap point
@@ -753,32 +848,25 @@ static int _sde_enc_phys_wb_validate_cwb(struct sde_encoder_phys *phys_enc,
 	 *	2.2) DSPP Tap point: same as No DS case
 	 *		a) wb-roi should be inside FB
 	 *		b) mode resolution & wb-roi should be same
-	 * 3) Partial Update case: additional stride check
+	 * 3) With DNSC_BLUR case:
+	 *      a) wb-roi should be inside FB
+	 *      b) mode resolution and wb-roi should be same
+	 * 4) Partial Update case: additional stride check
 	 *      a) cwb roi should be inside PU region or FB
 	 *      b) cropping is only allowed for fully sampled data
 	 *      c) add check for stride and QOS setting by 256B
 	 */
-	if (ds_in_use && data_pt == CAPTURE_DSPP_OUT) {
-		out_width = ds_outw;
-		out_height = ds_outh;
-	} else if (ds_in_use) { /* LM tap point */
-		out_width = ds_srcw;
-		out_height = ds_srch;
-	} else {
-		out_width = mode->hdisplay;
-		out_height = mode->vdisplay;
-	}
+	_sde_enc_phys_wb_get_out_resolution(crtc_state, conn_state, &out_width, &out_height);
 
 	if (SDE_FORMAT_IS_YUV(fmt) && ((wb_roi.w != out_width) || (wb_roi.h != out_height))) {
-		SDE_ERROR("invalid wb roi[%dx%d] with ds_use:%d out[%dx%d] fmt:%x\n",
-				wb_roi.w, wb_roi.h, ds_in_use, out_width, out_height,
-				fmt->base.pixel_format);
+		SDE_ERROR("invalid wb roi[%dx%d] out[%dx%d] fmt:%x\n",
+				wb_roi.w, wb_roi.h, out_width, out_height, fmt->base.pixel_format);
 		return -EINVAL;
 	}
 
 	if ((wb_roi.w > out_width) || (wb_roi.h > out_height)) {
-		SDE_ERROR("invalid wb roi[%dx%d] with ds_use:%d out[%dx%d]\n",
-				wb_roi.w, wb_roi.h, ds_in_use, out_width, out_height);
+		SDE_ERROR("invalid wb roi[%dx%d] out[%dx%d]\n",
+				wb_roi.w, wb_roi.h, out_width, out_height);
 		return -EINVAL;
 	}
 
@@ -792,10 +880,11 @@ static int _sde_enc_phys_wb_validate_cwb(struct sde_encoder_phys *phys_enc,
 	/*
 	 * If output size is equal to input size ensure wb_roi with x and y offset
 	 * will be within buffer. If output size is smaller, only width and height are taken
-	 * into consideration as output region will begin at top left corner */
-
+	 * into consideration as output region will begin at top left corner
+	 */
 	if ((fb->width == out_width && fb->height == out_height) &&
-			(((wb_roi.x + wb_roi.w) > fb->width) ||((wb_roi.y + wb_roi.h) > fb->height))) {
+			(((wb_roi.x + wb_roi.w) > fb->width)
+				|| ((wb_roi.y + wb_roi.h) > fb->height))) {
 		SDE_ERROR("invalid wb roi[%d,%d,%d,%d] fb[%dx%d] out[%dx%d]\n",
 				wb_roi.x, wb_roi.y, wb_roi.w, wb_roi.h, fb->width, fb->height,
 				out_width, out_height);
@@ -834,11 +923,13 @@ static int sde_encoder_phys_wb_atomic_check(
 {
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
 	struct sde_crtc_state *cstate = to_sde_crtc_state(crtc_state);
+	struct sde_connector_state *sde_conn_state;
 	struct sde_hw_wb *hw_wb = wb_enc->hw_wb;
 	const struct sde_wb_cfg *wb_cfg = hw_wb->caps;
 	struct drm_framebuffer *fb;
 	const struct sde_format *fmt;
 	struct sde_rect wb_roi;
+	u32 out_width = 0, out_height = 0;
 	const struct drm_display_mode *mode = &crtc_state->mode;
 	int rc;
 	bool clone_mode_curr = false;
@@ -857,6 +948,7 @@ static int sde_encoder_phys_wb_atomic_check(
 		return -EINVAL;
 	}
 
+	sde_conn_state = to_sde_connector_state(conn_state);
 	clone_mode_curr = phys_enc->in_clone_mode;
 
 	_sde_enc_phys_wb_detect_cwb(phys_enc, crtc_state);
@@ -912,6 +1004,12 @@ static int sde_encoder_phys_wb_atomic_check(
 	if (SDE_FORMAT_IS_YUV(fmt) != !!phys_enc->hw_cdm)
 		crtc_state->mode_changed = true;
 
+	rc = _sde_enc_phys_wb_validate_dnsc_blur_ds(crtc_state, conn_state, fmt);
+	if (rc) {
+		SDE_ERROR("failed dnsc_blur/ds validation, rc:%d\n", rc);
+		return rc;
+	}
+
 	/* if in clone mode, return after cwb validation */
 	if (cstate->cwb_enc_mask) {
 		rc = _sde_enc_phys_wb_validate_cwb(phys_enc, crtc_state,
@@ -922,48 +1020,30 @@ static int sde_encoder_phys_wb_atomic_check(
 		return rc;
 	}
 
-	if (wb_roi.w && wb_roi.h) {
-		if (wb_roi.w != mode->hdisplay) {
-			SDE_ERROR("invalid roi w=%d, mode w=%d\n", wb_roi.w,
-					mode->hdisplay);
-			return -EINVAL;
-		} else if (wb_roi.h != mode->vdisplay) {
-			SDE_ERROR("invalid roi h=%d, mode h=%d\n", wb_roi.h,
-					mode->vdisplay);
-			return -EINVAL;
-		} else if (wb_roi.x + wb_roi.w > fb->width) {
-			SDE_ERROR("invalid roi x=%d, w=%d, fb w=%d\n",
-					wb_roi.x, wb_roi.w, fb->width);
-			return -EINVAL;
-		} else if (wb_roi.y + wb_roi.h > fb->height) {
-			SDE_ERROR("invalid roi y=%d, h=%d, fb h=%d\n",
-					wb_roi.y, wb_roi.h, fb->height);
-			return -EINVAL;
-		} else if (wb_roi.w > SDE_WB_MAX_LINEWIDTH(fmt, wb_cfg)) {
-			SDE_ERROR("invalid roi ubwc=%d w=%d, maxlinewidth=%u\n",
-					SDE_FORMAT_IS_UBWC(fmt), wb_roi.w,
-					SDE_WB_MAX_LINEWIDTH(fmt, wb_cfg));
-			return -EINVAL;
-		}
-	} else {
-		if (wb_roi.x || wb_roi.y) {
-			SDE_ERROR("invalid roi x=%d, y=%d\n",
-					wb_roi.x, wb_roi.y);
-			return -EINVAL;
-		} else if (fb->width != mode->hdisplay) {
-			SDE_ERROR("invalid fb w=%d, mode w=%d\n", fb->width,
-					mode->hdisplay);
-			return -EINVAL;
-		} else if (fb->height != mode->vdisplay) {
-			SDE_ERROR("invalid fb h=%d, mode h=%d\n", fb->height,
-					mode->vdisplay);
-			return -EINVAL;
-		} else if (fb->width > SDE_WB_MAX_LINEWIDTH(fmt, wb_cfg)) {
-			SDE_ERROR("invalid fb ubwc=%d w=%d, maxlinewidth=%u\n",
-					SDE_FORMAT_IS_UBWC(fmt), fb->width,
-					SDE_WB_MAX_LINEWIDTH(fmt, wb_cfg));
-			return -EINVAL;
-		}
+	_sde_enc_phys_wb_get_out_resolution(crtc_state, conn_state, &out_width, &out_height);
+	if (!wb_roi.w || !wb_roi.h) {
+		wb_roi.x = 0;
+		wb_roi.y = 0;
+		wb_roi.w = out_width;
+		wb_roi.h = out_height;
+	}
+
+	if ((wb_roi.x + wb_roi.w > fb->width) || (wb_roi.x + wb_roi.w > out_width)) {
+		SDE_ERROR("invalid roi x:%d, w:%d, fb_w:%d, mode_w:%d, out_w:%d\n",
+				wb_roi.x, wb_roi.w, fb->width, mode->hdisplay, out_width);
+		return -EINVAL;
+	} else if ((wb_roi.y + wb_roi.h > fb->height) || (wb_roi.y + wb_roi.h > out_height)) {
+		SDE_ERROR("invalid roi y:%d, h:%d, fb_h:%d, mode_h%d, out_h:%d\n",
+				wb_roi.y, wb_roi.h, fb->height, mode->vdisplay, out_height);
+		return -EINVAL;
+	} else if ((out_width > mode->hdisplay) || (out_height > mode->vdisplay)) {
+		SDE_ERROR("invalid out w/h out_w:%d, mode_w:%d, out_h:%d, mode_h:%d\n",
+				out_width, mode->hdisplay, out_height, mode->vdisplay);
+		return -EINVAL;
+	} else if (wb_roi.w > SDE_WB_MAX_LINEWIDTH(fmt, wb_cfg)) {
+		SDE_ERROR("invalid roi ubwc:%d. w:%d, maxlinewidth:%u\n", SDE_FORMAT_IS_UBWC(fmt),
+				wb_roi.w, SDE_WB_MAX_LINEWIDTH(fmt, wb_cfg));
+		return -EINVAL;
 	}
 
 	return rc;
@@ -1274,8 +1354,11 @@ static void sde_encoder_phys_wb_setup(
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
 	struct sde_hw_wb *hw_wb = wb_enc->hw_wb;
 	struct drm_display_mode mode = phys_enc->cached_mode;
+	struct drm_connector_state *conn_state = phys_enc->connector->state;
+	struct drm_crtc_state *crtc_state = wb_enc->crtc->state;
 	struct drm_framebuffer *fb;
 	struct sde_rect *wb_roi = &wb_enc->wb_roi;
+	u32 out_width = 0, out_height = 0;
 
 	SDE_DEBUG("[mode_set:%d,\"%s\",%d,%d]\n",
 			hw_wb->idx - WB_0, mode.name,
@@ -1304,11 +1387,12 @@ static void sde_encoder_phys_wb_setup(
 	SDE_DEBUG("[fb_id:%u][fb:%u,%u]\n", fb->base.id,
 			fb->width, fb->height);
 
+	_sde_enc_phys_wb_get_out_resolution(crtc_state, conn_state, &out_width, &out_height);
 	if (wb_roi->w == 0 || wb_roi->h == 0) {
 		wb_roi->x = 0;
 		wb_roi->y = 0;
-		wb_roi->w = fb->width;
-		wb_roi->h = fb->height;
+		wb_roi->w = out_width;
+		wb_roi->h = out_height;
 	}
 
 	SDE_DEBUG("[roi:%u,%u,%u,%u]\n", wb_roi->x, wb_roi->y,
@@ -1333,7 +1417,7 @@ static void sde_encoder_phys_wb_setup(
 
 	sde_encoder_phys_setup_cdm(phys_enc, fb, wb_enc->wb_fmt, wb_roi);
 
-	sde_encoder_phys_wb_setup_fb(phys_enc, fb, wb_roi);
+	sde_encoder_phys_wb_setup_fb(phys_enc, fb, wb_roi, out_width, out_height);
 
 	_sde_encoder_phys_wb_setup_ctl(phys_enc, wb_enc->wb_fmt);
 

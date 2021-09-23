@@ -843,6 +843,36 @@ static inline uint64_t sde_connector_get_lp(
 }
 
 /**
+ * sde_connector_get_dnsc_blur_io_res - populates the downscale blur src/dst w/h
+ * @state: pointer to drm connector state
+ * @res: pointer to the output struct to populate the src/dst
+ */
+static inline void sde_connector_get_dnsc_blur_io_res(struct drm_connector_state *state,
+		struct sde_io_res *res)
+{
+	struct sde_connector_state *sde_conn_state;
+	int i;
+
+	if (!state || !res)
+		return;
+
+	memset(res, 0, sizeof(struct sde_io_res));
+
+	sde_conn_state = to_sde_connector_state(state);
+	if (!sde_conn_state->dnsc_blur_count ||
+			!(sde_conn_state->dnsc_blur_cfg[0].flags & DNSC_BLUR_EN))
+		return;
+
+	res->enabled = true;
+	for (i = 0; i < sde_conn_state->dnsc_blur_count; i++) {
+		res->src_w += sde_conn_state->dnsc_blur_cfg[i].src_width;
+		res->dst_w += sde_conn_state->dnsc_blur_cfg[i].dst_width;
+	}
+	res->src_h = sde_conn_state->dnsc_blur_cfg[0].src_height;
+	res->dst_h = sde_conn_state->dnsc_blur_cfg[0].dst_height;
+}
+
+/**
  * sde_connector_set_property_for_commit - add property set to atomic state
  *	Add a connector state property update for the specified property index
  *	to the atomic state in preparation for a drm_atomic_commit.

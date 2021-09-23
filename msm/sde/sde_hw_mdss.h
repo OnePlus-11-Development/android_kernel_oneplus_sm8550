@@ -562,6 +562,14 @@ struct sde_rect {
 	u16 h;
 };
 
+struct sde_io_res {
+	bool enabled;
+	u32 src_w;
+	u32 src_h;
+	u32 dst_w;
+	u32 dst_h;
+};
+
 struct sde_csc_cfg {
 	/* matrix coefficients in S15.16 format */
 	uint32_t csc_mv[SDE_CSC_MATRIX_COEFF_SIZE];
