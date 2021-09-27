@@ -891,7 +891,7 @@ static int sde_wb_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, wb_dev);
 
 	mutex_lock(&sde_wb_list_lock);
-	list_add(&wb_dev->wb_list, &sde_wb_list);
+	list_add_tail(&wb_dev->wb_list, &sde_wb_list);
 	mutex_unlock(&sde_wb_list_lock);
 
 	if (!_sde_wb_dev_init(wb_dev)) {

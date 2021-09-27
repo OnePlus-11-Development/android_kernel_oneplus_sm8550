@@ -128,7 +128,7 @@ static const u32 fetch_tbl[SSPP_MAX] = {CTL_INVALID_BIT, 16, 17, 18, 19,
 /**
  * list of WB bits in CTL_WB_FLUSH
  */
-static const u32 wb_flush_tbl[WB_MAX] = {SDE_NONE, SDE_NONE, SDE_NONE, 2};
+static const u32 wb_flush_tbl[WB_MAX] = {SDE_NONE, SDE_NONE, 1, 2};
 
 /**
  * list of INTF bits in CTL_INTF_FLUSH
