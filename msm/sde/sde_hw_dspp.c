@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -151,6 +151,12 @@ static void dspp_sixzone(struct sde_hw_dspp *c)
 			c->ops.setup_sixzone = reg_dmav1_setup_dspp_sixzonev17;
 		else
 			c->ops.setup_sixzone = sde_setup_dspp_sixzone_v17;
+	} else if (c->cap->sblk->sixzone.version ==
+			SDE_COLOR_PROCESS_VER(0x2, 0x0)) {
+		c->ops.setup_sixzone = NULL;
+		ret = reg_dmav2_init_dspp_op_v4(SDE_DSPP_SIXZONE, c->idx);
+		if (!ret)
+			c->ops.setup_sixzone = reg_dmav2_setup_dspp_sixzonev2;
 	}
 }
 

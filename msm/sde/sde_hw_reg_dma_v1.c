@@ -443,7 +443,8 @@ static int validate_blk_lut_write(struct sde_reg_dma_setup_ops_cfg *cfg)
 	if (cfg->table_sel >= LUTBUS_TABLE_SELECT_MAX ||
 			cfg->block_sel >= LUTBUS_BLOCK_MAX ||
 			(cfg->trans_size != LUTBUS_IGC_TRANS_SIZE &&
-			cfg->trans_size != LUTBUS_GAMUT_TRANS_SIZE)) {
+			cfg->trans_size != LUTBUS_GAMUT_TRANS_SIZE &&
+			cfg->trans_size != LUTBUS_SIXZONE_TRANS_SIZE)) {
 		DRM_ERROR("invalid table_sel %d block_sel %d trans_size %d\n",
 				cfg->table_sel, cfg->block_sel,
 				cfg->trans_size);
