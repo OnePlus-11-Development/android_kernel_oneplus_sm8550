@@ -25,8 +25,6 @@
 
 #include <linux/qcom-dma-mapping.h>
 #include <linux/dma-buf.h>
-#include <linux/ion.h>
-#include <linux/msm_ion.h>
 
 struct sg_table *msm_gem_prime_get_sg_table(struct drm_gem_object *obj)
 {

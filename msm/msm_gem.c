@@ -21,7 +21,6 @@
 #include <linux/shmem_fs.h>
 #include <linux/dma-buf.h>
 #include <linux/pfn_t.h>
-#include <linux/ion.h>
 
 #include "msm_drv.h"
 #include "msm_gem.h"
@@ -1238,9 +1237,6 @@ int msm_gem_delayed_import(struct drm_gem_object *obj)
 	attach = obj->import_attach;
 	attach->dma_map_attrs |= DMA_ATTR_DELAYED_UNMAP;
 
-	if (msm_obj->flags & MSM_BO_SKIPSYNC)
-		attach->dma_map_attrs |= DMA_ATTR_SKIP_CPU_SYNC;
-
 	/*
 	 * dma_buf_map_attachment will call dma_map_sg for ion buffer
 	 * mapping, and iova will get mapped when the function returns.
@@ -1293,17 +1289,9 @@ struct drm_gem_object *msm_gem_import(struct drm_device *dev,
 	 */
 	msm_obj->flags |= MSM_BO_EXTBUF;
 
-	/*
-	 * For all uncached buffers, there is no need to perform cache
-	 * maintenance on dma map/unmap time.
-	 */
 	ret = dma_buf_get_flags(dmabuf, &flags);
-	if (ret) {
+	if (ret)
 		DRM_ERROR("dma_buf_get_flags failure, err=%d\n", ret);
-	} else if ((flags & ION_FLAG_CACHED) == 0) {
-		DRM_DEBUG("Buffer is uncached type\n");
-		msm_obj->flags |= MSM_BO_SKIPSYNC;
-	}
 
 	mutex_unlock(&msm_obj->lock);
 	return obj;
