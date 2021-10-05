@@ -2480,8 +2480,12 @@ static int sde_intf_parse_dt(struct device_node *np,
 		if (SDE_HW_MAJOR(sde_cfg->hw_rev) >= SDE_HW_MAJOR(SDE_HW_VER_810)) {
 			set_bit(SDE_INTF_WD_TIMER, &intf->features);
 			set_bit(SDE_INTF_RESET_COUNTER, &intf->features);
-			set_bit(SDE_INTF_VSYNC_TIMESTAMP, &intf->features);
+			set_bit(SDE_INTF_PANEL_VSYNC_TS, &intf->features);
 			set_bit(SDE_INTF_AVR_STATUS, &intf->features);
+		}
+
+		if (SDE_HW_MAJOR(sde_cfg->hw_rev) >= SDE_HW_MAJOR(SDE_HW_VER_900)) {
+			set_bit(SDE_INTF_MDP_VSYNC_TS, &intf->features);
 		}
 	}
 
