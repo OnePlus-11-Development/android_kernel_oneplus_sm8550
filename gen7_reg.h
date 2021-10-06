@@ -139,6 +139,7 @@
 #define GEN7_CP_SQE_AC_UCODE_DBG_DATA    0xb28
 #define GEN7_CP_SQE_AC_STAT_ADDR         0xb29
 #define GEN7_CP_SQE_AC_STAT_DATA         0xb2a
+#define GEN7_CP_LPAC_CHICKEN_DBG         0xb30
 #define GEN7_CP_LPAC_APRIV_CNTL          0xb31
 #define GEN7_CP_LPAC_ROQ_DBG_DATA        0xb35
 #define GEN7_CP_LPAC_FIFO_DBG_DATA       0xb36
