@@ -2007,40 +2007,20 @@ static int dsi_display_debugfs_init(struct dsi_display *display)
 
 		snprintf(name, ARRAY_SIZE(name),
 				"%s_allow_phy_power_off", phy->name);
-		dump_file = debugfs_create_bool(name, 0600, dir,
-				&phy->allow_phy_power_off);
-		if (IS_ERR_OR_NULL(dump_file)) {
-			rc = PTR_ERR(dump_file);
-			DSI_ERR("[%s] debugfs create %s failed, rc=%d\n",
-			       display->name, name, rc);
-			goto error_remove_dir;
-		}
+		debugfs_create_bool(name, 0600, dir, &phy->allow_phy_power_off);
 
 		snprintf(name, ARRAY_SIZE(name),
 				"%s_regulator_min_datarate_bps", phy->name);
 		debugfs_create_u32(name, 0600, dir, &phy->regulator_min_datarate_bps);
 	}
 
-	if (!debugfs_create_bool("ulps_feature_enable", 0600, dir,
-			&display->panel->ulps_feature_enabled)) {
-		DSI_ERR("[%s] debugfs create ulps feature enable file failed\n",
-		       display->name);
-		goto error_remove_dir;
-	}
+	debugfs_create_bool("ulps_feature_enable", 0600, dir,
+			&display->panel->ulps_feature_enabled);
 
-	if (!debugfs_create_bool("ulps_suspend_feature_enable", 0600, dir,
-			&display->panel->ulps_suspend_enabled)) {
-		DSI_ERR("[%s] debugfs create ulps-suspend feature enable file failed\n",
-		       display->name);
-		goto error_remove_dir;
-	}
+	debugfs_create_bool("ulps_suspend_feature_enable", 0600, dir,
+			&display->panel->ulps_suspend_enabled);
 
-	if (!debugfs_create_bool("ulps_status", 0400, dir,
-			&display->ulps_enabled)) {
-		DSI_ERR("[%s] debugfs create ulps status file failed\n",
-		       display->name);
-		goto error_remove_dir;
-	}
+	debugfs_create_bool("ulps_status", 0400, dir, &display->ulps_enabled);
 
 	debugfs_create_u32("clk_gating_config", 0600, dir, &display->clk_gating_config);
 

@@ -297,17 +297,7 @@ static int dsi_ctrl_debugfs_init(struct dsi_ctrl *dsi_ctrl,
 		goto error_remove_dir;
 	}
 
-	cmd_dma_logs = debugfs_create_bool("enable_cmd_dma_stats",
-				       0600,
-				       dir,
-				       &dsi_ctrl->enable_cmd_dma_stats);
-	if (IS_ERR_OR_NULL(cmd_dma_logs)) {
-		rc = PTR_ERR(cmd_dma_logs);
-		DSI_CTRL_ERR(dsi_ctrl,
-				"enable cmd dma stats failed, rc=%d\n",
-				rc);
-		goto error_remove_dir;
-	}
+	debugfs_create_bool("enable_cmd_dma_stats", 0600, dir, &dsi_ctrl->enable_cmd_dma_stats);
 
 	cmd_dma_logs = debugfs_create_file("cmd_dma_stats",
 				       0444,
