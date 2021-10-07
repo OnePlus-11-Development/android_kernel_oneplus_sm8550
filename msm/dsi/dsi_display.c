@@ -249,7 +249,7 @@ int dsi_display_set_backlight(struct drm_connector *connector,
 	/* use bl_temp as index of dimming bl lut to find the dimming panel backlight */
 	if (bl_temp != 0 && panel->bl_config.dimming_bl_lut &&
 	    bl_temp < panel->bl_config.dimming_bl_lut->length) {
-		pr_debug("before dimming bl_temp = %u, after dimming bl_temp = %lu\n",
+		DSI_DEBUG("before dimming bl_temp = %u, after dimming bl_temp = %lu\n",
 			bl_temp, panel->bl_config.dimming_bl_lut->mapped_bl[bl_temp]);
 		bl_temp = panel->bl_config.dimming_bl_lut->mapped_bl[bl_temp];
 	}
@@ -257,10 +257,10 @@ int dsi_display_set_backlight(struct drm_connector *connector,
 	if (bl_temp > panel->bl_config.bl_max_level)
 		bl_temp = panel->bl_config.bl_max_level;
 
-        if (bl_temp && (bl_temp < panel->bl_config.bl_min_level))
-                bl_temp = panel->bl_config.bl_min_level;
+	if (bl_temp && (bl_temp < panel->bl_config.bl_min_level))
+		bl_temp = panel->bl_config.bl_min_level;
 
-	pr_debug("bl_scale = %u, bl_scale_sv = %u, bl_lvl = %u\n",
+	DSI_DEBUG("bl_scale = %u, bl_scale_sv = %u, bl_lvl = %u\n",
 		bl_scale, bl_scale_sv, (u32)bl_temp);
 
 	rc = dsi_panel_set_backlight(panel, (u32)bl_temp);
@@ -6978,6 +6978,11 @@ int dsi_display_get_modes(struct dsi_display *display,
 			if (!sub_mode->timing.qsync_min_fps && qsync_caps->qsync_min_fps)
 				sub_mode->timing.qsync_min_fps = qsync_caps->qsync_min_fps;
 
+			/*
+			 * Qsync min fps for the mode will be populated in the timing info
+			 * in dsi_panel_get_mode function.
+			 */
+			sub_mode->priv_info->qsync_min_fps = sub_mode->timing.qsync_min_fps;
 			if (!dfps_caps.dfps_support || !support_video_mode)
 				continue;
 
@@ -6986,8 +6991,10 @@ int dsi_display_get_modes(struct dsi_display *display,
 			sub_mode->timing.refresh_rate = dfps_caps.dfps_list[i];
 
 			/* Override with qsync min fps list in dfps usecases */
-			if (qsync_caps->qsync_min_fps && qsync_caps->qsync_min_fps_list_len)
+			if (qsync_caps->qsync_min_fps && qsync_caps->qsync_min_fps_list_len) {
 				sub_mode->timing.qsync_min_fps = qsync_caps->qsync_min_fps_list[i];
+				sub_mode->priv_info->qsync_min_fps = sub_mode->timing.qsync_min_fps;
+			}
 
 			dsi_display_get_dfps_timing(display, sub_mode,
 					curr_refresh_rate);
