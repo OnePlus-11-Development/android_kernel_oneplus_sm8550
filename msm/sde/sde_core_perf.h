@@ -76,9 +76,8 @@ struct sde_core_perf_tune {
  * @bw_vote_mode_updated: bandwidth vote mode update
  * @llcc_active: status of the llcc, true if active.
  * @uidle_enabled: indicates if uidle is already enabled
- * @idle_sys_cache_enabled: override system cache enable state
- *                          for idle usecase
  * @core_clk_reserve_rate: reserve core clk rate for built-in display
+ * @sys_cache_enabled: override system cache enable state
  */
 struct sde_core_perf {
 	struct drm_device *dev;
@@ -99,8 +98,8 @@ struct sde_core_perf {
 	bool bw_vote_mode_updated;
 	bool llcc_active[SDE_SYS_CACHE_MAX];
 	bool uidle_enabled;
-	bool idle_sys_cache_enabled;
 	u64 core_clk_reserve_rate;
+	u32 sys_cache_enabled;
 };
 
 /**
