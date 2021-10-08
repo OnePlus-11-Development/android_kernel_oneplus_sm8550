@@ -130,6 +130,47 @@ static const char *const roi_map_type[] = {
 	NULL,
 };
 
+static const char * const av1_profile[] = {
+	"Main",
+	"High",
+	"Professional",
+	NULL,
+};
+
+static const char * const av1_level[] = {
+	"2.0",
+	"2.1",
+	"2.2",
+	"2.3",
+	"3.0",
+	"3.1",
+	"3.2",
+	"3.3",
+	"4.0",
+	"4.1",
+	"4.2",
+	"4.3",
+	"5.0",
+	"5.1",
+	"5.2",
+	"5.3",
+	"6.0",
+	"6.1",
+	"6.2",
+	"6.3",
+	"7.0",
+	"7.1",
+	"7.2",
+	"7.3",
+	NULL,
+};
+
+static const char * const av1_tier[] = {
+	"Main",
+	"High",
+	NULL,
+};
+
 static u32 msm_vidc_get_port_info(struct msm_vidc_inst *inst,
 	enum msm_vidc_inst_capability_type cap_id)
 {
@@ -165,6 +206,12 @@ static const char * const * msm_vidc_get_qmenu_type(
 		return mpeg_video_avc_coding_layer;
 	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
 		return mpeg_video_hevc_profile;
+	case V4L2_CID_MPEG_VIDEO_AV1_PROFILE:
+		return av1_profile;
+	case V4L2_CID_MPEG_VIDEO_AV1_LEVEL:
+		return av1_level;
+	case V4L2_CID_MPEG_VIDEO_AV1_TIER:
+		return av1_tier;
 	default:
 		i_vpr_e(inst, "%s: No available qmenu for ctrl %#x\n",
 			__func__, control_id);

@@ -26,7 +26,8 @@
 #define V4L2_META_FMT_VIDC                      v4l2_fourcc('Q', 'M', 'E', 'T')
 /* HEIC encoder and decoder */
 #define V4L2_PIX_FMT_HEIC                       v4l2_fourcc('H', 'E', 'I', 'C')
-
+/* AV1 */
+#define V4L2_PIX_FMT_AV1                        v4l2_fourcc('A', 'V', '1', '0')
 /* start of vidc specific colorspace definitions */
 #define V4L2_COLORSPACE_VIDC_GENERIC_FILM    101
 #define V4L2_COLORSPACE_VIDC_EG431           102
@@ -143,6 +144,47 @@ enum v4l2_mpeg_vidc_blur_types {
 /* Decoder Max Number of Reorder Frames */
 #define V4L2_CID_MPEG_VIDC_METADATA_MAX_NUM_REORDER_FRAMES                   \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x30)
+/* Control IDs for AV1 */
+#define V4L2_CID_MPEG_VIDEO_AV1_PROFILE        (V4L2_CID_MPEG_VIDC_BASE + 0x31)
+enum v4l2_mpeg_video_av1_profile {
+	V4L2_MPEG_VIDEO_AV1_PROFILE_MAIN            = 0,
+	V4L2_MPEG_VIDEO_AV1_PROFILE_HIGH            = 1,
+	V4L2_MPEG_VIDEO_AV1_PROFILE_PROFESSIONAL    = 2,
+};
+
+#define V4L2_CID_MPEG_VIDEO_AV1_LEVEL           (V4L2_CID_MPEG_VIDC_BASE + 0x32)
+enum v4l2_mpeg_video_av1_level {
+	V4L2_MPEG_VIDEO_AV1_LEVEL_2_0  = 0,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_2_1  = 1,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_2_2  = 2,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_2_3  = 3,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_3_0  = 4,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_3_1  = 5,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_3_2  = 6,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_3_3  = 7,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_4_0  = 8,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_4_1  = 9,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_4_2  = 10,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_4_3  = 11,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_5_0  = 12,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_5_1  = 13,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_5_2  = 14,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_5_3  = 15,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_6_0  = 16,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_6_1  = 17,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_6_2  = 18,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_6_3  = 19,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_7_0  = 20,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_7_1  = 21,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_7_2  = 22,
+	V4L2_MPEG_VIDEO_AV1_LEVEL_7_3  = 23,
+};
+
+#define V4L2_CID_MPEG_VIDEO_AV1_TIER        (V4L2_CID_MPEG_VIDC_BASE + 0x33)
+enum v4l2_mpeg_video_av1_tier {
+	V4L2_MPEG_VIDEO_AV1_TIER_MAIN  = 0,
+	V4L2_MPEG_VIDEO_AV1_TIER_HIGH  = 1,
+};
 
 /* Deprecate below controls once availble in gki and gsi bionic header */
 #ifndef V4L2_CID_MPEG_VIDEO_BASELAYER_PRIORITY_ID
