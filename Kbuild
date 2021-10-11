@@ -9,6 +9,9 @@ endif
 ifeq ($(CONFIG_ARCH_WAIPIO), y)
 	include $(KGSL_PATH)/config/gki_waipiodisp.conf
 endif
+ifeq ($(CONFIG_ARCH_KALAMA), y)
+	include $(KGSL_PATH)/config/gki_waipiodisp.conf
+endif
 
 ccflags-y += -I$(KGSL_PATH) -I$(KGSL_PATH)/include/linux -I$(KGSL_PATH)/include -I$(KERN_SRC)/drivers/devfreq
 

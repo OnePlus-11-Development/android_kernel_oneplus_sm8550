@@ -1,9 +1,14 @@
-# Test dlkm
-DLKM_DIR   := device/qcom/common/dlkm
+ifneq ($(TARGET_USES_QMAA),true)
 KGSL_SELECT := CONFIG_QCOM_KGSL=m
-KERN_SRC := $(ANDROID_TOP)/kernel_platform/msm-kernel
 
 LOCAL_PATH := $(call my-dir)
+include $(CLEAR_VARS)
+
+# This makefile is only for DLKM
+ifneq ($(findstring vendor,$(LOCAL_PATH)),)
+
+DLKM_DIR   := device/qcom/common/dlkm
+KERN_SRC := $(ANDROID_TOP)/kernel_platform/msm-kernel
 
 KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 KBUILD_OPTIONS += $(KGSL_SELECT)
@@ -27,3 +32,5 @@ LOCAL_MODULE_PATH := $(KERNEL_MODULES_OUT)
 BOARD_VENDOR_KERNEL_MODULES += $(LOCAL_MODULE_PATH)/$(LOCAL_MODULE)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 
+endif # DLKM check
+endif # QMAA check
