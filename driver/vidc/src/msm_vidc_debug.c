@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  */
-
+#define CREATE_TRACE_POINTS
 #include "msm_vidc_debug.h"
 #include "msm_vidc_driver.h"
 #include "msm_vidc_dt.h"
@@ -10,6 +10,7 @@
 #include "msm_vidc_core.h"
 #include "msm_vidc_inst.h"
 #include "msm_vidc_internal.h"
+#include "msm_vidc_events.h"
 
 extern struct msm_vidc_core *g_core;
 
@@ -84,6 +85,8 @@ bool msm_vidc_syscache_disable = !true;
 EXPORT_SYMBOL(msm_vidc_syscache_disable);
 
 int msm_vidc_clock_voting = !1;
+int msm_vidc_ddr_bw = !1;
+int msm_vidc_llc_bw = !1;
 
 bool msm_vidc_fw_dump = !true;
 EXPORT_SYMBOL(msm_vidc_fw_dump);
@@ -124,6 +127,11 @@ void msm_vidc_show_stats(void *inst)
 {
 	int x;
 	struct msm_vidc_inst *i = (struct msm_vidc_inst *) inst;
+
+	if (!i) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return;
+	}
 
 	for (x = 0; x < MAX_PROFILING_POINTS; x++) {
 		if (i->debug.pdata[x].name[0]) {
@@ -300,6 +308,10 @@ struct dentry* msm_vidc_debugfs_init_drv()
 
 	debugfs_create_u32("core_clock_voting", 0644, dir,
 			&msm_vidc_clock_voting);
+	debugfs_create_u32("ddr_bw_kbps", 0644, dir,
+			&msm_vidc_ddr_bw);
+	debugfs_create_u32("llc_bw_kbps", 0644, dir,
+			&msm_vidc_llc_bw);
 	debugfs_create_bool("disable_video_syscache", 0644, dir,
 			&msm_vidc_syscache_disable);
 	debugfs_create_bool("lossless_encoding", 0644, dir,

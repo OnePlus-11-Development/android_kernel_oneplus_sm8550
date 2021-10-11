@@ -22,6 +22,8 @@
 #include "venus_hfi.h"
 #include "venus_hfi_response.h"
 #include "hfi_packet.h"
+#include "msm_vidc_events.h"
+
 extern struct msm_vidc_core *g_core;
 
 #define is_odd(val) ((val) % 2 == 1)
@@ -371,7 +373,7 @@ void print_vidc_buffer(u32 tag, const char *tag_str, const char *str, struct msm
 {
 	struct dma_buf *dbuf;
 
-	if (!(tag & msm_vidc_debug) || !inst || !vbuf || !tag_str || !str)
+	if (!inst || !vbuf || !tag_str || !str)
 		return;
 
 	dbuf = (struct dma_buf *)vbuf->dmabuf;
@@ -384,6 +386,11 @@ void print_vidc_buffer(u32 tag, const char *tag_str, const char *str, struct msm
 		(dbuf ? file_count(dbuf->file) : -1), vbuf->buffer_size, vbuf->data_size,
 		vbuf->flags, vbuf->timestamp, vbuf->attr, inst->debug_count.etb,
 		inst->debug_count.ebd, inst->debug_count.ftb, inst->debug_count.fbd);
+
+	trace_msm_v4l2_vidc_buffer_event_log(inst, str, buf_name(vbuf->type), vbuf,
+		(dbuf ? file_inode(dbuf->file)->i_ino : -1), (dbuf ? file_count(dbuf->file) : -1));
+
+
 }
 
 void print_vb2_buffer(const char *str, struct msm_vidc_inst *inst,
@@ -1193,6 +1200,9 @@ int msm_vidc_change_inst_state(struct msm_vidc_inst *inst,
 	else
 		i_vpr_h(inst, "%s: state changed to %s from %s\n",
 		   func, state_name(request_state), state_name(inst->state));
+
+	trace_msm_vidc_common_state_change(inst, func, state_name(inst->state),
+			state_name(request_state));
 
 	inst->state = request_state;
 
@@ -2209,7 +2219,7 @@ static int msm_vidc_insert_sort(struct list_head *head,
 		prev = node;
 	}
 
-	if (!is_inserted)
+	if (!is_inserted && prev)
 		list_add(&entry->list, &prev->list);
 
 	return 0;
@@ -2619,6 +2629,7 @@ void msm_vidc_allow_dcvs(struct msm_vidc_inst *inst)
 {
 	bool allow = false;
 	struct msm_vidc_core *core;
+	u32 fps;
 
 	if (!inst || !inst->core) {
 		d_vpr_e("%s: Invalid args: %pK\n", __func__, inst);
@@ -2671,6 +2682,13 @@ void msm_vidc_allow_dcvs(struct msm_vidc_inst *inst)
 	allow = !is_lowlatency_session(inst);
 	if (!allow) {
 		i_vpr_h(inst, "%s: lowlatency session\n", __func__);
+		goto exit;
+	}
+
+	fps =  msm_vidc_get_fps(inst);
+	if (is_decode_session(inst) && fps >= MAXIMUM_FPS) {
+		allow = false;
+		i_vpr_h(inst, "%s: unsupported fps %d\n", __func__, fps);
 		goto exit;
 	}
 
