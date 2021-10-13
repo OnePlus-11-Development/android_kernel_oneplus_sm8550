@@ -6351,11 +6351,11 @@ static int dsi_host_ext_attach(struct mipi_dsi_host *host,
 					DSI_VIDEO_TRAFFIC_SYNC_START_EVENTS;
 
 		panel->video_config.hsa_lp11_en =
-			dsi->mode_flags & MIPI_DSI_MODE_VIDEO_HSA;
+			dsi->mode_flags & MIPI_DSI_MODE_VIDEO_NO_HSA;
 		panel->video_config.hbp_lp11_en =
-			dsi->mode_flags & MIPI_DSI_MODE_VIDEO_HBP;
+			dsi->mode_flags & MIPI_DSI_MODE_VIDEO_NO_HBP;
 		panel->video_config.hfp_lp11_en =
-			dsi->mode_flags & MIPI_DSI_MODE_VIDEO_HFP;
+			dsi->mode_flags & MIPI_DSI_MODE_VIDEO_NO_HFP;
 		panel->video_config.pulse_mode_hsa_he =
 			dsi->mode_flags & MIPI_DSI_MODE_VIDEO_HSE;
 	} else {
