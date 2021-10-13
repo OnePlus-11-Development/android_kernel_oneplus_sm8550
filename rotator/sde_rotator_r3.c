@@ -1212,6 +1212,8 @@ static struct sde_hw_rotator_context *sde_hw_rotator_get_ctx(
 static void sde_hw_rotator_map_vaddr(struct sde_dbg_buf *dbgbuf,
 		struct sde_layer_buffer *buf, struct sde_mdp_data *data)
 {
+	struct dma_buf_map map;
+
 	dbgbuf->dmabuf = data->p[0].srcp_dma_buf;
 	dbgbuf->buflen = data->p[0].srcp_dma_buf->size;
 
@@ -1221,7 +1223,8 @@ static void sde_hw_rotator_map_vaddr(struct sde_dbg_buf *dbgbuf,
 
 	if (dbgbuf->dmabuf && (dbgbuf->buflen > 0)) {
 		dma_buf_begin_cpu_access(dbgbuf->dmabuf, DMA_FROM_DEVICE);
-		dbgbuf->vaddr = dma_buf_vmap(dbgbuf->dmabuf);
+		dma_buf_vmap(dbgbuf->dmabuf, &map);
+		dbgbuf->vaddr = map.vaddr;
 		SDEROT_DBG("vaddr mapping: 0x%pK/%ld w:%d/h:%d\n",
 				dbgbuf->vaddr, dbgbuf->buflen,
 				dbgbuf->width, dbgbuf->height);

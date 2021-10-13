@@ -37,12 +37,13 @@ struct sg_table *msm_gem_prime_get_sg_table(struct drm_gem_object *obj)
 	return drm_prime_pages_to_sg(obj->dev, msm_obj->pages, npages);
 }
 
-void *msm_gem_prime_vmap(struct drm_gem_object *obj)
+int msm_gem_prime_vmap(struct drm_gem_object *obj, struct dma_buf_map *map)
 {
-	return msm_gem_get_vaddr(obj);
+	map->vaddr = msm_gem_get_vaddr(obj);
+	return IS_ERR_OR_NULL(map->vaddr);
 }
 
-void msm_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr)
+void msm_gem_prime_vunmap(struct drm_gem_object *obj, struct dma_buf_map *map)
 {
 	msm_gem_put_vaddr(obj);
 }
