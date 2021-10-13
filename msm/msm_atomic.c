@@ -419,7 +419,7 @@ static void msm_atomic_helper_commit_modeset_enables(struct drm_device *dev,
 					 crtc->base.id);
 
 			if (funcs->atomic_enable)
-				funcs->atomic_enable(crtc, old_crtc_state);
+				funcs->atomic_enable(crtc, old_state);
 			else
 				funcs->commit(crtc);
 		}

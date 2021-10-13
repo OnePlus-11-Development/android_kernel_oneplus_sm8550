@@ -3534,7 +3534,7 @@ static void _sde_crtc_clear_all_blend_stages(struct sde_crtc *sde_crtc)
 }
 
 static void sde_crtc_atomic_begin(struct drm_crtc *crtc,
-		struct drm_crtc_state *old_state)
+		struct drm_atomic_state *state)
 {
 	struct sde_crtc *sde_crtc;
 	struct drm_encoder *encoder;
@@ -3543,6 +3543,7 @@ static void sde_crtc_atomic_begin(struct drm_crtc *crtc,
 	struct sde_splash_display *splash_display;
 	bool cont_splash_enabled = false;
 	size_t i;
+	struct drm_crtc_state *old_state = drm_atomic_get_new_crtc_state(state, crtc);
 
 	if (!crtc) {
 		SDE_ERROR("invalid crtc\n");
@@ -3636,7 +3637,7 @@ end:
 }
 
 static void sde_crtc_atomic_flush(struct drm_crtc *crtc,
-		struct drm_crtc_state *old_crtc_state)
+		struct drm_atomic_state *state)
 {
 	struct drm_encoder *encoder;
 	struct sde_crtc *sde_crtc;
@@ -4602,7 +4603,7 @@ static void sde_crtc_disable(struct drm_crtc *crtc)
 }
 
 static void sde_crtc_enable(struct drm_crtc *crtc,
-		struct drm_crtc_state *old_crtc_state)
+		struct drm_atomic_state *old_state)
 {
 	struct sde_crtc *sde_crtc;
 	struct drm_encoder *encoder;
@@ -5348,7 +5349,7 @@ static int _sde_crtc_check_plane_layout(struct drm_crtc *crtc,
 }
 
 static int sde_crtc_atomic_check(struct drm_crtc *crtc,
-		struct drm_crtc_state *state)
+		struct drm_atomic_state *atomic_state)
 {
 	struct drm_device *dev;
 	struct sde_crtc *sde_crtc;
@@ -5359,6 +5360,7 @@ static int sde_crtc_atomic_check(struct drm_crtc *crtc,
 	struct sde_multirect_plane_states *multirect_plane = NULL;
 	struct drm_connector *conn;
 	struct drm_connector_list_iter conn_iter;
+	struct drm_crtc_state *state = drm_atomic_get_new_crtc_state(atomic_state, crtc);
 
 	if (!crtc) {
 		SDE_ERROR("invalid crtc\n");

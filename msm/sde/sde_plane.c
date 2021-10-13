@@ -2704,11 +2704,12 @@ modeset_update:
 }
 
 static int sde_plane_atomic_check(struct drm_plane *plane,
-		struct drm_plane_state *state)
+		struct drm_atomic_state *atomic_state)
 {
 	int ret = 0;
 	struct sde_plane *psde;
 	struct sde_plane_state *pstate;
+	struct drm_plane_state *state = drm_atomic_get_new_plane_state(atomic_state, plane);
 
 	if (!plane || !state) {
 		SDE_ERROR("invalid arg(s), plane %d state %d\n",
@@ -3392,7 +3393,7 @@ static void _sde_plane_atomic_disable(struct drm_plane *plane,
 				multirect_index, SDE_SSPP_MULTIRECT_TIME_MX);
 }
 
-static void sde_plane_atomic_update(struct drm_plane *plane,
+static void _sde_plane_atomic_update(struct drm_plane *plane,
 				struct drm_plane_state *old_state)
 {
 	struct sde_plane *psde;
@@ -3423,6 +3424,14 @@ static void sde_plane_atomic_update(struct drm_plane *plane,
 	}
 }
 
+static void sde_plane_atomic_update(struct drm_plane *plane,
+				struct drm_atomic_state *atomic_state)
+{
+	struct drm_plane_state *old_state = drm_atomic_get_old_plane_state(atomic_state, plane);
+
+	_sde_plane_atomic_update(plane, old_state);
+}
+
 void sde_plane_restore(struct drm_plane *plane)
 {
 	struct sde_plane *psde;
@@ -3444,7 +3453,7 @@ void sde_plane_restore(struct drm_plane *plane)
 	SDE_DEBUG_PLANE(psde, "\n");
 
 	/* last plane state is same as current state */
-	sde_plane_atomic_update(plane, plane->state);
+	_sde_plane_atomic_update(plane, plane->state);
 }
 
 bool sde_plane_is_cache_required(struct drm_plane *plane,
