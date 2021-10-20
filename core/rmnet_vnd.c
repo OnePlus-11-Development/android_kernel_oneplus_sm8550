@@ -23,6 +23,7 @@
 #include <linux/inet.h>
 #include <linux/icmp.h>
 #include <linux/icmpv6.h>
+#include <linux/ethtool.h>
 #include <net/pkt_sched.h>
 #include <net/ipv6.h>
 #include "rmnet_config.h"

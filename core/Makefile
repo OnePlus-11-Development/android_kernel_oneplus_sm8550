@@ -28,7 +28,7 @@ rmnet_core-y += 	rmnet_config.o \
 			rmnet_qmap.o \
 			rmnet_ll_qmap.o
 
-ifneq (, $(filter y, $(CONFIG_ARCH_LAHAINA) $(CONFIG_ARCH_WAIPIO)))
+ifneq (, $(filter y, $(CONFIG_ARCH_LAHAINA) $(CONFIG_ARCH_WAIPIO) $(CONFIG_ARCH_KALAMA)))
 rmnet_ctl-y += 		rmnet_ctl_client.o \
 			rmnet_ctl_ipa.o \
 			rmnet_ctl_mhi.o
