@@ -1873,7 +1873,7 @@ int dp_mst_init(struct dp_display *dp_display)
 					dp_mst.caps.drm_aux,
 					dp_mst.caps.max_dpcd_transaction_bytes,
 					dp_mst.caps.max_streams_supported,
-					conn_base_id);
+					4, DP_LINK_BW_8_1, conn_base_id);
 	if (ret) {
 		DP_ERR("dp drm mst topology manager init failed\n");
 		goto error;

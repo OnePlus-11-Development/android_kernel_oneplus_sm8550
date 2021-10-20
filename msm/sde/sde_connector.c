@@ -2620,10 +2620,12 @@ sde_connector_best_encoder(struct drm_connector *connector)
 
 static struct drm_encoder *
 sde_connector_atomic_best_encoder(struct drm_connector *connector,
-		struct drm_connector_state *connector_state)
+		struct drm_atomic_state *state)
 {
 	struct sde_connector *c_conn;
 	struct drm_encoder *encoder = NULL;
+	struct drm_connector_state *connector_state =
+			drm_atomic_get_new_connector_state(state, connector);
 
 	if (!connector) {
 		SDE_ERROR("invalid connector\n");

@@ -419,7 +419,7 @@ static void msm_atomic_helper_commit_modeset_enables(struct drm_device *dev,
 					 crtc->base.id);
 
 			if (funcs->atomic_enable)
-				funcs->atomic_enable(crtc, old_crtc_state);
+				funcs->atomic_enable(crtc, old_state);
 			else
 				funcs->commit(crtc);
 		}
@@ -532,7 +532,7 @@ int msm_atomic_prepare_fb(struct drm_plane *plane,
 
 	obj = msm_framebuffer_bo(new_state->fb, 0);
 	msm_obj = to_msm_bo(obj);
-	fence = dma_resv_get_excl_rcu(msm_obj->resv);
+	fence = dma_resv_get_excl_unlocked(msm_obj->resv);
 
 	drm_atomic_set_fence_for_plane(new_state, fence);
 
@@ -740,7 +740,7 @@ int msm_atomic_commit(struct drm_device *dev,
 				msm_framebuffer_bo(new_plane_state->fb, 0);
 			struct msm_gem_object *msm_obj = to_msm_bo(obj);
 			struct dma_fence *fence =
-				dma_resv_get_excl_rcu(msm_obj->resv);
+				dma_resv_get_excl_unlocked(msm_obj->resv);
 
 			drm_atomic_set_fence_for_plane(new_plane_state, fence);
 		}

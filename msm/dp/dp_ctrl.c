@@ -372,7 +372,7 @@ static int dp_ctrl_link_training_1(struct dp_ctrl_private *ctrl)
 		if (ret)
 			break;
 
-		drm_dp_link_train_clock_recovery_delay(ctrl->panel->dpcd);
+		drm_dp_link_train_clock_recovery_delay(ctrl->aux->drm_aux, ctrl->panel->dpcd);
 
 		ret = dp_ctrl_read_link_status(ctrl, link_status);
 		if (ret)
@@ -457,7 +457,7 @@ static int dp_ctrl_link_rate_down_shift(struct dp_ctrl_private *ctrl)
 static void dp_ctrl_clear_training_pattern(struct dp_ctrl_private *ctrl)
 {
 	dp_ctrl_update_sink_pattern(ctrl, 0);
-	drm_dp_link_train_channel_eq_delay(ctrl->panel->dpcd);
+	drm_dp_link_train_channel_eq_delay(ctrl->aux->drm_aux, ctrl->panel->dpcd);
 }
 
 static int dp_ctrl_link_training_2(struct dp_ctrl_private *ctrl)
@@ -503,7 +503,7 @@ static int dp_ctrl_link_training_2(struct dp_ctrl_private *ctrl)
 		if (ret)
 			break;
 
-		drm_dp_link_train_channel_eq_delay(ctrl->panel->dpcd);
+		drm_dp_link_train_channel_eq_delay(ctrl->aux->drm_aux, ctrl->panel->dpcd);
 
 		ret = dp_ctrl_read_link_status(ctrl, link_status);
 		if (ret)

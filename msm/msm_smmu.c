@@ -129,8 +129,7 @@ static void msm_smmu_detach(struct msm_mmu *mmu, const char * const *names,
 	dev_dbg(client->dev, "iommu domain detached\n");
 }
 
-static int msm_smmu_set_attribute(struct msm_mmu *mmu,
-		enum iommu_attr attr, void *data)
+static int msm_enable_smmu_translations(struct msm_mmu *mmu)
 {
 	struct msm_smmu *smmu = to_msm_smmu(mmu);
 	struct msm_smmu_client *client = msm_smmu_to_client(smmu);
@@ -139,9 +138,9 @@ static int msm_smmu_set_attribute(struct msm_mmu *mmu,
 	if (!client || !client->domain)
 		return -ENODEV;
 
-	ret = iommu_domain_set_attr(client->domain, attr, data);
+	ret = qcom_iommu_enable_s1_translation(client->domain);
 	if (ret)
-		DRM_ERROR("set domain attribute failed:%d\n", ret);
+		DRM_ERROR("enable iommu s1 translations failed:%d\n", ret);
 
 	return ret;
 }
@@ -307,7 +306,7 @@ static const struct msm_mmu_funcs funcs = {
 	.unmap_dma_buf = msm_smmu_unmap_dma_buf,
 	.destroy = msm_smmu_destroy,
 	.is_domain_secure = msm_smmu_is_domain_secure,
-	.set_attribute = msm_smmu_set_attribute,
+	.enable_smmu_translations = msm_enable_smmu_translations,
 	.one_to_one_map = msm_smmu_one_to_one_map,
 	.one_to_one_unmap = msm_smmu_one_to_one_unmap,
 	.get_dev = msm_smmu_get_dev,

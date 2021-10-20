@@ -747,13 +747,6 @@ error:
 	return rc;
 }
 
-static void dsi_panel_pwm_unregister(struct dsi_panel *panel)
-{
-	struct dsi_backlight_config *bl = &panel->bl_config;
-
-	devm_pwm_put(panel->parent, bl->pwm_bl);
-}
-
 static int dsi_panel_bl_unregister(struct dsi_panel *panel)
 {
 	int rc = 0;
@@ -770,7 +763,6 @@ static int dsi_panel_bl_unregister(struct dsi_panel *panel)
 	case DSI_BACKLIGHT_EXTERNAL:
 		break;
 	case DSI_BACKLIGHT_PWM:
-		dsi_panel_pwm_unregister(panel);
 		break;
 	default:
 		DSI_ERR("Backlight type(%d) not supported\n", bl->type);

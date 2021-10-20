@@ -45,7 +45,7 @@ int dsi_parser_count_strings(const struct device_node *np,
 int dsi_parser_read_string_index(const struct device_node *np,
 				const char *propname,
 				int index, const char **output);
-int dsi_parser_get_named_gpio(struct device_node *np,
+int dsi_parser_get_named_gpio(const struct device_node *np,
 				const char *propname, int index);
 #else /* CONFIG_DSI_PARSER */
 static inline void *dsi_parser_get(struct device *dev)
@@ -155,7 +155,7 @@ static inline int dsi_parser_read_string_index(const struct device_node *np,
 	return -ENODEV;
 }
 
-static inline int dsi_parser_get_named_gpio(struct device_node *np,
+static inline int dsi_parser_get_named_gpio(const struct device_node *np,
 				const char *propname, int index)
 {
 	return -ENODEV;
@@ -201,7 +201,7 @@ struct dsi_parser_utils {
 		const char *propname);
 	int (*count_strings)(const struct device_node *np,
 					const char *propname);
-	int (*get_named_gpio)(struct device_node *np,
+	int (*get_named_gpio)(const struct device_node *np,
 				const char *propname, int index);
 	int (*get_available_child_count)(const struct device_node *np);
 };

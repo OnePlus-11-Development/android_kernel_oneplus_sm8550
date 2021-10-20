@@ -19,7 +19,6 @@
 #include <linux/module.h>
 
 #include <soc/qcom/rpmh.h>
-#include <drm/drm_irq.h>
 #include "msm_drv.h"
 #include "sde_rsc_priv.h"
 #include "sde_dbg.h"

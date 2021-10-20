@@ -897,7 +897,7 @@ end:
 	return -EINVAL;
 }
 
-int dsi_parser_get_named_gpio(struct device_node *np,
+int dsi_parser_get_named_gpio(const struct device_node *np,
 				const char *propname, int index)
 {
 	int gpio = -EINVAL;

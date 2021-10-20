@@ -764,11 +764,6 @@ static int _sde_kms_release_shared_buffer(unsigned int mem_addr,
 	pfn_start = mem_addr >> PAGE_SHIFT;
 	pfn_end = (mem_addr + splash_buffer_size) >> PAGE_SHIFT;
 
-	ret = memblock_free(mem_addr, splash_buffer_size);
-	if (ret) {
-		SDE_ERROR("continuous splash memory free failed:%d\n", ret);
-		return ret;
-	}
 	for (pfn_idx = pfn_start; pfn_idx < pfn_end; pfn_idx++)
 		free_reserved_page(pfn_to_page(pfn_idx));
 
@@ -4063,7 +4058,6 @@ static int _sde_kms_mmu_init(struct sde_kms *sde_kms)
 {
 	struct msm_mmu *mmu;
 	int i, ret;
-	int early_map = 0;
 
 	if (!sde_kms || !sde_kms->dev || !sde_kms->dev->dev)
 		return -EINVAL;
@@ -4096,7 +4090,7 @@ static int _sde_kms_mmu_init(struct sde_kms *sde_kms)
 			ret = _sde_kms_map_all_splash_regions(sde_kms);
 			if (ret) {
 				SDE_ERROR("failed to map ret:%d\n", ret);
-				goto early_map_fail;
+				goto enable_trans_fail;
 			}
 		}
 
@@ -4104,12 +4098,10 @@ static int _sde_kms_mmu_init(struct sde_kms *sde_kms)
 		 * disable early-map which would have been enabled during
 		 * bootup by smmu through the device-tree hint for cont-spash
 		 */
-		ret = mmu->funcs->set_attribute(mmu, DOMAIN_ATTR_EARLY_MAP,
-				 &early_map);
+		ret = mmu->funcs->enable_smmu_translations(mmu);
 		if (ret) {
-			SDE_ERROR("failed to set_att ret:%d, early_map:%d\n",
-					ret, early_map);
-			goto early_map_fail;
+			SDE_ERROR("failed to enable_s1_translations ret:%d\n", ret);
+			goto enable_trans_fail;
 		}
 	}
 
@@ -4117,7 +4109,7 @@ static int _sde_kms_mmu_init(struct sde_kms *sde_kms)
 
 	return 0;
 
-early_map_fail:
+enable_trans_fail:
 	_sde_kms_unmap_all_splash_regions(sde_kms);
 fail:
 	_sde_kms_mmu_destroy(sde_kms);
