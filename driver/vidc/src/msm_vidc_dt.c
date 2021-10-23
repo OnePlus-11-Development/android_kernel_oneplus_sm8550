@@ -823,7 +823,14 @@ static int msm_vidc_setup_context_bank(struct msm_vidc_core *core,
 	 * When memory is fragmented, below configuration increases the
 	 * possibility to get a mapping for buffer in the configured CB.
 	 */
-	iommu_dma_enable_best_fit_algo(cb->dev);
+
+	/*
+	 * TBD: iommu_dma_enable_best_fit_algo is commented temoprarily to enable dlkm
+	 * compilation once headers are availbale when the GKI branch for Kailua (android13-5.next)
+	 * branches out
+	 */
+
+	/*iommu_dma_enable_best_fit_algo(cb->dev);*/
 
 	/*
 	 * configure device segment size and segment boundary to ensure

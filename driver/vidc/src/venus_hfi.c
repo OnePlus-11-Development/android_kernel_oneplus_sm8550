@@ -9,7 +9,6 @@
 #include <linux/irqreturn.h>
 #include <linux/reset.h>
 #include <linux/interconnect.h>
-#include <soc/qcom/subsystem_restart.h>
 #include <linux/of_address.h>
 #include <linux/firmware.h>
 #include <linux/qcom_scm.h>

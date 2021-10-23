@@ -97,9 +97,15 @@
 #define NUM_MBS_PER_FRAME(__height, __width) \
 	((ALIGN(__height, 16) / 16) * (ALIGN(__width, 16) / 16))
 
+#ifdef V4L2_CTRL_CLASS_CODEC
+#define IS_PRIV_CTRL(idx) ( \
+	(V4L2_CTRL_ID2WHICH(idx) == V4L2_CTRL_CLASS_CODEC) && \
+	V4L2_CTRL_DRIVER_PRIV(idx))
+#else
 #define IS_PRIV_CTRL(idx) ( \
 	(V4L2_CTRL_ID2WHICH(idx) == V4L2_CTRL_CLASS_MPEG) && \
 	V4L2_CTRL_DRIVER_PRIV(idx))
+#endif
 
 #define BUFFER_ALIGNMENT_SIZE(x) x
 #define NUM_MBS_720P (((1280 + 15) >> 4) * ((720 + 15) >> 4))

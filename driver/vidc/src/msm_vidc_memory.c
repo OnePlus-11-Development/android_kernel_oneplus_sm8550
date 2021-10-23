@@ -377,8 +377,8 @@ int msm_vidc_memory_alloc(struct msm_vidc_core *core, struct msm_vidc_alloc *mem
 
 	if (mem->map_kernel) {
 		dma_buf_begin_cpu_access(mem->dmabuf, DMA_BIDIRECTIONAL);
-		mem->kvaddr = dma_buf_vmap(mem->dmabuf);
-		if (!mem->kvaddr) {
+		rc = dma_buf_vmap(mem->dmabuf, mem->kvaddr);
+		if (rc) {
 			d_vpr_e("%s: kernel map failed\n", __func__);
 			rc = -EIO;
 			goto error;
