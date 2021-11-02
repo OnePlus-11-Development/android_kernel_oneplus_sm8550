@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -223,12 +224,16 @@ enum sde_dspp {
 enum sde_ltm {
 	LTM_0 = DSPP_0,
 	LTM_1,
+	LTM_2,
+	LTM_3,
 	LTM_MAX
 };
 
 enum sde_rc {
 	RC_0 = DSPP_0,
 	RC_1,
+	RC_2,
+	RC_3,
 	RC_MAX
 };
 
