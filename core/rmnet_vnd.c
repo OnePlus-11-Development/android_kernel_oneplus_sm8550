@@ -1,5 +1,5 @@
 /* Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -39,9 +39,12 @@
 #include "rmnet_trace.h"
 
 typedef void (*rmnet_perf_tether_egress_hook_t)(struct sk_buff *skb);
-
 rmnet_perf_tether_egress_hook_t rmnet_perf_tether_egress_hook __rcu __read_mostly;
 EXPORT_SYMBOL(rmnet_perf_tether_egress_hook);
+
+typedef void (*rmnet_perf_egress_hook1_t)(struct sk_buff *skb);
+rmnet_perf_egress_hook1_t rmnet_perf_egress_hook1 __rcu __read_mostly;
+EXPORT_SYMBOL(rmnet_perf_egress_hook1);
 
 /* RX/TX Fixup */
 
@@ -262,6 +265,12 @@ static u16 rmnet_vnd_select_queue(struct net_device *dev,
 	u64 boost_period = 0;
 	int boost_trigger = 0;
 	int txq = 0;
+	rmnet_perf_egress_hook1_t rmnet_perf_egress1;
+
+	rmnet_perf_egress1 = rcu_dereference(rmnet_perf_egress_hook1);
+	if (rmnet_perf_egress1) {
+		rmnet_perf_egress1(skb);
+	}
 
 	if (trace_print_icmp_tx_enabled()) {
 		char saddr[INET6_ADDRSTRLEN], daddr[INET6_ADDRSTRLEN];
