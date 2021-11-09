@@ -924,11 +924,21 @@ static const struct drm_gem_object_funcs msm_gem_object_funcs = {
 };
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 static int msm_gem_new_impl(struct drm_device *dev,
 		uint32_t size, uint32_t flags,
 		struct dma_resv *resv,
 		struct drm_gem_object **obj)
 {
+#else
+static int msm_gem_new_impl(struct drm_device *dev,
+		uint32_t size, uint32_t flags,
+		struct dma_resv *resv,
+		struct drm_gem_object **obj,
+		bool struct_mutex_locked)
+{
+	struct msm_drm_private *priv = dev->dev_private;
+#endif
 	struct msm_gem_object *msm_obj;
 
 	switch (flags & MSM_BO_CACHE_MASK) {
@@ -968,6 +978,12 @@ static int msm_gem_new_impl(struct drm_device *dev,
 	msm_obj->in_active_list = false;
 	msm_obj->obj_dirty = false;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
+	mutex_lock(&priv->mm_lock);
+	list_add_tail(&msm_obj->mm_list, &priv->inactive_list);
+	mutex_unlock(&priv->mm_lock);
+#endif
+
 	*obj = &msm_obj->base;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	(*obj)->funcs = &msm_gem_object_funcs;
@@ -976,7 +992,12 @@ static int msm_gem_new_impl(struct drm_device *dev,
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 struct drm_gem_object *msm_gem_new(struct drm_device *dev, uint32_t size, uint32_t flags)
+#else
+static struct drm_gem_object *_msm_gem_new(struct drm_device *dev,
+		uint32_t size, uint32_t flags, bool struct_mutex_locked)
+#endif
 {
 	struct msm_drm_private *priv = dev->dev_private;
 	struct msm_gem_object *msm_obj;
@@ -1000,7 +1021,11 @@ struct drm_gem_object *msm_gem_new(struct drm_device *dev, uint32_t size, uint32
 	if (size == 0)
 		return ERR_PTR(-EINVAL);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	ret = msm_gem_new_impl(dev, size, flags, NULL, &obj);
+#else
+	ret = msm_gem_new_impl(dev, size, flags, NULL, &obj, struct_mutex_locked);
+#endif
 	if (ret)
 		goto fail;
 
@@ -1036,9 +1061,11 @@ struct drm_gem_object *msm_gem_new(struct drm_device *dev, uint32_t size, uint32
 			goto fail;
 	}
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	mutex_lock(&dev->struct_mutex);
 	list_add_tail(&msm_obj->mm_list, &priv->inactive_list);
 	mutex_unlock(&dev->struct_mutex);
+#endif
 
 	return obj;
 
@@ -1046,6 +1073,20 @@ fail:
 	drm_gem_object_put(obj);
 	return ERR_PTR(ret);
 }
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
+struct drm_gem_object *msm_gem_new_locked(struct drm_device *dev,
+		uint32_t size, uint32_t flags)
+{
+	return _msm_gem_new(dev, size, flags, true);
+}
+
+struct drm_gem_object *msm_gem_new(struct drm_device *dev,
+		uint32_t size, uint32_t flags)
+{
+	return _msm_gem_new(dev, size, flags, false);
+}
+#endif
 
 int msm_gem_delayed_import(struct drm_gem_object *obj)
 {
@@ -1090,7 +1131,9 @@ fail_import:
 struct drm_gem_object *msm_gem_import(struct drm_device *dev,
 		struct dma_buf *dmabuf, struct sg_table *sgt)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	struct msm_drm_private *priv = dev->dev_private;
+#endif
 	struct msm_gem_object *msm_obj;
 	struct drm_gem_object *obj = NULL;
 	uint32_t size;
@@ -1099,7 +1142,11 @@ struct drm_gem_object *msm_gem_import(struct drm_device *dev,
 
 	size = PAGE_ALIGN(dmabuf->size);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	ret = msm_gem_new_impl(dev, size, MSM_BO_WC, dmabuf->resv, &obj);
+#else
+	ret = msm_gem_new_impl(dev, size, MSM_BO_WC, dmabuf->resv, &obj, false);
+#endif
 	if (ret)
 		goto fail;
 
@@ -1127,9 +1174,11 @@ struct drm_gem_object *msm_gem_import(struct drm_device *dev,
 
 	mutex_unlock(&msm_obj->lock);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	mutex_lock(&dev->struct_mutex);
 	list_add_tail(&msm_obj->mm_list, &priv->inactive_list);
 	mutex_unlock(&dev->struct_mutex);
+#endif
 
 	return obj;
 
@@ -1137,6 +1186,75 @@ fail:
 	drm_gem_object_put(obj);
 	return ERR_PTR(ret);
 }
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
+static void *_msm_gem_kernel_new(struct drm_device *dev, uint32_t size,
+		uint32_t flags, struct msm_gem_address_space *aspace,
+		struct drm_gem_object **bo, uint64_t *iova, bool locked)
+{
+	void *vaddr;
+	struct drm_gem_object *obj = _msm_gem_new(dev, size, flags, locked);
+	int ret;
+
+	if (IS_ERR(obj))
+		return ERR_CAST(obj);
+
+	if (iova) {
+		ret = msm_gem_get_iova(obj, aspace, iova);
+		if (ret)
+			goto err;
+	}
+
+	vaddr = msm_gem_get_vaddr(obj);
+	if (IS_ERR(vaddr)) {
+		msm_gem_put_iova(obj, aspace);
+		ret = PTR_ERR(vaddr);
+		goto err;
+	}
+
+	if (bo)
+		*bo = obj;
+
+	return vaddr;
+err:
+	if (locked)
+		drm_gem_object_put_locked(obj);
+	else
+		drm_gem_object_put(obj);
+
+	return ERR_PTR(ret);
+
+}
+
+void *msm_gem_kernel_new(struct drm_device *dev, uint32_t size,
+		uint32_t flags, struct msm_gem_address_space *aspace,
+		struct drm_gem_object **bo, uint64_t *iova)
+{
+	return _msm_gem_kernel_new(dev, size, flags, aspace, bo, iova, false);
+}
+
+void *msm_gem_kernel_new_locked(struct drm_device *dev, uint32_t size,
+		uint32_t flags, struct msm_gem_address_space *aspace,
+		struct drm_gem_object **bo, uint64_t *iova)
+{
+	return _msm_gem_kernel_new(dev, size, flags, aspace, bo, iova, true);
+}
+
+void msm_gem_kernel_put(struct drm_gem_object *bo,
+		struct msm_gem_address_space *aspace, bool locked)
+{
+	if (IS_ERR_OR_NULL(bo))
+		return;
+
+	msm_gem_put_vaddr(bo);
+	msm_gem_unpin_iova(bo, aspace);
+
+	if (locked)
+		drm_gem_object_put_locked(bo);
+	else
+		drm_gem_object_put(bo);
+}
+#endif
 
 void msm_gem_object_set_name(struct drm_gem_object *bo, const char *fmt, ...)
 {
