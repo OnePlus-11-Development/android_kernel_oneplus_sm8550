@@ -36,6 +36,7 @@
 #include <drm/drm_fixed.h>
 #include <drm/drm_connector.h>
 #include <drm/drm_dp_helper.h>
+#include <linux/version.h>
 
 #include "msm_drv.h"
 #include "msm_kms.h"
@@ -1869,11 +1870,19 @@ int dp_mst_init(struct dp_display *dp_display)
 	mutex_init(&dp_mst.mst_lock);
 	mutex_init(&dp_mst.edid_lock);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	ret = drm_dp_mst_topology_mgr_init(&dp_mst.mst_mgr, dev,
 					dp_mst.caps.drm_aux,
 					dp_mst.caps.max_dpcd_transaction_bytes,
 					dp_mst.caps.max_streams_supported,
 					4, DP_LINK_BW_8_1, conn_base_id);
+#else
+	ret = drm_dp_mst_topology_mgr_init(&dp_mst.mst_mgr, dev,
+					dp_mst.caps.drm_aux,
+					dp_mst.caps.max_dpcd_transaction_bytes,
+					dp_mst.caps.max_streams_supported,
+					conn_base_id);
+#endif
 	if (ret) {
 		DP_ERR("dp drm mst topology manager init failed\n");
 		goto error;
