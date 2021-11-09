@@ -47,6 +47,9 @@
 #include <drm/drm_auth.h>
 #include <drm/drm_probe_helper.h>
 #include <linux/version.h>
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
+#include <drm/drm_irq.h>
+#endif
 
 #include "msm_drv.h"
 #include "msm_gem.h"
@@ -377,6 +380,7 @@ static int msm_irq_postinstall(struct drm_device *dev)
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 static int msm_irq_install(struct drm_device *dev, unsigned int irq)
 {
 	int ret;
@@ -407,6 +411,21 @@ static void msm_irq_uninstall(struct drm_device *dev)
 	kms->funcs->irq_uninstall(kms);
 	free_irq(kms->irq, dev);
 }
+#else
+static void msm_irq_uninstall(struct drm_device *dev)
+{
+	struct msm_drm_private *priv = dev->dev_private;
+	struct msm_kms *kms = priv->kms;
+	BUG_ON(!kms);
+	kms->funcs->irq_uninstall(kms);
+}
+
+static const struct vm_operations_struct vm_ops = {
+	.fault = msm_gem_fault,
+	.open = drm_gem_vm_open,
+	.close = drm_gem_vm_close,
+};
+#endif
 
 int msm_get_src_bpc(int chroma_format,
 	int bpc)
@@ -475,7 +494,11 @@ static int msm_drm_uninit(struct device *dev)
 		msm_fbdev_free(ddev);
 #endif
 	drm_atomic_helper_shutdown(ddev);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	msm_irq_uninstall(ddev);
+#else
+	drm_irq_uninstall(ddev);
+#endif
 
 	if (kms && kms->funcs)
 		kms->funcs->destroy(kms);
@@ -924,7 +947,11 @@ static int msm_drm_component_init(struct device *dev)
 
 	if (kms) {
 		pm_runtime_get_sync(dev);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 		ret = msm_irq_install(ddev, platform_get_irq(pdev, 0));
+#else
+		ret = drm_irq_install(ddev, platform_get_irq(pdev, 0));
+#endif
 		pm_runtime_put_sync(dev);
 		if (ret < 0) {
 			dev_err(dev, "failed to install IRQ handler\n");
@@ -1716,14 +1743,6 @@ static const struct drm_ioctl_desc msm_ioctls[] = {
 			DRM_UNLOCKED),
 };
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
-static const struct vm_operations_struct vm_ops = {
-	.fault = msm_gem_fault,
-	.open = drm_gem_vm_open,
-	.close = drm_gem_vm_close,
-};
-#endif
-
 static const struct file_operations fops = {
 	.owner              = THIS_MODULE,
 	.open               = drm_open,
@@ -1745,6 +1764,10 @@ static struct drm_driver msm_driver = {
 	.postclose          = msm_postclose,
 	.lastclose          = msm_lastclose,
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
+	.irq_handler        = msm_irq,
+	.irq_preinstall     = msm_irq_preinstall,
+	.irq_postinstall    = msm_irq_postinstall,
+	.irq_uninstall      = msm_irq_uninstall,
 	.gem_free_object_unlocked    = msm_gem_free_object,
 	.gem_vm_ops         = &vm_ops,
 	.gem_prime_export   = drm_gem_prime_export,
