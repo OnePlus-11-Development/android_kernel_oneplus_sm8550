@@ -17,6 +17,7 @@
  */
 #include <drm/drm_panel.h>
 #include <drm/drm_vblank.h>
+#include <linux/version.h>
 
 #include "msm_drv.h"
 #include "msm_gem.h"
@@ -419,7 +420,11 @@ static void msm_atomic_helper_commit_modeset_enables(struct drm_device *dev,
 					 crtc->base.id);
 
 			if (funcs->atomic_enable)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 				funcs->atomic_enable(crtc, old_state);
+#else
+				funcs->atomic_enable(crtc, old_crtc_state);
+#endif
 			else
 				funcs->commit(crtc);
 		}

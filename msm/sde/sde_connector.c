@@ -19,6 +19,7 @@
 #include "sde_rm.h"
 #include "sde_vm.h"
 #include <drm/drm_probe_helper.h>
+#include <linux/version.h>
 
 #define BL_NODE_NAME_SIZE 32
 #define HDR10_PLUS_VSIF_TYPE_CODE      0x81
@@ -2618,14 +2619,22 @@ sde_connector_best_encoder(struct drm_connector *connector)
 	return c_conn->encoder;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 static struct drm_encoder *
 sde_connector_atomic_best_encoder(struct drm_connector *connector,
 		struct drm_atomic_state *state)
+#else
+static struct drm_encoder *
+sde_connector_atomic_best_encoder(struct drm_connector *connector,
+		struct drm_connector_state *connector_state)
+#endif
 {
 	struct sde_connector *c_conn;
 	struct drm_encoder *encoder = NULL;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	struct drm_connector_state *connector_state =
 			drm_atomic_get_new_connector_state(state, connector);
+#endif
 
 	if (!connector) {
 		SDE_ERROR("invalid connector\n");
