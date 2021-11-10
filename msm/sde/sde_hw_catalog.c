@@ -1875,6 +1875,9 @@ static void sde_sspp_set_features(struct sde_mdss_cfg *sde_cfg,
 
 		if (test_bit(SDE_FEATURE_UBWC_STATS, sde_cfg->features))
 			set_bit(SDE_SSPP_UBWC_STATS, &sspp->features);
+
+		if (SDE_HW_MAJOR(sde_cfg->hw_rev) >= SDE_HW_MAJOR(SDE_HW_VER_900))
+			set_bit(SDE_SSPP_SCALER_DE_LPF_BLEND, &sspp->features);
 	}
 }
 
@@ -3087,6 +3090,10 @@ static int sde_ds_parse_dt(struct device_node *np,
 		else if (sde_cfg->qseed_sw_lib_rev ==
 				SDE_SSPP_SCALER_QSEED3LITE)
 			set_bit(SDE_SSPP_SCALER_QSEED3LITE, &ds->features);
+		if (SDE_HW_MAJOR(sde_cfg->hw_rev) >= SDE_HW_MAJOR(SDE_HW_VER_900)) {
+			set_bit(SDE_DS_DE_LPF_BLEND, &ds->features);
+			set_bit(SDE_DS_MERGE_CTRL, &ds->features);
+		}
 	}
 
 end:

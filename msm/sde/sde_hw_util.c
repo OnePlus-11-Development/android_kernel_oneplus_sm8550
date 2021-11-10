@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 #define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
@@ -30,6 +31,7 @@ static u32 sde_hw_util_log_mask = SDE_DBG_MASK_NONE;
 #define QSEED3_DE_ADJUST_DATA_0            0x34
 #define QSEED3_DE_ADJUST_DATA_1            0x38
 #define QSEED3_DE_ADJUST_DATA_2            0x3C
+#define QSEED3_DE_LPF_BLEND                0x64
 #define QSEED3_SRC_SIZE_Y_RGB_A            0x40
 #define QSEED3_SRC_SIZE_UV                 0x44
 #define QSEED3_DST_SIZE                    0x48
@@ -152,6 +154,9 @@ void sde_set_scaler_v2(struct sde_hw_scaler3_cfg *cfg,
 	cfg->de.thr_low = scale_v2->de.thr_low;
 	cfg->de.thr_high = scale_v2->de.thr_high;
 	cfg->de.blend = scale_v2->de_blend;
+	cfg->de_lpf_h = scale_v2->de_lpf_h;
+	cfg->de_lpf_l = scale_v2->de_lpf_l;
+	cfg->de_lpf_m = scale_v2->de_lpf_m;
 
 	for (i = 0; i < SDE_MAX_DE_CURVES; i++) {
 		cfg->de.adjust_a[i] = scale_v2->de.adjust_a[i];
@@ -348,11 +353,12 @@ static inline scaler_lut_type get_scaler_lut(
 
 void sde_hw_setup_scaler3(struct sde_hw_blk_reg_map *c,
 		struct sde_hw_scaler3_cfg *scaler3_cfg, u32 scaler_version,
-		u32 scaler_offset, const struct sde_format *format)
+		u32 scaler_offset, const struct sde_format *format, bool de_lpf)
 {
 	u32 op_mode = 0;
 	u32 phase_init, preload, src_y_rgb, src_uv, dst;
 	scaler_lut_type setup_lut = NULL;
+	u32 de_lpf_blend = 0;
 
 	if (!scaler3_cfg->enable)
 		goto end;
@@ -430,6 +436,13 @@ void sde_hw_setup_scaler3(struct sde_hw_blk_reg_map *c,
 	SDE_REG_WRITE(c, QSEED3_SRC_SIZE_UV + scaler_offset, src_uv);
 
 	SDE_REG_WRITE(c, QSEED3_DST_SIZE + scaler_offset, dst);
+
+	if (de_lpf && (scaler3_cfg->de_lpf_flags & SDE_DYN_EXP_DISABLE)) {
+		de_lpf_blend = (scaler3_cfg->de_lpf_h & 0x3FF) |
+			((scaler3_cfg->de_lpf_l & 0x3FF) << 10) |
+			((scaler3_cfg->de_lpf_m & 0x3FF) << 20);
+		SDE_REG_WRITE(c, QSEED3_DE_LPF_BLEND, de_lpf_blend);
+	}
 
 end:
 	if (format && !SDE_FORMAT_IS_DX(format))

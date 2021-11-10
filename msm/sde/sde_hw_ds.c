@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -11,13 +12,26 @@
 /* Destination scaler TOP registers */
 #define DEST_SCALER_OP_MODE     0x00
 #define DEST_SCALER_HW_VERSION  0x10
+#define DEST_SCALER_MERGE_CTRL  0x0C
 
-static void sde_hw_ds_setup_opmode(struct sde_hw_ds *hw_ds,
-				u32 op_mode)
+#define DEST_SCALER_DUAL_PIPE   1
+#define DEST_SCALER_QUAD_PIPE   3
+
+static void sde_hw_ds_setup_opmode(struct sde_hw_ds *hw_ds, u32 op_mode)
 {
 	struct sde_hw_blk_reg_map *hw = &hw_ds->hw;
 
 	SDE_REG_WRITE(hw, DEST_SCALER_OP_MODE, op_mode);
+}
+
+static void sde_hw_ds_setup_opmode_v1(struct sde_hw_ds *hw_ds, u32 op_mode)
+{
+	struct sde_hw_blk_reg_map *hw = &hw_ds->hw;
+
+	if (op_mode & SDE_DS_OP_MODE_DUAL) {
+		op_mode = DEST_SCALER_DUAL_PIPE;
+		SDE_REG_WRITE(hw, DEST_SCALER_MERGE_CTRL + hw_ds->scl->base, op_mode);
+	}
 }
 
 static void sde_hw_ds_setup_scaler3(struct sde_hw_ds *hw_ds,
@@ -25,6 +39,8 @@ static void sde_hw_ds_setup_scaler3(struct sde_hw_ds *hw_ds,
 {
 	struct sde_hw_scaler3_cfg *scl3_cfg = scaler_cfg;
 	struct sde_hw_scaler3_lut_cfg *scl3_lut_cfg = scaler_lut_cfg;
+
+	bool de_lpf_en = false;
 
 	if (!hw_ds || !hw_ds->scl || !scl3_cfg || !scl3_lut_cfg)
 		return;
@@ -41,14 +57,21 @@ static void sde_hw_ds_setup_scaler3(struct sde_hw_ds *hw_ds,
 		scl3_cfg->sep_len = scl3_lut_cfg->sep_len;
 	}
 
+
+	if (test_bit(SDE_DS_DE_LPF_BLEND, &hw_ds->scl->features))
+		de_lpf_en = true;
 	sde_hw_setup_scaler3(&hw_ds->hw, scl3_cfg, hw_ds->scl->version,
 			 hw_ds->scl->base,
-			 sde_get_sde_format(DRM_FORMAT_XBGR2101010));
+			 sde_get_sde_format(DRM_FORMAT_XBGR2101010), de_lpf_en);
 }
 
 static void _setup_ds_ops(struct sde_hw_ds_ops *ops, unsigned long features)
 {
-	ops->setup_opmode = sde_hw_ds_setup_opmode;
+
+	if (test_bit(SDE_DS_MERGE_CTRL, &features))
+		ops->setup_opmode = sde_hw_ds_setup_opmode_v1;
+	else
+		ops->setup_opmode = sde_hw_ds_setup_opmode;
 
 	if (test_bit(SDE_SSPP_SCALER_QSEED3, &features) ||
 			test_bit(SDE_SSPP_SCALER_QSEED3LITE, &features))
