@@ -3,6 +3,7 @@
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  */
 
+#include <linux/version.h>
 #include <linux/dma-buf.h>
 #include <linux/dma-heap.h>
 #include <linux/dma-mapping.h>
@@ -377,12 +378,22 @@ int msm_vidc_memory_alloc(struct msm_vidc_core *core, struct msm_vidc_alloc *mem
 
 	if (mem->map_kernel) {
 		dma_buf_begin_cpu_access(mem->dmabuf, DMA_BIDIRECTIONAL);
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,15,0))
+		mem->kvaddr = dma_buf_vmap(mem->dmabuf);
+		if (!mem->kvaddr) {
+			d_vpr_e("%s: kernel map failed\n", __func__);
+			rc = -EIO;
+			goto error;
+		}
+#else
 		rc = dma_buf_vmap(mem->dmabuf, mem->kvaddr);
 		if (rc) {
 			d_vpr_e("%s: kernel map failed\n", __func__);
 			rc = -EIO;
 			goto error;
 		}
+#endif
 	}
 
 	d_vpr_h(
