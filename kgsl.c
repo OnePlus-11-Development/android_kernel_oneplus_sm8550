@@ -2589,103 +2589,6 @@ static int kgsl_setup_anon_useraddr(struct kgsl_pagetable *pagetable,
 	return ret;
 }
 
-#ifdef CONFIG_DMA_SHARED_BUFFER
-static void _setup_cache_mode(struct kgsl_mem_entry *entry,
-		struct vm_area_struct *vma)
-{
-	uint64_t mode;
-	pgprot_t pgprot = vma->vm_page_prot;
-
-	if ((pgprot_val(pgprot) == pgprot_val(pgprot_noncached(pgprot))) ||
-	    (pgprot_val(pgprot) == pgprot_val(pgprot_writecombine(pgprot))))
-		mode = KGSL_CACHEMODE_WRITECOMBINE;
-	else
-		mode = KGSL_CACHEMODE_WRITEBACK;
-
-	entry->memdesc.flags |= FIELD_PREP(KGSL_CACHEMODE_MASK, mode);
-}
-
-static int kgsl_setup_dma_buf(struct kgsl_device *device,
-				struct kgsl_pagetable *pagetable,
-				struct kgsl_mem_entry *entry,
-				struct dma_buf *dmabuf);
-
-static int kgsl_setup_dmabuf_useraddr(struct kgsl_device *device,
-		struct kgsl_pagetable *pagetable,
-		struct kgsl_mem_entry *entry, unsigned long hostptr)
-{
-	struct vm_area_struct *vma;
-	struct dma_buf *dmabuf = NULL;
-	int ret;
-
-	/*
-	 * Find the VMA containing this pointer and figure out if it
-	 * is a dma-buf.
-	 */
-	mmap_read_lock(current->mm);
-	vma = find_vma(current->mm, hostptr);
-
-	if (vma && vma->vm_file) {
-		ret = check_vma_flags(vma, entry->memdesc.flags);
-		if (ret) {
-			mmap_read_unlock(current->mm);
-			return ret;
-		}
-
-		/*
-		 * Check to see that this isn't our own memory that we have
-		 * already mapped
-		 */
-		if (vma->vm_ops == &kgsl_gpumem_vm_ops) {
-			mmap_read_unlock(current->mm);
-			return -EFAULT;
-		}
-
-		if (!is_dma_buf_file(vma->vm_file)) {
-			mmap_read_unlock(current->mm);
-			return -ENODEV;
-		}
-
-		/* Take a refcount because dma_buf_put() decrements the refcount */
-		get_file(vma->vm_file);
-
-		dmabuf = vma->vm_file->private_data;
-	}
-
-	if (!dmabuf) {
-		mmap_read_unlock(current->mm);
-		return -ENODEV;
-	}
-
-	ret = kgsl_setup_dma_buf(device, pagetable, entry, dmabuf);
-	if (ret) {
-		dma_buf_put(dmabuf);
-		mmap_read_unlock(current->mm);
-		return ret;
-	}
-
-	/* Setup the cache mode for cache operations */
-	_setup_cache_mode(entry, vma);
-
-	if (kgsl_mmu_has_feature(device, KGSL_MMU_IO_COHERENT) &&
-	   (IS_ENABLED(CONFIG_QCOM_KGSL_IOCOHERENCY_DEFAULT) &&
-		kgsl_cachemode_is_cached(entry->memdesc.flags)))
-		entry->memdesc.flags |= KGSL_MEMFLAGS_IOCOHERENT;
-	else
-		entry->memdesc.flags &= ~((u64) KGSL_MEMFLAGS_IOCOHERENT);
-
-	mmap_read_unlock(current->mm);
-	return 0;
-}
-#else
-static int kgsl_setup_dmabuf_useraddr(struct kgsl_device *device,
-		struct kgsl_pagetable *pagetable,
-		struct kgsl_mem_entry *entry, unsigned long hostptr)
-{
-	return -ENODEV;
-}
-#endif
-
 static int kgsl_setup_useraddr(struct kgsl_device *device,
 		struct kgsl_pagetable *pagetable,
 		struct kgsl_mem_entry *entry,
@@ -2696,12 +2599,6 @@ static int kgsl_setup_useraddr(struct kgsl_device *device,
 	if (hostptr == 0 || !IS_ALIGNED(hostptr, PAGE_SIZE))
 		return -EINVAL;
 
-	/* Try to set up a dmabuf - if it returns -ENODEV assume anonymous */
-	ret = kgsl_setup_dmabuf_useraddr(device, pagetable, entry, hostptr);
-	if (ret != -ENODEV)
-		return ret;
-
-	/* Okay - lets go legacy */
 	return kgsl_setup_anon_useraddr(pagetable, entry,
 		hostptr, offset, size);
 }
@@ -2748,6 +2645,11 @@ static bool check_and_warn_secured(struct kgsl_device *device)
 }
 
 #ifdef CONFIG_DMA_SHARED_BUFFER
+static int kgsl_setup_dma_buf(struct kgsl_device *device,
+				struct kgsl_pagetable *pagetable,
+				struct kgsl_mem_entry *entry,
+				struct dma_buf *dmabuf);
+
 static long _gpuobj_map_dma_buf(struct kgsl_device *device,
 		struct kgsl_pagetable *pagetable,
 		struct kgsl_mem_entry *entry,
