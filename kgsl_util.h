@@ -113,6 +113,7 @@ int kgsl_clk_set_rate(struct clk_bulk_data *clks, int num_clks,
  */
 int kgsl_zap_shader_load(struct device *dev, const char *name);
 
+#if IS_ENABLED(CONFIG_QCOM_VA_MINIDUMP)
 /**
  * kgsl_add_to_minidump - Add a physically contiguous section to minidump
  * @name: Name of the section
@@ -146,5 +147,23 @@ int kgsl_add_va_to_minidump(struct device *dev, const char *name, void *ptr,
  * @device: Pointer to kgsl device
  */
 void kgsl_qcom_va_md_register(struct kgsl_device *device);
+#else
+static inline void kgsl_add_to_minidump(char *name, u64 virt_addr, u64 phy_addr, size_t size)
+{
+}
 
+static inline void kgsl_remove_from_minidump(char *name, u64 virt_addr, u64 phy_addr, size_t size)
+{
+}
+
+static inline int kgsl_add_va_to_minidump(struct device *dev, const char *name, void *ptr,
+               size_t size)
+{
+       return 0;
+}
+
+static inline void kgsl_qcom_va_md_register(struct kgsl_device *device)
+{
+}
+#endif
 #endif

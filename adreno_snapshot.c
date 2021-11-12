@@ -857,7 +857,7 @@ static void adreno_snapshot_os(struct kgsl_device *device,
 	strlcpy(header->release, init_utsname()->release, sizeof(header->release));
 	strlcpy(header->version, init_utsname()->version, sizeof(header->version));
 
-	header->seconds = get_seconds();
+	header->seconds = ktime_get_real_seconds();
 	header->power_flags = device->pwrctrl.power_flags;
 	header->power_level = device->pwrctrl.active_pwrlevel;
 	header->power_interval_timeout = device->pwrctrl.interval_timeout;

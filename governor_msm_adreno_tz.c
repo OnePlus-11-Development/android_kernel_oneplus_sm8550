@@ -546,7 +546,7 @@ static struct devfreq_governor msm_adreno_tz = {
 	.name = "msm-adreno-tz",
 	.get_target_freq = tz_get_target_freq,
 	.event_handler = tz_handler,
-	.immutable = 1,
+	.flags = DEVFREQ_GOV_FLAG_IMMUTABLE,
 };
 
 int msm_adreno_tz_init(void)

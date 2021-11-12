@@ -3,8 +3,8 @@
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  */
 
-#include <linux/notifier.h>
 #include <linux/of.h>
+#include <linux/panic_notifier.h>
 #include <linux/slab.h>
 #include <linux/utsname.h>
 
@@ -592,7 +592,7 @@ static void kgsl_device_snapshot_atomic(struct kgsl_device *device)
 	 * the kernel log
 	 */
 	getboottime64(&boot);
-	snapshot->timestamp = get_seconds() - boot.tv_sec;
+	snapshot->timestamp = ktime_get_real_seconds() - boot.tv_sec;
 
 	kgsl_add_to_minidump("ATOMIC_GPU_SNAPSHOT", (u64) device->snapshot_memory_atomic.ptr,
 		atomic_snapshot_phy_addr(device), device->snapshot_memory_atomic.size);
@@ -682,7 +682,7 @@ void kgsl_device_snapshot(struct kgsl_device *device,
 	 */
 
 	getboottime64(&boot);
-	snapshot->timestamp = get_seconds() - boot.tv_sec;
+	snapshot->timestamp = ktime_get_real_seconds() - boot.tv_sec;
 
 	/* Store the instance in the device until it gets dumped */
 	device->snapshot = snapshot;

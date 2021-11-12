@@ -211,6 +211,7 @@ void kgsl_hwunlock(struct cpu_gpu_lock *lock)
 	lock->cpu_req = 0;
 }
 
+#if IS_ENABLED(CONFIG_QCOM_VA_MINIDUMP)
 void kgsl_add_to_minidump(char *name, u64 virt_addr, u64 phy_addr, size_t size)
 {
 	struct md_region md_entry = {0};
@@ -348,3 +349,4 @@ void kgsl_qcom_va_md_register(struct kgsl_device *device)
 	if (qcom_va_md_register("KGSL", &kgsl_va_minidump_nb))
 		dev_err(device->dev, "Failed to register notifier with va_minidump\n");
 }
+#endif
