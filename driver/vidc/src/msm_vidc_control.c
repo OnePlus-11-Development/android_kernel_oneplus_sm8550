@@ -125,13 +125,6 @@ static const char *const mpeg_video_hevc_profile[] = {
 	NULL,
 };
 
-static const char *const roi_map_type[] = {
-	"None",
-	"2-bit",
-	"2-bit",
-	NULL,
-};
-
 static const char * const av1_profile[] = {
 	"Main",
 	"High",
