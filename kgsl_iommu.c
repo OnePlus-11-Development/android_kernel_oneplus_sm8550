@@ -74,46 +74,26 @@ static const struct iommu_flush_ops kgsl_iopgtbl_tlb_ops = {
 	.tlb_add_page = _tlb_add_page,
 };
 
-static bool _iommu_domain_check_bool(struct iommu_domain *domain, int attr)
-{
-	u32 val;
-	int ret = iommu_domain_get_attr(domain, attr, &val);
-
-	return (!ret && val);
-}
-
-static int _iommu_domain_context_bank(struct iommu_domain *domain)
-{
-	int val, ret;
-
-	ret = iommu_domain_get_attr(domain, DOMAIN_ATTR_CONTEXT_BANK, &val);
-
-	return ret ? ret : val;
-}
-
 static struct kgsl_iommu_pt *to_iommu_pt(struct kgsl_pagetable *pagetable)
 {
 	return container_of(pagetable, struct kgsl_iommu_pt, base);
 }
 
-static u32 get_llcc_flags(struct iommu_domain *domain)
+static u32 get_llcc_flags(struct kgsl_mmu *mmu)
 {
-	if (_iommu_domain_check_bool(domain, DOMAIN_ATTR_USE_LLC_NWA))
-		return IOMMU_USE_LLC_NWA;
-
-	if (_iommu_domain_check_bool(domain, DOMAIN_ATTR_USE_UPSTREAM_HINT))
+	if (mmu->subtype == KGSL_IOMMU_SMMU_V500)
+		return (test_bit(KGSL_MMU_IO_COHERENT, &mmu->features)) ?
+			0 : IOMMU_USE_LLC_NWA;
+	else
 		return IOMMU_USE_UPSTREAM_HINT;
-
-	return 0;
 }
 
-
-static int _iommu_get_protection_flags(struct iommu_domain *domain,
+static int _iommu_get_protection_flags(struct kgsl_mmu *mmu,
 	struct kgsl_memdesc *memdesc)
 {
 	int flags = IOMMU_READ | IOMMU_WRITE | IOMMU_NOEXEC;
 
-	flags |= get_llcc_flags(domain);
+	flags |= get_llcc_flags(mmu);
 
 	if (memdesc->flags & KGSL_MEMFLAGS_GPUREADONLY)
 		flags &= ~IOMMU_WRITE;
@@ -282,7 +262,7 @@ kgsl_iopgtbl_map_child(struct kgsl_pagetable *pt, struct kgsl_memdesc *memdesc,
 		return ret;
 
 	/* Inherit the flags from the child for this mapping */
-	flags = _iommu_get_protection_flags(domain, child);
+	flags = _iommu_get_protection_flags(pt->mmu, child);
 
 	ret = _iopgtbl_map_sg(iommu_pt, memdesc->gpuaddr + offset, &sgt, flags);
 
@@ -332,7 +312,6 @@ static int kgsl_iopgtbl_map_zero_page_to_range(struct kgsl_pagetable *pt,
 		struct kgsl_memdesc *memdesc, u64 offset, u64 length)
 {
 	struct kgsl_iommu *iommu = &pt->mmu->iommu;
-	struct iommu_domain *domain = to_iommu_domain(&iommu->user_context);
 	/*
 	 * The SMMU only does the PRT compare at the bottom level of the page table, because
 	 * there is not an easy way for the hardware to perform this check at earlier levels.
@@ -340,7 +319,7 @@ static int kgsl_iopgtbl_map_zero_page_to_range(struct kgsl_pagetable *pt,
 	 * of this zero page is programmed in PRR register, MMU will intercept any accesses to
 	 * the page before they go to DDR and will terminate the transaction.
 	 */
-	u32 flags = IOMMU_READ | IOMMU_WRITE | IOMMU_NOEXEC | get_llcc_flags(domain);
+	u32 flags = IOMMU_READ | IOMMU_WRITE | IOMMU_NOEXEC | get_llcc_flags(pt->mmu);
 	struct kgsl_iommu_pt *iommu_pt = to_iommu_pt(pt);
 	struct page *page = kgsl_vbo_zero_page;
 
@@ -363,12 +342,11 @@ static int kgsl_iopgtbl_map(struct kgsl_pagetable *pagetable,
 {
 	struct kgsl_iommu_pt *pt = to_iommu_pt(pagetable);
 	struct kgsl_iommu *iommu = &pagetable->mmu->iommu;
-	struct iommu_domain *domain = to_iommu_domain(&iommu->user_context);
 	size_t mapped, padding;
 	int prot;
 
 	/* Get the protection flags for the user context */
-	prot = _iommu_get_protection_flags(domain, memdesc);
+	prot = _iommu_get_protection_flags(pagetable->mmu, memdesc);
 
 	if (memdesc->sgt)
 		mapped = _iopgtbl_map_sg(pt, memdesc->gpuaddr,
@@ -465,9 +443,10 @@ static size_t _iommu_map_sg(struct iommu_domain *domain, u64 gpuaddr,
 }
 
 static int
-_kgsl_iommu_map(struct iommu_domain *domain, struct kgsl_memdesc *memdesc)
+_kgsl_iommu_map(struct kgsl_mmu *mmu, struct iommu_domain *domain,
+		struct kgsl_memdesc *memdesc)
 {
-	int prot = _iommu_get_protection_flags(domain, memdesc);
+	int prot = _iommu_get_protection_flags(mmu, memdesc);
 	size_t mapped, padding;
 	int ret = 0;
 
@@ -519,7 +498,7 @@ static int kgsl_iommu_secure_map(struct kgsl_pagetable *pagetable,
 	struct kgsl_iommu *iommu = &pagetable->mmu->iommu;
 	struct iommu_domain *domain = to_iommu_domain(&iommu->secure_context);
 
-	return _kgsl_iommu_map(domain, memdesc);
+	return _kgsl_iommu_map(pagetable->mmu, domain, memdesc);
 }
 
 /*
@@ -557,13 +536,13 @@ static int kgsl_iommu_default_map(struct kgsl_pagetable *pagetable,
 	domain = to_iommu_domain(&iommu->user_context);
 
 	/* Map the object to the default GPU domain */
-	ret = _kgsl_iommu_map(domain, memdesc);
+	ret = _kgsl_iommu_map(mmu, domain, memdesc);
 
 	/* Also map the object to the LPAC domain if it exists */
 	lpac = to_iommu_domain(&iommu->lpac_context);
 
 	if (!ret && lpac) {
-		ret = _kgsl_iommu_map(lpac, memdesc);
+		ret = _kgsl_iommu_map(mmu, lpac, memdesc);
 
 		/* On failure, also unmap from the default domain */
 		if (ret)
@@ -1097,7 +1076,7 @@ static int kgsl_iommu_get_context_bank(struct kgsl_pagetable *pt)
 	struct kgsl_iommu *iommu = to_kgsl_iommu(pt);
 	struct iommu_domain *domain = to_iommu_domain(&iommu->user_context);
 
-	return _iommu_domain_context_bank(domain);
+	return qcom_iommu_get_context_bank_nr(domain);
 }
 
 static void kgsl_iommu_destroy_default_pagetable(struct kgsl_pagetable *pagetable)
@@ -1131,15 +1110,15 @@ static void kgsl_iommu_destroy_pagetable(struct kgsl_pagetable *pagetable)
 
 static void _enable_gpuhtw_llc(struct kgsl_mmu *mmu, struct iommu_domain *domain)
 {
-	int val = 1;
-
 	if (!test_bit(KGSL_MMU_LLCC_ENABLE, &mmu->features))
 		return;
 
-	if (mmu->subtype == KGSL_IOMMU_SMMU_V500)
-		iommu_domain_set_attr(domain, DOMAIN_ATTR_USE_LLC_NWA, &val);
-	else
-		iommu_domain_set_attr(domain, DOMAIN_ATTR_USE_UPSTREAM_HINT, &val);
+	if (mmu->subtype == KGSL_IOMMU_SMMU_V500) {
+		if (!test_bit(KGSL_MMU_IO_COHERENT, &mmu->features))
+			iommu_set_pgtable_quirks(domain,
+					IO_PGTABLE_QUIRK_QCOM_USE_LLC_NWA);
+	} else
+		iommu_set_pgtable_quirks(domain, IO_PGTABLE_QUIRK_ARM_OUTER_WBWA);
 }
 
 static int set_smmu_aperture(struct kgsl_device *device,
@@ -2059,7 +2038,7 @@ static int kgsl_iommu_setup_context(struct kgsl_mmu *mmu,
 
 	iommu_set_fault_handler(context->domain, handler, mmu);
 
-	context->cb_num = _iommu_domain_context_bank(context->domain);
+	context->cb_num = qcom_iommu_get_context_bank_nr(context->domain);
 
 	if (context->cb_num >= 0)
 		return 0;
@@ -2156,8 +2135,7 @@ static int iommu_probe_secure_context(struct kgsl_device *device,
 		return -ENODEV;
 	}
 
-	ret = iommu_domain_set_attr(context->domain, DOMAIN_ATTR_SECURE_VMID,
-		&secure_vmid);
+	ret = qcom_iommu_set_secure_vmid(context->domain, secure_vmid);
 	if (ret) {
 		dev_err(device->dev, "Unable to set the secure VMID: %d\n", ret);
 		iommu_domain_free(context->domain);
@@ -2180,7 +2158,7 @@ static int iommu_probe_secure_context(struct kgsl_device *device,
 	iommu_set_fault_handler(context->domain,
 		kgsl_iommu_secure_fault_handler, mmu);
 
-	context->cb_num = _iommu_domain_context_bank(context->domain);
+	context->cb_num = qcom_iommu_get_context_bank_nr(context->domain);
 
 	if (context->cb_num < 0) {
 		iommu_detach_device(context->domain, &context->pdev->dev);

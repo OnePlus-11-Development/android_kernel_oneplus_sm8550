@@ -1917,7 +1917,6 @@ static int gen7_gmu_iommu_fault_handler(struct iommu_domain *domain,
 static int gen7_gmu_iommu_init(struct gen7_gmu_device *gmu)
 {
 	int ret;
-	int no_stall = 1;
 
 	gmu->domain = iommu_domain_alloc(&platform_bus_type);
 	if (gmu->domain == NULL) {
@@ -1930,8 +1929,7 @@ static int gen7_gmu_iommu_init(struct gen7_gmu_device *gmu)
 	 * This sets SCTLR.CFCFG = 0.
 	 * Also note that, the smmu driver sets SCTLR.HUPCF = 0 by default.
 	 */
-	iommu_domain_set_attr(gmu->domain,
-		DOMAIN_ATTR_FAULT_MODEL_NO_STALL, &no_stall);
+	qcom_iommu_set_fault_model(gmu->domain, QCOM_IOMMU_FAULT_MODEL_NO_STALL);
 
 	ret = iommu_attach_device(gmu->domain, &gmu->pdev->dev);
 	if (!ret) {
