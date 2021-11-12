@@ -14,14 +14,6 @@
 #define PREEMPT_SMMU_RECORD(_field) \
 		offsetof(struct gen7_cp_smmu_info, _field)
 
-enum {
-	SET_PSEUDO_REGISTER_SAVE_REGISTER_SMMU_INFO = 0,
-	SET_PSEUDO_REGISTER_SAVE_REGISTER_PRIV_NON_SECURE_SAVE_ADDR,
-	SET_PSEUDO_REGISTER_SAVE_REGISTER_PRIV_SECURE_SAVE_ADDR,
-	SET_PSEUDO_REGISTER_SAVE_REGISTER_NON_PRIV_SAVE_ADDR,
-	SET_PSEUDO_REGISTER_SAVE_REGISTER_COUNTER,
-};
-
 static void _update_wptr(struct adreno_device *adreno_dev, bool reset_timer,
 	bool atomic)
 {
@@ -257,16 +249,11 @@ void gen7_preemption_trigger(struct adreno_device *adreno_dev, bool atomic)
 
 	spin_lock_irqsave(&next->preempt_lock, flags);
 
-	/*
-	 * Get the pagetable from the pagetable info.
-	 * The pagetable_desc is allocated and mapped at probe time, and
-	 * preemption_desc at init time, so no need to check if
-	 * sharedmem accesses to these memdescs succeed.
-	 */
-	kgsl_sharedmem_readq(next->pagetable_desc, &ttbr0,
-		PT_INFO_OFFSET(ttbr0));
-	kgsl_sharedmem_readl(next->pagetable_desc, &contextidr,
-		PT_INFO_OFFSET(contextidr));
+	/* Get the pagetable from the pagetable info. */
+	kgsl_sharedmem_readq(device->scratch, &ttbr0,
+		SCRATCH_RB_OFFSET(next->id, ttbr0));
+	kgsl_sharedmem_readl(device->scratch, &contextidr,
+		SCRATCH_RB_OFFSET(next->id, contextidr));
 
 	kgsl_sharedmem_writel(next->preemption_desc,
 		PREEMPT_RECORD(wptr), next->wptr);
@@ -476,36 +463,28 @@ u32 gen7_preemption_pre_ibsubmit(struct adreno_device *adreno_dev,
 		u32 *cmds)
 {
 	u32 *cmds_orig = cmds;
-	u64 gpuaddr = 0;
 
 	if (!adreno_is_preemption_enabled(adreno_dev))
 		return 0;
 
+	if (test_and_set_bit(ADRENO_RB_SET_PSEUDO_DONE, &rb->flags))
+		goto done;
+
 	*cmds++ = cp_type7_packet(CP_THREAD_CONTROL, 1);
 	*cmds++ = CP_SET_THREAD_BR;
 
-	if (drawctxt) {
-		gpuaddr = drawctxt->base.user_ctxt_record->memdesc.gpuaddr;
-		*cmds++ = cp_type7_packet(CP_SET_PSEUDO_REGISTER, 15);
-	} else {
-		*cmds++ = cp_type7_packet(CP_SET_PSEUDO_REGISTER, 12);
-	}
+	*cmds++ = cp_type7_packet(CP_SET_PSEUDO_REGISTER, 12);
 
 	/* NULL SMMU_INFO buffer - we track in KMD */
-	*cmds++ = SET_PSEUDO_REGISTER_SAVE_REGISTER_SMMU_INFO;
+	*cmds++ = SET_PSEUDO_SMMU_INFO;
 	cmds += cp_gpuaddr(adreno_dev, cmds, 0x0);
 
-	*cmds++ = SET_PSEUDO_REGISTER_SAVE_REGISTER_PRIV_NON_SECURE_SAVE_ADDR;
+	*cmds++ = SET_PSEUDO_PRIV_NON_SECURE_SAVE_ADDR;
 	cmds += cp_gpuaddr(adreno_dev, cmds, rb->preemption_desc->gpuaddr);
 
-	*cmds++ = SET_PSEUDO_REGISTER_SAVE_REGISTER_PRIV_SECURE_SAVE_ADDR;
+	*cmds++ = SET_PSEUDO_PRIV_SECURE_SAVE_ADDR;
 	cmds += cp_gpuaddr(adreno_dev, cmds,
 			rb->secure_preemption_desc->gpuaddr);
-
-	if (drawctxt) {
-		*cmds++ = SET_PSEUDO_REGISTER_SAVE_REGISTER_NON_PRIV_SAVE_ADDR;
-		cmds += cp_gpuaddr(adreno_dev, cmds, gpuaddr);
-	}
 
 	/*
 	 * There is no need to specify this address when we are about to
@@ -514,14 +493,16 @@ u32 gen7_preemption_pre_ibsubmit(struct adreno_device *adreno_dev,
 	 * the context record and thus knows from where to restore
 	 * the saved perfcounters for the new ringbuffer.
 	 */
-	*cmds++ = SET_PSEUDO_REGISTER_SAVE_REGISTER_COUNTER;
+	*cmds++ = SET_PSEUDO_COUNTER;
 	cmds += cp_gpuaddr(adreno_dev, cmds,
 			rb->perfcounter_save_restore_desc->gpuaddr);
 
+done:
 	if (drawctxt) {
 		struct adreno_ringbuffer *rb = drawctxt->rb;
 		u64 dest = adreno_dev->preempt.scratch->gpuaddr
 			+ (rb->id * sizeof(u64));
+		u64 gpuaddr = drawctxt->base.user_ctxt_record->memdesc.gpuaddr;
 
 		*cmds++ = cp_mem_packet(adreno_dev, CP_MEM_WRITE, 2, 2);
 		cmds += cp_gpuaddr(adreno_dev, cmds, dest);
@@ -601,8 +582,10 @@ void gen7_preemption_start(struct adreno_device *adreno_dev)
 		kgsl_sharedmem_writel(rb->preemption_desc,
 			PREEMPT_RECORD(wptr), 0);
 
-		adreno_ringbuffer_set_pagetable(rb,
+		adreno_ringbuffer_set_pagetable(device, rb,
 			device->mmu.defaultpagetable);
+
+		clear_bit(ADRENO_RB_SET_PSEUDO_DONE, &rb->flags);
 	}
 }
 
@@ -616,13 +599,13 @@ static void reset_rb_preempt_record(struct adreno_device *adreno_dev,
 	kgsl_sharedmem_writel(rb->preemption_desc,
 		PREEMPT_RECORD(cntl), GEN7_CP_RB_CNTL_DEFAULT);
 	kgsl_sharedmem_writeq(rb->preemption_desc,
-		PREEMPT_RECORD(rptr_addr), SCRATCH_RPTR_GPU_ADDR(
-		KGSL_DEVICE(adreno_dev), rb->id));
+		PREEMPT_RECORD(rptr_addr), SCRATCH_RB_GPU_ADDR(
+		KGSL_DEVICE(adreno_dev), rb->id, rptr));
 	kgsl_sharedmem_writeq(rb->preemption_desc,
 		PREEMPT_RECORD(rbase), rb->buffer_desc->gpuaddr);
 	kgsl_sharedmem_writeq(rb->preemption_desc,
-		PREEMPT_RECORD(bv_rptr_addr), SCRATCH_BV_RPTR_GPU_ADDR(
-		KGSL_DEVICE(adreno_dev), rb->id));
+		PREEMPT_RECORD(bv_rptr_addr), SCRATCH_RB_GPU_ADDR(
+		KGSL_DEVICE(adreno_dev), rb->id, bv_rptr));
 }
 
 void gen7_reset_preempt_records(struct adreno_device *adreno_dev)

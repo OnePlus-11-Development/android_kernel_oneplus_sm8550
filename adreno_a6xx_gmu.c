@@ -544,7 +544,9 @@ int a6xx_rscc_wakeup_sequence(struct adreno_device *adreno_dev)
 	if (!test_bit(GMU_PRIV_RSCC_SLEEP_DONE, &gmu->flags))
 		return 0;
 	 /* A660 has a replacement register */
-	if (adreno_is_a660(ADRENO_DEVICE(device)))
+	if (adreno_is_a662(ADRENO_DEVICE(device)))
+		gmu_core_regread(device, A662_GPU_CC_GX_DOMAIN_MISC3, &val);
+	else if (adreno_is_a660(ADRENO_DEVICE(device)))
 		gmu_core_regread(device, A6XX_GPU_CC_GX_DOMAIN_MISC3, &val);
 	else
 		gmu_core_regread(device, A6XX_GPU_CC_GX_DOMAIN_MISC, &val);
@@ -784,6 +786,9 @@ int a6xx_gmu_oob_set(struct kgsl_device *device,
 	int ret = 0;
 	int set, check;
 
+	if (req == oob_perfcntr && gmu->num_oob_perfcntr++)
+		return 0;
+
 	if (adreno_is_a630(adreno_dev) || adreno_is_a615_family(adreno_dev)) {
 		set = BIT(req + 16);
 		check = BIT(req + 24);
@@ -807,6 +812,8 @@ int a6xx_gmu_oob_set(struct kgsl_device *device,
 
 	if (gmu_core_timed_poll_check(device, A6XX_GMU_GMU2HOST_INTR_INFO,
 				check, GPU_START_TIMEOUT, check)) {
+		if (req == oob_perfcntr)
+			gmu->num_oob_perfcntr--;
 		gmu_core_fault_snapshot(device);
 		ret = -ETIMEDOUT;
 		WARN(1, "OOB request %s timed out\n", oob_to_str(req));
@@ -825,6 +832,9 @@ void a6xx_gmu_oob_clear(struct kgsl_device *device,
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	struct a6xx_gmu_device *gmu = to_a6xx_gmu(adreno_dev);
 	int clear;
+
+	if (req == oob_perfcntr && --gmu->num_oob_perfcntr)
+		return;
 
 	if (adreno_is_a630(adreno_dev) || adreno_is_a615_family(adreno_dev)) {
 		clear = BIT(req + 24);
@@ -2388,7 +2398,7 @@ static void a6xx_free_gmu_globals(struct a6xx_gmu_device *gmu)
 {
 	int i;
 
-	for (i = 0; i < gmu->global_entries; i++) {
+	for (i = 0; i < gmu->global_entries && i < ARRAY_SIZE(gmu->gmu_globals); i++) {
 		struct kgsl_memdesc *md = &gmu->gmu_globals[i];
 
 		if (!md->gmuaddr)
@@ -2834,8 +2844,6 @@ static int a6xx_gpu_boot(struct adreno_device *adreno_dev)
 	adreno_clear_gpu_fault(adreno_dev);
 
 	adreno_set_active_ctxs_null(adreno_dev);
-
-	adreno_ringbuffer_set_global(adreno_dev, 0);
 
 	ret = kgsl_mmu_start(device);
 	if (ret)

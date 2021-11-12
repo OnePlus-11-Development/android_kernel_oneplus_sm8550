@@ -35,10 +35,10 @@ static int a6xx_rb_pagetable_switch(struct adreno_device *adreno_dev,
 	}
 
 	cmds[count++] = cp_type7_packet(CP_MEM_WRITE, 5);
-	cmds[count++] = lower_32_bits(rb->pagetable_desc->gpuaddr +
-			PT_INFO_OFFSET(ttbr0));
-	cmds[count++] = upper_32_bits(rb->pagetable_desc->gpuaddr +
-			PT_INFO_OFFSET(ttbr0));
+	cmds[count++] = lower_32_bits(SCRATCH_RB_GPU_ADDR(device,
+				rb->id, ttbr0));
+	cmds[count++] = upper_32_bits(SCRATCH_RB_GPU_ADDR(device,
+				rb->id, ttbr0));
 	cmds[count++] = lower_32_bits(ttbr0);
 	cmds[count++] = upper_32_bits(ttbr0);
 	cmds[count++] = id;
@@ -61,7 +61,7 @@ static int a6xx_rb_context_switch(struct adreno_device *adreno_dev,
 		adreno_drawctxt_get_pagetable(drawctxt);
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	int count = 0;
-	u32 cmds[32];
+	u32 cmds[36];
 
 	if (adreno_drawctxt_get_pagetable(rb->drawctxt_active) != pagetable)
 		count += a6xx_rb_pagetable_switch(adreno_dev, rb, drawctxt,
@@ -86,6 +86,14 @@ static int a6xx_rb_context_switch(struct adreno_device *adreno_dev,
 
 	cmds[count++] = cp_type7_packet(CP_EVENT_WRITE, 1);
 	cmds[count++] = 0x31;
+
+	if (adreno_is_preemption_enabled(adreno_dev)) {
+		u64 gpuaddr = drawctxt->base.user_ctxt_record->memdesc.gpuaddr;
+
+		cmds[count++] = cp_type7_packet(CP_SET_PSEUDO_REGISTER, 3);
+		cmds[count++] = SET_PSEUDO_NON_PRIV_SAVE_ADDR;
+		count += cp_gpuaddr(adreno_dev, &cmds[count], gpuaddr);
+	}
 
 	return a6xx_ringbuffer_addcmds(adreno_dev, rb, NULL, F_NOTPROTECTED,
 			cmds, count, 0, NULL);
@@ -119,8 +127,10 @@ int a6xx_ringbuffer_submit(struct adreno_ringbuffer *rb,
 			return PTR_ERR(cmds);
 
 		cmds[0] = cp_type7_packet(CP_WHERE_AM_I, 2);
-		cmds[1] = lower_32_bits(SCRATCH_RPTR_GPU_ADDR(device, rb->id));
-		cmds[2] = upper_32_bits(SCRATCH_RPTR_GPU_ADDR(device, rb->id));
+		cmds[1] = lower_32_bits(SCRATCH_RB_GPU_ADDR(device, rb->id,
+				rptr));
+		cmds[2] = upper_32_bits(SCRATCH_RB_GPU_ADDR(device, rb->id,
+				rptr));
 	}
 
 	spin_lock_irqsave(&rb->preempt_lock, flags);

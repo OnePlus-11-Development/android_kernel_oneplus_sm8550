@@ -166,7 +166,7 @@ unsigned int adreno_get_rptr(struct adreno_ringbuffer *rb)
 		kgsl_regread(device, A3XX_CP_RB_RPTR, &rptr);
 	else
 		kgsl_sharedmem_readl(device->scratch, &rptr,
-				SCRATCH_RPTR_OFFSET(rb->id));
+				SCRATCH_RB_OFFSET(rb->id, rptr));
 
 	return rptr;
 }
@@ -682,18 +682,32 @@ out:
 	return ret;
 }
 
-static void adreno_of_get_initial_pwrlevel(struct kgsl_pwrctrl *pwr,
+static void adreno_of_get_initial_pwrlevels(struct kgsl_pwrctrl *pwr,
 		struct device_node *node)
 {
-	int init_level = 1;
+	int level;
 
-	of_property_read_u32(node, "qcom,initial-pwrlevel", &init_level);
+	/* Get and set the initial power level */
+	if (of_property_read_u32(node, "qcom,initial-pwrlevel", &level))
+		level = 1;
 
-	if (init_level < 0 || init_level >= pwr->num_pwrlevels)
-		init_level = 1;
+	if (level < 0 || level >= pwr->num_pwrlevels)
+		level = 1;
 
-	pwr->active_pwrlevel = init_level;
-	pwr->default_pwrlevel = init_level;
+	pwr->active_pwrlevel = level;
+	pwr->default_pwrlevel = level;
+
+	/* Set the max power level */
+	pwr->max_pwrlevel = 0;
+
+	/* Get and set the min power level */
+	if (of_property_read_u32(node, "qcom,initial-min-pwrlevel", &level))
+		level = pwr->num_pwrlevels - 1;
+
+	if (level < 0 || level >= pwr->num_pwrlevels || level < pwr->default_pwrlevel)
+		level = pwr->num_pwrlevels - 1;
+
+	pwr->min_pwrlevel = level;
 }
 
 static void adreno_of_get_limits(struct adreno_device *adreno_dev,
@@ -733,7 +747,7 @@ static int adreno_of_get_legacy_pwrlevels(struct adreno_device *adreno_dev,
 	ret = adreno_of_parse_pwrlevels(adreno_dev, node);
 
 	if (!ret) {
-		adreno_of_get_initial_pwrlevel(&device->pwrctrl, parent);
+		adreno_of_get_initial_pwrlevels(&device->pwrctrl, parent);
 		adreno_of_get_limits(adreno_dev, parent);
 	}
 
@@ -766,7 +780,7 @@ static int adreno_of_get_pwrlevels(struct adreno_device *adreno_dev,
 				return ret;
 			}
 
-			adreno_of_get_initial_pwrlevel(&device->pwrctrl, child);
+			adreno_of_get_initial_pwrlevels(&device->pwrctrl, child);
 
 			/*
 			 * Check for global throttle-pwrlevel first and override
@@ -1511,14 +1525,16 @@ void adreno_set_active_ctxs_null(struct adreno_device *adreno_dev)
 {
 	int i;
 	struct adreno_ringbuffer *rb;
+	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 
 	FOR_EACH_RINGBUFFER(adreno_dev, rb, i) {
 		if (rb->drawctxt_active)
 			kgsl_context_put(&(rb->drawctxt_active->base));
 		rb->drawctxt_active = NULL;
 
-		kgsl_sharedmem_writel(rb->pagetable_desc,
-			PT_INFO_OFFSET(current_rb_ptname), 0);
+		kgsl_sharedmem_writel(device->scratch,
+			SCRATCH_RB_OFFSET(rb->id, current_rb_ptname),
+			0);
 	}
 }
 
@@ -1748,8 +1764,6 @@ static int _adreno_start(struct adreno_device *adreno_dev)
 
 	/* Set the bit to indicate that we've just powered on */
 	set_bit(ADRENO_DEVICE_PWRON, &adreno_dev->priv);
-
-	adreno_ringbuffer_set_global(adreno_dev, 0);
 
 	/* Clear the busy_data stats - we're starting over from scratch */
 	memset(&adreno_dev->busy_data, 0, sizeof(adreno_dev->busy_data));
@@ -2344,9 +2358,6 @@ static int adreno_soft_reset(struct kgsl_device *device)
 	adreno_dev->busy_data.bif_ram_cycles_write_ch1 = 0;
 	adreno_dev->busy_data.bif_starved_ram = 0;
 	adreno_dev->busy_data.bif_starved_ram_ch1 = 0;
-
-	/* Set the page table back to the default page table */
-	adreno_ringbuffer_set_global(adreno_dev, 0);
 
 	/* Reinitialize the GPU */
 	gpudev->start(adreno_dev);

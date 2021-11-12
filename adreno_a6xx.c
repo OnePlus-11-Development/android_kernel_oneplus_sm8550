@@ -50,6 +50,7 @@ static u32 a6xx_pwrup_reglist[] = {
 	A6XX_SP_NC_MODE_CNTL,
 	A6XX_PC_DBG_ECO_CNTL,
 	A6XX_RB_CONTEXT_SWITCH_GMEM_SAVE_RESTORE,
+	A6XX_UCHE_GBIF_GX_CONFIG,
 };
 
 /* IFPC only static powerup restore list */
@@ -93,8 +94,27 @@ static u32 a6xx_ifpc_pwrup_reglist[] = {
 };
 
 /* Applicable to a620, a635, a650 and a660 */
+static u32 a650_ifpc_pwrup_reglist[] = {
+	A6XX_CP_PROTECT_REG+32,
+	A6XX_CP_PROTECT_REG+33,
+	A6XX_CP_PROTECT_REG+34,
+	A6XX_CP_PROTECT_REG+35,
+	A6XX_CP_PROTECT_REG+36,
+	A6XX_CP_PROTECT_REG+37,
+	A6XX_CP_PROTECT_REG+38,
+	A6XX_CP_PROTECT_REG+39,
+	A6XX_CP_PROTECT_REG+40,
+	A6XX_CP_PROTECT_REG+41,
+	A6XX_CP_PROTECT_REG+42,
+	A6XX_CP_PROTECT_REG+43,
+	A6XX_CP_PROTECT_REG+44,
+	A6XX_CP_PROTECT_REG+45,
+	A6XX_CP_PROTECT_REG+46,
+	A6XX_CP_PROTECT_REG+47,
+};
+
+/* Applicable to a620, a635, a650 and a660 */
 static u32 a650_pwrup_reglist[] = {
-	A6XX_CP_PROTECT_REG + 47,          /* Programmed for infinite span */
 	A6XX_TPL1_BICUBIC_WEIGHTS_TABLE_0,
 	A6XX_TPL1_BICUBIC_WEIGHTS_TABLE_1,
 	A6XX_TPL1_BICUBIC_WEIGHTS_TABLE_2,
@@ -170,7 +190,8 @@ int a6xx_init(struct adreno_device *adreno_dev)
 	/* If the memory type is DDR 4, override the existing configuration */
 	if (of_fdt_get_ddrtype() == 0x7) {
 		if (adreno_is_a660_shima(adreno_dev) ||
-			adreno_is_a635(adreno_dev))
+			adreno_is_a635(adreno_dev) ||
+			adreno_is_a662(adreno_dev))
 			adreno_dev->highest_bank_bit = 14;
 		else if ((adreno_is_a650(adreno_dev) ||
 				adreno_is_a660(adreno_dev)))
@@ -258,6 +279,9 @@ __get_gmu_ao_cgc_mode_cntl(struct adreno_device *adreno_dev)
 		return 0x00000022;
 	else if (adreno_is_a615_family(adreno_dev))
 		return 0x00000222;
+	/* a662 should be checked before a660 */
+	else if (adreno_is_a662(adreno_dev))
+		return 0x00020200;
 	else if (adreno_is_a660(adreno_dev))
 		return 0x00020000;
 	else
@@ -298,7 +322,12 @@ static unsigned int __get_gmu_wfi_config(struct adreno_device *adreno_dev)
 void a6xx_cx_regulator_disable_wait(struct regulator *reg,
 				struct kgsl_device *device, u32 timeout)
 {
-	if (!adreno_regulator_disable_poll(device, reg, A6XX_GPU_CC_CX_GDSCR, timeout)) {
+	u32 offset;
+
+	offset = adreno_is_a662(ADRENO_DEVICE(device)) ?
+			 A662_GPU_CC_CX_GDSCR : A6XX_GPU_CC_CX_GDSCR;
+
+	if (!adreno_regulator_disable_poll(device, reg, offset, timeout)) {
 		dev_err(device->dev, "GPU CX wait timeout. Dumping CX votes:\n");
 		/* Dump the cx regulator consumer list */
 		qcom_clk_dump(NULL, reg, false);
@@ -361,6 +390,10 @@ static void a6xx_hwcg_set(struct adreno_device *adreno_dev, bool on)
 		kgsl_regwrite(device, a6xx_core->hwcg[i].offset,
 			on ? a6xx_core->hwcg[i].val : 0);
 
+	/* GBIF L2 CGC control is not part of the UCHE */
+	kgsl_regrmw(device, A6XX_UCHE_GBIF_GX_CONFIG, 0x70000,
+			FIELD_PREP(GENMASK(18, 16), on ? 2 : 0));
+
 	/*
 	 * Enable SP clock after programming HWCG registers.
 	 * A612 and A610 GPU is not having the GX power domain.
@@ -388,14 +421,21 @@ struct a6xx_reglist_list {
 
 static void a6xx_patch_pwrup_reglist(struct adreno_device *adreno_dev)
 {
-	struct a6xx_reglist_list reglist[3];
+	struct a6xx_reglist_list reglist[4];
 	void *ptr = adreno_dev->pwrup_reglist->hostptr;
 	struct cpu_gpu_lock *lock = ptr;
 	int items = 0, i, j;
 	u32 *dest = ptr + sizeof(*lock);
+	u16 list_offset = 0;
 
 	/* Static IFPC-only registers */
-	reglist[items++] = REGLIST(a6xx_ifpc_pwrup_reglist);
+	reglist[items] = REGLIST(a6xx_ifpc_pwrup_reglist);
+	list_offset += reglist[items++].count * 2;
+
+	if (adreno_is_a650_family(adreno_dev)) {
+		reglist[items] = REGLIST(a650_ifpc_pwrup_reglist);
+		list_offset += reglist[items++].count * 2;
+	}
 
 	/* Static IFPC + preemption registers */
 	reglist[items++] = REGLIST(a6xx_pwrup_reglist);
@@ -448,7 +488,7 @@ static void a6xx_patch_pwrup_reglist(struct adreno_device *adreno_dev)
 	 * all the lists and list_offset should be specified as the size in
 	 * dwords of the first entry in the list.
 	 */
-	lock->list_offset = reglist[0].count * 2;
+	lock->list_offset = list_offset;
 }
 
 
@@ -958,7 +998,7 @@ static int a6xx_send_cp_init(struct adreno_device *adreno_dev,
 				"CP initialization failed to idle\n");
 
 			kgsl_sharedmem_writel(device->scratch,
-				SCRATCH_RPTR_OFFSET(rb->id), 0);
+				SCRATCH_RB_OFFSET(rb->id, rptr), 0);
 			rb->wptr = 0;
 			rb->_wptr = 0;
 		}
@@ -982,11 +1022,11 @@ static int _preemption_init(struct adreno_device *adreno_dev,
 		cmds += cp_protected_mode(adreno_dev, cmds, 0);
 
 	*cmds++ = cp_type7_packet(CP_SET_PSEUDO_REGISTER, 6);
-	*cmds++ = 1;
+	*cmds++ = SET_PSEUDO_PRIV_NON_SECURE_SAVE_ADDR;
 	cmds += cp_gpuaddr(adreno_dev, cmds,
 			rb->preemption_desc->gpuaddr);
 
-	*cmds++ = 2;
+	*cmds++ = SET_PSEUDO_PRIV_SECURE_SAVE_ADDR;
 	cmds += cp_gpuaddr(adreno_dev, cmds,
 		rb->secure_preemption_desc->gpuaddr);
 
@@ -1052,7 +1092,7 @@ int a6xx_rb_start(struct adreno_device *adreno_dev)
 	FOR_EACH_RINGBUFFER(adreno_dev, rb, i) {
 		memset(rb->buffer_desc->hostptr, 0xaa, KGSL_RB_SIZE);
 		kgsl_sharedmem_writel(device->scratch,
-			SCRATCH_RPTR_OFFSET(rb->id), 0);
+			SCRATCH_RB_OFFSET(rb->id, rptr), 0);
 
 		rb->wptr = 0;
 		rb->_wptr = 0;
@@ -1063,7 +1103,7 @@ int a6xx_rb_start(struct adreno_device *adreno_dev)
 
 	/* Set up the current ringbuffer */
 	rb = ADRENO_CURRENT_RINGBUFFER(adreno_dev);
-	addr = SCRATCH_RPTR_GPU_ADDR(device, rb->id);
+	addr = SCRATCH_RB_GPU_ADDR(device, rb->id, rptr);
 
 	kgsl_regwrite(device, A6XX_CP_RB_RPTR_ADDR_LO, lower_32_bits(addr));
 	kgsl_regwrite(device, A6XX_CP_RB_RPTR_ADDR_HI, upper_32_bits(addr));

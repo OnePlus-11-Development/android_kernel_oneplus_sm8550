@@ -30,6 +30,15 @@ config DEVFREQ_GOV_QCOM_GPUBW_MON
 	  This governor will not be useful for non-Adreno based
 	  targets.
 
+config QCOM_KGSL_FENCE_TRACE
+	bool "Enable built-in tracing for adreno fence timeouts"
+	depends on QCOM_KGSL
+	help
+	  A boolean flag used to create a KGSL-specific tracing instance
+	  under <tracefs>/tracing/instances/kgsl-fence that can be used
+	  for debugging timeouts for fences between KGSL-contexts and
+	  sync-point blocks. If unsure, say 'N' here.
+
 config QCOM_ADRENO_DEFAULT_GOVERNOR
 	string "devfreq governor for the adreno core"
 	default "msm-adreno-tz"
@@ -87,3 +96,23 @@ config QCOM_KGSL_QDSS_STM
 	  When enabled, the Adreno GPU QDSS STM support is enabled. GPU QDSS STM
 	  memory will be mapped to GPU and QDSS clock needed to access this memory
 	  is voted. Debug kernels should say 'Y' here.
+
+config QCOM_KGSL_USE_SHMEM
+	bool "Enable using shmem for memory allocations"
+	depends on QCOM_KGSL
+	help
+	  Say 'Y' to enable using shmem for memory allocations. If enabled,
+	  there will be no support for the memory pools and higher order pages.
+	  But using shmem will help in making kgsl pages available for
+	  reclaiming.
+
+config QCOM_KGSL_PROCESS_RECLAIM
+	bool "Make driver pages available for reclaim"
+	depends on QCOM_KGSL
+	select QCOM_KGSL_USE_SHMEM
+	help
+	  Say 'Y' to make driver pages available for reclaiming. If enabled,
+	  shmem will be used for allocation. kgsl would know the process
+	  foreground/background activity through the sysfs entry exposed per
+	  process. Based on this kgsl can unpin given number of pages from
+	  background processes and make them available to the shrinker.

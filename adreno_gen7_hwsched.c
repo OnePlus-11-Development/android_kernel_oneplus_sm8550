@@ -332,6 +332,8 @@ gdsc_off:
 	/* Poll to make sure that the CX is off */
 	gen7_cx_regulator_disable_wait(gmu->cx_gdsc, device, 5000);
 
+	gen7_rdpm_cx_freq_update(gmu, 0);
+
 	return ret;
 }
 
@@ -391,6 +393,8 @@ clks_gdsc_off:
 gdsc_off:
 	/* Poll to make sure that the CX is off */
 	gen7_cx_regulator_disable_wait(gmu->cx_gdsc, device, 5000);
+
+	gen7_rdpm_cx_freq_update(gmu, 0);
 
 	return ret;
 }
@@ -464,6 +468,8 @@ static int gen7_hwsched_gmu_power_off(struct adreno_device *adreno_dev)
 
 	ret = gen7_rscc_sleep_sequence(adreno_dev);
 
+	gen7_rdpm_mx_freq_update(gmu, 0);
+
 	/* Now that we are done with GMU and GPU, Clear the GBIF */
 	ret = gen7_halt_gbif(adreno_dev);
 
@@ -475,6 +481,8 @@ static int gen7_hwsched_gmu_power_off(struct adreno_device *adreno_dev)
 
 	/* Poll to make sure that the CX is off */
 	gen7_cx_regulator_disable_wait(gmu->cx_gdsc, device, 5000);
+
+	gen7_rdpm_cx_freq_update(gmu, 0);
 
 	return ret;
 
@@ -703,7 +711,7 @@ static int gen7_hwsched_power_off(struct adreno_device *adreno_dev)
 {
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
-	int ret;
+	int ret = 0;
 
 	if (!test_bit(GMU_PRIV_GPU_STARTED, &gmu->flags))
 		return 0;
@@ -713,8 +721,11 @@ static int gen7_hwsched_power_off(struct adreno_device *adreno_dev)
 	/* process any profiling results that are available */
 	adreno_profile_process_results(ADRENO_DEVICE(device));
 
-	if (!gen7_hw_isidle(adreno_dev))
+	if (!gen7_hw_isidle(adreno_dev)) {
 		dev_err(&gmu->pdev->dev, "GPU isn't idle before SLUMBER\n");
+		gmu_core_fault_snapshot(device);
+		goto no_gx_power;
+	}
 
 	ret = gen7_gmu_oob_set(device, oob_gpu);
 	if (ret) {
@@ -883,6 +894,10 @@ static int gen7_hwsched_dcvs_set(struct adreno_device *adreno_dev,
 			adreno_hwsched_fault(adreno_dev, ADRENO_HARD_FAULT);
 	}
 
+	if (req.freq != INVALID_DCVS_IDX)
+		gen7_rdpm_mx_freq_update(gmu,
+			gmu->hfi.dcvs_table.gx_votes[req.freq].freq);
+
 	return ret;
 }
 
@@ -918,6 +933,8 @@ static void scale_gmu_frequency(struct adreno_device *adreno_dev, int buslevel)
 			freq);
 		return;
 	}
+
+	gen7_rdpm_cx_freq_update(gmu, freq / 1000);
 
 	trace_kgsl_gmu_pwrlevel(freq, prev_freq);
 

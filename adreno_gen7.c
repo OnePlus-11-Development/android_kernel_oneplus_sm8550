@@ -79,6 +79,19 @@ static const u32 gen7_ifpc_pwrup_reglist[] = {
 	GEN7_CP_PROTECT_REG+31,
 	GEN7_CP_PROTECT_REG+32,
 	GEN7_CP_PROTECT_REG+33,
+	GEN7_CP_PROTECT_REG+34,
+	GEN7_CP_PROTECT_REG+35,
+	GEN7_CP_PROTECT_REG+36,
+	GEN7_CP_PROTECT_REG+37,
+	GEN7_CP_PROTECT_REG+38,
+	GEN7_CP_PROTECT_REG+39,
+	GEN7_CP_PROTECT_REG+40,
+	GEN7_CP_PROTECT_REG+41,
+	GEN7_CP_PROTECT_REG+42,
+	GEN7_CP_PROTECT_REG+43,
+	GEN7_CP_PROTECT_REG+44,
+	GEN7_CP_PROTECT_REG+45,
+	GEN7_CP_PROTECT_REG+46,
 	GEN7_CP_PROTECT_REG+47,
 	GEN7_CP_AHB_CNTL,
 };
@@ -474,6 +487,36 @@ int gen7_start(struct adreno_device *adreno_dev)
 	return 0;
 }
 
+/* Offsets into the MX/CX mapped register regions */
+#define GEN7_RDPM_MX_OFFSET 0xf00
+#define GEN7_RDPM_CX_OFFSET 0xf14
+
+void gen7_rdpm_mx_freq_update(struct gen7_gmu_device *gmu, u32 freq)
+{
+	if (gmu->rdpm_mx_virt) {
+		writel_relaxed(freq/1000, (gmu->rdpm_mx_virt + GEN7_RDPM_MX_OFFSET));
+
+		/*
+		 * ensure previous writes post before this one,
+		 * i.e. act like normal writel()
+		 */
+		wmb();
+	}
+}
+
+void gen7_rdpm_cx_freq_update(struct gen7_gmu_device *gmu, u32 freq)
+{
+	if (gmu->rdpm_cx_virt) {
+		writel_relaxed(freq/1000, (gmu->rdpm_cx_virt + GEN7_RDPM_CX_OFFSET));
+
+		/*
+		 * ensure previous writes post before this one,
+		 * i.e. act like normal writel()
+		 */
+		wmb();
+	}
+}
+
 void gen7_spin_idle_debug(struct adreno_device *adreno_dev,
 				const char *str)
 {
@@ -549,11 +592,11 @@ static int gen7_post_start(struct adreno_device *adreno_dev)
 		return PTR_ERR(cmds);
 
 	cmds[0] = cp_type7_packet(CP_SET_PSEUDO_REGISTER, 6);
-	cmds[1] = 1;
+	cmds[1] = SET_PSEUDO_PRIV_NON_SECURE_SAVE_ADDR;
 	cmds[2] = lower_32_bits(rb->preemption_desc->gpuaddr);
 	cmds[3] = upper_32_bits(rb->preemption_desc->gpuaddr);
 
-	cmds[4] = 2;
+	cmds[4] = SET_PSEUDO_PRIV_SECURE_SAVE_ADDR;
 	cmds[5] = lower_32_bits(rb->secure_preemption_desc->gpuaddr);
 	cmds[6] = upper_32_bits(rb->secure_preemption_desc->gpuaddr);
 
@@ -589,9 +632,9 @@ int gen7_rb_start(struct adreno_device *adreno_dev)
 	FOR_EACH_RINGBUFFER(adreno_dev, rb, i) {
 		memset(rb->buffer_desc->hostptr, 0xaa, KGSL_RB_SIZE);
 		kgsl_sharedmem_writel(device->scratch,
-			SCRATCH_RPTR_OFFSET(rb->id), 0);
+			SCRATCH_RB_OFFSET(rb->id, rptr), 0);
 		kgsl_sharedmem_writel(device->scratch,
-			SCRATCH_BV_RPTR_OFFSET(rb->id), 0);
+			SCRATCH_RB_OFFSET(rb->id, bv_rptr), 0);
 
 		rb->wptr = 0;
 		rb->_wptr = 0;
@@ -603,11 +646,11 @@ int gen7_rb_start(struct adreno_device *adreno_dev)
 	/* Set up the current ringbuffer */
 	rb = ADRENO_CURRENT_RINGBUFFER(adreno_dev);
 
-	addr = SCRATCH_RPTR_GPU_ADDR(device, rb->id);
+	addr = SCRATCH_RB_GPU_ADDR(device, rb->id, rptr);
 	kgsl_regwrite(device, GEN7_CP_RB_RPTR_ADDR_LO, lower_32_bits(addr));
 	kgsl_regwrite(device, GEN7_CP_RB_RPTR_ADDR_HI, upper_32_bits(addr));
 
-	addr = SCRATCH_BV_RPTR_GPU_ADDR(device, rb->id);
+	addr = SCRATCH_RB_GPU_ADDR(device, rb->id, bv_rptr);
 	kgsl_regwrite(device, GEN7_CP_BV_RB_RPTR_ADDR_LO, lower_32_bits(addr));
 	kgsl_regwrite(device, GEN7_CP_BV_RB_RPTR_ADDR_HI, upper_32_bits(addr));
 
@@ -815,8 +858,17 @@ static void gen7_err_callback(struct adreno_device *adreno_dev, int bit)
 		dev_crit_ratelimited(dev, "UCHE: Trap interrupt\n");
 		break;
 	case GEN7_INT_TSBWRITEERROR:
-		dev_crit_ratelimited(dev, "TSB: Write error interrupt\n");
+		{
+		u32 lo, hi;
+
+		kgsl_regread(device, GEN7_RBBM_SECVID_TSB_STATUS_LO, &lo);
+		kgsl_regread(device, GEN7_RBBM_SECVID_TSB_STATUS_HI, &hi);
+
+		dev_crit_ratelimited(dev, "TSB: Write error interrupt: Address: 0x%llx MID: %d\n",
+			FIELD_GET(GENMASK(16, 0), hi) << 32 | lo,
+			FIELD_GET(GENMASK(31, 23), hi));
 		break;
+		}
 	default:
 		dev_crit_ratelimited(dev, "Unknown interrupt %d\n", bit);
 	}

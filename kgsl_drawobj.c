@@ -188,11 +188,23 @@ static void syncobj_timer(struct timer_list *t)
 		case KGSL_CMD_SYNCPOINT_TYPE_TIMELINE: {
 			int j;
 			struct event_timeline_info *info = event->priv;
+			struct dma_fence *fence = event->fence;
+			bool retired = false;
+			bool signaled = test_bit(DMA_FENCE_FLAG_SIGNALED_BIT,
+					&fence->flags);
+			const char *str = NULL;
 
+			if (fence->ops->signaled && fence->ops->signaled(fence))
+				retired = true;
+
+			if (!retired)
+				str = "not retired";
+			else if (retired && signaled)
+				str = "signaled";
+			else if (retired && !signaled)
+				str = "retired but not signaled";
 			dev_err(device->dev, "       [%u] FENCE %s\n",
-				i, dma_fence_is_signaled(event->fence) ?
-					"signaled" : "not signaled");
-
+				i, str);
 			for (j = 0; info && info[j].timeline; j++)
 				dev_err(device->dev, "       TIMELINE %d SEQNO %lld\n",
 					info[j].timeline, info[j].seqno);
@@ -530,10 +542,11 @@ static int drawobj_add_sync_timeline(struct kgsl_device *device,
 		drawobj_get_sync_timeline_priv(u64_to_user_ptr(sync.timelines),
 			sync.timelines_size, sync.count);
 
+	/* Set pending flag before adding callback to avoid race */
+	set_bit(event->id, &syncobj->pending);
+
 	ret = dma_fence_add_callback(event->fence,
 		&event->cb, drawobj_sync_timeline_fence_callback);
-
-	set_bit(event->id, &syncobj->pending);
 
 	if (ret) {
 		clear_bit(event->id, &syncobj->pending);
@@ -746,6 +759,7 @@ static void add_profiling_buffer(struct kgsl_device *device,
 {
 	struct kgsl_mem_entry *entry;
 	struct kgsl_drawobj *drawobj = DRAWOBJ(cmdobj);
+	u64 start;
 
 	if (!(drawobj->flags & KGSL_DRAWOBJ_PROFILING))
 		return;
@@ -762,7 +776,14 @@ static void add_profiling_buffer(struct kgsl_device *device,
 			gpuaddr);
 
 	if (entry != NULL) {
-		if (!kgsl_gpuaddr_in_memdesc(&entry->memdesc, gpuaddr, size)) {
+		start = id ? (entry->memdesc.gpuaddr + offset) : gpuaddr;
+		/*
+		 * Make sure there is enough room in the object to store the
+		 * entire profiling buffer object
+		 */
+		if (!kgsl_gpuaddr_in_memdesc(&entry->memdesc, gpuaddr, size) ||
+			!kgsl_gpuaddr_in_memdesc(&entry->memdesc, start,
+				sizeof(struct kgsl_drawobj_profiling_buffer))) {
 			kgsl_mem_entry_put(entry);
 			entry = NULL;
 		}
@@ -775,28 +796,7 @@ static void add_profiling_buffer(struct kgsl_device *device,
 		return;
 	}
 
-
-	if (!id) {
-		cmdobj->profiling_buffer_gpuaddr = gpuaddr;
-	} else {
-		u64 off = offset + sizeof(struct kgsl_drawobj_profiling_buffer);
-
-		/*
-		 * Make sure there is enough room in the object to store the
-		 * entire profiling buffer object
-		 */
-		if (off < offset || off >= entry->memdesc.size) {
-			dev_err(device->dev,
-				"ignore invalid profile offset ctxt %d id %d offset %lld gpuaddr %llx size %lld\n",
-			drawobj->context->id, id, offset, gpuaddr, size);
-			kgsl_mem_entry_put(entry);
-			return;
-		}
-
-		cmdobj->profiling_buffer_gpuaddr =
-			entry->memdesc.gpuaddr + offset;
-	}
-
+	cmdobj->profiling_buffer_gpuaddr = start;
 	cmdobj->profiling_buf_entry = entry;
 }
 

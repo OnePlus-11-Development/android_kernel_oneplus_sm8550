@@ -16,6 +16,17 @@
 #include "adreno_ringbuffer.h"
 #include "kgsl_sharedmem.h"
 
+/* Used to point CP to the SMMU record during preemption */
+#define SET_PSEUDO_SMMU_INFO 0
+/* Used to inform CP where to save preemption data at the time of switch out */
+#define SET_PSEUDO_PRIV_NON_SECURE_SAVE_ADDR 1
+/* Used to inform CP where to save secure preemption data at the time of switch out */
+#define SET_PSEUDO_PRIV_SECURE_SAVE_ADDR 2
+/* Used to inform CP where to save per context non-secure data at the time of switch out */
+#define SET_PSEUDO_NON_PRIV_SAVE_ADDR 3
+/* Used to inform CP where to save preemption counter data at the time of switch out */
+#define SET_PSEUDO_COUNTER 4
+
 /* ADRENO_DEVICE - Given a kgsl_device return the adreno device struct */
 #define ADRENO_DEVICE(device) \
 		container_of(device, struct adreno_device, dev)
@@ -178,6 +189,7 @@ enum adreno_gpurev {
 	ADRENO_REV_A640 = 640,
 	ADRENO_REV_A650 = 650,
 	ADRENO_REV_A660 = 660,
+	ADRENO_REV_A662 = 662,
 	ADRENO_REV_A680 = 680,
 	/*
 	 * Gen7 and higher version numbers may exceed 1 digit
@@ -187,6 +199,7 @@ enum adreno_gpurev {
 	 */
 	ADRENO_REV_GEN7_0_0 = 0x070000,
 	ADRENO_REV_GEN7_0_1 = 0x070001,
+	ADRENO_REV_GEN7_4_0 = 0x070400,
 };
 
 #define ADRENO_SOFT_FAULT BIT(0)
@@ -1014,6 +1027,7 @@ ADRENO_TARGET(a619, ADRENO_REV_A619)
 ADRENO_TARGET(a620, ADRENO_REV_A620)
 ADRENO_TARGET(a630, ADRENO_REV_A630)
 ADRENO_TARGET(a635, ADRENO_REV_A635)
+ADRENO_TARGET(a662, ADRENO_REV_A662)
 ADRENO_TARGET(a640, ADRENO_REV_A640)
 ADRENO_TARGET(a650, ADRENO_REV_A650)
 ADRENO_TARGET(a680, ADRENO_REV_A680)
@@ -1023,7 +1037,8 @@ static inline int adreno_is_a660(struct adreno_device *adreno_dev)
 {
 	unsigned int rev = ADRENO_GPUREV(adreno_dev);
 
-	return (rev == ADRENO_REV_A660 || rev == ADRENO_REV_A635);
+	return (rev == ADRENO_REV_A660 || rev == ADRENO_REV_A635 ||
+			rev == ADRENO_REV_A662);
 }
 
 /*
@@ -1061,7 +1076,8 @@ static inline int adreno_is_a650_family(struct adreno_device *adreno_dev)
 	unsigned int rev = ADRENO_GPUREV(adreno_dev);
 
 	return (rev == ADRENO_REV_A650 || rev == ADRENO_REV_A620 ||
-		rev == ADRENO_REV_A660 || rev == ADRENO_REV_A635);
+		rev == ADRENO_REV_A660 || rev == ADRENO_REV_A635 ||
+		rev == ADRENO_REV_A662);
 }
 
 static inline int adreno_is_a619_holi(struct adreno_device *adreno_dev)
@@ -1421,28 +1437,22 @@ static inline bool adreno_support_64bit(struct adreno_device *adreno_dev)
 	return (BITS_PER_LONG > 32 && ADRENO_GPUREV(adreno_dev) >= 500);
 }
 
-static inline void adreno_ringbuffer_set_global(
-		struct adreno_device *adreno_dev, int name)
-{
-	kgsl_sharedmem_writel(adreno_dev->ringbuffers[0].pagetable_desc,
-		PT_INFO_OFFSET(current_global_ptname), name);
-}
-
-static inline void adreno_ringbuffer_set_pagetable(struct adreno_ringbuffer *rb,
-		struct kgsl_pagetable *pt)
+static inline void adreno_ringbuffer_set_pagetable(struct kgsl_device *device,
+	struct adreno_ringbuffer *rb, struct kgsl_pagetable *pt)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&rb->preempt_lock, flags);
 
-	kgsl_sharedmem_writel(rb->pagetable_desc,
-		PT_INFO_OFFSET(current_rb_ptname), pt->name);
+	kgsl_sharedmem_writel(device->scratch,
+		SCRATCH_RB_OFFSET(rb->id, current_rb_ptname), pt->name);
 
-	kgsl_sharedmem_writeq(rb->pagetable_desc,
-		PT_INFO_OFFSET(ttbr0), kgsl_mmu_pagetable_get_ttbr0(pt));
+	kgsl_sharedmem_writeq(device->scratch,
+		SCRATCH_RB_OFFSET(rb->id, ttbr0),
+		kgsl_mmu_pagetable_get_ttbr0(pt));
 
-	kgsl_sharedmem_writel(rb->pagetable_desc,
-		PT_INFO_OFFSET(contextidr), 0);
+	kgsl_sharedmem_writel(device->scratch,
+		SCRATCH_RB_OFFSET(rb->id, contextidr), 0);
 
 	spin_unlock_irqrestore(&rb->preempt_lock, flags);
 }
@@ -1753,6 +1763,7 @@ static inline void adreno_set_dispatch_ops(struct adreno_device *adreno_dev,
 	adreno_dev->dispatch_ops = ops;
 }
 
+#ifdef CONFIG_QCOM_KGSL_FENCE_TRACE
 /**
  * adreno_fence_trace_array_init - Initialize an always on trace array
  * @device: A GPU device handle
@@ -1760,6 +1771,9 @@ static inline void adreno_set_dispatch_ops(struct adreno_device *adreno_dev,
  * Register an always-on trace array to for fence timeout debugging
  */
 void adreno_fence_trace_array_init(struct kgsl_device *device);
+#else
+static inline void adreno_fence_trace_array_init(struct kgsl_device *device) {}
+#endif
 
 /*
  * adreno_drawobj_set_constraint - Set a power constraint

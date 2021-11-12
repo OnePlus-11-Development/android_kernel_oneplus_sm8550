@@ -37,10 +37,10 @@ static int gen7_rb_pagetable_switch(struct adreno_device *adreno_dev,
 	cmds[count++] = id;
 
 	cmds[count++] = cp_type7_packet(CP_MEM_WRITE, 5);
-	cmds[count++] = lower_32_bits(rb->pagetable_desc->gpuaddr +
-			PT_INFO_OFFSET(ttbr0));
-	cmds[count++] = upper_32_bits(rb->pagetable_desc->gpuaddr +
-			PT_INFO_OFFSET(ttbr0));
+	cmds[count++] = lower_32_bits(SCRATCH_RB_GPU_ADDR(device,
+				rb->id, ttbr0));
+	cmds[count++] = upper_32_bits(SCRATCH_RB_GPU_ADDR(device,
+				rb->id, ttbr0));
 	cmds[count++] = lower_32_bits(ttbr0);
 	cmds[count++] = upper_32_bits(ttbr0);
 	cmds[count++] = id;
@@ -64,15 +64,15 @@ static int gen7_rb_context_switch(struct adreno_device *adreno_dev,
 		adreno_drawctxt_get_pagetable(drawctxt);
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	int count = 0;
-	u32 cmds[42];
+	u32 cmds[46];
 
 	/* Sync both threads */
 	cmds[count++] = cp_type7_packet(CP_THREAD_CONTROL, 1);
 	cmds[count++] = CP_SYNC_THREADS | CP_SET_THREAD_BOTH;
 	/* Reset context state */
 	cmds[count++] = cp_type7_packet(CP_RESET_CONTEXT_STATE, 1);
-	cmds[count++] = CP_CLEAR_BV_BR_COUNTER | CP_CLEAR_RESOURCE_TABLE |
-			CP_CLEAR_ON_CHIP_TS;
+	cmds[count++] = CP_RESET_GLOBAL_LOCAL_TS | CP_CLEAR_BV_BR_COUNTER |
+			CP_CLEAR_RESOURCE_TABLE | CP_CLEAR_ON_CHIP_TS;
 	/*
 	 * Enable/disable concurrent binning for pagetable switch and
 	 * set the thread to BR since only BR can execute the pagetable
@@ -87,7 +87,7 @@ static int gen7_rb_context_switch(struct adreno_device *adreno_dev,
 			drawctxt, pagetable, &cmds[count]);
 	else {
 		struct kgsl_iommu *iommu = KGSL_IOMMU(device);
-		u32 id = drawctxt ? drawctxt->base.id : 0;
+
 		u32 offset = GEN7_SMMU_BASE + (iommu->cb0_offset >> 2) + 0x0d;
 
 		/*
@@ -96,7 +96,7 @@ static int gen7_rb_context_switch(struct adreno_device *adreno_dev,
 		 * need any special sequence or locking to change it
 		 */
 		cmds[count++] = cp_type4_packet(offset, 1);
-		cmds[count++] = id;
+		cmds[count++] = drawctxt->base.id;
 	}
 
 	cmds[count++] = cp_type7_packet(CP_NOP, 1);
@@ -118,6 +118,15 @@ static int gen7_rb_context_switch(struct adreno_device *adreno_dev,
 
 	cmds[count++] = cp_type7_packet(CP_EVENT_WRITE, 1);
 	cmds[count++] = 0x31;
+
+	if (adreno_is_preemption_enabled(adreno_dev)) {
+		u64 gpuaddr = drawctxt->base.user_ctxt_record->memdesc.gpuaddr;
+
+		cmds[count++] = cp_type7_packet(CP_SET_PSEUDO_REGISTER, 3);
+		cmds[count++] = SET_PSEUDO_NON_PRIV_SAVE_ADDR;
+		cmds[count++] = lower_32_bits(gpuaddr);
+		cmds[count++] = upper_32_bits(gpuaddr);
+	}
 
 	return gen7_ringbuffer_addcmds(adreno_dev, rb, NULL, F_NOTPROTECTED,
 			cmds, count, 0, NULL);
@@ -305,6 +314,37 @@ int gen7_ringbuffer_addcmds(struct adreno_device *adreno_dev,
 	if (test_bit(KGSL_FT_PAGEFAULT_GPUHALT_ENABLE, &device->mmu.pfpolicy))
 		cmds[index++] = cp_type7_packet(CP_WAIT_MEM_WRITES, 0);
 
+	if (is_concurrent_binning(drawctxt)) {
+		u64 addr = SCRATCH_RB_GPU_ADDR(device, rb->id, bv_ts);
+
+		cmds[index++] = cp_type7_packet(CP_THREAD_CONTROL, 1);
+		cmds[index++] = CP_SET_THREAD_BV;
+
+		/*
+		 * Make sure the timestamp is committed once BV pipe is
+		 * completely done with this submission.
+		 */
+		cmds[index++] = cp_type7_packet(CP_EVENT_WRITE, 4);
+		cmds[index++] = CACHE_CLEAN | BIT(27);
+		cmds[index++] = lower_32_bits(addr);
+		cmds[index++] = upper_32_bits(addr);
+		cmds[index++] = rb->timestamp;
+
+		cmds[index++] = cp_type7_packet(CP_THREAD_CONTROL, 1);
+		cmds[index++] = CP_SET_THREAD_BR;
+
+		/*
+		 * This makes sure that BR doesn't race ahead and commit
+		 * timestamp to memstore while BV is still processing
+		 * this submission.
+		 */
+		cmds[index++] = cp_type7_packet(CP_WAIT_TIMESTAMP, 4);
+		cmds[index++] = 0;
+		cmds[index++] = lower_32_bits(addr);
+		cmds[index++] = upper_32_bits(addr);
+		cmds[index++] = rb->timestamp;
+	}
+
 	/*
 	 * If this is an internal command, just write the ringbuffer timestamp,
 	 * otherwise, write both
@@ -431,7 +471,7 @@ static int gen7_drawctxt_switch(struct adreno_device *adreno_dev,
 			ADRENO_DRAWOBJ_PROFILE_OFFSET((cmdobj)->profile_index, \
 				field))
 
-#define GEN7_COMMAND_DWORDS 38
+#define GEN7_COMMAND_DWORDS 52
 
 int gen7_ringbuffer_submitcmd(struct adreno_device *adreno_dev,
 		struct kgsl_drawobj_cmd *cmdobj, u32 flags,
