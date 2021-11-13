@@ -232,9 +232,6 @@ void gen7_cx_regulator_disable_wait(struct regulator *reg,
 }
 
 #define RBBM_CLOCK_CNTL_ON 0x8aa8aa82
-#define GMU_AO_CGC_MODE_CNTL 0x00020000
-#define GMU_AO_CGC_DELAY_CNTL 0x00010111
-#define GMU_AO_CGC_HYST_CNTL 0x00005555
 
 static void gen7_hwcg_set(struct adreno_device *adreno_dev, bool on)
 {
@@ -246,12 +243,9 @@ static void gen7_hwcg_set(struct adreno_device *adreno_dev, bool on)
 	if (!adreno_dev->hwcg_enabled)
 		on = false;
 
-	gmu_core_regwrite(device, GEN7_GPU_GMU_AO_GMU_CGC_MODE_CNTL,
-			on ? GMU_AO_CGC_MODE_CNTL : 0);
-	gmu_core_regwrite(device, GEN7_GPU_GMU_AO_GMU_CGC_DELAY_CNTL,
-			on ? GMU_AO_CGC_DELAY_CNTL : 0);
-	gmu_core_regwrite(device, GEN7_GPU_GMU_AO_GMU_CGC_HYST_CNTL,
-			on ? GMU_AO_CGC_HYST_CNTL : 0);
+	for (i = 0; i < gen7_core->ao_hwcg_count; i++)
+		gmu_core_regwrite(device, gen7_core->ao_hwcg[i].offset,
+			on ? gen7_core->ao_hwcg[i].val : 0);
 
 	kgsl_regread(device, GEN7_RBBM_CLOCK_CNTL, &value);
 
