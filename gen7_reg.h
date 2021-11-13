@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _GEN7_REG_H
@@ -1149,6 +1150,9 @@
 #define GEN7_RSCC_TCS1_DRV0_STATUS			0x003ee
 #define GEN7_RSCC_TCS2_DRV0_STATUS			0x00496
 #define GEN7_RSCC_TCS3_DRV0_STATUS			0x0053e
+
+/* Device-specific RSCC registers */
+#define GEN7_2_0_RSCC_SEQ_MEM_0_DRV0			0x00154
 
 /* GPU PDC sequencer registers in AOSS.RPMh domain */
 #define GEN7_PDC_GPU_ENABLE_PDC				0x1140
