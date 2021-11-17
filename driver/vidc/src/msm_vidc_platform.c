@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of_platform.h>
@@ -9,8 +10,18 @@
 #include "msm_vidc_v4l2.h"
 #include "msm_vidc_vb2.h"
 #include "msm_vidc_control.h"
+#if defined(CONFIG_MSM_VIDC_WAIPIO)
 #include "msm_vidc_waipio.h"
+#endif
+#if defined(CONFIG_MSM_VIDC_KALAMA)
+#include "msm_vidc_kalama.h"
+#endif
+#if defined(CONFIG_MSM_VIDC_IRIS2)
 #include "msm_vidc_iris2.h"
+#endif
+#if defined(CONFIG_MSM_VIDC_IRIS3)
+#include "msm_vidc_iris3.h"
+#endif
 
 static struct v4l2_file_operations msm_v4l2_file_operations = {
 	.owner                          = THIS_MODULE,
@@ -137,7 +148,7 @@ static int msm_vidc_init_ops(struct msm_vidc_core *core)
 
 static int msm_vidc_deinit_platform_variant(struct msm_vidc_core *core, struct device *dev)
 {
-	int rc = 0;
+	int rc = -EINVAL;
 
 	if (!core || !dev) {
 		d_vpr_e("%s: Invalid params\n", __func__);
@@ -146,22 +157,30 @@ static int msm_vidc_deinit_platform_variant(struct msm_vidc_core *core, struct d
 
 	d_vpr_h("%s()\n", __func__);
 
+#if defined(CONFIG_MSM_VIDC_WAIPIO)
 	if (of_device_is_compatible(dev->of_node, "qcom,msm-vidc-waipio")) {
 		rc = msm_vidc_deinit_platform_waipio(core, dev);
-	} else {
-		d_vpr_e("%s(): unknown platform\n", __func__);
-		rc = -EINVAL;
+		if (rc)
+			d_vpr_e("%s: failed with %d\n", __func__, rc);
+		goto end_target_config;
 	}
+#endif
+#if defined(CONFIG_MSM_VIDC_KALAMA)
+	if (of_device_is_compatible(dev->of_node, "qcom,msm-vidc-kalama")) {
+		rc = msm_vidc_deinit_platform_kalama(core, dev);
+		if (rc)
+			d_vpr_e("%s: failed with %d\n", __func__, rc);
+		goto end_target_config;
+	}
+#endif
 
-	if (rc)
-		d_vpr_e("%s: failed with %d\n", __func__, rc);
-
+end_target_config:
 	return rc;
 }
 
 static int msm_vidc_init_platform_variant(struct msm_vidc_core *core, struct device *dev)
 {
-	int rc = 0;
+	int rc = -EINVAL;
 
 	if (!core || !dev) {
 		d_vpr_e("%s: Invalid params\n", __func__);
@@ -170,22 +189,30 @@ static int msm_vidc_init_platform_variant(struct msm_vidc_core *core, struct dev
 
 	d_vpr_h("%s()\n", __func__);
 
+#if defined(CONFIG_MSM_VIDC_WAIPIO)
 	if (of_device_is_compatible(dev->of_node, "qcom,msm-vidc-waipio")) {
 		rc = msm_vidc_init_platform_waipio(core, dev);
-	} else {
-		d_vpr_e("%s(): unknown platform\n", __func__);
-		rc = -EINVAL;
+		if (rc)
+			d_vpr_e("%s: failed with %d\n", __func__, rc);
+		goto end_target_config;
 	}
+#endif
+#if defined(CONFIG_MSM_VIDC_KALAMA)
+	if (of_device_is_compatible(dev->of_node, "qcom,msm-vidc-kalama")) {
+		rc = msm_vidc_init_platform_kalama(core, dev);
+		if (rc)
+			d_vpr_e("%s: failed with %d\n", __func__, rc);
+		goto end_target_config;
+	}
+#endif
 
-	if (rc)
-		d_vpr_e("%s: failed with %d\n", __func__, rc);
-
+end_target_config:
 	return rc;
 }
 
 static int msm_vidc_deinit_vpu(struct msm_vidc_core *core, struct device *dev)
 {
-	int rc = 0;
+	int rc = -EINVAL;
 
 	if (!core || !dev) {
 		d_vpr_e("%s: Invalid params\n", __func__);
@@ -194,40 +221,54 @@ static int msm_vidc_deinit_vpu(struct msm_vidc_core *core, struct device *dev)
 
 	d_vpr_h("%s()\n", __func__);
 
+#if defined(CONFIG_MSM_VIDC_IRIS2)
 	if (of_device_is_compatible(dev->of_node, "qcom,msm-vidc-iris2")) {
 		rc = msm_vidc_deinit_iris2(core);
-	} else {
-		d_vpr_e("%s(): unknown vpu\n", __func__);
-		rc = -EINVAL;
+		if (rc)
+			d_vpr_e("%s: failed with %d\n", __func__, rc);
+		goto end_of_iris_config;
 	}
+#endif
+#if defined(CONFIG_MSM_VIDC_IRIS3)
+	if (of_device_is_compatible(dev->of_node, "qcom,msm-vidc-iris3")) {
+		rc = msm_vidc_deinit_iris3(core);
+		if (rc)
+			d_vpr_e("%s: failed with %d\n", __func__, rc);
+		goto end_of_iris_config;
+	}
+#endif
 
-	if (rc)
-		d_vpr_e("%s: failed with %d\n", __func__, rc);
-
+end_of_iris_config:
 	return rc;
 }
 
 static int msm_vidc_init_vpu(struct msm_vidc_core *core, struct device *dev)
 {
-	int rc = 0;
+	int rc = -EINVAL;
 
 	if (!core || !dev) {
 		d_vpr_e("%s: Invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	d_vpr_h("%s()\n", __func__);
-
+#if defined(CONFIG_MSM_VIDC_IRIS2)
 	if (of_device_is_compatible(dev->of_node, "qcom,msm-vidc-iris2")) {
 		rc = msm_vidc_init_iris2(core);
-	} else {
-		d_vpr_e("%s(): unknown vpu\n", __func__);
-		rc = -EINVAL;
+		if (rc)
+			d_vpr_e("%s: failed with %d\n", __func__, rc);
+		goto end_of_iris_config;
 	}
+#endif
+#if defined(CONFIG_MSM_VIDC_IRIS3)
+	if (of_device_is_compatible(dev->of_node, "qcom,msm-vidc-iris3")) {
+		rc = msm_vidc_init_iris3(core);
+		if (rc)
+			d_vpr_e("%s: failed with %d\n", __func__, rc);
+		goto end_of_iris_config;
+	}
+#endif
 
-	if (rc)
-		d_vpr_e("%s: failed with %d\n", __func__, rc);
-
+end_of_iris_config:
 	return rc;
 }
 
