@@ -557,6 +557,27 @@ uint64_t msm_gem_iova(struct drm_gem_object *obj,
 	return vma ? vma->iova : 0;
 }
 
+/*
+ * Unpin a iova by updating the reference counts. The memory isn't actually
+ * purged until something else (shrinker, mm_notifier, destroy, etc) decides
+ * to get rid of it
+ */
+void msm_gem_unpin_iova(struct drm_gem_object *obj,
+		struct msm_gem_address_space *aspace)
+{
+	struct msm_gem_object *msm_obj = to_msm_bo(obj);
+	struct msm_gem_vma *vma;
+
+	mutex_lock(&msm_obj->lock);
+	vma = lookup_vma(obj, aspace);
+
+	if (!WARN_ON(!vma))
+		msm_gem_unmap_vma(vma->aspace, vma, msm_obj->sgt,
+				msm_obj->flags);
+
+	mutex_unlock(&msm_obj->lock);
+}
+
 void msm_gem_put_iova(struct drm_gem_object *obj,
 		struct msm_gem_address_space *aspace)
 {

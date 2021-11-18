@@ -50,7 +50,12 @@ struct msm_mmu_funcs {
 			int dir, u32 flags);
 	void (*destroy)(struct msm_mmu *mmu);
 	bool (*is_domain_secure)(struct msm_mmu *mmu);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	int (*enable_smmu_translations)(struct msm_mmu *mmu);
+#else
+	int (*set_attribute)(struct msm_mmu *mmu,
+			enum iommu_attr attr, void *data);
+#endif
 	int (*one_to_one_map)(struct msm_mmu *mmu, uint32_t iova,
 			uint32_t dest_address, uint32_t size, int prot);
 	int (*one_to_one_unmap)(struct msm_mmu *mmu, uint32_t dest_address,

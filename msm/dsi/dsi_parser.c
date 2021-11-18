@@ -897,8 +897,13 @@ end:
 	return -EINVAL;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 int dsi_parser_get_named_gpio(const struct device_node *np,
 				const char *propname, int index)
+#else
+int dsi_parser_get_named_gpio(struct device_node *np,
+				const char *propname, int index)
+#endif
 {
 	int gpio = -EINVAL;
 

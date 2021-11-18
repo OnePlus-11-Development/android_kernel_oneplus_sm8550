@@ -4060,6 +4060,10 @@ static int _sde_kms_mmu_init(struct sde_kms *sde_kms)
 	struct msm_mmu *mmu;
 	int i, ret;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
+	int early_map = 0;
+#endif
+
 	if (!sde_kms || !sde_kms->dev || !sde_kms->dev->dev)
 		return -EINVAL;
 
@@ -4099,11 +4103,22 @@ static int _sde_kms_mmu_init(struct sde_kms *sde_kms)
 		 * disable early-map which would have been enabled during
 		 * bootup by smmu through the device-tree hint for cont-spash
 		 */
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 		ret = mmu->funcs->enable_smmu_translations(mmu);
 		if (ret) {
 			SDE_ERROR("failed to enable_s1_translations ret:%d\n", ret);
 			goto enable_trans_fail;
 		}
+#else
+		ret = mmu->funcs->set_attribute(mmu, DOMAIN_ATTR_EARLY_MAP,
+				 &early_map);
+		if (ret) {
+			SDE_ERROR("failed to set_att ret:%d, early_map:%d\n",
+					ret, early_map);
+			goto enable_trans_fail;
+		}
+#endif
 	}
 
 	sde_kms->base.aspace = sde_kms->aspace[0];
