@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
 #ifndef __SDE_VBIF_H__
@@ -71,6 +71,14 @@ struct sde_vbif_set_qos_params {
 	u32 num;
 	enum sde_vbif_client_type client_type;
 };
+
+/**
+ * sde_vbif_clk_register - register vbif clk client
+ * @sde_kms:	SDE handler
+ * @client:	pointer to VBIF clk client info
+ * Returns:	0 on success, error code otherwise
+ */
+int sde_vbif_clk_register(struct sde_kms *sde_kms, struct sde_vbif_clk_client *client);
 
 /**
  * sde_vbif_set_ot_limit - set OT limit for vbif client

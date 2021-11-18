@@ -3703,11 +3703,11 @@ static void _sde_plane_setup_capabilities_blob(struct sde_plane *psde,
 	sde_kms_info_add_keyint(info, "max_per_pipe_bw_high",
 			psde->pipe_sblk->max_per_pipe_bw_high * 1000LL);
 
-	if (psde->pipe <= SSPP_VIG3 && psde->pipe >= SSPP_VIG0)
+	if (SDE_SSPP_VALID_VIG(psde->pipe))
 		pipe_id = psde->pipe -  SSPP_VIG0;
-	else if (psde->pipe <= SSPP_RGB3 && psde->pipe >= SSPP_RGB0)
+	else if (SDE_SSPP_VALID_RGB(psde->pipe))
 		pipe_id = psde->pipe -  SSPP_RGB0;
-	else if (psde->pipe <= SSPP_DMA3 && psde->pipe >= SSPP_DMA0)
+	else if (SDE_SSPP_VALID_DMA(psde->pipe))
 		pipe_id = psde->pipe -  SSPP_DMA0;
 	else
 		pipe_id = -1;
@@ -4738,6 +4738,7 @@ struct drm_plane *sde_plane_init(struct drm_device *dev,
 	struct msm_drm_private *priv;
 	struct sde_kms *kms;
 	enum drm_plane_type type;
+	struct sde_vbif_clk_client clk_client;
 	int ret = -EINVAL;
 
 	if (!dev) {
@@ -4783,8 +4784,8 @@ struct drm_plane *sde_plane_init(struct drm_device *dev,
 	}
 
 	/* initialize underlying h/w driver */
-	psde->pipe_hw = sde_hw_sspp_init(pipe, kms->mmio, kms->catalog,
-							psde->is_virtual);
+	psde->pipe_hw = sde_hw_sspp_init(pipe, kms->mmio, kms->catalog, psde->is_virtual,
+			&clk_client);
 	if (IS_ERR(psde->pipe_hw)) {
 		SDE_ERROR("[%u]SSPP init failed\n", pipe);
 		ret = PTR_ERR(psde->pipe_hw);
@@ -4792,6 +4793,15 @@ struct drm_plane *sde_plane_init(struct drm_device *dev,
 	} else if (!psde->pipe_hw->cap || !psde->pipe_hw->cap->sblk) {
 		SDE_ERROR("[%u]SSPP init returned invalid cfg\n", pipe);
 		goto clean_sspp;
+	}
+
+	if (test_bit(SDE_FEATURE_VBIF_CLK_SPLIT, kms->catalog->features)) {
+		ret = sde_vbif_clk_register(kms, &clk_client);
+		if (ret) {
+			SDE_ERROR("failed to register vbif client %d\n",
+					clk_client.clk_ctrl);
+			goto clean_sspp;
+		}
 	}
 
 	/* cache features mask for later */

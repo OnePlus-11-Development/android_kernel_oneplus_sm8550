@@ -2030,25 +2030,27 @@ static int _sde_sspp_setup_cmn(struct device_node *np,
 		sblk->src_blk.len = PROP_VALUE_ACCESS(props->values, SSPP_SIZE,
 				0);
 
-		for (j = 0; j < sde_cfg->mdp_count; j++) {
-			sde_cfg->mdp[j].clk_ctrls[sspp->clk_ctrl].reg_off =
-					PROP_BITVALUE_ACCESS(props->values,
-					SSPP_CLK_CTRL, i, 0);
-			sde_cfg->mdp[j].clk_ctrls[sspp->clk_ctrl].bit_off =
-					PROP_BITVALUE_ACCESS(props->values,
-					SSPP_CLK_CTRL, i, 1);
-			sde_cfg->mdp[j].clk_status[sspp->clk_ctrl].reg_off =
-					PROP_BITVALUE_ACCESS(props->values,
-					SSPP_CLK_STATUS, i, 0);
-			sde_cfg->mdp[j].clk_status[sspp->clk_ctrl].bit_off =
-					PROP_BITVALUE_ACCESS(props->values,
-					SSPP_CLK_STATUS, i, 1);
-		}
+		if (!test_bit(SDE_FEATURE_VBIF_CLK_SPLIT, sde_cfg->features)) {
+			for (j = 0; j < sde_cfg->mdp_count; j++) {
+				sde_cfg->mdp[j].clk_ctrls[sspp->clk_ctrl].reg_off =
+						PROP_BITVALUE_ACCESS(props->values,
+						SSPP_CLK_CTRL, i, 0);
+				sde_cfg->mdp[j].clk_ctrls[sspp->clk_ctrl].bit_off =
+						PROP_BITVALUE_ACCESS(props->values,
+						SSPP_CLK_CTRL, i, 1);
+				sde_cfg->mdp[j].clk_status[sspp->clk_ctrl].reg_off =
+						PROP_BITVALUE_ACCESS(props->values,
+						SSPP_CLK_STATUS, i, 0);
+				sde_cfg->mdp[j].clk_status[sspp->clk_ctrl].bit_off =
+						PROP_BITVALUE_ACCESS(props->values,
+						SSPP_CLK_STATUS, i, 1);
+			}
 
-		SDE_DEBUG("xin:%d ram:%d clk%d:%x/%d\n",
-			sspp->xin_id, sblk->pixel_ram_size, sspp->clk_ctrl,
-			sde_cfg->mdp[0].clk_ctrls[sspp->clk_ctrl].reg_off,
-			sde_cfg->mdp[0].clk_ctrls[sspp->clk_ctrl].bit_off);
+			SDE_DEBUG("xin:%d ram:%d clk%d:%x/%d\n",
+					sspp->xin_id, sblk->pixel_ram_size, sspp->clk_ctrl,
+					sde_cfg->mdp[0].clk_ctrls[sspp->clk_ctrl].reg_off,
+					sde_cfg->mdp[0].clk_ctrls[sspp->clk_ctrl].bit_off);
+		}
 	}
 
 end:
@@ -2586,31 +2588,29 @@ static int sde_wb_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
 			}
 		}
 
-		for (j = 0; j < sde_cfg->mdp_count; j++) {
-			sde_cfg->mdp[j].clk_ctrls[wb->clk_ctrl].reg_off =
-				PROP_BITVALUE_ACCESS(prop_value,
-						WB_CLK_CTRL, i, 0);
-			sde_cfg->mdp[j].clk_ctrls[wb->clk_ctrl].bit_off =
-				PROP_BITVALUE_ACCESS(prop_value,
-						WB_CLK_CTRL, i, 1);
-			sde_cfg->mdp[j].clk_status[wb->clk_ctrl].reg_off =
-				PROP_BITVALUE_ACCESS(prop_value,
-						WB_CLK_STATUS, i, 0);
-			sde_cfg->mdp[j].clk_status[wb->clk_ctrl].bit_off =
-				PROP_BITVALUE_ACCESS(prop_value,
-						WB_CLK_STATUS, i, 1);
+		if (!test_bit(SDE_FEATURE_VBIF_CLK_SPLIT, sde_cfg->features)) {
+			for (j = 0; j < sde_cfg->mdp_count; j++) {
+				sde_cfg->mdp[j].clk_ctrls[wb->clk_ctrl].reg_off =
+					PROP_BITVALUE_ACCESS(prop_value,
+							WB_CLK_CTRL, i, 0);
+				sde_cfg->mdp[j].clk_ctrls[wb->clk_ctrl].bit_off =
+					PROP_BITVALUE_ACCESS(prop_value,
+							WB_CLK_CTRL, i, 1);
+				sde_cfg->mdp[j].clk_status[wb->clk_ctrl].reg_off =
+					PROP_BITVALUE_ACCESS(prop_value,
+							WB_CLK_STATUS, i, 0);
+				sde_cfg->mdp[j].clk_status[wb->clk_ctrl].bit_off =
+					PROP_BITVALUE_ACCESS(prop_value,
+							WB_CLK_STATUS, i, 1);
+			}
+
+			SDE_DEBUG("wb:%d xin:%d vbif:%d clk%d:%x/%d\n", wb->id - WB_0,
+					wb->xin_id, wb->vbif_idx, wb->clk_ctrl,
+					sde_cfg->mdp[0].clk_ctrls[wb->clk_ctrl].reg_off,
+					sde_cfg->mdp[0].clk_ctrls[wb->clk_ctrl].bit_off);
 		}
 
 		wb->format_list = sde_cfg->wb_formats;
-
-		SDE_DEBUG(
-			"wb:%d xin:%d vbif:%d clk%d:%x/%d\n",
-			wb->id - WB_0,
-			wb->xin_id,
-			wb->vbif_idx,
-			wb->clk_ctrl,
-			sde_cfg->mdp[0].clk_ctrls[wb->clk_ctrl].reg_off,
-			sde_cfg->mdp[0].clk_ctrls[wb->clk_ctrl].bit_off);
 	}
 
 end:
@@ -5108,6 +5108,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		set_bit(SDE_FEATURE_UBWC_STATS, sde_cfg->features);
 		set_bit(SDE_FEATURE_HW_VSYNC_TS, sde_cfg->features);
 		set_bit(SDE_FEATURE_AVR_STEP, sde_cfg->features);
+		set_bit(SDE_FEATURE_VBIF_CLK_SPLIT, sde_cfg->features);
 		sde_cfg->allowed_dsc_reservation_switch = SDE_DP_DSC_RESERVATION_SWITCH;
 		sde_cfg->perf.min_prefill_lines = 40;
 		sde_cfg->vbif_qos_nlvl = 8;

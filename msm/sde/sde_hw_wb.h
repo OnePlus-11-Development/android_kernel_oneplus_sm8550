@@ -11,6 +11,7 @@
 #include "sde_hw_top.h"
 #include "sde_hw_util.h"
 #include "sde_hw_pingpong.h"
+#include "sde_hw_vbif.h"
 
 struct sde_hw_wb;
 
@@ -211,11 +212,13 @@ static inline struct sde_hw_wb *to_sde_hw_wb(struct sde_hw_blk_reg_map *hw)
  * @addr: mapped register io address of MDP
  * @m :   pointer to mdss catalog data
  * @hw_mdp: pointer to mdp top hw driver object
+ * @clk_client: pointer to vbif clk client info
  */
 struct sde_hw_blk_reg_map *sde_hw_wb_init(enum sde_wb idx,
 		void __iomem *addr,
 		struct sde_mdss_cfg *m,
-		struct sde_hw_mdp *hw_mdp);
+		struct sde_hw_mdp *hw_mdp,
+		struct sde_vbif_clk_client *clk_client);
 
 /**
  * sde_hw_wb_destroy(): Destroy writeback hw driver object.

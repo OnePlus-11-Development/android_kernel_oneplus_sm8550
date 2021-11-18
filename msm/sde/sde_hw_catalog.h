@@ -657,6 +657,7 @@ enum {
  * @SDE_FEATURE_SUI_NS_ALLOWED SecureUI allowed to access non-secure context banks
  * @SDE_FEATURE_TRUSTED_VM     Trusted VM supported
  * @SDE_FEATURE_UBWC_STATS     UBWC statistics supported
+ * @SDE_FEATURE_VBIF_CLK_SPLIT VBIF clock split supported
  * @SDE_FEATURE_MAX:             MAX features value
  */
 enum sde_mdss_features {
@@ -696,6 +697,7 @@ enum sde_mdss_features {
 	SDE_FEATURE_SUI_NS_ALLOWED,
 	SDE_FEATURE_TRUSTED_VM,
 	SDE_FEATURE_UBWC_STATS,
+	SDE_FEATURE_VBIF_CLK_SPLIT,
 	SDE_FEATURE_MAX
 };
 
@@ -1025,13 +1027,53 @@ enum sde_clk_ctrl_type {
 	SDE_CLK_CTRL_RGB3,
 	SDE_CLK_CTRL_DMA0,
 	SDE_CLK_CTRL_DMA1,
+	SDE_CLK_CTRL_DMA2,
+	SDE_CLK_CTRL_DMA3,
+	SDE_CLK_CTRL_DMA4,
+	SDE_CLK_CTRL_DMA5,
 	SDE_CLK_CTRL_CURSOR0,
 	SDE_CLK_CTRL_CURSOR1,
 	SDE_CLK_CTRL_WB0,
 	SDE_CLK_CTRL_WB1,
 	SDE_CLK_CTRL_WB2,
 	SDE_CLK_CTRL_LUTDMA,
+	SDE_CLK_CTRL_IPCC_MSI,
 	SDE_CLK_CTRL_MAX,
+};
+
+#define SDE_CLK_CTRL_VALID(x) (x > SDE_CLK_CTRL_NONE && x < SDE_CLK_CTRL_MAX)
+#define SDE_CLK_CTRL_SSPP_VALID(x) (x >= SDE_CLK_CTRL_VIG0 && x <= SDE_CLK_CTRL_CURSOR1)
+#define SDE_CLK_CTRL_WB_VALID(x) (x >= SDE_CLK_CTRL_WB0 && x <= SDE_CLK_CTRL_WB2)
+#define SDE_CLK_CTRL_LUTDMA_VALID(x) (x == SDE_CLK_CTRL_LUTDMA)
+#define SDE_CLK_CTRL_IPCC_MSI_VALID(x) (x == SDE_CLK_CTRL_IPCC_MSI)
+
+/**
+ * sde_clk_ctrl_type - String of top level clock control signals
+ */
+static const char *sde_clk_ctrl_type_s[SDE_CLK_CTRL_MAX] = {
+	[SDE_CLK_CTRL_NONE] = "NONE",
+	[SDE_CLK_CTRL_VIG0] = "VIG0",
+	[SDE_CLK_CTRL_VIG1] = "VIG1",
+	[SDE_CLK_CTRL_VIG2] = "VIG2",
+	[SDE_CLK_CTRL_VIG3] = "VIG3",
+	[SDE_CLK_CTRL_VIG4] = "VIG4",
+	[SDE_CLK_CTRL_RGB0] = "RGB0",
+	[SDE_CLK_CTRL_RGB1] = "RGB1",
+	[SDE_CLK_CTRL_RGB2] = "RGB2",
+	[SDE_CLK_CTRL_RGB3] = "RGB3",
+	[SDE_CLK_CTRL_DMA0] = "DMA0",
+	[SDE_CLK_CTRL_DMA1] = "DMA1",
+	[SDE_CLK_CTRL_DMA2] = "DMA2",
+	[SDE_CLK_CTRL_DMA3] = "DMA3",
+	[SDE_CLK_CTRL_DMA4] = "DMA4",
+	[SDE_CLK_CTRL_DMA5] = "DMA5",
+	[SDE_CLK_CTRL_CURSOR0] = "CURSOR0",
+	[SDE_CLK_CTRL_CURSOR1] = "CURSOR1",
+	[SDE_CLK_CTRL_WB0] = "WB0",
+	[SDE_CLK_CTRL_WB1] = "WB1",
+	[SDE_CLK_CTRL_WB2] = "WB2",
+	[SDE_CLK_CTRL_LUTDMA] = "LUTDMA",
+	[SDE_CLK_CTRL_IPCC_MSI] = "IPCC_MSI",
 };
 
 /* struct sde_clk_ctrl_reg : Clock control register
