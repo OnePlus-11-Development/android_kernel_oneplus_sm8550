@@ -9,7 +9,7 @@
 #include "mmrm_internal.h"
 #include "mmrm_debug.h"
 
-static struct mmrm_common_data waipio_common_data[] = {
+static struct mmrm_common_data common_pt_data[] = {
 	{
 		.key = "qcom,mmrm_clk_threshold",
 		.value = 9000,
@@ -22,7 +22,7 @@ static struct mmrm_common_data waipio_common_data[] = {
 
 /*throttle client list is as per fdd & resource availability*/
 
-static struct mmrm_throttle_clients_data waipio_throttle_clients_data[] = {
+static struct mmrm_throttle_clients_data common_pt_throttle_clients_data[] = {
 	{
 		.domain = MMRM_CLIENT_DOMAIN_DISPLAY,
 		.id = 0x3d,
@@ -45,17 +45,21 @@ static struct mmrm_throttle_clients_data waipio_throttle_clients_data[] = {
 	},
 };
 
-static struct mmrm_platform_data waipio_data = {
-	.common_data = waipio_common_data,
-	.common_data_length = ARRAY_SIZE(waipio_common_data),
-	.throttle_clk_clients_data = waipio_throttle_clients_data,
-	.throttle_clk_clients_data_length = ARRAY_SIZE(waipio_throttle_clients_data),
+static struct mmrm_platform_data commom_pt_platform_data = {
+	.common_data = common_pt_data,
+	.common_data_length = ARRAY_SIZE(common_pt_data),
+	.throttle_clk_clients_data = common_pt_throttle_clients_data,
+	.throttle_clk_clients_data_length = ARRAY_SIZE(common_pt_throttle_clients_data),
 };
 
 static const struct of_device_id mmrm_dt_match[] = {
 	{
 		.compatible = "qcom,waipio-mmrm",
-		.data = &waipio_data,
+		.data = &commom_pt_platform_data,
+	},
+	{
+		.compatible = "qcom,kalama-mmrm",
+		.data = &commom_pt_platform_data,
 	},
 	{},
 };
@@ -95,7 +99,6 @@ int mmrm_init(struct mmrm_driver_data *drv_data)
 		d_mpr_e("%s: init clk mgr failed\n", __func__);
 		goto err_init_clk_mgr;
 	}
-
 	return rc;
 
 err_init_clk_mgr:
