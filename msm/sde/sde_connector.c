@@ -3099,13 +3099,6 @@ static int _sde_connector_install_properties(struct drm_device *dev,
 		msm_property_install_enum(&c_conn->property_info, "dsc_mode", 0,
 			0, e_dsc_mode, ARRAY_SIZE(e_dsc_mode), 0, CONNECTOR_PROP_DSC_MODE);
 
-		if (display_info->capabilities & MSM_DISPLAY_CAP_CMD_MODE)
-			msm_property_install_enum(&c_conn->property_info,
-				"frame_trigger_mode", 0, 0,
-				e_frame_trigger_mode,
-				ARRAY_SIZE(e_frame_trigger_mode), 0,
-				CONNECTOR_PROP_CMD_FRAME_TRIGGER_MODE);
-
 		if (display_info->capabilities & MSM_DISPLAY_CAP_CMD_MODE &&
 			display_info->capabilities & MSM_DISPLAY_CAP_VID_MODE)
 			msm_property_install_enum(&c_conn->property_info,
@@ -3125,6 +3118,12 @@ static int _sde_connector_install_properties(struct drm_device *dev,
 			      CONNECTOR_PROP_DEMURA_PANEL_ID);
 		}
 	}
+
+	if ((display_info->capabilities & MSM_DISPLAY_CAP_CMD_MODE)
+			|| (connector_type == DRM_MODE_CONNECTOR_VIRTUAL))
+		msm_property_install_enum(&c_conn->property_info, "frame_trigger_mode",
+			0, 0, e_frame_trigger_mode, ARRAY_SIZE(e_frame_trigger_mode), 0,
+			CONNECTOR_PROP_CMD_FRAME_TRIGGER_MODE);
 
 	msm_property_install_range(&c_conn->property_info, "bl_scale",
 		0x0, 0, MAX_BL_SCALE_LEVEL, MAX_BL_SCALE_LEVEL,

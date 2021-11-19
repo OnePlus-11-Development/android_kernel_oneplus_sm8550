@@ -166,13 +166,13 @@ enum {
 		IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_UBWC_VER_40)
 
 /**
- * Supported SSPP system cache settings
+ * Supported system cache settings
  */
-#define SSPP_SYS_CACHE_EN_FLAG	BIT(0)
-#define SSPP_SYS_CACHE_SCID		BIT(1)
-#define SSPP_SYS_CACHE_OP_MODE	BIT(2)
-#define SSPP_SYS_CACHE_OP_TYPE	BIT(3)
-#define SSPP_SYS_CACHE_NO_ALLOC	BIT(4)
+#define SYS_CACHE_EN_FLAG	BIT(0)
+#define SYS_CACHE_SCID		BIT(1)
+#define SYS_CACHE_OP_MODE	BIT(2)
+#define SYS_CACHE_OP_TYPE	BIT(3)
+#define SYS_CACHE_NO_ALLOC	BIT(4)
 
 /**
  * sde_sys_cache_type: Types of system cache supported
@@ -182,6 +182,7 @@ enum {
  */
 enum sde_sys_cache_type {
 	SDE_SYS_CACHE_DISP,
+	SDE_SYS_CACHE_DISP_WB,
 	SDE_SYS_CACHE_MAX,
 	SDE_SYS_CACHE_NONE = SDE_SYS_CACHE_MAX
 };
@@ -196,6 +197,7 @@ enum sde_intr_hwblk_type {
 	SDE_INTR_HWBLK_AD4,
 	SDE_INTR_HWBLK_INTF_TEAR,
 	SDE_INTR_HWBLK_LTM,
+	SDE_INTR_HWBLK_WB,
 	SDE_INTR_HWBLK_MAX
 };
 
@@ -540,13 +542,8 @@ enum {
  * @SDE_WB_CHROMA_DOWN,     Writeback chroma down block,
  * @SDE_WB_DOWNSCALE,       Writeback integer downscaler,
  * @SDE_WB_DITHER,          Dither block
- * @SDE_WB_TRAFFIC_SHAPER,  Writeback traffic shaper bloc
  * @SDE_WB_UBWC,            Writeback Universal bandwidth compression
- * @SDE_WB_YUV_CONFIG       Writeback supports output of YUV colorspace
  * @SDE_WB_PIPE_ALPHA       Writeback supports pipe alpha
- * @SDE_WB_XY_ROI_OFFSET    Writeback supports x/y-offset of out ROI in
- *                          the destination image
- * @SDE_WB_QOS,             Writeback supports QoS control, danger/safe/creq
  * @SDE_WB_QOS_8LVL,        Writeback supports 8-level QoS control
  * @SDE_WB_CDP              Writeback supports client driven prefetch
  * @SDE_WB_INPUT_CTRL       Writeback supports from which pp block input pixel
@@ -554,9 +551,11 @@ enum {
  * @SDE_WB_HAS_CWB          Writeback block supports concurrent writeback
  * @SDE_WB_HAS_DCWB         Writeback block supports dedicated CWB
  * @SDE_WB_CROP             CWB supports cropping
+ * @SDE_WB_SYS_CACHE        Writeback block supports system cache usage
  * @SDE_WB_CWB_CTRL         Separate CWB control is available for configuring
  * @SDE_WB_DCWB_CTRL        Separate DCWB control is available for configuring
  * @SDE_WB_CWB_DITHER_CTRL  CWB dither is available for configuring
+ * @SDE_WB_PROG_LINE        Writeback block supports programmable line ptr
  * @SDE_WB_MAX              maximum value
  */
 enum {
@@ -567,21 +566,19 @@ enum {
 	SDE_WB_CHROMA_DOWN,
 	SDE_WB_DOWNSCALE,
 	SDE_WB_DITHER,
-	SDE_WB_TRAFFIC_SHAPER,
 	SDE_WB_UBWC,
-	SDE_WB_YUV_CONFIG,
 	SDE_WB_PIPE_ALPHA,
-	SDE_WB_XY_ROI_OFFSET,
-	SDE_WB_QOS,
 	SDE_WB_QOS_8LVL,
 	SDE_WB_CDP,
 	SDE_WB_INPUT_CTRL,
 	SDE_WB_HAS_CWB,
 	SDE_WB_HAS_DCWB,
 	SDE_WB_CROP,
+	SDE_WB_SYS_CACHE,
 	SDE_WB_CWB_CTRL,
 	SDE_WB_DCWB_CTRL,
 	SDE_WB_CWB_DITHER_CTRL,
+	SDE_WB_PROG_LINE,
 	SDE_WB_MAX
 };
 
@@ -1525,6 +1522,17 @@ struct sde_sc_cfg {
 };
 
 /**
+ * autorefresh_disable_sequence - defines autorefresh disable sequences
+ * followed during bootup with continuous splash
+ * @AUTOREFRESH_DISABLE_SEQ1 - disable TE / disable autorefresh / Wait for tx-complete / enable TE
+ * @AUTOREFRESH_DISABLE_SEQ2 - disable TE / Disable autorefresh / enable TE
+ */
+enum autorefresh_disable_sequence {
+	AUTOREFRESH_DISABLE_SEQ1,
+	AUTOREFRESH_DISABLE_SEQ2,
+};
+
+/**
  * struct sde_perf_cfg - performance control settings
  * @max_bw_low         low threshold of maximum bandwidth (kbps)
  * @max_bw_high        high threshold of maximum bandwidth (kbps)
@@ -1681,6 +1689,7 @@ struct sde_perf_cfg {
  * @pipe_order_type     indicates if it is required to specify pipe order
  * @csc_type            csc or csc_10bit support
  * @allowed_dsc_reservation_switch      intf to which dsc reservation switch is supported
+ * @autorefresh_disable_seq    indicates the autorefresh disable sequence; default is seq1
  * @sc_cfg              system cache configuration
  * @perf                performance control settings
  * @uidle_cfg           settings for uidle feature
@@ -1784,6 +1793,7 @@ struct sde_mdss_cfg {
 	u32 pipe_order_type;
 	u32 csc_type;
 	u32 allowed_dsc_reservation_switch;
+	enum autorefresh_disable_sequence autorefresh_disable_seq;
 	struct sde_sc_cfg sc_cfg[SDE_SYS_CACHE_MAX];
 	struct sde_perf_cfg perf;
 	struct sde_uidle_cfg uidle_cfg;

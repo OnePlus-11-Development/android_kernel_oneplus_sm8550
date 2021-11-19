@@ -205,6 +205,7 @@ struct sde_encoder_phys_ops {
  * @INTR_IDX_AUTOREFRESH_DONE:  Autorefresh done for cmd mode panel meaning
  *                              autorefresh has triggered a double buffer flip
  * @INTR_IDX_WRPTR:    Writepointer start interrupt for cmd mode panel
+ * @INTR_IDX_WB_LINEPTR:  Programmable lineptr interrupt for WB
  */
 enum sde_intr_idx {
 	INTR_IDX_VSYNC,
@@ -221,6 +222,7 @@ enum sde_intr_idx {
 	INTR_IDX_PP5_OVFL,
 	INTR_IDX_PP_CWB_OVFL,
 	INTR_IDX_WRPTR,
+	INTR_IDX_WB_LINEPTR,
 	INTR_IDX_MAX,
 };
 
@@ -286,6 +288,10 @@ struct sde_encoder_irq {
  *				scheduled. Decremented in irq handler
  * @pending_retire_fence_cnt:   Atomic counter tracking the pending retire
  *                              fences that have to be signalled.
+ * @pending_ctl_start_cnt:      Atomic counter tracking the pending ctl-start-irq,
+ *                              used to release commit thread. Currently managed
+ *                              only for writeback encoder and the counter keeps
+ *                              increasing for other type of encoders.
  * @pending_kickoff_wq:		Wait queue for blocking until kickoff completes
  * @kickoff_timeout_ms:		kickoff timeout in mill seconds
  * @irq:			IRQ tracking structures
@@ -333,6 +339,7 @@ struct sde_encoder_phys {
 	atomic_t underrun_cnt;
 	atomic_t pending_kickoff_cnt;
 	atomic_t pending_retire_fence_cnt;
+	atomic_t pending_ctl_start_cnt;
 	wait_queue_head_t pending_kickoff_wq;
 	u32 kickoff_timeout_ms;
 	struct sde_encoder_irq irq[INTR_IDX_MAX];
@@ -423,13 +430,14 @@ struct sde_encoder_phys_cmd {
  * @wb_fmt:		Writeback pixel format
  * @wb_fb:		Pointer to current writeback framebuffer
  * @wb_aspace:		Pointer to current writeback address space
- * @cwb_old_fb:		Pointer to old writeback framebuffer
- * @cwb_old_aspace:	Pointer to old writeback address space
+ * @old_fb:		Pointer to old writeback framebuffer
+ * @old_aspace:		Pointer to old writeback address space
  * @aspace:		address space identifier for non-secure/secure domain
  * @wb_dev:		Pointer to writeback device
  * @bo_disable:		Buffer object(s) to use during the disabling state
  * @fb_disable:		Frame buffer to use during the disabling state
  * @crtc		Pointer to drm_crtc
+ * @prog_line:		Cached programmable line value used to trigger early wb-fence
  */
 struct sde_encoder_phys_wb {
 	struct sde_encoder_phys base;
@@ -441,13 +449,14 @@ struct sde_encoder_phys_wb {
 	const struct sde_format *wb_fmt;
 	struct drm_framebuffer *wb_fb;
 	struct msm_gem_address_space *wb_aspace;
-	struct drm_framebuffer *cwb_old_fb;
-	struct msm_gem_address_space *cwb_old_aspace;
+	struct drm_framebuffer *old_fb;
+	struct msm_gem_address_space *old_aspace;
 	struct msm_gem_address_space *aspace[SDE_IOMMU_DOMAIN_MAX];
 	struct sde_wb_device *wb_dev;
 	struct drm_gem_object *bo_disable[SDE_MAX_PLANES];
 	struct drm_framebuffer *fb_disable;
 	struct drm_crtc *crtc;
+	u32 prog_line;
 };
 
 /**

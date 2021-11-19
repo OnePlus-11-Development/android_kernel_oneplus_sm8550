@@ -1348,6 +1348,10 @@ static int _add_to_irq_offset_list(struct sde_mdss_cfg *sde_cfg,
 		if (instance >= LTM_MAX)
 			err = true;
 		break;
+	case SDE_INTR_HWBLK_WB:
+		if (instance >= WB_MAX)
+			err = true;
+		break;
 	default:
 		SDE_ERROR("invalid hwblk_type: %d", blk_type);
 		return -EINVAL;
@@ -2539,13 +2543,10 @@ static int sde_wb_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
 			set_bit(SDE_WB_LINE_MODE, &wb->features);
 		else
 			set_bit(SDE_WB_BLOCK_MODE, &wb->features);
-		set_bit(SDE_WB_TRAFFIC_SHAPER, &wb->features);
-		set_bit(SDE_WB_YUV_CONFIG, &wb->features);
 
 		if (test_bit(SDE_FEATURE_CDP, sde_cfg->features))
 			set_bit(SDE_WB_CDP, &wb->features);
 
-		set_bit(SDE_WB_QOS, &wb->features);
 		if (sde_cfg->vbif_qos_nlvl == 8)
 			set_bit(SDE_WB_QOS_8LVL, &wb->features);
 
@@ -2555,10 +2556,15 @@ static int sde_wb_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
 		if (test_bit(SDE_FEATURE_CWB_CROP, sde_cfg->features))
 			set_bit(SDE_WB_CROP, &wb->features);
 
-		set_bit(SDE_WB_XY_ROI_OFFSET, &wb->features);
-
 		if (IS_SDE_CTL_REV_100(sde_cfg->ctl_rev))
 			set_bit(SDE_WB_INPUT_CTRL, &wb->features);
+
+		if (SDE_HW_MAJOR(sde_cfg->hw_rev) >= SDE_HW_MAJOR(SDE_HW_VER_900)) {
+			set_bit(SDE_WB_PROG_LINE, &wb->features);
+			set_bit(SDE_WB_SYS_CACHE, &wb->features);
+		}
+
+		rc = _add_to_irq_offset_list(sde_cfg, SDE_INTR_HWBLK_WB, wb->id, wb->base);
 
 		if (test_bit(SDE_FEATURE_DEDICATED_CWB, sde_cfg->features)) {
 			set_bit(SDE_WB_HAS_DCWB, &wb->features);
@@ -3483,16 +3489,13 @@ static int sde_cache_parse_dt(struct device_node *np,
 		struct sde_mdss_cfg *sde_cfg)
 {
 	struct llcc_slice_desc *slice;
-	struct sde_sc_cfg *sc_cfg = sde_cfg->sc_cfg;
 	struct device_node *llcc_node;
+	int i;
 
 	if (!sde_cfg) {
 		SDE_ERROR("invalid argument\n");
 		return -EINVAL;
 	}
-
-	if (!test_bit(SDE_FEATURE_SYSCACHE, sde_cfg->features))
-		return 0;
 
 	llcc_node = of_find_node_by_name(NULL, "cache-controller");
 	if (!llcc_node) {
@@ -3500,19 +3503,43 @@ static int sde_cache_parse_dt(struct device_node *np,
 		return 0;
 	}
 
-	slice = llcc_slice_getd(LLCC_DISP);
-	if (IS_ERR_OR_NULL(slice)) {
-		SDE_ERROR("failed to get system cache %ld\n", PTR_ERR(slice));
-		return -EINVAL;
-	}
+	for (i = 0; i < SDE_SYS_CACHE_MAX; i++) {
+		struct sde_sc_cfg *sc_cfg = &sde_cfg->sc_cfg[i];
+		u32 usecase_id = 0;
 
-	sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache = true;
-	sc_cfg[SDE_SYS_CACHE_DISP].llcc_scid = llcc_get_slice_id(slice);
-	sc_cfg[SDE_SYS_CACHE_DISP].llcc_slice_size = llcc_get_slice_size(slice);
-	SDE_DEBUG("img cache scid:%d slice_size:%zu kb\n",
-			sc_cfg[SDE_SYS_CACHE_DISP].llcc_scid,
-			sc_cfg[SDE_SYS_CACHE_DISP].llcc_slice_size);
-	llcc_slice_putd(slice);
+		if (!sc_cfg->has_sys_cache)
+			continue;
+
+		switch (i) {
+		case SDE_SYS_CACHE_DISP:
+			usecase_id = LLCC_DISP;
+			break;
+
+		case SDE_SYS_CACHE_DISP_WB:
+			usecase_id = LLCC_DISP;
+			break;
+
+		default:
+			usecase_id = 0;
+			SDE_DEBUG("invalid sys cache:%d\n", i);
+			break;
+		}
+
+		if (!usecase_id)
+			continue;
+
+		slice = llcc_slice_getd(usecase_id);
+		if (IS_ERR_OR_NULL(slice)) {
+			SDE_ERROR("failed to get system cache %ld\n", PTR_ERR(slice));
+			return -EINVAL;
+		}
+
+		sc_cfg->llcc_scid = llcc_get_slice_id(slice);
+		sc_cfg->llcc_slice_size = llcc_get_slice_size(slice);
+		SDE_DEBUG("img cache:%d usecase_id:%d, scid:%d slice_size:%zu kb\n",
+				i, usecase_id, sc_cfg->llcc_scid, sc_cfg->llcc_slice_size);
+		llcc_slice_putd(slice);
+	}
 
 	return 0;
 }
@@ -5006,7 +5033,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		set_bit(SDE_FEATURE_DITHER_LUMA_MODE, sde_cfg->features);
 		sde_cfg->mdss_hw_block_size = 0x158;
 		set_bit(SDE_FEATURE_TRUSTED_VM, sde_cfg->features);
-		set_bit(SDE_FEATURE_SYSCACHE, sde_cfg->features);
+		sde_cfg->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache = true;
 	} else if (IS_HOLI_TARGET(hw_rev)) {
 		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 24;
@@ -5036,7 +5063,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
 		sde_cfg->mdss_hw_block_size = 0x158;
 		set_bit(SDE_FEATURE_TRUSTED_VM, sde_cfg->features);
-		set_bit(SDE_FEATURE_SYSCACHE, sde_cfg->features);
+		sde_cfg->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache = true;
 	} else if (IS_WAIPIO_TARGET(hw_rev)) {
 		sde_cfg->allowed_dsc_reservation_switch = SDE_DP_DSC_RESERVATION_SWITCH;
 		set_bit(SDE_FEATURE_DEDICATED_CWB, sde_cfg->features);
@@ -5058,7 +5085,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
 		set_bit(SDE_FEATURE_DITHER_LUMA_MODE, sde_cfg->features);
 		sde_cfg->mdss_hw_block_size = 0x158;
-		set_bit(SDE_FEATURE_SYSCACHE, sde_cfg->features);
+		sde_cfg->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache = true;
 		set_bit(SDE_FEATURE_MULTIRECT_ERROR, sde_cfg->features);
 		set_bit(SDE_FEATURE_FP16, sde_cfg->features);
 		set_bit(SDE_MDP_PERIPH_TOP_0_REMOVED, &sde_cfg->mdp[0].features);
@@ -5100,7 +5127,6 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		set_bit(SDE_FEATURE_VIG_P010, sde_cfg->features);
 		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
 		set_bit(SDE_FEATURE_DITHER_LUMA_MODE, sde_cfg->features);
-		set_bit(SDE_FEATURE_SYSCACHE, sde_cfg->features);
 		set_bit(SDE_FEATURE_MULTIRECT_ERROR, sde_cfg->features);
 		set_bit(SDE_FEATURE_FP16, sde_cfg->features);
 		set_bit(SDE_MDP_PERIPH_TOP_0_REMOVED, &sde_cfg->mdp[0].features);
@@ -5109,7 +5135,9 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		set_bit(SDE_FEATURE_HW_VSYNC_TS, sde_cfg->features);
 		set_bit(SDE_FEATURE_AVR_STEP, sde_cfg->features);
 		set_bit(SDE_FEATURE_VBIF_CLK_SPLIT, sde_cfg->features);
+		sde_cfg->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache = true;
 		sde_cfg->allowed_dsc_reservation_switch = SDE_DP_DSC_RESERVATION_SWITCH;
+		sde_cfg->autorefresh_disable_seq = AUTOREFRESH_DISABLE_SEQ2;
 		sde_cfg->perf.min_prefill_lines = 40;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;

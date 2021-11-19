@@ -1148,19 +1148,19 @@ static void sde_hw_sspp_setup_sys_cache(struct sde_hw_pipe *ctx,
 
 	val = SDE_REG_READ(&ctx->hw, SSPP_SYS_CACHE_MODE + idx);
 
-	if (cfg->flags & SSPP_SYS_CACHE_EN_FLAG)
+	if (cfg->flags & SYS_CACHE_EN_FLAG)
 		val = (val & ~BIT(15)) | ((cfg->rd_en & 0x1) << 15);
 
-	if (cfg->flags & SSPP_SYS_CACHE_SCID)
+	if (cfg->flags & SYS_CACHE_SCID)
 		val = (val & ~0x1F00) | ((cfg->rd_scid & 0x1f) << 8);
 
-	if (cfg->flags & SSPP_SYS_CACHE_OP_MODE)
+	if (cfg->flags & SYS_CACHE_OP_MODE)
 		val = (val & ~0xC0000) | ((cfg->op_mode & 0x3) << 18);
 
-	if (cfg->flags & SSPP_SYS_CACHE_OP_TYPE)
+	if (cfg->flags & SYS_CACHE_OP_TYPE)
 		val = (val & ~0xF) | ((cfg->rd_op_type & 0xf) << 0);
 
-	if (cfg->flags & SSPP_SYS_CACHE_NO_ALLOC)
+	if (cfg->flags & SYS_CACHE_NO_ALLOC)
 		val = (val & ~0x10) | ((cfg->rd_noallocate & 0x1) << 4);
 
 	SDE_REG_WRITE(&ctx->hw, SSPP_SYS_CACHE_MODE + idx, val);

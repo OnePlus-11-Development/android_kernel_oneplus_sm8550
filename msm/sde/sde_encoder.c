@@ -923,11 +923,11 @@ static int _sde_encoder_atomic_check_phys_enc(struct sde_encoder_virt *sde_enc,
 }
 
 static int _sde_encoder_atomic_check_pu_roi(struct sde_encoder_virt *sde_enc,
-	struct drm_crtc_state *crtc_state,
-	struct drm_connector_state *conn_state,
-	struct sde_connector_state *sde_conn_state,
-	struct sde_crtc_state *sde_crtc_state)
+	struct drm_crtc_state *crtc_state, struct drm_connector_state *conn_state,
+	struct sde_connector_state *sde_conn_state, struct sde_crtc_state *sde_crtc_state)
 {
+	struct sde_crtc *sde_crtc = to_sde_crtc(crtc_state->crtc);
+	struct drm_display_mode *mode = &crtc_state->adjusted_mode;
 	int ret = 0;
 
 	if (crtc_state->mode_changed || crtc_state->active_changed) {
@@ -935,12 +935,11 @@ static int _sde_encoder_atomic_check_pu_roi(struct sde_encoder_virt *sde_enc,
 
 		mode_roi.x = 0;
 		mode_roi.y = 0;
-		mode_roi.w = crtc_state->adjusted_mode.hdisplay;
-		mode_roi.h = crtc_state->adjusted_mode.vdisplay;
+		mode_roi.w = sde_crtc_get_width(sde_crtc, sde_crtc_state, mode);
+		mode_roi.h = sde_crtc_get_mixer_height(sde_crtc, sde_crtc_state, mode);
 
 		if (sde_conn_state->rois.num_rects) {
-			sde_kms_rect_merge_rectangles(
-					&sde_conn_state->rois, &roi);
+			sde_kms_rect_merge_rectangles(&sde_conn_state->rois, &roi);
 			if (!sde_kms_rect_is_equal(&mode_roi, &roi)) {
 				SDE_ERROR_ENC(sde_enc,
 					"roi (%d,%d,%d,%d) on connector invalid during modeset\n",
@@ -950,8 +949,7 @@ static int _sde_encoder_atomic_check_pu_roi(struct sde_encoder_virt *sde_enc,
 		}
 
 		if (sde_crtc_state->user_roi_list.num_rects) {
-			sde_kms_rect_merge_rectangles(
-					&sde_crtc_state->user_roi_list, &roi);
+			sde_kms_rect_merge_rectangles(&sde_crtc_state->user_roi_list, &roi);
 			if (!sde_kms_rect_is_equal(&mode_roi, &roi)) {
 				SDE_ERROR_ENC(sde_enc,
 					"roi (%d,%d,%d,%d) on crtc invalid during modeset\n",
@@ -3417,13 +3415,9 @@ void sde_encoder_register_vblank_callback(struct drm_encoder *drm_enc,
 		SDE_ERROR("invalid encoder\n");
 		return;
 	}
-	SDE_DEBUG_ENC(sde_enc, "\n");
-	SDE_EVT32(DRMID(drm_enc), enable);
 
-	if (sde_encoder_in_clone_mode(drm_enc)) {
-		SDE_EVT32(DRMID(drm_enc), SDE_EVTLOG_ERROR);
-		return;
-	}
+	SDE_DEBUG_ENC(sde_enc, "enable:%d\n", enable);
+	SDE_EVT32(DRMID(drm_enc), enable);
 
 	spin_lock_irqsave(&sde_enc->enc_spinlock, lock_flags);
 	sde_enc->crtc_vblank_cb = vbl_cb;
@@ -3607,8 +3601,10 @@ static inline void _sde_encoder_trigger_flush(struct drm_encoder *drm_enc,
 	/* update pending counts and trigger kickoff ctl flush atomically */
 	spin_lock_irqsave(&sde_enc->enc_spinlock, lock_flags);
 
-	if (phys->ops.is_master && phys->ops.is_master(phys) && config_changed)
+	if (phys->ops.is_master && phys->ops.is_master(phys) && config_changed) {
 		atomic_inc(&phys->pending_retire_fence_cnt);
+		atomic_inc(&phys->pending_ctl_start_cnt);
+	}
 
 	pend_ret_fence_cnt = atomic_read(&phys->pending_retire_fence_cnt);
 
@@ -4284,7 +4280,7 @@ int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 		struct sde_encoder_kickoff_params *params)
 {
 	struct sde_encoder_virt *sde_enc;
-	struct sde_encoder_phys *phys;
+	struct sde_encoder_phys *phys, *cur_master;
 	struct sde_kms *sde_kms = NULL;
 	struct sde_crtc *sde_crtc;
 	bool needs_hw_reset = false, is_cmd_mode;
@@ -4307,13 +4303,12 @@ int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 	SDE_DEBUG_ENC(sde_enc, "\n");
 	SDE_EVT32(DRMID(drm_enc));
 
-	is_cmd_mode = sde_encoder_check_curr_mode(drm_enc,
-				MSM_DISPLAY_CMD_MODE);
-	if (sde_enc->cur_master && sde_enc->cur_master->connector
-			&& is_cmd_mode)
-		sde_enc->frame_trigger_mode = sde_connector_get_property(
-			sde_enc->cur_master->connector->state,
-			CONNECTOR_PROP_CMD_FRAME_TRIGGER_MODE);
+	cur_master = sde_enc->cur_master;
+	is_cmd_mode = sde_encoder_check_curr_mode(drm_enc, MSM_DISPLAY_CMD_MODE);
+	if (cur_master && cur_master->connector)
+		sde_enc->frame_trigger_mode =
+				sde_connector_get_property(cur_master->connector->state,
+					CONNECTOR_PROP_CMD_FRAME_TRIGGER_MODE);
 
 	_sde_encoder_helper_hdr_plus_mempool_update(sde_enc);
 

@@ -62,6 +62,24 @@ struct sde_hw_wb_qos_cfg {
 };
 
 /**
+ * struct sde_hw_wb_sc_cfg - system cache configuration
+ * @wr_en: system cache read enable
+ * @wr_scid: system cache read block id
+ * @wr_noallocate: system cache read no allocate attribute
+ * @wr_op_type: system cache read operation type
+ * @flags: dirty flags to change the configuration
+ * @type: sys cache type
+ */
+struct sde_hw_wb_sc_cfg {
+	bool wr_en;
+	u32 wr_scid;
+	bool wr_noallocate;
+	u32 wr_op_type;
+	u32 flags;
+	enum sde_sys_cache_type type;
+};
+
+/**
  *
  * struct sde_hw_wb_ops : Interface to the wb Hw driver functions
  *  Assumption is these functions will be called after clocks are enabled
@@ -153,6 +171,13 @@ struct sde_hw_wb_ops {
 		const enum sde_cwb data_src, int tap_location, bool enable);
 
 	/**
+	 * setup_sys_cache - setup system cache configuration
+	 * @ctx: Pointer to wb context
+	 * @cfg: Pointer to wb system cache configuration
+	 */
+	void (*setup_sys_cache)(struct sde_hw_wb *ctx, struct sde_hw_wb_sc_cfg *cfg);
+
+	/**
 	 * program_cwb_dither_ctrl - program cwb dither block config
 	 * @ctx: Pointer to wb context
 	 * @dcwb_idx: Current Ping-Pong CWB block index to program
@@ -162,6 +187,31 @@ struct sde_hw_wb_ops {
 	 */
 	void (*program_cwb_dither_ctrl)(struct sde_hw_wb *ctx,
 		const enum sde_dcwb dcwb_idx, void *cfg, size_t len, bool enable);
+
+	/**
+	 * get_line_count - get current wb output linecount
+	 * @ctx: Pointer to wb context
+	 */
+	u32 (*get_line_count)(struct sde_hw_wb *ctx);
+
+	/**
+	 * set_prog_line_count - set wb programmable line
+	 * @ctx: Pointer to wb context
+	 * @line_count: programmable line-count value
+	 */
+	void (*set_prog_line_count)(struct sde_hw_wb *ctx, u32 line_count);
+
+	/**
+	 * get_ubwc_error - get ubwc error status
+	 * @ctx: Pointer to wb context
+	 */
+	u32 (*get_ubwc_error)(struct sde_hw_wb *ctx);
+
+	/**
+	 * clear_ubwc_error - clear ubwc error status
+	 * @ctx: Pointer to wb context
+	 */
+	void (*clear_ubwc_error)(struct sde_hw_wb *ctx);
 };
 
 /**
