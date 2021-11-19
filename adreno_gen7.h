@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _ADRENO_GEN7_H_
@@ -15,6 +16,9 @@
 #define PIPE_BR 1
 #define PIPE_BV 2
 #define PIPE_LPAC 3
+
+/* Forward struct declaration */
+struct gen7_snapshot_block_list;
 
 extern const struct adreno_power_ops gen7_gmu_power_ops;
 extern const struct adreno_power_ops gen7_hwsched_power_ops;
@@ -94,6 +98,8 @@ struct adreno_gen7_core {
 	u64 ctxt_record_size;
 	/** @highest_bank_bit: Highest bank bit value */
 	u32 highest_bank_bit;
+	/** @gen7_snapshot_block_list: Device-specific blocks dumped in the snapshot */
+	const struct gen7_snapshot_block_list *gen7_snapshot_block_list;
 };
 
 /**

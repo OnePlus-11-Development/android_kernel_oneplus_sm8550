@@ -4,16 +4,16 @@
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
-#include "adreno_gen7_snapshot.h"
 #include "adreno.h"
 #include "adreno_snapshot.h"
+#include "adreno_gen7_snapshot.h"
 
 static struct kgsl_memdesc *gen7_capturescript;
 static struct kgsl_memdesc *gen7_crashdump_registers;
 static u32 *gen7_cd_reg_end;
 static const struct gen7_snapshot_block_list *gen7_snapshot_block_list;
 
-static const struct gen7_snapshot_block_list gen7_0_0_snapshot_block_list = {
+const struct gen7_snapshot_block_list gen7_0_0_snapshot_block_list = {
 	.pre_crashdumper_regs = gen7_0_0_pre_crashdumper_registers,
 	.debugbus_blocks = gen7_0_0_debugbus_blocks,
 	.debugbus_blocks_len = ARRAY_SIZE(gen7_0_0_debugbus_blocks),
@@ -23,6 +23,9 @@ static const struct gen7_snapshot_block_list gen7_0_0_snapshot_block_list = {
 	.cx_debugbus_blocks_len = ARRAY_SIZE(gen7_cx_dbgc_debugbus_blocks),
 	.external_core_regs = gen7_0_0_external_core_regs,
 	.num_external_core_regs = ARRAY_SIZE(gen7_0_0_external_core_regs),
+	.gmu_regs = gen7_0_0_gmu_registers,
+	.gmu_gx_regs = gen7_0_0_gmu_gx_registers,
+	.rscc_regs = gen7_0_0_rscc_registers,
 	.reg_list = gen7_0_0_reg_list,
 	.shader_blocks = gen7_0_0_shader_blocks,
 	.num_shader_blocks = ARRAY_SIZE(gen7_0_0_shader_blocks),
@@ -30,6 +33,29 @@ static const struct gen7_snapshot_block_list gen7_0_0_snapshot_block_list = {
 	.num_clusters = ARRAY_SIZE(gen7_0_0_clusters),
 	.sptp_clusters = gen7_0_0_sptp_clusters,
 	.num_sptp_clusters = ARRAY_SIZE(gen7_0_0_sptp_clusters),
+	.post_crashdumper_regs = gen7_0_0_post_crashdumper_registers,
+};
+
+const struct gen7_snapshot_block_list gen7_2_0_snapshot_block_list = {
+	.pre_crashdumper_regs = gen7_0_0_pre_crashdumper_registers,
+	.debugbus_blocks = gen7_2_0_debugbus_blocks,
+	.debugbus_blocks_len = ARRAY_SIZE(gen7_2_0_debugbus_blocks),
+	.gbif_debugbus_blocks = gen7_gbif_debugbus_blocks,
+	.gbif_debugbus_blocks_len = ARRAY_SIZE(gen7_gbif_debugbus_blocks),
+	.cx_debugbus_blocks = gen7_cx_dbgc_debugbus_blocks,
+	.cx_debugbus_blocks_len = ARRAY_SIZE(gen7_cx_dbgc_debugbus_blocks),
+	.external_core_regs = gen7_2_0_external_core_regs,
+	.num_external_core_regs = ARRAY_SIZE(gen7_2_0_external_core_regs),
+	.gmu_regs = gen7_2_0_gmu_registers,
+	.gmu_gx_regs = gen7_2_0_gmu_gx_registers,
+	.rscc_regs = gen7_2_0_rscc_registers,
+	.reg_list = gen7_2_0_reg_list,
+	.shader_blocks = gen7_2_0_shader_blocks,
+	.num_shader_blocks = ARRAY_SIZE(gen7_2_0_shader_blocks),
+	.clusters = gen7_2_0_clusters,
+	.num_clusters = ARRAY_SIZE(gen7_2_0_clusters),
+	.sptp_clusters = gen7_2_0_sptp_clusters,
+	.num_sptp_clusters = ARRAY_SIZE(gen7_2_0_sptp_clusters),
 	.post_crashdumper_regs = gen7_0_0_post_crashdumper_registers,
 };
 
@@ -257,13 +283,15 @@ static void gen7_snapshot_shader(struct kgsl_device *device,
 
 	if (CD_SCRIPT_CHECK(device)) {
 		for (i = 0; i < num_shader_blocks; i++) {
-			for (sp = 0; sp < shader_blocks[i].num_sps; sp++) {
-				for (usptp = 0; usptp < shader_blocks[i].num_usptps; usptp++) {
-					info.block = &shader_blocks[i];
+			struct gen7_shader_block *block = &shader_blocks[i];
+
+			for (sp = 0; sp < block->num_sps; sp++) {
+				for (usptp = 0; usptp < block->num_usptps; usptp++) {
+					info.block = block;
 					info.sp_id = sp;
 					info.usptp = usptp;
 					info.offset = offset;
-					offset += shader_blocks[i].size << 2;
+					offset += block->size << 2;
 
 					/* Shader working/shadow memory */
 					kgsl_snapshot_add_section(device, KGSL_SNAPSHOT_SECTION_SHADER_V2,
@@ -274,15 +302,15 @@ static void gen7_snapshot_shader(struct kgsl_device *device,
 		return;
 	}
 
-	/* Build the crash script */
-	ptr = gen7_capturescript->hostptr;
-	offset = 0;
-
 	for (i = 0; i < num_shader_blocks; i++) {
-		for (sp = 0; sp < shader_blocks[i].num_sps; sp++) {
-			for (usptp = 0; usptp < shader_blocks[i].num_usptps; usptp++) {
-				struct gen7_shader_block *block = &shader_blocks[i];
+		struct gen7_shader_block *block = &shader_blocks[i];
 
+		/* Build the crash script */
+		ptr = gen7_capturescript->hostptr;
+		offset = 0;
+
+		for (sp = 0; sp < block->num_sps; sp++) {
+			for (usptp = 0; usptp < block->num_usptps; usptp++) {
 				/* Program the aperture */
 				ptr += CD_WRITE(ptr, GEN7_SP_READ_SEL,
 					GEN7_SP_READ_SEL_VAL(block->location, block->pipeid,
@@ -291,30 +319,25 @@ static void gen7_snapshot_shader(struct kgsl_device *device,
 				/* Read all the data in one chunk */
 				ptr += CD_READ(ptr, GEN7_SP_AHB_READ_APERTURE, block->size,
 					gen7_crashdump_registers->gpuaddr + offset);
-
 				offset += block->size << 2;
 			}
 		}
-	}
+		/* Marker for end of script */
+		CD_FINISH(ptr, offset);
 
-	/* Marker for end of script */
-	CD_FINISH(ptr, offset);
+		/* Try to run the crash dumper */
+		func = gen7_legacy_snapshot_shader;
+		if (_gen7_do_crashdump(device))
+			func = gen7_snapshot_shader_memory;
 
-	/* Try to run the crash dumper */
-	if (_gen7_do_crashdump(device))
-		func = gen7_snapshot_shader_memory;
-
-	offset = 0;
-
-	for (i = 0; i < num_shader_blocks; i++) {
-		for (sp = 0; sp < shader_blocks[i].num_sps; sp++) {
-			for (usptp = 0; usptp < shader_blocks[i].num_usptps; usptp++) {
-
-				info.block = &shader_blocks[i];
+		offset = 0;
+		for (sp = 0; sp < block->num_sps; sp++) {
+			for (usptp = 0; usptp < block->num_usptps; usptp++) {
+				info.block = block;
 				info.sp_id = sp;
 				info.usptp = usptp;
 				info.offset = offset;
-				offset += shader_blocks[i].size << 2;
+				offset += block->size << 2;
 
 				/* Shader working/shadow memory */
 				kgsl_snapshot_add_section(device, KGSL_SNAPSHOT_SECTION_SHADER_V2,
@@ -1143,8 +1166,9 @@ void gen7_snapshot(struct adreno_device *adreno_dev,
 	struct adreno_ringbuffer *rb;
 	unsigned int i;
 	u32 hi, lo, cgc = 0, cgc1 = 0, cgc2 = 0;
+	const struct adreno_gen7_core *gpucore = to_gen7_core(ADRENO_DEVICE(device));
 
-	gen7_snapshot_block_list = &gen7_0_0_snapshot_block_list;
+	gen7_snapshot_block_list = gpucore->gen7_snapshot_block_list;
 
 	/*
 	 * Dump debugbus data here to capture it for both
@@ -1267,7 +1291,7 @@ void gen7_crashdump_init(struct adreno_device *adreno_dev)
 
 	if (IS_ERR_OR_NULL(gen7_capturescript))
 		gen7_capturescript = kgsl_allocate_global(device,
-			4 * PAGE_SIZE, 0, KGSL_MEMFLAGS_GPUREADONLY,
+			6 * PAGE_SIZE, 0, KGSL_MEMFLAGS_GPUREADONLY,
 			KGSL_MEMDESC_PRIVILEGED, "capturescript");
 
 	if (IS_ERR(gen7_capturescript))
