@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef __ADRENO_GEN7_SNAPSHOT_H
 #define __ADRENO_GEN7_SNAPSHOT_H
@@ -104,7 +105,7 @@ enum gen7_debugbus_ids {
 	DEBUGBUS_USPTP_7          = 337,
 };
 
-static const u32 gen7_debugbus_blocks[] = {
+static const u32 gen7_0_0_debugbus_blocks[] = {
 	DEBUGBUS_CP_0_0,
 	DEBUGBUS_CP_0_1,
 	DEBUGBUS_RBBM,
@@ -263,20 +264,20 @@ gen7_0_0_rb_rbp_sel = {
 	.val = 0x9,
 };
 
-static const u32 gen7_pre_crashdumper_registers[] = {
+static const u32 gen7_0_0_pre_crashdumper_registers[] = {
 	0x00210, 0x00210, 0x00212, 0x00213, 0x03c00, 0x03c0b, 0x03c40, 0x03c42,
 	0x03c45, 0x03c47, 0x03c49, 0x03c4a, 0x03cc0, 0x03cd1,
 	UINT_MAX, UINT_MAX,
 };
-static_assert(IS_ALIGNED(sizeof(gen7_pre_crashdumper_registers), 8));
+static_assert(IS_ALIGNED(sizeof(gen7_0_0_pre_crashdumper_registers), 8));
 
-static const u32 gen7_post_crashdumper_registers[] = {
+static const u32 gen7_0_0_post_crashdumper_registers[] = {
 	0x00535, 0x00535,
 	UINT_MAX, UINT_MAX,
 };
-static_assert(IS_ALIGNED(sizeof(gen7_post_crashdumper_registers), 8));
+static_assert(IS_ALIGNED(sizeof(gen7_0_0_post_crashdumper_registers), 8));
 
-static const u32 gen7_gpu_registers[] = {
+static const u32 gen7_0_0_gpu_registers[] = {
 	0x00000, 0x00000, 0x00002, 0x00002, 0x00011, 0x00012, 0x00016, 0x0001b,
 	0x0001f, 0x00032, 0x00038, 0x0003c, 0x00042, 0x00042, 0x00044, 0x00044,
 	0x00047, 0x00047, 0x00049, 0x0004a, 0x0004c, 0x0004c, 0x00050, 0x00050,
@@ -305,15 +306,15 @@ static const u32 gen7_gpu_registers[] = {
 	0x00e1b, 0x00e2b, 0x00e30, 0x00e32, 0x00e38, 0x00e3c,
 	UINT_MAX, UINT_MAX,
 };
-static_assert(IS_ALIGNED(sizeof(gen7_gpu_registers), 8));
+static_assert(IS_ALIGNED(sizeof(gen7_0_0_gpu_registers), 8));
 
-static const u32 gen7_cx_misc_registers[] = {
+static const u32 gen7_0_0_cx_misc_registers[] = {
 	0x27800, 0x27800, 0x27810, 0x27814, 0x27820, 0x27824, 0x27832, 0x27857,
 	UINT_MAX, UINT_MAX,
 };
-static_assert(IS_ALIGNED(sizeof(gen7_cx_misc_registers), 8));
+static_assert(IS_ALIGNED(sizeof(gen7_0_0_cx_misc_registers), 8));
 
-static const u32 gen7_cpr_registers[] = {
+static const u32 gen7_0_0_cpr_registers[] = {
 	0x26800, 0x26805, 0x26808, 0x2680c, 0x26814, 0x26814, 0x2681c, 0x2681c,
 	0x26820, 0x26838, 0x26840, 0x26840, 0x26848, 0x26848, 0x26850, 0x26850,
 	0x26880, 0x26898, 0x26980, 0x269b0, 0x269c0, 0x269c8, 0x269e0, 0x269ee,
@@ -321,16 +322,16 @@ static const u32 gen7_cpr_registers[] = {
 	0x27440, 0x27441, 0x27444, 0x27444, 0x27480, 0x274a2, 0x274ac, 0x274ac,
 	UINT_MAX, UINT_MAX,
 };
-static_assert(IS_ALIGNED(sizeof(gen7_cpr_registers), 8));
+static_assert(IS_ALIGNED(sizeof(gen7_0_0_cpr_registers), 8));
 
-static const u32 gen7_dpm_registers[] = {
+static const u32 gen7_0_0_dpm_registers[] = {
 	0x1aa00, 0x1aa06, 0x1aa09, 0x1aa0a, 0x1aa0c, 0x1aa0d, 0x1aa0f, 0x1aa12,
 	0x1aa14, 0x1aa47, 0x1aa50, 0x1aa51,
 	UINT_MAX, UINT_MAX,
 };
-static_assert(IS_ALIGNED(sizeof(gen7_dpm_registers), 8));
+static_assert(IS_ALIGNED(sizeof(gen7_0_0_dpm_registers), 8));
 
-static const u32 gen7_gpucc_registers[] = {
+static const u32 gen7_0_0_gpucc_registers[] = {
 	0x24000, 0x2400e, 0x24400, 0x2440e, 0x24800, 0x24805, 0x24c00, 0x24cff,
 	0x25800, 0x25804, 0x25c00, 0x25c04, 0x26000, 0x26004, 0x26400, 0x26405,
 	0x26414, 0x2641d, 0x2642a, 0x26430, 0x26432, 0x26432, 0x26441, 0x26455,
@@ -340,7 +341,7 @@ static const u32 gen7_gpucc_registers[] = {
 	0x26540, 0x26570, 0x26600, 0x26616, 0x26620, 0x2662d,
 	UINT_MAX, UINT_MAX,
 };
-static_assert(IS_ALIGNED(sizeof(gen7_gpucc_registers), 8));
+static_assert(IS_ALIGNED(sizeof(gen7_0_0_gpucc_registers), 8));
 
 static const u32 gen7_0_0_noncontext_pipe_br_registers[] = {
 	0x00887, 0x0088c, 0x08600, 0x08600, 0x08602, 0x08602, 0x08610, 0x0861b,
@@ -784,7 +785,7 @@ struct gen7_cluster_registers {
 	unsigned int offset;
 };
 
-static struct gen7_cluster_registers gen7_clusters[] = {
+static struct gen7_cluster_registers gen7_0_0_clusters[] = {
 	{ CLUSTER_NONE, PIPE_BR, STATE_NON_CONTEXT,
 		gen7_0_0_noncontext_pipe_br_registers, },
 	{ CLUSTER_NONE, PIPE_BV, STATE_NON_CONTEXT,
@@ -872,7 +873,7 @@ struct gen7_sptp_cluster_registers {
 	unsigned int offset;
 };
 
-static struct gen7_sptp_cluster_registers gen7_sptp_clusters[] = {
+static struct gen7_sptp_cluster_registers gen7_0_0_sptp_clusters[] = {
 	{ CLUSTER_NONE, SP_NCTX_REG, PIPE_BR, 0, HLSQ_State,
 		gen7_0_0_sp_noncontext_pipe_br_hlsq_state_registers, 0xae00 },
 	{ CLUSTER_NONE, SP_NCTX_REG, PIPE_BR, 0, SP_TOP,
@@ -978,10 +979,10 @@ struct gen7_shader_block {
 	u32 statetype;
 	/* size: Size of the block (in dwords) */
 	u32 size
-	/* sp_id: The SP id to dump */;
-	u32 sp_id;
-	/* usptp: The usptp id to dump */;
-	u32 usptp;
+	/* num_sps: The SP id to dump */;
+	u32 num_sps;
+	/* num_usptps: The number of USPTPs to dump */;
+	u32 num_usptps;
 	/* pipe_id: Pipe identifier for the block data  */
 	u32 pipeid;
 	/* location: Location identifer for the block data */
@@ -990,275 +991,86 @@ struct gen7_shader_block {
 	u64 offset;
 };
 
-static struct gen7_shader_block gen7_shader_blocks[] = {
-	{TP0_TMO_DATA,               0x200, 0, 0, PIPE_BR, USPTP},
-	{TP0_SMO_DATA,               0x80, 0, 0, PIPE_BR, USPTP},
-	{TP0_MIPMAP_BASE_DATA,       0x3c0, 0, 0, PIPE_BR, USPTP},
-	{SP_INST_DATA,               0x800, 0, 0, PIPE_BR, USPTP},
-	{SP_INST_DATA_1,             0x800, 0, 0, PIPE_BR, USPTP},
-	{SP_LB_0_DATA,               0x800, 0, 0, PIPE_BR, USPTP},
-	{SP_LB_1_DATA,               0x800, 0, 0, PIPE_BR, USPTP},
-	{SP_LB_2_DATA,               0x800, 0, 0, PIPE_BR, USPTP},
-	{SP_LB_3_DATA,               0x800, 0, 0, PIPE_BR, USPTP},
-	{SP_LB_4_DATA,               0x800, 0, 0, PIPE_BR, USPTP},
-	{SP_LB_5_DATA,               0x800, 0, 0, PIPE_BR, USPTP},
-	{SP_LB_6_DATA,               0x800, 0, 0, PIPE_BR, USPTP},
-	{SP_LB_7_DATA,               0x800, 0, 0, PIPE_BR, USPTP},
-	{SP_CB_RAM,                  0x390, 0, 0, PIPE_BR, USPTP,},
-	{SP_INST_TAG,                0x90, 0, 0, PIPE_BR, USPTP},
-	{SP_INST_DATA_2,             0x200, 0, 0, PIPE_BR, USPTP},
-	{SP_TMO_TAG,                 0x80, 0, 0, PIPE_BR, USPTP},
-	{SP_SMO_TAG,                 0x80, 0, 0, PIPE_BR, USPTP},
-	{SP_STATE_DATA,              0x40, 0, 0, PIPE_BR, USPTP},
-	{SP_HWAVE_RAM,               0x100, 0, 0, PIPE_BR, USPTP},
-	{SP_L0_INST_BUF,             0x50, 0, 0, PIPE_BR, USPTP},
-	{SP_LB_8_DATA,               0x800, 0, 0, PIPE_BR, USPTP},
-	{SP_LB_9_DATA,               0x800, 0, 0, PIPE_BR, USPTP},
-	{SP_LB_10_DATA,              0x800, 0, 0, PIPE_BR, USPTP},
-	{SP_LB_11_DATA,              0x800, 0, 0, PIPE_BR, USPTP},
-	{SP_LB_12_DATA,              0x200, 0, 0, PIPE_BR, USPTP},
-	{HLSQ_CVS_BE_CTXT_BUF_RAM_TAG,    0x10, 0, 0, PIPE_BV, HLSQ_State},
-	{HLSQ_CVS_BE_CTXT_BUF_RAM_TAG,    0x10, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_CPS_BE_CTXT_BUF_RAM_TAG,    0x10, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_GFX_CVS_BE_CTXT_BUF_RAM,        0x300, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_GFX_CVS_BE_CTXT_BUF_RAM,        0x300, 0, 0, PIPE_BV, HLSQ_State},
-	{HLSQ_GFX_CPS_BE_CTXT_BUF_RAM,        0x300, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_CHUNK_CVS_RAM,         0x1c0, 0, 0, PIPE_BV, HLSQ_State},
-	{HLSQ_CHUNK_CVS_RAM,         0x1c0, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_CHUNK_CPS_RAM,         0x300, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_CHUNK_CPS_RAM,         0x300, 0, 0, PIPE_LPAC, HLSQ_State},
-	{HLSQ_CHUNK_CVS_RAM_TAG,     0x40, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_CHUNK_CVS_RAM_TAG,     0x40, 0, 0, PIPE_BV, HLSQ_State},
-	{HLSQ_CHUNK_CPS_RAM_TAG,     0x40, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_CHUNK_CPS_RAM_TAG,     0x40, 0, 0, PIPE_LPAC, HLSQ_State},
-	{HLSQ_ICB_CVS_CB_BASE_TAG,   0x10, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_ICB_CVS_CB_BASE_TAG,   0x10, 0, 0, PIPE_BV, HLSQ_State},
-	{HLSQ_ICB_CPS_CB_BASE_TAG,   0x10, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_ICB_CPS_CB_BASE_TAG,   0x10, 0, 0, PIPE_LPAC, HLSQ_State},
-	{HLSQ_CVS_MISC_RAM,          0x280, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_CVS_MISC_RAM,          0x280, 0, 0, PIPE_BV, HLSQ_State},
-	{HLSQ_CPS_MISC_RAM,          0x800, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_CPS_MISC_RAM,          0x800, 0, 0, PIPE_LPAC, HLSQ_State},
-	{HLSQ_CPS_MISC_RAM_1,        0x200, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_INST_RAM,              0x800, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_INST_RAM,              0x800, 0, 0, PIPE_BV, HLSQ_State},
-	{HLSQ_INST_RAM,              0x800, 0, 0, PIPE_LPAC, HLSQ_State},
-	{HLSQ_GFX_CVS_CONST_RAM,     0x800, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_GFX_CVS_CONST_RAM,     0x800, 0, 0, PIPE_BV, HLSQ_State},
-	{HLSQ_GFX_CPS_CONST_RAM,     0x800, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_GFX_CPS_CONST_RAM,     0x800, 0, 0, PIPE_LPAC, HLSQ_State},
-	{HLSQ_CVS_MISC_RAM_TAG,      0x10, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_CVS_MISC_RAM_TAG,      0x10, 0, 0, PIPE_BV, HLSQ_State},
-	{HLSQ_CPS_MISC_RAM_TAG,      0x10, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_CPS_MISC_RAM_TAG,      0x10, 0, 0, PIPE_LPAC, HLSQ_State},
-	{HLSQ_INST_RAM_TAG,          0x80, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_INST_RAM_TAG,          0x80, 0, 0, PIPE_BV, HLSQ_State},
-	{HLSQ_INST_RAM_TAG,          0x80, 0, 0, PIPE_LPAC, HLSQ_State},
-	{HLSQ_GFX_CVS_CONST_RAM_TAG, 0x64, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_GFX_CVS_CONST_RAM_TAG, 0x64, 0, 0, PIPE_BV, HLSQ_State},
-	{HLSQ_GFX_CPS_CONST_RAM_TAG, 0x64, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_GFX_CPS_CONST_RAM_TAG, 0x64, 0, 0, PIPE_LPAC, HLSQ_State},
-	{HLSQ_INST_RAM_1,            0x800, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_STPROC_META,           0x10, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_BV_BE_META,            0x10, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_BV_BE_META,            0x10, 0, 0, PIPE_BV, HLSQ_State},
-	{HLSQ_DATAPATH_META,         0x20, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_FRONTEND_META,         0x40, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_FRONTEND_META,         0x40, 0, 0, PIPE_BV, HLSQ_State},
-	{HLSQ_FRONTEND_META,         0x40, 0, 0, PIPE_LPAC, HLSQ_State},
-	{HLSQ_INDIRECT_META,         0x10, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_BACKEND_META,          0x40, 0, 0, PIPE_BR, HLSQ_State},
-	{HLSQ_BACKEND_META,          0x40, 0, 0, PIPE_BV, HLSQ_State},
-	{HLSQ_BACKEND_META,          0x40, 0, 0, PIPE_LPAC, HLSQ_State},
-	/* SP 0 USPTP 1 */
-	{TP0_TMO_DATA,               0x200, 0, 1, PIPE_BR, USPTP},
-	{TP0_SMO_DATA,               0x80, 0, 1, PIPE_BR, USPTP},
-	{TP0_MIPMAP_BASE_DATA,       0x3c0, 0, 1, PIPE_BR, USPTP},
-	{SP_INST_DATA,               0x800, 0, 1, PIPE_BR, USPTP},
-	{SP_INST_DATA_1,             0x800, 0, 1, PIPE_BR, USPTP},
-	{SP_LB_0_DATA,               0x800, 0, 1, PIPE_BR, USPTP},
-	{SP_LB_1_DATA,               0x800, 0, 1, PIPE_BR, USPTP},
-	{SP_LB_2_DATA,               0x800, 0, 1, PIPE_BR, USPTP},
-	{SP_LB_3_DATA,               0x800, 0, 1, PIPE_BR, USPTP},
-	{SP_LB_4_DATA,               0x800, 0, 1, PIPE_BR, USPTP},
-	{SP_LB_5_DATA,               0x800, 0, 1, PIPE_BR, USPTP},
-	{SP_LB_6_DATA,               0x800, 0, 1, PIPE_BR, USPTP},
-	{SP_LB_7_DATA,               0x800, 0, 1, PIPE_BR, USPTP},
-	{SP_CB_RAM,                  0x390, 0, 1, PIPE_BR, USPTP,},
-	{SP_INST_TAG,                0x90, 0, 1, PIPE_BR, USPTP},
-	{SP_INST_DATA_2,             0x200, 0, 1, PIPE_BR, USPTP},
-	{SP_TMO_TAG,                 0x80, 0, 1, PIPE_BR, USPTP},
-	{SP_SMO_TAG,                 0x80, 0, 1, PIPE_BR, USPTP},
-	{SP_STATE_DATA,              0x40, 0, 1, PIPE_BR, USPTP},
-	{SP_HWAVE_RAM,               0x100, 0, 1, PIPE_BR, USPTP},
-	{SP_L0_INST_BUF,             0x50, 0, 1, PIPE_BR, USPTP},
-	{SP_LB_8_DATA,               0x800, 0, 1, PIPE_BR, USPTP},
-	{SP_LB_9_DATA,               0x800, 0, 1, PIPE_BR, USPTP},
-	{SP_LB_10_DATA,              0x800, 0, 1, PIPE_BR, USPTP},
-	{SP_LB_11_DATA,              0x800, 0, 1, PIPE_BR, USPTP},
-	{SP_LB_12_DATA,              0x200, 0, 1, PIPE_BR, USPTP},
-	/* SP 1 USPTP 0 */
-	{TP0_TMO_DATA,               0x200, 1, 0, PIPE_BR, USPTP},
-	{TP0_SMO_DATA,               0x80, 1, 0, PIPE_BR, USPTP},
-	{TP0_MIPMAP_BASE_DATA,       0x3c0, 1, 0, PIPE_BR, USPTP},
-	{SP_INST_DATA,               0x800, 1, 0, PIPE_BR, USPTP},
-	{SP_INST_DATA_1,             0x800, 1, 0, PIPE_BR, USPTP},
-	{SP_LB_0_DATA,               0x800, 1, 0, PIPE_BR, USPTP},
-	{SP_LB_1_DATA,               0x800, 1, 0, PIPE_BR, USPTP},
-	{SP_LB_2_DATA,               0x800, 1, 0, PIPE_BR, USPTP},
-	{SP_LB_3_DATA,               0x800, 1, 0, PIPE_BR, USPTP},
-	{SP_LB_4_DATA,               0x800, 1, 0, PIPE_BR, USPTP},
-	{SP_LB_5_DATA,               0x800, 1, 0, PIPE_BR, USPTP},
-	{SP_LB_6_DATA,               0x800, 1, 0, PIPE_BR, USPTP},
-	{SP_LB_7_DATA,               0x800, 1, 0, PIPE_BR, USPTP},
-	{SP_CB_RAM,                  0x390, 1, 0, PIPE_BR, USPTP,},
-	{SP_INST_TAG,                0x90, 1, 0, PIPE_BR, USPTP,},
-	{SP_INST_DATA_2,             0x200, 1, 0, PIPE_BR, USPTP,},
-	{SP_TMO_TAG,                 0x80, 1, 0, PIPE_BR, USPTP,},
-	{SP_SMO_TAG,                 0x80, 1, 0, PIPE_BR, USPTP,},
-	{SP_STATE_DATA,              0x40, 1, 0, PIPE_BR, USPTP,},
-	{SP_HWAVE_RAM,               0x100, 1, 0, PIPE_BR, USPTP},
-	{SP_L0_INST_BUF,             0x50, 1, 0, PIPE_BR, USPTP,},
-	{SP_LB_8_DATA,               0x800, 1, 0, PIPE_BR, USPTP},
-	{SP_LB_9_DATA,               0x800, 1, 0, PIPE_BR, USPTP},
-	{SP_LB_10_DATA,              0x800, 1, 0, PIPE_BR, USPTP},
-	{SP_LB_11_DATA,              0x800, 1, 0, PIPE_BR, USPTP},
-	{SP_LB_12_DATA,              0x200, 1, 0, PIPE_BR, USPTP},
-	/* SP 1 USPTP 1 */
-	{TP0_TMO_DATA,               0x200, 1, 1, PIPE_BR, USPTP},
-	{TP0_SMO_DATA,               0x80, 1, 1, PIPE_BR, USPTP},
-	{TP0_MIPMAP_BASE_DATA,       0x3c0, 1, 1, PIPE_BR, USPTP},
-	{SP_INST_DATA,               0x800, 1, 1, PIPE_BR, USPTP},
-	{SP_INST_DATA_1,             0x800, 1, 1, PIPE_BR, USPTP},
-	{SP_LB_0_DATA,               0x800, 1, 1, PIPE_BR, USPTP},
-	{SP_LB_1_DATA,               0x800, 1, 1, PIPE_BR, USPTP},
-	{SP_LB_2_DATA,               0x800, 1, 1, PIPE_BR, USPTP},
-	{SP_LB_3_DATA,               0x800, 1, 1, PIPE_BR, USPTP},
-	{SP_LB_4_DATA,               0x800, 1, 1, PIPE_BR, USPTP},
-	{SP_LB_5_DATA,               0x800, 1, 1, PIPE_BR, USPTP},
-	{SP_LB_6_DATA,               0x800, 1, 1, PIPE_BR, USPTP},
-	{SP_LB_7_DATA,               0x800, 1, 1, PIPE_BR, USPTP},
-	{SP_CB_RAM,                  0x390, 1, 1, PIPE_BR, USPTP,},
-	{SP_INST_TAG,                0x90, 1, 1, PIPE_BR, USPTP,},
-	{SP_INST_DATA_2,             0x200, 1, 1, PIPE_BR, USPTP,},
-	{SP_TMO_TAG,                 0x80, 1, 1, PIPE_BR, USPTP,},
-	{SP_SMO_TAG,                 0x80, 1, 1, PIPE_BR, USPTP,},
-	{SP_STATE_DATA,              0x40, 1, 1, PIPE_BR, USPTP,},
-	{SP_HWAVE_RAM,               0x100, 1, 1, PIPE_BR, USPTP},
-	{SP_L0_INST_BUF,             0x50, 1, 1, PIPE_BR, USPTP,},
-	{SP_LB_8_DATA,               0x800, 1, 1, PIPE_BR, USPTP},
-	{SP_LB_9_DATA,               0x800, 1, 1, PIPE_BR, USPTP},
-	{SP_LB_10_DATA,              0x800, 1, 1, PIPE_BR, USPTP},
-	{SP_LB_11_DATA,              0x800, 1, 1, PIPE_BR, USPTP},
-	{SP_LB_12_DATA,              0x200, 1, 1, PIPE_BR, USPTP},
-	/* SP 2 USPTP 0 */
-	{TP0_TMO_DATA,               0x200, 2, 0, PIPE_BR, USPTP},
-	{TP0_SMO_DATA,               0x80, 2, 0, PIPE_BR, USPTP},
-	{TP0_MIPMAP_BASE_DATA,       0x3c0, 2, 0, PIPE_BR, USPTP},
-	{SP_INST_DATA,               0x800, 2, 0, PIPE_BR, USPTP},
-	{SP_INST_DATA_1,             0x800, 2, 0, PIPE_BR, USPTP},
-	{SP_LB_0_DATA,               0x800, 2, 0, PIPE_BR, USPTP},
-	{SP_LB_1_DATA,               0x800, 2, 0, PIPE_BR, USPTP},
-	{SP_LB_2_DATA,               0x800, 2, 0, PIPE_BR, USPTP},
-	{SP_LB_3_DATA,               0x800, 2, 0, PIPE_BR, USPTP},
-	{SP_LB_4_DATA,               0x800, 2, 0, PIPE_BR, USPTP},
-	{SP_LB_5_DATA,               0x800, 2, 0, PIPE_BR, USPTP},
-	{SP_LB_6_DATA,               0x800, 2, 0, PIPE_BR, USPTP},
-	{SP_LB_7_DATA,               0x800, 2, 0, PIPE_BR, USPTP},
-	{SP_CB_RAM,                  0x390, 2, 0, PIPE_BR, USPTP,},
-	{SP_INST_TAG,                0x90, 2, 0, PIPE_BR, USPTP,},
-	{SP_INST_DATA_2,             0x200, 2, 0, PIPE_BR, USPTP,},
-	{SP_TMO_TAG,                 0x80, 2, 0, PIPE_BR, USPTP,},
-	{SP_SMO_TAG,                 0x80, 2, 0, PIPE_BR, USPTP,},
-	{SP_STATE_DATA,              0x40, 2, 0, PIPE_BR, USPTP,},
-	{SP_HWAVE_RAM,               0x100, 2, 0, PIPE_BR, USPTP},
-	{SP_L0_INST_BUF,             0x50, 2, 0, PIPE_BR, USPTP,},
-	{SP_LB_8_DATA,               0x800, 2, 0, PIPE_BR, USPTP},
-	{SP_LB_9_DATA,               0x800, 2, 0, PIPE_BR, USPTP},
-	{SP_LB_10_DATA,              0x800, 2, 0, PIPE_BR, USPTP},
-	{SP_LB_11_DATA,              0x800, 2, 0, PIPE_BR, USPTP},
-	{SP_LB_12_DATA,              0x200, 2, 0, PIPE_BR, USPTP},
-	/* SP 2 USPTP 1 */
-	{TP0_TMO_DATA,               0x200, 2, 1, PIPE_BR, USPTP},
-	{TP0_SMO_DATA,               0x80, 2, 1, PIPE_BR, USPTP},
-	{TP0_MIPMAP_BASE_DATA,       0x3c0, 2, 1, PIPE_BR, USPTP},
-	{SP_INST_DATA,               0x800, 2, 1, PIPE_BR, USPTP},
-	{SP_INST_DATA_1,             0x800, 2, 1, PIPE_BR, USPTP},
-	{SP_LB_0_DATA,               0x800, 2, 1, PIPE_BR, USPTP},
-	{SP_LB_1_DATA,               0x800, 2, 1, PIPE_BR, USPTP},
-	{SP_LB_2_DATA,               0x800, 2, 1, PIPE_BR, USPTP},
-	{SP_LB_3_DATA,               0x800, 2, 1, PIPE_BR, USPTP},
-	{SP_LB_4_DATA,               0x800, 2, 1, PIPE_BR, USPTP},
-	{SP_LB_5_DATA,               0x800, 2, 1, PIPE_BR, USPTP},
-	{SP_LB_6_DATA,               0x800, 2, 1, PIPE_BR, USPTP},
-	{SP_LB_7_DATA,               0x800, 2, 1, PIPE_BR, USPTP},
-	{SP_CB_RAM,                  0x390, 2, 1, PIPE_BR, USPTP,},
-	{SP_INST_TAG,                0x90, 2, 1, PIPE_BR, USPTP,},
-	{SP_INST_DATA_2,             0x200, 2, 1, PIPE_BR, USPTP,},
-	{SP_TMO_TAG,                 0x80, 2, 1, PIPE_BR, USPTP,},
-	{SP_SMO_TAG,                 0x80, 2, 1, PIPE_BR, USPTP,},
-	{SP_STATE_DATA,              0x40, 2, 1, PIPE_BR, USPTP,},
-	{SP_HWAVE_RAM,               0x100, 2, 1, PIPE_BR, USPTP},
-	{SP_L0_INST_BUF,             0x50, 2, 1, PIPE_BR, USPTP,},
-	{SP_LB_8_DATA,               0x800, 2, 1, PIPE_BR, USPTP},
-	{SP_LB_9_DATA,               0x800, 2, 1, PIPE_BR, USPTP},
-	{SP_LB_10_DATA,              0x800, 2, 1, PIPE_BR, USPTP},
-	{SP_LB_11_DATA,              0x800, 2, 1, PIPE_BR, USPTP},
-	{SP_LB_12_DATA,              0x200, 2, 1, PIPE_BR, USPTP},
-	/* SP 3 USPTP 0 */
-	{TP0_TMO_DATA,               0x200, 3, 0, PIPE_BR, USPTP},
-	{TP0_SMO_DATA,               0x80, 3, 0, PIPE_BR, USPTP},
-	{TP0_MIPMAP_BASE_DATA,       0x3c0, 3, 0, PIPE_BR, USPTP},
-	{SP_INST_DATA,               0x800, 3, 0, PIPE_BR, USPTP},
-	{SP_INST_DATA_1,             0x800, 3, 0, PIPE_BR, USPTP},
-	{SP_LB_0_DATA,               0x800, 3, 0, PIPE_BR, USPTP},
-	{SP_LB_1_DATA,               0x800, 3, 0, PIPE_BR, USPTP},
-	{SP_LB_2_DATA,               0x800, 3, 0, PIPE_BR, USPTP},
-	{SP_LB_3_DATA,               0x800, 3, 0, PIPE_BR, USPTP},
-	{SP_LB_4_DATA,               0x800, 3, 0, PIPE_BR, USPTP},
-	{SP_LB_5_DATA,               0x800, 3, 0, PIPE_BR, USPTP},
-	{SP_LB_6_DATA,               0x800, 3, 0, PIPE_BR, USPTP},
-	{SP_LB_7_DATA,               0x800, 3, 0, PIPE_BR, USPTP},
-	{SP_CB_RAM,                  0x390, 3, 0, PIPE_BR, USPTP,},
-	{SP_INST_TAG,                0x90, 3, 0, PIPE_BR, USPTP,},
-	{SP_INST_DATA_2,             0x200, 3, 0, PIPE_BR, USPTP,},
-	{SP_TMO_TAG,                 0x80, 3, 0, PIPE_BR, USPTP,},
-	{SP_SMO_TAG,                 0x80, 3, 0, PIPE_BR, USPTP,},
-	{SP_STATE_DATA,              0x40, 3, 0, PIPE_BR, USPTP,},
-	{SP_HWAVE_RAM,               0x100, 3, 0, PIPE_BR, USPTP},
-	{SP_L0_INST_BUF,             0x50, 3, 0, PIPE_BR, USPTP,},
-	{SP_LB_8_DATA,               0x800, 3, 0, PIPE_BR, USPTP},
-	{SP_LB_9_DATA,               0x800, 3, 0, PIPE_BR, USPTP},
-	{SP_LB_10_DATA,              0x800, 3, 0, PIPE_BR, USPTP},
-	{SP_LB_11_DATA,              0x800, 3, 0, PIPE_BR, USPTP},
-	{SP_LB_12_DATA,              0x200, 3, 0, PIPE_BR, USPTP},
-	/* SP 3 USPTP 1 */
-	{TP0_TMO_DATA,               0x200, 3, 1, PIPE_BR, USPTP},
-	{TP0_SMO_DATA,               0x80, 3, 1, PIPE_BR, USPTP},
-	{TP0_MIPMAP_BASE_DATA,       0x3c0, 3, 1, PIPE_BR, USPTP},
-	{SP_INST_DATA,               0x800, 3, 1, PIPE_BR, USPTP},
-	{SP_INST_DATA_1,             0x800, 3, 1, PIPE_BR, USPTP},
-	{SP_LB_0_DATA,               0x800, 3, 1, PIPE_BR, USPTP},
-	{SP_LB_1_DATA,               0x800, 3, 1, PIPE_BR, USPTP},
-	{SP_LB_2_DATA,               0x800, 3, 1, PIPE_BR, USPTP},
-	{SP_LB_3_DATA,               0x800, 3, 1, PIPE_BR, USPTP},
-	{SP_LB_4_DATA,               0x800, 3, 1, PIPE_BR, USPTP},
-	{SP_LB_5_DATA,               0x800, 3, 1, PIPE_BR, USPTP},
-	{SP_LB_6_DATA,               0x800, 3, 1, PIPE_BR, USPTP},
-	{SP_LB_7_DATA,               0x800, 3, 1, PIPE_BR, USPTP},
-	{SP_CB_RAM,                  0x390, 3, 1, PIPE_BR, USPTP,},
-	{SP_INST_TAG,                0x90, 3, 1, PIPE_BR, USPTP,},
-	{SP_INST_DATA_2,             0x200, 3, 1, PIPE_BR, USPTP,},
-	{SP_TMO_TAG,                 0x80, 3, 1, PIPE_BR, USPTP,},
-	{SP_SMO_TAG,                 0x80, 3, 1, PIPE_BR, USPTP,},
-	{SP_STATE_DATA,              0x40, 3, 1, PIPE_BR, USPTP,},
-	{SP_HWAVE_RAM,               0x100, 3, 1, PIPE_BR, USPTP},
-	{SP_L0_INST_BUF,             0x50, 3, 1, PIPE_BR, USPTP,},
-	{SP_LB_8_DATA,               0x800, 3, 1, PIPE_BR, USPTP},
-	{SP_LB_9_DATA,               0x800, 3, 1, PIPE_BR, USPTP},
-	{SP_LB_10_DATA,              0x800, 3, 1, PIPE_BR, USPTP},
-	{SP_LB_11_DATA,              0x800, 3, 1, PIPE_BR, USPTP},
-	{SP_LB_12_DATA,              0x200, 3, 1, PIPE_BR, USPTP},
+static struct gen7_shader_block gen7_0_0_shader_blocks[] = {
+	{TP0_TMO_DATA,               0x200, 4, 2, PIPE_BR, USPTP},
+	{TP0_SMO_DATA,               0x80, 4, 2, PIPE_BR, USPTP},
+	{TP0_MIPMAP_BASE_DATA,       0x3c0, 4, 2, PIPE_BR, USPTP},
+	{SP_INST_DATA,               0x800, 4, 2, PIPE_BR, USPTP},
+	{SP_INST_DATA_1,             0x800, 4, 2, PIPE_BR, USPTP},
+	{SP_LB_0_DATA,               0x800, 4, 2, PIPE_BR, USPTP},
+	{SP_LB_1_DATA,               0x800, 4, 2, PIPE_BR, USPTP},
+	{SP_LB_2_DATA,               0x800, 4, 2, PIPE_BR, USPTP},
+	{SP_LB_3_DATA,               0x800, 4, 2, PIPE_BR, USPTP},
+	{SP_LB_4_DATA,               0x800, 4, 2, PIPE_BR, USPTP},
+	{SP_LB_5_DATA,               0x800, 4, 2, PIPE_BR, USPTP},
+	{SP_LB_6_DATA,               0x800, 4, 2, PIPE_BR, USPTP},
+	{SP_LB_7_DATA,               0x800, 4, 2, PIPE_BR, USPTP},
+	{SP_CB_RAM,                  0x390, 4, 2, PIPE_BR, USPTP,},
+	{SP_INST_TAG,                0x90, 4, 2, PIPE_BR, USPTP},
+	{SP_INST_DATA_2,             0x200, 4, 2, PIPE_BR, USPTP},
+	{SP_TMO_TAG,                 0x80, 4, 2, PIPE_BR, USPTP},
+	{SP_SMO_TAG,                 0x80, 4, 2, PIPE_BR, USPTP},
+	{SP_STATE_DATA,              0x40, 4, 2, PIPE_BR, USPTP},
+	{SP_HWAVE_RAM,               0x100, 4, 2, PIPE_BR, USPTP},
+	{SP_L0_INST_BUF,             0x50, 4, 2, PIPE_BR, USPTP},
+	{SP_LB_8_DATA,               0x800, 4, 2, PIPE_BR, USPTP},
+	{SP_LB_9_DATA,               0x800, 4, 2, PIPE_BR, USPTP},
+	{SP_LB_10_DATA,              0x800, 4, 2, PIPE_BR, USPTP},
+	{SP_LB_11_DATA,              0x800, 4, 2, PIPE_BR, USPTP},
+	{SP_LB_12_DATA,              0x200, 4, 2, PIPE_BR, USPTP},
+	{HLSQ_CVS_BE_CTXT_BUF_RAM_TAG,    0x10, 1, 1, PIPE_BV, HLSQ_State},
+	{HLSQ_CVS_BE_CTXT_BUF_RAM_TAG,    0x10, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_CPS_BE_CTXT_BUF_RAM_TAG,    0x10, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_GFX_CVS_BE_CTXT_BUF_RAM,        0x300, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_GFX_CVS_BE_CTXT_BUF_RAM,        0x300, 1, 1, PIPE_BV, HLSQ_State},
+	{HLSQ_GFX_CPS_BE_CTXT_BUF_RAM,        0x300, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_CHUNK_CVS_RAM,         0x1c0, 1, 1, PIPE_BV, HLSQ_State},
+	{HLSQ_CHUNK_CVS_RAM,         0x1c0, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_CHUNK_CPS_RAM,         0x300, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_CHUNK_CPS_RAM,         0x300, 1, 1, PIPE_LPAC, HLSQ_State},
+	{HLSQ_CHUNK_CVS_RAM_TAG,     0x40, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_CHUNK_CVS_RAM_TAG,     0x40, 1, 1, PIPE_BV, HLSQ_State},
+	{HLSQ_CHUNK_CPS_RAM_TAG,     0x40, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_CHUNK_CPS_RAM_TAG,     0x40, 1, 1, PIPE_LPAC, HLSQ_State},
+	{HLSQ_ICB_CVS_CB_BASE_TAG,   0x10, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_ICB_CVS_CB_BASE_TAG,   0x10, 1, 1, PIPE_BV, HLSQ_State},
+	{HLSQ_ICB_CPS_CB_BASE_TAG,   0x10, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_ICB_CPS_CB_BASE_TAG,   0x10, 1, 1, PIPE_LPAC, HLSQ_State},
+	{HLSQ_CVS_MISC_RAM,          0x280, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_CVS_MISC_RAM,          0x280, 1, 1, PIPE_BV, HLSQ_State},
+	{HLSQ_CPS_MISC_RAM,          0x800, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_CPS_MISC_RAM,          0x800, 1, 1, PIPE_LPAC, HLSQ_State},
+	{HLSQ_CPS_MISC_RAM_1,        0x200, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_INST_RAM,              0x800, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_INST_RAM,              0x800, 1, 1, PIPE_BV, HLSQ_State},
+	{HLSQ_INST_RAM,              0x800, 1, 1, PIPE_LPAC, HLSQ_State},
+	{HLSQ_GFX_CVS_CONST_RAM,     0x800, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_GFX_CVS_CONST_RAM,     0x800, 1, 1, PIPE_BV, HLSQ_State},
+	{HLSQ_GFX_CPS_CONST_RAM,     0x800, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_GFX_CPS_CONST_RAM,     0x800, 1, 1, PIPE_LPAC, HLSQ_State},
+	{HLSQ_CVS_MISC_RAM_TAG,      0x10, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_CVS_MISC_RAM_TAG,      0x10, 1, 1, PIPE_BV, HLSQ_State},
+	{HLSQ_CPS_MISC_RAM_TAG,      0x10, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_CPS_MISC_RAM_TAG,      0x10, 1, 1, PIPE_LPAC, HLSQ_State},
+	{HLSQ_INST_RAM_TAG,          0x80, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_INST_RAM_TAG,          0x80, 1, 1, PIPE_BV, HLSQ_State},
+	{HLSQ_INST_RAM_TAG,          0x80, 1, 1, PIPE_LPAC, HLSQ_State},
+	{HLSQ_GFX_CVS_CONST_RAM_TAG, 0x64, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_GFX_CVS_CONST_RAM_TAG, 0x64, 1, 1, PIPE_BV, HLSQ_State},
+	{HLSQ_GFX_CPS_CONST_RAM_TAG, 0x64, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_GFX_CPS_CONST_RAM_TAG, 0x64, 1, 1, PIPE_LPAC, HLSQ_State},
+	{HLSQ_INST_RAM_1,            0x800, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_STPROC_META,           0x10, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_BV_BE_META,            0x10, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_BV_BE_META,            0x10, 1, 1, PIPE_BV, HLSQ_State},
+	{HLSQ_DATAPATH_META,         0x20, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_FRONTEND_META,         0x40, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_FRONTEND_META,         0x40, 1, 1, PIPE_BV, HLSQ_State},
+	{HLSQ_FRONTEND_META,         0x40, 1, 1, PIPE_LPAC, HLSQ_State},
+	{HLSQ_INDIRECT_META,         0x10, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_BACKEND_META,          0x40, 1, 1, PIPE_BR, HLSQ_State},
+	{HLSQ_BACKEND_META,          0x40, 1, 1, PIPE_BV, HLSQ_State},
+	{HLSQ_BACKEND_META,          0x40, 1, 1, PIPE_LPAC, HLSQ_State},
 };
 
 static const u32 gen7_gbif_debugbus_blocks[] = {
@@ -1269,10 +1081,13 @@ static const u32 gen7_gbif_debugbus_blocks[] = {
 static const u32 gen7_cx_dbgc_debugbus_blocks[] = {
 	DEBUGBUS_GMU_CX,
 	DEBUGBUS_CX,
+	DEBUGBUS_GBIF_CX,
 };
 
 struct gen7_shader_block_info {
 	struct gen7_shader_block *block;
+	unsigned int sp_id;
+	unsigned int usptp;
 	u32 bank;
 	u64 offset;
 };
@@ -1281,10 +1096,11 @@ static struct reg_list {
 	const u32 *regs;
 	const struct sel_reg *sel;
 	u64 offset;
-} gen7_reg_list[] = {
-	{ gen7_gpu_registers, NULL },
-	{ gen7_cx_misc_registers, NULL },
-	{ gen7_dpm_registers, NULL },
+} gen7_0_0_reg_list[] = {
+	{ gen7_0_0_gpu_registers, NULL },
+	{ gen7_0_0_cx_misc_registers, NULL },
+	{ gen7_0_0_dpm_registers, NULL },
+	{ NULL, NULL },
 };
 
 static struct cp_indexed_reg_list {
@@ -1303,4 +1119,47 @@ static struct cp_indexed_reg_list {
 	{ GEN7_CP_SQE_AC_UCODE_DBG_ADDR, GEN7_CP_SQE_AC_UCODE_DBG_DATA, 0x8000},
 	{ GEN7_CP_LPAC_FIFO_DBG_ADDR, GEN7_CP_LPAC_FIFO_DBG_DATA, 0x40},
 };
+
+static const u32 *gen7_0_0_external_core_regs[] = {
+	gen7_0_0_gpucc_registers,
+	gen7_0_0_cpr_registers,
+};
+
+static struct gen7_snapshot_block_list {
+	/* pre_crashdumper_regs : Registers which need to be dumped before CD runs */
+	const u32 *pre_crashdumper_regs;
+	/* debugbus_blocks : List of debugbus blocks */
+	const u32 *debugbus_blocks;
+	/* debugbus_blocks_len : Length of the debugbus list */
+	size_t debugbus_blocks_len;
+	/* gbif_debugbus_blocks : List of GBIF debugbus blocks */
+	const u32 *gbif_debugbus_blocks;
+	/* gbif_debugbus_blocks_len : Length of GBIF debugbus list */
+	size_t gbif_debugbus_blocks_len;
+	/* cx_debugbus_blocks : List of CX debugbus blocks */
+	const u32 *cx_debugbus_blocks;
+	/* cx_debugbus_blocks_len : Length of the CX debugbus list */
+	size_t cx_debugbus_blocks_len;
+	/* external_core_regs : List of external core registers */
+	const u32 **external_core_regs;
+	/* num_external_core_regs : length of external core registers list */
+	size_t num_external_core_regs;
+	/* reg_list : List of GPU internal registers */
+	struct reg_list *reg_list;
+	/* shader_blocks : List of GPU shader memory */
+	struct gen7_shader_block *shader_blocks;
+	/* num_shader_blocks : Length of the shader memory list */
+	size_t num_shader_blocks;
+	/* cluster_registers : List of GPU cluster registers */
+	struct gen7_cluster_registers *clusters;
+	/* num_clusters : Length of GPU cluster registers list */
+	size_t num_clusters;
+	/* spstp_cluster_registers : List of GPU SPTP cluster registers */
+	struct gen7_sptp_cluster_registers *sptp_clusters;
+	/* num_sptp_clusters : Length of GPU SPTP cluster registers list */
+	size_t num_sptp_clusters;
+	/* post_crashdumper_regs : Registers which need to be dumped after CD runs */
+	const u32 *post_crashdumper_regs;
+};
+
 #endif /*_ADRENO_GEN7_SNAPSHOT_H */
