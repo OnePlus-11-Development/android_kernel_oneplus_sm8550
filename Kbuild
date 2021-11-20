@@ -4,13 +4,19 @@ KBUILD_CPPFLAGS += -DCONFIG_MSM_MMRM=1
 
 ifeq ($(CONFIG_ARCH_WAIPIO), y)
 include $(VIDEO_ROOT)/config/waipio_video.conf
-LINUXINCLUDE    += -include $(VIDEO_ROOT)/config/waipio_video.h
+LINUXINCLUDE    += -include $(VIDEO_ROOT)/config/waipio_video.h \
+                   -I$(VIDEO_ROOT)/driver/platform/waipio/inc
 endif
 
+ifeq ($(CONFIG_ARCH_KALAMA), y)
+include $(VIDEO_ROOT)/config/kalama_video.conf
+LINUXINCLUDE    += -include $(VIDEO_ROOT)/config/kalama_video.h \
+                   -I$(VIDEO_ROOT)/driver/platform/kalama/inc
+endif
+
+
 LINUXINCLUDE    += -I$(VIDEO_ROOT)/driver/vidc/inc \
-                   -I$(VIDEO_ROOT)/include/uapi/vidc \
-                   -I$(VIDEO_ROOT)/driver/platform/waipio/inc \
-                   -I$(VIDEO_ROOT)/driver/variant/iris2/inc
+                   -I$(VIDEO_ROOT)/include/uapi/vidc
 
 USERINCLUDE     += -I$(VIDEO_ROOT)/include/uapi/vidc/media \
                    -I$(VIDEO_ROOT)/include/uapi/vidc
@@ -21,10 +27,22 @@ ifeq ($(CONFIG_MSM_VIDC_WAIPIO), y)
 msm_video-objs += driver/platform/waipio/src/msm_vidc_waipio.o
 endif
 
+ifeq ($(CONFIG_MSM_VIDC_KALAMA), y)
+msm_video-objs += driver/platform/kalama/src/msm_vidc_kalama.o
+endif
+
 ifeq ($(CONFIG_MSM_VIDC_IRIS2), y)
+LINUXINCLUDE    += -I$(VIDEO_ROOT)/driver/variant/iris2/inc
 msm_video-objs += driver/variant/iris2/src/msm_vidc_buffer_iris2.o \
                   driver/variant/iris2/src/msm_vidc_power_iris2.o \
                   driver/variant/iris2/src/msm_vidc_iris2.o
+endif
+
+ifeq ($(CONFIG_MSM_VIDC_IRIS3), y)
+LINUXINCLUDE    += -I$(VIDEO_ROOT)/driver/variant/iris3/inc
+msm_video-objs += driver/variant/iris3/src/msm_vidc_buffer_iris3.o \
+                  driver/variant/iris3/src/msm_vidc_power_iris3.o \
+                  driver/variant/iris3/src/msm_vidc_iris3.o
 endif
 
 msm_video-objs += driver/vidc/src/msm_vidc_v4l2.o \
