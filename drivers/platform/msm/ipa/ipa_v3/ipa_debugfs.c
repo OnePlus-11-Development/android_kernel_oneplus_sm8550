@@ -40,6 +40,7 @@ static const char * const ipa_eth_clients_strings[] = {
 	__stringify(RTK8111K),
 	__stringify(RTK8125B),
 	__stringify(NTN),
+	__stringify(NTN3),
 	__stringify(EMAC),
 };
 
@@ -1553,7 +1554,14 @@ static ssize_t ipa3_read_stats(struct file *file, char __user *ubuf,
 		"lan_repl_rx_empty=%u\n"
 		"flow_enable=%u\n"
 		"flow_disable=%u\n"
-		"rx_page_drop_cnt=%u\n",
+		"rx_page_drop_cnt=%u\n"
+		"lower_order=%u\n"
+		"rmnet_notifier_enabled=%u\n"
+		"num_buff_above_thresh_for_def_pipe_notified=%u\n"
+		"num_buff_below_thresh_for_def_pipe_notified=%u\n"
+		"num_buff_above_thresh_for_coal_pipe_notified=%u\n"
+		"num_buff_below_thresh_for_coal_pipe_notified=%u\n"
+		"pipe_setup_fail_cnt=%u\n",
 		ipa3_ctx->stats.tx_sw_pkts,
 		ipa3_ctx->stats.tx_hw_pkts,
 		ipa3_ctx->stats.tx_non_linear,
@@ -1573,7 +1581,14 @@ static ssize_t ipa3_read_stats(struct file *file, char __user *ubuf,
 		ipa3_ctx->stats.lan_repl_rx_empty,
 		ipa3_ctx->stats.flow_enable,
 		ipa3_ctx->stats.flow_disable,
-		ipa3_ctx->stats.rx_page_drop_cnt
+		ipa3_ctx->stats.rx_page_drop_cnt,
+		ipa3_ctx->stats.lower_order,
+		ipa3_ctx->ipa_rmnet_notifier_enabled,
+		atomic_read(&ipa3_ctx->stats.num_buff_above_thresh_for_def_pipe_notified),
+		atomic_read(&ipa3_ctx->stats.num_buff_below_thresh_for_def_pipe_notified),
+		atomic_read(&ipa3_ctx->stats.num_buff_above_thresh_for_coal_pipe_notified),
+		atomic_read(&ipa3_ctx->stats.num_buff_below_thresh_for_coal_pipe_notified),
+		ipa3_ctx->stats.pipe_setup_fail_cnt
 		);
 	cnt += nbytes;
 
@@ -1820,76 +1835,83 @@ nxt_clnt_cons:
 static ssize_t ipa3_read_ntn(struct file *file, char __user *ubuf,
 		size_t count, loff_t *ppos)
 {
-#define TX_STATS(y) \
-	stats.tx_ch_stats[0].y
-#define RX_STATS(y) \
-	stats.rx_ch_stats[0].y
+#define TX_STATS(x, y) \
+	stats.tx_ch_stats[x].y
+#define RX_STATS(x, y) \
+	stats.rx_ch_stats[x].y
 
 	struct Ipa3HwStatsNTNInfoData_t stats;
 	int nbytes;
-	int cnt = 0;
+	int cnt = 0, i = 0;
 
 	if (!ipa3_get_ntn_stats(&stats)) {
-		nbytes = scnprintf(dbg_buff, IPA_MAX_MSG_LEN,
-			"TX num_pkts_processed=%u\n"
-			"TX ringFull=%u\n"
-			"TX ringEmpty=%u\n"
-			"TX ringUsageHigh=%u\n"
-			"TX ringUsageLow=%u\n"
-			"TX RingUtilCount=%u\n"
-			"TX bamFifoFull=%u\n"
-			"TX bamFifoEmpty=%u\n"
-			"TX bamFifoUsageHigh=%u\n"
-			"TX bamFifoUsageLow=%u\n"
-			"TX bamUtilCount=%u\n"
-			"TX num_db=%u\n"
-			"TX num_qmb_int_handled=%u\n"
-			"TX ipa_pipe_number=%u\n",
-			TX_STATS(num_pkts_processed),
-			TX_STATS(ring_stats.ringFull),
-			TX_STATS(ring_stats.ringEmpty),
-			TX_STATS(ring_stats.ringUsageHigh),
-			TX_STATS(ring_stats.ringUsageLow),
-			TX_STATS(ring_stats.RingUtilCount),
-			TX_STATS(gsi_stats.bamFifoFull),
-			TX_STATS(gsi_stats.bamFifoEmpty),
-			TX_STATS(gsi_stats.bamFifoUsageHigh),
-			TX_STATS(gsi_stats.bamFifoUsageLow),
-			TX_STATS(gsi_stats.bamUtilCount),
-			TX_STATS(num_db),
-			TX_STATS(num_qmb_int_handled),
-			TX_STATS(ipa_pipe_number));
-		cnt += nbytes;
-		nbytes = scnprintf(dbg_buff + cnt, IPA_MAX_MSG_LEN - cnt,
-			"RX num_pkts_processed=%u\n"
-			"RX ringFull=%u\n"
-			"RX ringEmpty=%u\n"
-			"RX ringUsageHigh=%u\n"
-			"RX ringUsageLow=%u\n"
-			"RX RingUtilCount=%u\n"
-			"RX bamFifoFull=%u\n"
-			"RX bamFifoEmpty=%u\n"
-			"RX bamFifoUsageHigh=%u\n"
-			"RX bamFifoUsageLow=%u\n"
-			"RX bamUtilCount=%u\n"
-			"RX num_db=%u\n"
-			"RX num_qmb_int_handled=%u\n"
-			"RX ipa_pipe_number=%u\n",
-			RX_STATS(num_pkts_processed),
-			RX_STATS(ring_stats.ringFull),
-			RX_STATS(ring_stats.ringEmpty),
-			RX_STATS(ring_stats.ringUsageHigh),
-			RX_STATS(ring_stats.ringUsageLow),
-			RX_STATS(ring_stats.RingUtilCount),
-			RX_STATS(gsi_stats.bamFifoFull),
-			RX_STATS(gsi_stats.bamFifoEmpty),
-			RX_STATS(gsi_stats.bamFifoUsageHigh),
-			RX_STATS(gsi_stats.bamFifoUsageLow),
-			RX_STATS(gsi_stats.bamUtilCount),
-			RX_STATS(num_db),
-			RX_STATS(num_qmb_int_handled),
-			RX_STATS(ipa_pipe_number));
-		cnt += nbytes;
+		for (i = 0; i < IPA_UC_MAX_NTN_TX_CHANNELS; i++) {
+			nbytes = scnprintf(dbg_buff + cnt,
+				IPA_MAX_MSG_LEN - cnt,
+				"TX%d num_pkts_psr=%u\n"
+				"TX%d ringFull=%u\n"
+				"TX%d ringEmpty=%u\n"
+				"TX%d ringUsageHigh=%u\n"
+				"TX%d ringUsageLow=%u\n"
+				"TX%d RingUtilCount=%u\n"
+				"TX%d bamFifoFull=%u\n"
+				"TX%d bamFifoEmpty=%u\n"
+				"TX%d bamFifoUsageHigh=%u\n"
+				"TX%d bamFifoUsageLow=%u\n"
+				"TX%d bamUtilCount=%u\n"
+				"TX%d num_db=%u\n"
+				"TX%d num_qmb_int_handled=%u\n"
+				"TX%d ipa_pipe_number=%u\n",
+				i, TX_STATS(i, num_pkts_processed),
+				i, TX_STATS(i, ring_stats.ringFull),
+				i, TX_STATS(i, ring_stats.ringEmpty),
+				i, TX_STATS(i, ring_stats.ringUsageHigh),
+				i, TX_STATS(i, ring_stats.ringUsageLow),
+				i, TX_STATS(i, ring_stats.RingUtilCount),
+				i, TX_STATS(i, gsi_stats.bamFifoFull),
+				i, TX_STATS(i, gsi_stats.bamFifoEmpty),
+				i, TX_STATS(i, gsi_stats.bamFifoUsageHigh),
+				i, TX_STATS(i, gsi_stats.bamFifoUsageLow),
+				i, TX_STATS(i, gsi_stats.bamUtilCount),
+				i, TX_STATS(i, num_db),
+				i, TX_STATS(i, num_qmb_int_handled),
+				i, TX_STATS(i, ipa_pipe_number));
+			cnt += nbytes;
+		}
+
+		for (i = 0; i < IPA_UC_MAX_NTN_RX_CHANNELS; i++) {
+			nbytes = scnprintf(dbg_buff + cnt,
+				IPA_MAX_MSG_LEN - cnt,
+				"RX%d num_pkts_psr=%u\n"
+				"RX%d ringFull=%u\n"
+				"RX%d ringEmpty=%u\n"
+				"RX%d ringUsageHigh=%u\n"
+				"RX%d ringUsageLow=%u\n"
+				"RX%d RingUtilCount=%u\n"
+				"RX%d bamFifoFull=%u\n"
+				"RX%d bamFifoEmpty=%u\n"
+				"RX%d bamFifoUsageHigh=%u\n"
+				"RX%d bamFifoUsageLow=%u\n"
+				"RX%d bamUtilCount=%u\n"
+				"RX%d num_db=%u\n"
+				"RX%d num_qmb_int_handled=%u\n"
+				"RX%d ipa_pipe_number=%u\n",
+				i, RX_STATS(i, num_pkts_processed),
+				i, RX_STATS(i, ring_stats.ringFull),
+				i, RX_STATS(i, ring_stats.ringEmpty),
+				i, RX_STATS(i, ring_stats.ringUsageHigh),
+				i, RX_STATS(i, ring_stats.ringUsageLow),
+				i, RX_STATS(i, ring_stats.RingUtilCount),
+				i, RX_STATS(i, gsi_stats.bamFifoFull),
+				i, RX_STATS(i, gsi_stats.bamFifoEmpty),
+				i, RX_STATS(i, gsi_stats.bamFifoUsageHigh),
+				i, RX_STATS(i, gsi_stats.bamFifoUsageLow),
+				i, RX_STATS(i, gsi_stats.bamUtilCount),
+				i, RX_STATS(i, num_db),
+				i, RX_STATS(i, num_qmb_int_handled),
+				i, RX_STATS(i, ipa_pipe_number));
+			cnt += nbytes;
+		}
 	} else {
 		nbytes = scnprintf(dbg_buff, IPA_MAX_MSG_LEN,
 				"Fail to read NTN stats\n");
@@ -3636,6 +3658,55 @@ done:
 	return simple_read_from_buffer(ubuf, count, ppos, dbg_buff, cnt);
 }
 
+#if IPA_ETH_API_VER >= 2
+static void __ipa_ntn3_client_stats_read(int *cnt, struct ipa_ntn3_client_stats *s,
+	const char *str_client_tx, const char *str_client_rx)
+{
+	int nbytes;
+
+	nbytes = scnprintf(dbg_buff + *cnt, IPA_MAX_MSG_LEN - *cnt,
+		"%s_RP=0x%x\n"
+		"%s_WP=0x%x\n"
+		"%s_ntn_pending_db_after_rollback:%u\n"
+		"%s_msi_db_idx_val:%u\n"
+		"%s_tx_derr_counter:%u\n"
+		"%s_ntn_tx_oob_counter:%u\n"
+		"%s_ntn_accumulated_tres_handled:%u\n"
+		"%s_ntn_rollbacks_counter:%u\n"
+		"%s_ntn_msi_db_count:%u\n",
+		str_client_tx, s->tx_stats.rp,
+		str_client_tx, s->tx_stats.wp,
+		str_client_tx, s->tx_stats.pending_db_after_rollback,
+		str_client_tx, s->tx_stats.msi_db_idx,
+		str_client_tx, s->tx_stats.derr_cnt,
+		str_client_tx, s->tx_stats.oob_cnt,
+		str_client_tx, s->tx_stats.tres_handled,
+		str_client_tx, s->tx_stats.rollbacks_cnt,
+		str_client_tx, s->tx_stats.msi_db_cnt);
+	*cnt += nbytes;
+	nbytes = scnprintf(dbg_buff + *cnt, IPA_MAX_MSG_LEN - *cnt,
+		"%s_RP=0x%x\n"
+		"%s_WP=0x%x\n"
+		"%s_ntn_pending_db_after_rollback:%u\n"
+		"%s_msi_db_idx_val:%u\n"
+		"%s_ntn_rx_chain_counter:%u\n"
+		"%s_ntn_rx_err_counter:%u\n"
+		"%s_ntn_accumulated_tres_handled:%u\n"
+		"%s_ntn_rollbacks_counter:%u\n"
+		"%s_ntn_msi_db_count:%u\n",
+		str_client_rx, s->rx_stats.rp,
+		str_client_rx, s->rx_stats.wp,
+		str_client_rx, s->rx_stats.pending_db_after_rollback,
+		str_client_rx, s->rx_stats.msi_db_idx,
+		str_client_rx, s->rx_stats.chain_cnt,
+		str_client_rx, s->rx_stats.err_cnt,
+		str_client_rx, s->rx_stats.tres_handled,
+		str_client_rx, s->rx_stats.rollbacks_cnt,
+		str_client_rx, s->rx_stats.msi_db_cnt);
+	*cnt += nbytes;
+}
+#endif
+
 static ssize_t ipa3_eth_read_err_status(struct file *file,
 	char __user *ubuf, size_t count, loff_t *ppos)
 {
@@ -3646,6 +3717,10 @@ static ssize_t ipa3_eth_read_err_status(struct file *file,
 	struct ipa3_eth_error_stats tx_stats;
 	struct ipa3_eth_error_stats rx_stats;
 	int scratch_num;
+#if IPA_ETH_API_VER >= 2
+	struct ipa_ntn3_client_stats ntn3_stats;
+	const char *str_client_tx, *str_client_rx;
+#endif
 
 	memset(&tx_stats, 0, sizeof(struct ipa3_eth_error_stats));
 	memset(&rx_stats, 0, sizeof(struct ipa3_eth_error_stats));
@@ -3659,6 +3734,7 @@ static ssize_t ipa3_eth_read_err_status(struct file *file,
 		goto done;
 	}
 	client = (struct ipa_eth_client *)file->private_data;
+
 	switch (client->client_type) {
 	case IPA_ETH_CLIENT_AQC107:
 	case IPA_ETH_CLIENT_AQC113:
@@ -3675,6 +3751,22 @@ static ssize_t ipa3_eth_read_err_status(struct file *file,
 		tx_ep = IPA_CLIENT_ETHERNET_CONS;
 		rx_ep = IPA_CLIENT_ETHERNET_PROD;
 		scratch_num = 6;
+#if IPA_ETH_API_VER >= 2
+	case IPA_ETH_CLIENT_NTN3:
+
+		memset(&ntn3_stats, 0, sizeof(ntn3_stats));
+		if (strstr(file->f_path.dentry->d_name.name, "0_status")) {
+			ipa_eth_ntn3_get_status(&ntn3_stats, 0);
+			str_client_tx = ipa_clients_strings[IPA_CLIENT_ETHERNET_CONS];
+			str_client_rx = ipa_clients_strings[IPA_CLIENT_ETHERNET_PROD];
+		} else {
+			ipa_eth_ntn3_get_status(&ntn3_stats, 1);
+			str_client_tx = ipa_clients_strings[IPA_CLIENT_ETHERNET2_CONS];
+			str_client_rx = ipa_clients_strings[IPA_CLIENT_ETHERNET2_PROD];
+		}
+		__ipa_ntn3_client_stats_read(&cnt, &ntn3_stats, str_client_tx, str_client_rx);
+		goto done;
+#endif
 	default:
 		IPAERR("Not supported\n");
 		return 0;

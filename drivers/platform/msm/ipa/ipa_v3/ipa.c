@@ -69,6 +69,8 @@
 #define DEFAULT_MPM_TETH_AGGR_SIZE 24
 #define DEFAULT_MPM_UC_THRESH_SIZE 4
 
+RAW_NOTIFIER_HEAD(ipa_rmnet_notifier_list);
+
 /*
  * The following for adding code (ie. for EMULATION) not found on x86.
  */
@@ -3935,6 +3937,7 @@ static long ipa3_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 
 	case IPA_IOC_ADD_EoGRE_MAPPING:
+		IPADBG("Got IPA_IOC_ADD_EoGRE_MAPPING\n");
 		if (copy_from_user(
 				&eogre_info,
 				(const void __user *) arg,
@@ -3945,6 +3948,8 @@ static long ipa3_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		}
 
 		retval = ipa3_check_eogre(&eogre_info, &send2uC, &send2ipacm);
+
+		ipa3_ctx->eogre_enabled = (retval == 0);
 
 		if (retval == 0 && send2uC == true) {
 			/*
@@ -3961,13 +3966,15 @@ static long ipa3_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			retval = ipa3_send_eogre_info(IPA_EoGRE_UP_EVENT, &eogre_info);
 		}
 
-		if (retval == 0) {
-			ipa3_ctx->eogre_enabled = true;
+		if (retval != 0) {
+			ipa3_ctx->eogre_enabled = false;
 		}
 
 		break;
 
 	case IPA_IOC_DEL_EoGRE_MAPPING:
+		IPADBG("Got IPA_IOC_DEL_EoGRE_MAPPING\n");
+
 		memset(&eogre_info, 0, sizeof(eogre_info));
 
 		retval = ipa3_check_eogre(&eogre_info, &send2uC, &send2ipacm);
@@ -4329,16 +4336,19 @@ static void ipa3_q6_avoid_holb(void)
 			 * setting HOLB on Q6 pipes, and from APPS perspective
 			 * they are not valid, therefore, the above function
 			 * will fail.
+			 * Also don't reset the HOLB timer to 0 for Q6 pipes.
 			 */
-			ipahal_write_reg_n_fields(
-				IPA_ENDP_INIT_HOL_BLOCK_TIMER_n,
-				ep_idx, &ep_holb);
+
+
+
 			ipahal_write_reg_n_fields(
 				IPA_ENDP_INIT_HOL_BLOCK_EN_n,
 				ep_idx, &ep_holb);
 
-			/* IPA4.5 issue requires HOLB_EN to be written twice */
-			if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_5)
+			/* For targets > IPA_4.0 issue requires HOLB_EN to
+			 * be written twice.
+			 */
+			if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_0)
 				ipahal_write_reg_n_fields(
 					IPA_ENDP_INIT_HOL_BLOCK_EN_n,
 					ep_idx, &ep_holb);
@@ -7264,6 +7274,10 @@ static inline void ipa3_register_to_fmwk(void)
 	data.ipa_rmnet_ll_xmit = ipa3_rmnet_ll_xmit;
 	data.ipa_register_rmnet_ll_cb = ipa3_register_rmnet_ll_cb;
 	data.ipa_unregister_rmnet_ll_cb = ipa3_unregister_rmnet_ll_cb;
+	data.ipa_register_notifier =
+		ipa3_register_notifier;
+	data.ipa_unregister_notifier =
+		ipa3_unregister_notifier;
 
 	if (ipa_fmwk_register_ipa(&data)) {
 		IPAERR("couldn't register to IPA framework\n");
@@ -7287,7 +7301,7 @@ void ipa3_notify_clients_registered(void)
 }
 EXPORT_SYMBOL(ipa3_notify_clients_registered);
 
-void ipa_gsi_map_unmap_gsi_msi_addr(bool map)
+static void ipa_gsi_map_unmap_gsi_msi_addr(bool map)
 {
 	struct ipa_smmu_cb_ctx *cb;
 	u64 rounddown_addr;
@@ -7303,20 +7317,13 @@ void ipa_gsi_map_unmap_gsi_msi_addr(bool map)
 			IPAERR("iommu mapping failed for gsi_msi_addr\n");
 			ipa_assert();
 		}
-		ipa3_ctx->gsi_msi_clear_addr_io_mapped =
-			(u64)ioremap(ipa3_ctx->gsi_msi_clear_addr, 4);
-		ipa3_ctx->gsi_msi_addr_io_mapped =
-			(u64)ioremap(ipa3_ctx->gsi_msi_addr, 4);
 	} else {
-		iounmap((int *) ipa3_ctx->gsi_msi_clear_addr_io_mapped);
-		iounmap((int *) ipa3_ctx->gsi_msi_addr_io_mapped);
 		res = iommu_unmap(cb->iommu_domain, rounddown_addr, PAGE_SIZE);
-		ipa3_ctx->gsi_msi_clear_addr_io_mapped = 0;
-		ipa3_ctx->gsi_msi_addr_io_mapped = 0;
 		if (res)
 			IPAERR("smmu unmap for gsi_msi_addr failed %d\n", res);
 	}
 }
+
 
 /**
  * ipa3_post_init() - Initialize the IPA Driver (Part II).
@@ -7700,11 +7707,11 @@ static int ipa3_post_init(const struct ipa3_plat_drv_res *resource_p,
 
 	ipa_ut_module_init();
 
+	/* Query MSI address. */
+	gsi_query_device_msi_addr(&ipa3_ctx->gsi_msi_addr);
 	/* Map the MSI addresses for the GSI to access, for LL and QMAP FC pipe */
-	if (!ipa3_ctx->gsi_msi_addr_io_mapped &&
-		!ipa3_ctx->gsi_msi_clear_addr_io_mapped &&
-		(ipa3_ctx->rmnet_ll_enable || ipa3_ctx->rmnet_ctl_enable))
-			ipa_gsi_map_unmap_gsi_msi_addr(true);
+	if (ipa3_ctx->gsi_msi_addr)
+		ipa_gsi_map_unmap_gsi_msi_addr(true);
 
 	if(!ipa_spearhead_stats_init())
 		IPADBG("Fail to init spearhead ipa lnx module");
@@ -8609,18 +8616,6 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	ipa3_ctx->ipa_gpi_event_rp_ddr = resource_p->ipa_gpi_event_rp_ddr;
 	ipa3_ctx->rmnet_ctl_enable = resource_p->rmnet_ctl_enable;
 	ipa3_ctx->rmnet_ll_enable = resource_p->rmnet_ll_enable;
-	ipa3_ctx->gsi_msi_addr = resource_p->gsi_msi_addr;
-	ipa3_ctx->gsi_msi_addr_io_mapped = 0;
-	ipa3_ctx->gsi_msi_clear_addr_io_mapped = 0;
-	ipa3_ctx->gsi_msi_clear_addr = resource_p->gsi_msi_clear_addr;
-	ipa3_ctx->gsi_rmnet_ctl_evt_ring_intvec =
-		resource_p->gsi_rmnet_ctl_evt_ring_intvec;
-	ipa3_ctx->gsi_rmnet_ctl_evt_ring_irq =
-		resource_p->gsi_rmnet_ctl_evt_ring_irq;
-	ipa3_ctx->gsi_rmnet_ll_evt_ring_intvec =
-		resource_p->gsi_rmnet_ll_evt_ring_intvec;
-	ipa3_ctx->gsi_rmnet_ll_evt_ring_irq =
-		resource_p->gsi_rmnet_ll_evt_ring_irq;
 	ipa3_ctx->tx_wrapper_cache_max_size = get_tx_wrapper_cache_size(
 			resource_p->tx_wrapper_cache_max_size);
 	ipa3_ctx->ipa_config_is_auto = resource_p->ipa_config_is_auto;
@@ -8827,7 +8822,7 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	}
 
 	IPADBG(
-	    "base(0x%x)+offset(0x%x)=(0x%x) mapped to (%pK) with len (0x%x)\n",
+	    "base(0x%x)+offset(0x%x)=(0x%x) mapped to (%0x%x) with len (0x%x)\n",
 	    resource_p->ipa_mem_base,
 	    ipa3_ctx->ctrl->ipa_reg_base_ofst,
 	    resource_p->ipa_mem_base + ipa3_ctx->ctrl->ipa_reg_base_ofst,
@@ -9140,6 +9135,12 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 			goto fail_rmnet_ll_init;
 		}
 	}
+	ipa3_ctx->ipa_rmnet_notifier_list_internal = &ipa_rmnet_notifier_list;
+	spin_lock_init(&ipa3_ctx->notifier_lock);
+	ipa3_ctx->buff_above_thresh_for_def_pipe_notified = false;
+	ipa3_ctx->buff_above_thresh_for_coal_pipe_notified = false;
+	ipa3_ctx->buff_below_thresh_for_def_pipe_notified = false;
+	ipa3_ctx->buff_below_thresh_for_coal_pipe_notified = false;
 
 	mutex_init(&ipa3_ctx->app_clock_vote.mutex);
 	ipa3_ctx->is_modem_up = false;
@@ -9469,10 +9470,6 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 	u32 ipa_holb_monitor_max_cnt_usb;
 	u32 ipa_holb_monitor_max_cnt_11ad;
 	u32 ipa_wan_aggr_pkt_cnt;
-	u32 gsi_msi_addr;
-	u32 gsi_msi_clear_addr;
-	u32 gsi_rmnet_ctl_evt_ring_intvec;
-	u32 gsi_rmnet_ll_evt_ring_intvec;
 
 	/* initialize ipa3_res */
 	ipa_drv_res->ipa_wdi3_2g_holb_timeout = 0;
@@ -9812,58 +9809,6 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 			ipa_drv_res->rmnet_ll_enable
 			? "True" : "False");
 	}
-
-	result = of_property_read_u32(pdev->dev.of_node,
-		"qcom,gsi-msi-addr",
-		&gsi_msi_addr);
-	IPADBG("GSI MSI addr = %lu\n", gsi_msi_addr);
-	ipa_drv_res->gsi_msi_addr = (u64)gsi_msi_addr;
-
-	result = of_property_read_u32(pdev->dev.of_node,
-		"qcom,gsi-msi-clear-addr",
-		&gsi_msi_clear_addr);
-	IPADBG("GSI MSI clear addr = %lu\n", gsi_msi_clear_addr);
-	ipa_drv_res->gsi_msi_clear_addr = (u64)gsi_msi_clear_addr;
-
-	/* Get IPA MSI IRQ number for rmnet_ctl */
-	resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
-		"msi-irq-rmnet-ctl");
-	if (!resource) {
-		ipa_drv_res->gsi_rmnet_ctl_evt_ring_irq = 0;
-		IPAERR(":get resource failed for msi-irq-rmnet-ctl\n");
-	} else {
-		ipa_drv_res->gsi_rmnet_ctl_evt_ring_irq = resource->start;
-		IPADBG(": msi-irq-rmnet-ctl = %d\n",
-			ipa_drv_res->gsi_rmnet_ctl_evt_ring_irq);
-	}
-
-	/* Get IPA MSI IRQ number for rmnet_ll */
-	resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
-		"msi-irq-rmnet-ll");
-	if (!resource) {
-		ipa_drv_res->gsi_rmnet_ll_evt_ring_irq = 0;
-		IPAERR(":get resource failed for msi-irq-rmnet-ll\n");
-	} else {
-		ipa_drv_res->gsi_rmnet_ll_evt_ring_irq = resource->start;
-		IPADBG(": msi-irq-rmnet-ll = %d\n",
-			ipa_drv_res->gsi_rmnet_ll_evt_ring_irq);
-	}
-
-	result = of_property_read_u32(pdev->dev.of_node,
-		"qcom,gsi-rmnet-ctl-evt-ring-intvec",
-		&gsi_rmnet_ctl_evt_ring_intvec);
-	IPADBG("gsi_rmnet_ctl_evt_ring_intvec = %u\n",
-		gsi_rmnet_ctl_evt_ring_intvec);
-	ipa_drv_res->gsi_rmnet_ctl_evt_ring_intvec =
-		gsi_rmnet_ctl_evt_ring_intvec;
-
-	result = of_property_read_u32(pdev->dev.of_node,
-		"qcom,gsi-rmnet-ll-evt-ring-intvec",
-		&gsi_rmnet_ll_evt_ring_intvec);
-	IPADBG("gsi_rmnet_ll_evt_ring_intvec = %u\n",
-		gsi_rmnet_ll_evt_ring_intvec);
-	ipa_drv_res->gsi_rmnet_ll_evt_ring_intvec =
-		gsi_rmnet_ll_evt_ring_intvec;
 
 	result = of_property_read_string(pdev->dev.of_node,
 			"qcom,use-gsi-ipa-fw", &ipa_drv_res->gsi_fw_file_name);
