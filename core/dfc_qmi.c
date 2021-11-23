@@ -44,6 +44,7 @@ struct dfc_ack_cmd {
 } __aligned(1);
 
 static void dfc_svc_init(struct work_struct *work);
+extern int dfc_ps_ext;
 
 /* **************************************************** */
 #define DFC_SERVICE_ID_V01 0x4E
@@ -775,8 +776,11 @@ dfc_indication_register_req(struct qmi_handle *dfc_handle,
 
 	req->report_flow_status_valid = 1;
 	req->report_flow_status = reg;
-	req->report_tx_link_status_valid = 1;
-	req->report_tx_link_status = reg;
+
+	if (!dfc_ps_ext) {
+		req->report_tx_link_status_valid = 1;
+		req->report_tx_link_status = reg;
+	}
 
 	ret = qmi_send_request(dfc_handle, ssctl, &txn,
 			       QMI_DFC_INDICATION_REGISTER_REQ_V01,
@@ -1003,7 +1007,9 @@ static int dfc_update_fc_map(struct net_device *dev, struct qos_info *qos,
 	u32 adjusted_grant;
 
 	itm = qmi_rmnet_get_bearer_map(qos, fc_info->bearer_id);
-	if (!itm)
+
+	/* cache the bearer assuming it is a new bearer */
+	if (unlikely(!itm && !is_query && fc_info->num_bytes))
 		itm = qmi_rmnet_get_bearer_noref(qos, fc_info->bearer_id);
 
 	if (itm) {

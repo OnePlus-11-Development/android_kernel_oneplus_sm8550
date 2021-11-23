@@ -1,4 +1,5 @@
 /* Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -79,7 +80,8 @@ static netdev_tx_t rmnet_vnd_start_xmit(struct sk_buff *skb,
 	u32 mark;
 	unsigned int len;
 	rmnet_perf_tether_egress_hook_t rmnet_perf_tether_egress;
-	bool low_latency;
+	bool low_latency = false;
+	bool need_to_drop = false;
 
 	priv = netdev_priv(dev);
 	if (priv->real_dev) {
@@ -92,7 +94,14 @@ static netdev_tx_t rmnet_vnd_start_xmit(struct sk_buff *skb,
 		if (rmnet_perf_tether_egress) {
 			rmnet_perf_tether_egress(skb);
 		}
-		low_latency = qmi_rmnet_flow_is_low_latency(dev, skb);
+
+		qmi_rmnet_get_flow_state(dev, skb, &need_to_drop, &low_latency);
+		if (unlikely(need_to_drop)) {
+			this_cpu_inc(priv->pcpu_stats->stats.tx_drops);
+			kfree_skb(skb);
+			return NETDEV_TX_OK;
+		}
+
 		if (low_latency && skb_is_gso(skb)) {
 			netdev_features_t features;
 			struct sk_buff *segs, *tmp;
@@ -512,6 +521,11 @@ static const char rmnet_ll_gstrings_stats[][ETH_GSTRING_LEN] = {
 	"LL RX OOM errors",
 	"LL RX packets",
 	"LL RX temp buffer allocations",
+	"LL TX disabled",
+	"LL TX enabled",
+	"LL TX FC queued",
+	"LL TX FC sent",
+	"LL TX FC err",
 };
 
 static void rmnet_get_strings(struct net_device *dev, u32 stringset, u8 *buf)
