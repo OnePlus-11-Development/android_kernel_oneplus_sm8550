@@ -55,6 +55,10 @@ struct gen7_gmu_device {
 	/** @num_clks: Number of entries in the @clks array */
 	int num_clks;
 	unsigned int idle_level;
+	/** @freqs: Array of GMU frequencies */
+	u32 freqs[2];
+	/** @vlvls: Array of GMU voltage levels */
+	u32 vlvls[2];
 	struct kgsl_mailbox mailbox;
 	/** @gmu_globals: Array to store gmu global buffers */
 	struct kgsl_memdesc gmu_globals[GMU_KERNEL_ENTRIES];
