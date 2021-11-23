@@ -58,6 +58,15 @@
 	 FIELD_PREP(GENMASK(15, 12), ADRENO_CHIPID_MINOR(_id)) | \
 	 FIELD_PREP(GENMASK(11, 8), ADRENO_CHIPID_PATCH(_id)))
 
+#define ADRENO_REV_MAJOR(_rev) FIELD_GET(GENMASK(23, 16), _rev)
+#define ADRENO_REV_MINOR(_rev) FIELD_GET(GENMASK(15, 8), _rev)
+#define ADRENO_REV_PATCH(_rev) FIELD_GET(GENMASK(7, 0), _rev)
+
+#define ADRENO_GMU_REV(_rev) \
+	(FIELD_PREP(GENMASK(31, 24), ADRENO_REV_MAJOR(_rev)) | \
+	 FIELD_PREP(GENMASK(23, 16), ADRENO_REV_MINOR(_rev)) | \
+	 FIELD_PREP(GENMASK(15, 8), ADRENO_REV_PATCH(_rev)))
+
 /* ADRENO_GPUREV - Return the GPU ID for the given adreno_device */
 #define ADRENO_GPUREV(_a) ((_a)->gpucore->gpurev)
 
