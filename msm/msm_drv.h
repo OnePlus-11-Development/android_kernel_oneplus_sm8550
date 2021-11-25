@@ -37,6 +37,7 @@
 #include <linux/sde_vm_event.h>
 #include <linux/sizes.h>
 #include <linux/kthread.h>
+#include <linux/version.h>
 
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
@@ -1159,8 +1160,14 @@ int msm_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
 int msm_gem_dumb_map_offset(struct drm_file *file, struct drm_device *dev,
 		uint32_t handle, uint64_t *offset);
 struct sg_table *msm_gem_prime_get_sg_table(struct drm_gem_object *obj);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 int msm_gem_prime_vmap(struct drm_gem_object *obj, struct dma_buf_map *map);
 void msm_gem_prime_vunmap(struct drm_gem_object *obj, struct dma_buf_map *map);
+#else
+void *msm_gem_prime_vmap(struct drm_gem_object *obj);
+void msm_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr);
+vm_fault_t msm_gem_fault(struct vm_fault *vmf);
+#endif
 int msm_gem_prime_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma);
 struct drm_gem_object *msm_gem_prime_import_sg_table(struct drm_device *dev,
 		struct dma_buf_attachment *attach, struct sg_table *sg);

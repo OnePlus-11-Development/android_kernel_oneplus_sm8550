@@ -21,6 +21,10 @@
 #include <linux/shmem_fs.h>
 #include <linux/dma-buf.h>
 #include <linux/pfn_t.h>
+#include <linux/version.h>
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
+#include <linux/ion.h>
+#endif
 
 #include "msm_drv.h"
 #include "msm_gem.h"
@@ -255,7 +259,11 @@ int msm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 	return msm_gem_mmap_obj(vma->vm_private_data, vma);
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 static vm_fault_t msm_gem_fault(struct vm_fault *vmf)
+#else
+vm_fault_t msm_gem_fault(struct vm_fault *vmf)
+#endif
 {
 	struct vm_area_struct *vma = vmf->vma;
 	struct drm_gem_object *obj = vma->vm_private_data;
@@ -651,7 +659,9 @@ fail:
 static void *get_vaddr(struct drm_gem_object *obj, unsigned madv)
 {
 	struct msm_gem_object *msm_obj = to_msm_bo(obj);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	struct dma_buf_map map;
+#endif
 	int ret = 0;
 
 	mutex_lock(&msm_obj->lock);
@@ -686,10 +696,14 @@ static void *get_vaddr(struct drm_gem_object *obj, unsigned madv)
 					goto fail;
 			}
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 			ret = dma_buf_vmap(obj->import_attach->dmabuf, &map);
 			if (ret)
-				return ERR_PTR(ret);
+				goto fail;
 			msm_obj->vaddr = map.vaddr;
+#else
+			msm_obj->vaddr = dma_buf_vmap(obj->import_attach->dmabuf);
+#endif
 		} else {
 			msm_obj->vaddr = vmap(pages, obj->size >> PAGE_SHIFT,
 				VM_MAP, PAGE_KERNEL);
@@ -749,7 +763,9 @@ int msm_gem_madvise(struct drm_gem_object *obj, unsigned madv)
 static void msm_gem_vunmap_locked(struct drm_gem_object *obj)
 {
 	struct msm_gem_object *msm_obj = to_msm_bo(obj);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	struct dma_buf_map map = DMA_BUF_MAP_INIT_VADDR(msm_obj->vaddr);
+#endif
 
 	WARN_ON(!mutex_is_locked(&msm_obj->lock));
 
@@ -757,8 +773,14 @@ static void msm_gem_vunmap_locked(struct drm_gem_object *obj)
 		return;
 
 	if (obj->import_attach) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 		dma_buf_vunmap(obj->import_attach->dmabuf, &map);
 		dma_buf_end_cpu_access(obj->import_attach->dmabuf, DMA_BIDIRECTIONAL);
+#else
+		dma_buf_vunmap(obj->import_attach->dmabuf, msm_obj->vaddr);
+		if (obj->dev && obj->dev->dev && !dev_is_dma_coherent(obj->dev->dev))
+			dma_buf_end_cpu_access(obj->import_attach->dmabuf, DMA_BIDIRECTIONAL);
+#endif
 	} else {
 		vunmap(msm_obj->vaddr);
 	}
@@ -783,8 +805,11 @@ int msm_gem_cpu_prep(struct drm_gem_object *obj, uint32_t op, ktime_t *timeout)
 		op & MSM_PREP_NOSYNC ? 0 : timeout_to_jiffies(timeout);
 	long ret;
 
-	ret = dma_resv_wait_timeout(msm_obj->resv, write,
-						  true,  remain);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+	ret = dma_resv_wait_timeout(msm_obj->resv, write, true, remain);
+#else
+	ret = dma_resv_wait_timeout_rcu(msm_obj->resv, write, true, remain);
+#endif
 	if (ret == 0)
 		return remain == 0 ? -EBUSY : -ETIMEDOUT;
 	else if (ret < 0)
@@ -807,7 +832,9 @@ void msm_gem_free_object(struct drm_gem_object *obj)
 	struct msm_gem_object *msm_obj = to_msm_bo(obj);
 	struct drm_device *dev = obj->dev;
 	struct msm_drm_private *priv = dev->dev_private;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	struct dma_buf_map map = DMA_BUF_MAP_INIT_VADDR(msm_obj->vaddr);
+#endif
 
 	/* object should not be on active list: */
 	WARN_ON(is_active(msm_obj));
@@ -828,7 +855,11 @@ void msm_gem_free_object(struct drm_gem_object *obj)
 
 	if (obj->import_attach) {
 		if (msm_obj->vaddr)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 			dma_buf_vunmap(obj->import_attach->dmabuf, &map);
+#else
+			dma_buf_vunmap(obj->import_attach->dmabuf, msm_obj->vaddr);
+#endif
 
 		/* Don't drop the pages for imported dmabuf, as they are not
 		 * ours, just free the array we allocated:
@@ -875,6 +906,7 @@ int msm_gem_new_handle(struct drm_device *dev, struct drm_file *file,
 	return ret;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 static const struct vm_operations_struct vm_ops = {
 	.fault = msm_gem_fault,
 	.open = drm_gem_vm_open,
@@ -890,6 +922,7 @@ static const struct drm_gem_object_funcs msm_gem_object_funcs = {
 	.vunmap = msm_gem_prime_vunmap,
 	.vm_ops = &vm_ops,
 };
+#endif
 
 static int msm_gem_new_impl(struct drm_device *dev,
 		uint32_t size, uint32_t flags,
@@ -936,7 +969,9 @@ static int msm_gem_new_impl(struct drm_device *dev,
 	msm_obj->obj_dirty = false;
 
 	*obj = &msm_obj->base;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	(*obj)->funcs = &msm_gem_object_funcs;
+#endif
 
 	return 0;
 }

@@ -25,6 +25,11 @@
 
 #include <linux/qcom-dma-mapping.h>
 #include <linux/dma-buf.h>
+#include <linux/version.h>
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
+#include <linux/ion.h>
+#include <linux/msm_ion.h>
+#endif
 
 struct sg_table *msm_gem_prime_get_sg_table(struct drm_gem_object *obj)
 {
@@ -37,13 +42,24 @@ struct sg_table *msm_gem_prime_get_sg_table(struct drm_gem_object *obj)
 	return drm_prime_pages_to_sg(obj->dev, msm_obj->pages, npages);
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 int msm_gem_prime_vmap(struct drm_gem_object *obj, struct dma_buf_map *map)
 {
 	map->vaddr = msm_gem_get_vaddr(obj);
 	return IS_ERR_OR_NULL(map->vaddr);
 }
+#else
+void *msm_gem_prime_vmap(struct drm_gem_object *obj)
+{
+	return msm_gem_get_vaddr(obj);
+}
+#endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 void msm_gem_prime_vunmap(struct drm_gem_object *obj, struct dma_buf_map *map)
+#else
+void msm_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr)
+#endif
 {
 	msm_gem_put_vaddr(obj);
 }
