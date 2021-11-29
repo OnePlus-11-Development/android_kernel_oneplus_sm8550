@@ -10,11 +10,15 @@
 #include "msm_vidc_v4l2.h"
 #include "msm_vidc_vb2.h"
 #include "msm_vidc_control.h"
+#include "msm_vidc_core.h"
 #if defined(CONFIG_MSM_VIDC_WAIPIO)
 #include "msm_vidc_waipio.h"
 #endif
 #if defined(CONFIG_MSM_VIDC_KALAMA)
 #include "msm_vidc_kalama.h"
+#endif
+#if defined(CONFIG_MSM_VIDC_DIWALI)
+#include "msm_vidc_diwali.h"
 #endif
 #if defined(CONFIG_MSM_VIDC_IRIS2)
 #include "msm_vidc_iris2.h"
@@ -162,7 +166,7 @@ static int msm_vidc_deinit_platform_variant(struct msm_vidc_core *core, struct d
 		rc = msm_vidc_deinit_platform_waipio(core, dev);
 		if (rc)
 			d_vpr_e("%s: failed with %d\n", __func__, rc);
-		goto end_target_config;
+		return rc;
 	}
 #endif
 #if defined(CONFIG_MSM_VIDC_KALAMA)
@@ -170,11 +174,20 @@ static int msm_vidc_deinit_platform_variant(struct msm_vidc_core *core, struct d
 		rc = msm_vidc_deinit_platform_kalama(core, dev);
 		if (rc)
 			d_vpr_e("%s: failed with %d\n", __func__, rc);
-		goto end_target_config;
+		return rc;
 	}
 #endif
 
-end_target_config:
+#if defined(CONFIG_MSM_VIDC_DIWALI)
+	if (of_device_is_compatible(dev->of_node, "qcom,msm-vidc-diwali")) {
+		rc = msm_vidc_deinit_platform_diwali(core, dev);
+		if (rc)
+			d_vpr_e("%s: failed msm-vidc-diwali with %d\n",
+				__func__, rc);
+		return rc;
+	}
+#endif
+
 	return rc;
 }
 
@@ -194,7 +207,7 @@ static int msm_vidc_init_platform_variant(struct msm_vidc_core *core, struct dev
 		rc = msm_vidc_init_platform_waipio(core, dev);
 		if (rc)
 			d_vpr_e("%s: failed with %d\n", __func__, rc);
-		goto end_target_config;
+		return rc;
 	}
 #endif
 #if defined(CONFIG_MSM_VIDC_KALAMA)
@@ -202,11 +215,20 @@ static int msm_vidc_init_platform_variant(struct msm_vidc_core *core, struct dev
 		rc = msm_vidc_init_platform_kalama(core, dev);
 		if (rc)
 			d_vpr_e("%s: failed with %d\n", __func__, rc);
-		goto end_target_config;
+		return rc;
 	}
 #endif
 
-end_target_config:
+#if defined(CONFIG_MSM_VIDC_DIWALI)
+	if (of_device_is_compatible(dev->of_node, "qcom,msm-vidc-diwali")) {
+		rc = msm_vidc_init_platform_diwali(core, dev);
+		if (rc)
+			d_vpr_e("%s: failed msm-vidc-diwali with %d\n",
+				__func__, rc);
+		return rc;
+	}
+#endif
+
 	return rc;
 }
 
@@ -226,7 +248,7 @@ static int msm_vidc_deinit_vpu(struct msm_vidc_core *core, struct device *dev)
 		rc = msm_vidc_deinit_iris2(core);
 		if (rc)
 			d_vpr_e("%s: failed with %d\n", __func__, rc);
-		goto end_of_iris_config;
+        return rc;
 	}
 #endif
 #if defined(CONFIG_MSM_VIDC_IRIS3)
@@ -234,11 +256,10 @@ static int msm_vidc_deinit_vpu(struct msm_vidc_core *core, struct device *dev)
 		rc = msm_vidc_deinit_iris3(core);
 		if (rc)
 			d_vpr_e("%s: failed with %d\n", __func__, rc);
-		goto end_of_iris_config;
+        return rc;
 	}
 #endif
 
-end_of_iris_config:
 	return rc;
 }
 
@@ -256,7 +277,7 @@ static int msm_vidc_init_vpu(struct msm_vidc_core *core, struct device *dev)
 		rc = msm_vidc_init_iris2(core);
 		if (rc)
 			d_vpr_e("%s: failed with %d\n", __func__, rc);
-		goto end_of_iris_config;
+	    return rc;
 	}
 #endif
 #if defined(CONFIG_MSM_VIDC_IRIS3)
@@ -264,11 +285,10 @@ static int msm_vidc_init_vpu(struct msm_vidc_core *core, struct device *dev)
 		rc = msm_vidc_init_iris3(core);
 		if (rc)
 			d_vpr_e("%s: failed with %d\n", __func__, rc);
-		goto end_of_iris_config;
+	    return rc;
 	}
 #endif
 
-end_of_iris_config:
 	return rc;
 }
 

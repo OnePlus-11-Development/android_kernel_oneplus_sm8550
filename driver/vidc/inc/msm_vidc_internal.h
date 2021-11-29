@@ -30,8 +30,6 @@
 #define MIN_SUPPORTED_WIDTH   32
 #define MIN_SUPPORTED_HEIGHT  32
 #define DEFAULT_FPS       30
-#define MINIMUM_FPS       1
-#define MAXIMUM_FPS       960
 #define MAXIMUM_VP9_FPS   60
 #define SINGLE_INPUT_BUFFER   1
 #define SINGLE_OUTPUT_BUFFER  1
@@ -325,6 +323,7 @@ enum msm_vidc_core_capability_type {
 	MAX_MBPS_HQ,
 	MAX_MBPF_B_FRAME,
 	MAX_MBPS_B_FRAME,
+	MAX_MBPS_ALL_INTRA,
 	MAX_ENH_LAYER_COUNT,
 	NUM_VPP_PIPE,
 	SW_PC,
@@ -346,6 +345,7 @@ enum msm_vidc_core_capability_type {
 	CLK_FREQ_THRESHOLD,
 	NON_FATAL_FAULTS,
 	ENC_AUTO_FRAMERATE,
+	MMRM,
 	CORE_CAP_MAX,
 };
 
@@ -466,6 +466,7 @@ enum msm_vidc_inst_capability_type {
 	PRIORITY,
 	ENC_IP_CR,
 	DPB_LIST,
+	ALL_INTRA,
 	META_LTR_MARK_USE,
 	META_DPB_MISR,
 	META_OPB_MISR,

@@ -164,6 +164,7 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{PRIORITY,                       "PRIORITY"                   },
 	{ENC_IP_CR,                      "ENC_IP_CR"                  },
 	{DPB_LIST,                       "DPB_LIST"                   },
+	{ALL_INTRA,                      "ALL_INTRA"                  },
 	{META_LTR_MARK_USE,              "META_LTR_MARK_USE"          },
 	{META_DPB_MISR,                  "META_DPB_MISR"              },
 	{META_OPB_MISR,                  "META_OPB_MISR"              },
@@ -372,23 +373,32 @@ void print_vidc_buffer(u32 tag, const char *tag_str, const char *str, struct msm
 		struct msm_vidc_buffer *vbuf)
 {
 	struct dma_buf *dbuf;
+	struct inode *f_inode;
+	unsigned long inode_num = 0;
+	long ref_count = -1;
 
 	if (!inst || !vbuf || !tag_str || !str)
 		return;
 
 	dbuf = (struct dma_buf *)vbuf->dmabuf;
+	if (dbuf && dbuf->file) {
+		f_inode = file_inode(dbuf->file);
+		if (f_inode) {
+			inode_num = f_inode->i_ino;
+			ref_count = file_count(dbuf->file);
+		}
+	}
 
 	dprintk_inst(tag, tag_str, inst,
 		"%s: %s: idx %2d fd %3d off %d daddr %#llx inode %8lu ref %2ld size %8d filled %8d flags %#x ts %8lld attr %#x counts(etb ebd ftb fbd) %4llu %4llu %4llu %4llu\n",
 		str, buf_name(vbuf->type),
 		vbuf->index, vbuf->fd, vbuf->data_offset,
-		vbuf->device_addr, (dbuf ? file_inode(dbuf->file)->i_ino : -1),
-		(dbuf ? file_count(dbuf->file) : -1), vbuf->buffer_size, vbuf->data_size,
+		vbuf->device_addr, inode_num, ref_count, vbuf->buffer_size, vbuf->data_size,
 		vbuf->flags, vbuf->timestamp, vbuf->attr, inst->debug_count.etb,
 		inst->debug_count.ebd, inst->debug_count.ftb, inst->debug_count.fbd);
 
 	trace_msm_v4l2_vidc_buffer_event_log(inst, str, buf_name(vbuf->type), vbuf,
-		(dbuf ? file_inode(dbuf->file)->i_ino : -1), (dbuf ? file_count(dbuf->file) : -1));
+		inode_num, ref_count);
 
 
 }
@@ -1949,8 +1959,8 @@ int msm_vidc_get_mbs_per_frame(struct msm_vidc_inst *inst)
 
 	if (is_decode_session(inst)) {
 		inp_f = &inst->fmts[INPUT_PORT];
-		width = inp_f->fmt.pix_mp.width;
-		height = inp_f->fmt.pix_mp.height;
+		width = max(inp_f->fmt.pix_mp.width, inst->crop.width);
+		height = max(inp_f->fmt.pix_mp.height, inst->crop.height);
 	} else if (is_encode_session(inst)) {
 		width = inst->crop.width;
 		height = inst->crop.height;
@@ -2631,7 +2641,7 @@ void msm_vidc_allow_dcvs(struct msm_vidc_inst *inst)
 	struct msm_vidc_core *core;
 	u32 fps;
 
-	if (!inst || !inst->core) {
+	if (!inst || !inst->core || !inst->capabilities) {
 		d_vpr_e("%s: Invalid args: %pK\n", __func__, inst);
 		return;
 	}
@@ -2686,7 +2696,8 @@ void msm_vidc_allow_dcvs(struct msm_vidc_inst *inst)
 	}
 
 	fps =  msm_vidc_get_fps(inst);
-	if (is_decode_session(inst) && fps >= MAXIMUM_FPS) {
+	if (is_decode_session(inst) &&
+			fps >= inst->capabilities->cap[FRAME_RATE].max) {
 		allow = false;
 		i_vpr_h(inst, "%s: unsupported fps %d\n", __func__, fps);
 		goto exit;
@@ -2858,7 +2869,7 @@ void msm_vidc_update_stats(struct msm_vidc_inst *inst,
 	msm_vidc_debugfs_update(inst, etype);
 }
 
-static void msm_vidc_print_stats(struct msm_vidc_inst *inst)
+void msm_vidc_print_stats(struct msm_vidc_inst *inst)
 {
 	u32 frame_rate, operating_rate, achieved_fps, priority, etb, ebd, ftb, fbd, dt_ms;
 	u64 bitrate_kbps = 0, time_ms = ktime_get_ns() / 1000 / 1000;
@@ -2899,6 +2910,16 @@ int schedule_stats_work(struct msm_vidc_inst *inst)
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
+
+	/**
+	 * Hfi session is already closed and inst also going to be
+	 * closed soon. So skip scheduling new stats_work to avoid
+	 * use-after-free issues with close sequence.
+	 */
+	if (!inst->packet) {
+		i_vpr_e(inst, "skip scheduling stats_work\n");
+		return 0;
+	}
 	core = inst->core;
 	mod_delayed_work(inst->response_workq, &inst->stats_work,
 		msecs_to_jiffies(core->capabilities[STATS_TIMEOUT_MS].value));
@@ -2906,16 +2927,13 @@ int schedule_stats_work(struct msm_vidc_inst *inst)
 	return 0;
 }
 
-int cancel_stats_work(struct msm_vidc_inst *inst)
+int cancel_stats_work_sync(struct msm_vidc_inst *inst)
 {
 	if (!inst) {
 		d_vpr_e("%s: Invalid arguments\n", __func__);
 		return -EINVAL;
 	}
-	cancel_delayed_work(&inst->stats_work);
-
-	/* print final stats */
-	msm_vidc_print_stats(inst);
+	cancel_delayed_work_sync(&inst->stats_work);
 
 	return 0;
 }
@@ -2926,7 +2944,7 @@ void msm_vidc_stats_handler(struct work_struct *work)
 
 	inst = container_of(work, struct msm_vidc_inst, stats_work.work);
 	inst = get_inst_ref(g_core, inst);
-	if (!inst) {
+	if (!inst || !inst->packet) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return;
 	}
@@ -4286,6 +4304,7 @@ int msm_vidc_core_init(struct msm_vidc_core *core)
 	init_completion(&core->init_done);
 	core->smmu_fault_handled = false;
 	core->ssr.trigger = false;
+	core->pm_suspended = false;
 
 	rc = venus_hfi_core_init(core);
 	if (rc) {
@@ -4390,6 +4409,9 @@ int msm_vidc_print_inst_info(struct msm_vidc_inst *inst)
 	bool is_secure, is_decode;
 	u32 bit_depth, bit_rate, frame_rate, width, height;
 	struct dma_buf *dbuf;
+	struct inode *f_inode;
+	unsigned long inode_num = 0;
+	long ref_count = -1;
 	int i = 0;
 
 	if (!inst || !inst->capabilities) {
@@ -4426,12 +4448,18 @@ int msm_vidc_print_inst_info(struct msm_vidc_inst *inst)
 			if (!buf->dmabuf)
 				continue;
 			dbuf = (struct dma_buf *)buf->dmabuf;
+			if (dbuf && dbuf->file) {
+				f_inode = file_inode(dbuf->file);
+				if (f_inode) {
+					inode_num = f_inode->i_ino;
+					ref_count = file_count(dbuf->file);
+				}
+			}
 			i_vpr_e(inst,
-				"buf: type: %11s, index: %2d, fd: %4d, size: %9u, off: %8u, filled: %9u, iova: %8x, inode: %9ld, flags: %8x, ts: %16lld, attr: %8x\n",
+				"buf: type: %11s, index: %2d, fd: %4d, size: %9u, off: %8u, filled: %9u, daddr: %#llx, inode: %8lu, ref: %2ld, flags: %8x, ts: %16lld, attr: %8x\n",
 				buf_type_name_arr[i].name, buf->index, buf->fd, buf->buffer_size,
 				buf->data_offset, buf->data_size, buf->device_addr,
-				file_inode(dbuf->file)->i_ino,
-				buf->flags, buf->timestamp, buf->attr);
+				inode_num, ref_count, buf->flags, buf->timestamp, buf->attr);
 		}
 	}
 
@@ -4586,22 +4614,45 @@ void msm_vidc_fw_unload_handler(struct work_struct *work)
 
 }
 
+int msm_vidc_suspend(struct msm_vidc_core *core)
+{
+	int rc = 0;
+
+	if (!core) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	rc = venus_hfi_suspend(core);
+	if (rc)
+		return rc;
+
+	return rc;
+}
+
 void msm_vidc_batch_handler(struct work_struct *work)
 {
 	struct msm_vidc_inst *inst;
 	enum msm_vidc_allow allow;
+	struct msm_vidc_core *core;
 	int rc = 0;
 
 	inst = container_of(work, struct msm_vidc_inst, decode_batch.work.work);
 	inst = get_inst_ref(g_core, inst);
-	if (!inst) {
+	if (!inst || !inst->core) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return;
 	}
 
+	core = inst->core;
 	inst_lock(inst, __func__);
 	if (is_session_error(inst)) {
 		i_vpr_e(inst, "%s: failled. Session error\n", __func__);
+		goto exit;
+	}
+
+	if (core->pm_suspended) {
+		i_vpr_h(inst, "%s: device in pm suspend state\n", __func__);
 		goto exit;
 	}
 
@@ -5187,21 +5238,28 @@ static int msm_vidc_print_insts_info(struct msm_vidc_core *core)
 
 int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst)
 {
-	u32 mbps = 0;
+	u32 mbps = 0, num_inactive_sessions = 0;
 	struct msm_vidc_core *core;
 	struct msm_vidc_inst *instance;
+	u64 curr_time_ns;
+	int rc = 0;
 
 	if (!inst || !inst->core) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 	core = inst->core;
+	curr_time_ns = ktime_get_ns();
 
 	core_lock(core, __func__);
 	list_for_each_entry(instance, &core->instances, list) {
 		/* ignore invalid/error session */
 		if (is_session_error(instance))
 			continue;
+
+		if (!is_active_session(instance->last_qbuf_time_ns, curr_time_ns)) {
+			num_inactive_sessions++;
+		}
 
 		/* ignore thumbnail, image, and non realtime sessions */
 		if (is_thumbnail_session(instance) ||
@@ -5214,15 +5272,19 @@ int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst)
 	core_unlock(core, __func__);
 
 	if (mbps > core->capabilities[MAX_MBPS].value) {
+		rc = num_inactive_sessions ? -ENOMEM : -EAGAIN;
 		i_vpr_e(inst, "%s: Hardware overloaded. needed %u, max %u", __func__,
 			mbps, core->capabilities[MAX_MBPS].value);
-		return -ENOMEM;
+		return rc;
+	} else {
+		i_vpr_h(inst, "%s: HW load needed %u is within max %u", __func__,
+			mbps, core->capabilities[MAX_MBPS].value);
 	}
 
 	return 0;
 }
 
-static int msm_vidc_check_core_mbpf(struct msm_vidc_inst *inst)
+int msm_vidc_check_core_mbpf(struct msm_vidc_inst *inst)
 {
 	u32 video_mbpf = 0, image_mbpf = 0, video_rt_mbpf = 0;
 	struct msm_vidc_core *core;
@@ -5528,17 +5590,20 @@ static int msm_vidc_check_max_sessions(struct msm_vidc_inst *inst)
 		 * one 1080p session equal to two 720p sessions. This equation
 		 * will make one 8k session equal to eight 720p sessions
 		 * which looks good.
+		 *
+		 * Do not treat resolutions above 4k as 8k session instead
+		 * treat (4K + half 4k) above as 8k session
 		 */
-		if (res_is_greater_than(width, height, 4096, 2176)) {
+		if (res_is_greater_than(width, height, 4096 + (4096 >> 1), 2176 + (2176 >> 1))) {
 			num_8k_sessions += 1;
 			num_4k_sessions += 2;
 			num_1080p_sessions += 4;
 			num_720p_sessions += 8;
-		} else if (res_is_greater_than(width, height, 1920, 1088)) {
+		} else if (res_is_greater_than(width, height, 1920 + (1920 >> 1), 1088 + (1088 >> 1))) {
 			num_4k_sessions += 1;
 			num_1080p_sessions += 2;
 			num_720p_sessions += 4;
-		} else if (res_is_greater_than(width, height, 1280, 736)) {
+		} else if (res_is_greater_than(width, height, 1280 + (1280 >> 1), 736 + (736 >> 1))) {
 			num_1080p_sessions += 1;
 			num_720p_sessions += 2;
 		} else {

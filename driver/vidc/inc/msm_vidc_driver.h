@@ -282,6 +282,8 @@ const char *allow_name(enum msm_vidc_allow allow);
 const char *state_name(enum msm_vidc_inst_state state);
 int msm_vidc_change_inst_state(struct msm_vidc_inst *inst,
 	enum msm_vidc_inst_state request_state, const char *func);
+int msm_vidc_create_internal_buffer(struct msm_vidc_inst *inst,
+	enum msm_vidc_buffer_type buffer_type, u32 index);
 int msm_vidc_get_internal_buffers(struct msm_vidc_inst *inst,
 	enum msm_vidc_buffer_type buffer_type);
 int msm_vidc_create_internal_buffers(struct msm_vidc_inst *inst,
@@ -322,6 +324,7 @@ int msm_vidc_trigger_ssr(struct msm_vidc_core *core,
 void msm_vidc_ssr_handler(struct work_struct *work);
 void msm_vidc_pm_work_handler(struct work_struct *work);
 void msm_vidc_fw_unload_handler(struct work_struct *work);
+int msm_vidc_suspend(struct msm_vidc_core *core);
 void msm_vidc_batch_handler(struct work_struct *work);
 int msm_vidc_event_queue_init(struct msm_vidc_inst *inst);
 int msm_vidc_event_queue_deinit(struct msm_vidc_inst *inst);
@@ -353,7 +356,8 @@ void msm_vidc_update_stats(struct msm_vidc_inst *inst,
 	struct msm_vidc_buffer *buf, enum msm_vidc_debugfs_event etype);
 void msm_vidc_stats_handler(struct work_struct *work);
 int schedule_stats_work(struct msm_vidc_inst *inst);
-int cancel_stats_work(struct msm_vidc_inst *inst);
+int cancel_stats_work_sync(struct msm_vidc_inst *inst);
+void msm_vidc_print_stats(struct msm_vidc_inst *inst);
 enum msm_vidc_buffer_type v4l2_type_to_driver(u32 type,
 	const char *func);
 int msm_vidc_queue_buffer_single(struct msm_vidc_inst *inst,
@@ -418,6 +422,7 @@ void msm_vidc_allow_dcvs(struct msm_vidc_inst *inst);
 bool msm_vidc_allow_decode_batch(struct msm_vidc_inst *inst);
 int msm_vidc_check_session_supported(struct msm_vidc_inst *inst);
 int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst);
+int msm_vidc_check_core_mbpf(struct msm_vidc_inst *inst);
 int msm_vidc_check_scaling_supported(struct msm_vidc_inst *inst);
 int msm_vidc_update_timestamp(struct msm_vidc_inst *inst, u64 timestamp);
 int msm_vidc_set_auto_framerate(struct msm_vidc_inst *inst, u64 timestamp);

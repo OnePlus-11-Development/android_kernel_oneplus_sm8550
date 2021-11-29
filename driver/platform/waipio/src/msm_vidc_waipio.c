@@ -18,6 +18,8 @@
 #define MAX_BASE_LAYER_PRIORITY_ID 63
 #define MAX_BITRATE             220000000
 #define DEFAULT_BITRATE         20000000
+#define MINIMUM_FPS             1
+#define MAXIMUM_FPS             960
 #define MIN_QP_10BIT            -12
 #define MIN_QP_8BIT             0
 #define MAX_QP                  51
@@ -70,6 +72,7 @@ static struct msm_platform_core_capability core_data_waipio[] = {
 	{MAX_MBPS_HQ, 489600}, /* ((1920x1088)/256)@60fps */
 	{MAX_MBPF_B_FRAME, 32640}, /* 3840x2176/256 */
 	{MAX_MBPS_B_FRAME, 1958400}, /* 3840x2176/256 MBs@60fps */
+	{MAX_MBPS_ALL_INTRA, 1958400}, /* 3840x2176/256 MBs@60fps */
 	{MAX_ENH_LAYER_COUNT, 5},
 	{NUM_VPP_PIPE, 4},
 	{SW_PC, 1},
@@ -98,6 +101,7 @@ static struct msm_platform_core_capability core_data_waipio[] = {
 	{AV_SYNC_WINDOW_SIZE, 40},
 	{NON_FATAL_FAULTS, 1},
 	{ENC_AUTO_FRAMERATE, 1},
+	{MMRM, 1},
 };
 
 static struct msm_platform_inst_capability instance_data_waipio[] = {
@@ -404,7 +408,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 			LOWLATENCY_MODE},
 		msm_vidc_adjust_bitrate_mode, msm_vidc_set_u32_enum},
 
-	{LOSSLESS, ENC, HEVC|HEIC,
+	{LOSSLESS, ENC, HEVC,
 		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_CID_MPEG_VIDEO_HEVC_LOSSLESS_CU},
@@ -441,7 +445,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_INPUT_PORT |
 			CAP_FLAG_DYNAMIC_ALLOWED,
 		{ENH_LAYER_COUNT},
-		{0},
+		{ALL_INTRA},
 		msm_vidc_adjust_gop_size, msm_vidc_set_gop_size},
 
 	{GOP_CLOSURE, ENC, H264|HEVC,
@@ -456,7 +460,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		HFI_PROP_MAX_B_FRAMES,
 		CAP_FLAG_OUTPUT_PORT,
 		{ENH_LAYER_COUNT},
-		{0},
+		{ALL_INTRA},
 		msm_vidc_adjust_b_frame, msm_vidc_set_u32},
 
 	{BLUR_TYPES, ENC, CODECS_ALL,
@@ -526,7 +530,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_CID_MPEG_VIDEO_LTR_COUNT,
 		HFI_PROP_LTR_COUNT,
 		CAP_FLAG_OUTPUT_PORT,
-		{BITRATE_MODE}, {0},
+		{BITRATE_MODE, ALL_INTRA}, {0},
 		msm_vidc_adjust_ltr_count, msm_vidc_set_u32},
 
 	{USE_LTR, ENC, H264|HEVC,
@@ -560,7 +564,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_CID_MPEG_VIDC_INTRA_REFRESH_PERIOD,
 		HFI_PROP_IR_RANDOM_PERIOD,
 		CAP_FLAG_OUTPUT_PORT,
-		{BITRATE_MODE}, {0},
+		{BITRATE_MODE, ALL_INTRA}, {0},
 		msm_vidc_adjust_ir_random, msm_vidc_set_u32},
 
 	{AU_DELIMITER, ENC, H264|HEVC,
@@ -1229,7 +1233,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_CID_MPEG_VIDEO_MULTI_SLICE_MODE,
 		0,
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
-		{BITRATE_MODE}, {0},
+		{BITRATE_MODE, ALL_INTRA}, {0},
 		msm_vidc_adjust_slice_count, msm_vidc_set_slice_count},
 
 	{SLICE_MAX_BYTES, ENC, H264|HEVC|HEIC,
@@ -1400,6 +1404,16 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		CAP_FLAG_OUTPUT_PORT,
 		{0}, {0},
 		NULL, NULL},
+
+	{ALL_INTRA, ENC, H264|HEVC,
+		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,
+		1, V4L2_MPEG_MSM_VIDC_DISABLE,
+		0,
+		0,
+		CAP_FLAG_OUTPUT_PORT,
+		{GOP_SIZE, B_FRAME},
+		{LTR_COUNT, IR_RANDOM, SLICE_MODE},
+		msm_vidc_adjust_all_intra, NULL},
 
 	{META_LTR_MARK_USE, ENC, H264|HEVC,
 		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,

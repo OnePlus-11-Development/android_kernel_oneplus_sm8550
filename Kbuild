@@ -8,6 +8,12 @@ LINUXINCLUDE    += -include $(VIDEO_ROOT)/config/waipio_video.h \
                    -I$(VIDEO_ROOT)/driver/platform/waipio/inc
 endif
 
+ifeq ($(CONFIG_ARCH_DIWALI), y)
+include $(VIDEO_ROOT)/config/diwali_video.conf
+LINUXINCLUDE    += -include $(VIDEO_ROOT)/config/diwali_video.h \
+                   -I$(VIDEO_ROOT)/driver/platform/diwali/inc
+endif
+
 ifeq ($(CONFIG_ARCH_KALAMA), y)
 include $(VIDEO_ROOT)/config/kalama_video.conf
 LINUXINCLUDE    += -include $(VIDEO_ROOT)/config/kalama_video.h \
@@ -31,8 +37,12 @@ ifeq ($(CONFIG_MSM_VIDC_KALAMA), y)
 msm_video-objs += driver/platform/kalama/src/msm_vidc_kalama.o
 endif
 
+ifeq ($(CONFIG_MSM_VIDC_DIWALI), y)
+msm_video-objs += driver/platform/diwali/src/msm_vidc_diwali.o
+endif
+
 ifeq ($(CONFIG_MSM_VIDC_IRIS2), y)
-LINUXINCLUDE    += -I$(VIDEO_ROOT)/driver/variant/iris2/inc
+LINUXINCLUDE   += -I$(VIDEO_ROOT)/driver/variant/iris2/inc
 msm_video-objs += driver/variant/iris2/src/msm_vidc_buffer_iris2.o \
                   driver/variant/iris2/src/msm_vidc_power_iris2.o \
                   driver/variant/iris2/src/msm_vidc_iris2.o

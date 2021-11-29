@@ -729,11 +729,12 @@ int msm_vidc_enum_frameintervals(void *instance, struct v4l2_frmivalenum *fival)
 
 	fival->type = V4L2_FRMIVAL_TYPE_STEPWISE;
 	fival->stepwise.min.numerator = 1;
-	fival->stepwise.min.denominator = min_t(u32, fps, MAXIMUM_FPS);
+	fival->stepwise.min.denominator =
+			min_t(u32, fps, capability->cap[FRAME_RATE].max);
 	fival->stepwise.max.numerator = 1;
 	fival->stepwise.max.denominator = 1;
 	fival->stepwise.step.numerator = 1;
-	fival->stepwise.step.denominator = MAXIMUM_FPS;
+	fival->stepwise.step.denominator = capability->cap[FRAME_RATE].max;
 
 	return 0;
 }
@@ -961,11 +962,13 @@ int msm_vidc_close(void *instance)
 	i_vpr_h(inst, "%s()\n", __func__);
 	inst_lock(inst, __func__);
 	cancel_response_work(inst);
-	cancel_stats_work(inst);
+	/* print final stats */
+	msm_vidc_print_stats(inst);
 	msm_vidc_session_close(inst);
 	msm_vidc_remove_session(inst);
 	msm_vidc_destroy_buffers(inst);
 	inst_unlock(inst, __func__);
+	cancel_stats_work_sync(inst);
 	msm_vidc_show_stats(inst);
 	put_inst(inst);
 	msm_vidc_schedule_core_deinit(core);
