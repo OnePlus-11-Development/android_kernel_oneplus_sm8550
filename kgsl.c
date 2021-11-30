@@ -12,7 +12,6 @@
 #include <linux/dma-map-ops.h>
 #include <linux/fdtable.h>
 #include <linux/io.h>
-#include <linux/ion.h>
 #include <linux/mem-buf.h>
 #include <linux/mman.h>
 #include <linux/mm_types.h>
