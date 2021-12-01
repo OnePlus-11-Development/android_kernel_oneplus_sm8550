@@ -32,10 +32,10 @@ DATARMNETc4b1be7898;static struct work_struct DATARMNETbfcbb4b8ac;static
 DEFINE_PER_CPU(struct freq_qos_request,DATARMNET17d6a9530a);static void 
 DATARMNETb90d2272b4(struct work_struct*DATARMNET33110a3ff5){struct cpu_freq*
 DATARMNETe24d518157;unsigned int i;int ret;struct freq_qos_request*
-DATARMNETddcafd8b91;get_online_cpus();for_each_online_cpu(i){DATARMNETe24d518157
-=per_cpu_ptr(DATARMNETc4b1be7898.DATARMNET9dd9bc4abb,i);DATARMNETddcafd8b91=&
+DATARMNETddcafd8b91;cpus_read_lock();for_each_online_cpu(i){DATARMNETe24d518157=
+per_cpu_ptr(DATARMNETc4b1be7898.DATARMNET9dd9bc4abb,i);DATARMNETddcafd8b91=&
 per_cpu(DATARMNET17d6a9530a,i);ret=freq_qos_update_request(DATARMNETddcafd8b91,
-DATARMNETe24d518157->DATARMNET103c8d34fe);}put_online_cpus();}void 
+DATARMNETe24d518157->DATARMNET103c8d34fe);}cpus_read_unlock();}void 
 DATARMNET82d7f4ffa2(void){struct cpu_freq*DATARMNETe24d518157;int i;
 for_each_possible_cpu(i){DATARMNETe24d518157=per_cpu_ptr(DATARMNETc4b1be7898.
 DATARMNET9dd9bc4abb,i);DATARMNETe24d518157->DATARMNET103c8d34fe=MIN_FREQ;
