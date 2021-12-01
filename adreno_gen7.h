@@ -73,6 +73,10 @@ struct adreno_gen7_core {
 	const struct kgsl_regmap_list *hwcg;
 	/** @hwcg_count: Number of registers in @hwcg */
 	u32 hwcg_count;
+	/** @ao_hwcg: List of registers and values to write for HWCG in AO block */
+	const struct kgsl_regmap_list *ao_hwcg;
+	/** @ao_hwcg_count: Number of registers in @ao_hwcg */
+	u32 ao_hwcg_count;
 	/** @gbif: List of registers and values to write for GBIF */
 	const struct kgsl_regmap_list *gbif;
 	/** @gbif_count: Number of registers in @gbif */
