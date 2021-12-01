@@ -2043,7 +2043,7 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_2_0 = {
 		.gmem_base = 0x1000000,
 		.gmem_size = 3 * SZ_1M,
 		.bus_width = 32,
-		.snapshot_size = SZ_4M,
+		.snapshot_size = SZ_8M,
 	},
 	.sqefw_name = "a740_sqe.fw",
 	.gmufw_name = "gmu_gen70200.bin",

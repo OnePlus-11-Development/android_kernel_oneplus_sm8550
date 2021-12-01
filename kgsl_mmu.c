@@ -507,18 +507,20 @@ void kgsl_mmu_close(struct kgsl_device *device)
 		mmu->mmu_ops->mmu_close(mmu);
 }
 
-int kgsl_mmu_pagetable_get_context_bank(struct kgsl_pagetable *pagetable)
+int kgsl_mmu_pagetable_get_context_bank(struct kgsl_pagetable *pagetable,
+	struct kgsl_context *context)
 {
 	if (PT_OP_VALID(pagetable, get_context_bank))
-		return pagetable->pt_ops->get_context_bank(pagetable);
+		return pagetable->pt_ops->get_context_bank(pagetable, context);
 
 	return -ENOENT;
 }
 
-int kgsl_mmu_pagetable_get_asid(struct kgsl_pagetable *pagetable)
+int kgsl_mmu_pagetable_get_asid(struct kgsl_pagetable *pagetable,
+		struct kgsl_context *context)
 {
 	if (PT_OP_VALID(pagetable, get_asid))
-		return pagetable->pt_ops->get_asid(pagetable);
+		return pagetable->pt_ops->get_asid(pagetable, context);
 
 	return -ENOENT;
 }

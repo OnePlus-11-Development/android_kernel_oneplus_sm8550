@@ -991,6 +991,49 @@ static const char *gen7_fault_block_uche(struct kgsl_device *device,
 	return str;
 }
 
+static const char *gen7_fault_block_uche_lpac(struct kgsl_device *device,
+		unsigned int mid)
+{
+	unsigned int uche_client_id;
+	static char str[20];
+
+	/*
+	 * Smmu driver takes a vote on CX gdsc before calling the kgsl
+	 * pagefault handler. If there is contention for device mutex in this
+	 * path and the dispatcher fault handler is holding this lock, trying
+	 * to turn off CX gdsc will fail during the reset. So to avoid blocking
+	 * here, try to lock device mutex and return if it fails.
+	 */
+	if (!mutex_trylock(&device->mutex))
+		return "UCHE LPAC: unknown";
+
+	if (!kgsl_state_is_awake(device)) {
+		mutex_unlock(&device->mutex);
+		return "UCHE LPAC: unknown";
+	}
+
+	kgsl_regread(device, GEN7_UCHE_CLIENT_PF, &uche_client_id);
+	mutex_unlock(&device->mutex);
+
+	/* Ignore the value if the gpu is in IFPC */
+	if (uche_client_id == SCOOBYDOO)
+		return "UCHE LPAC: unknown";
+
+	/* UCHE client id mask is bits [6:0] */
+	uche_client_id &= GENMASK(6, 0);
+	if (uche_client_id >= ARRAY_SIZE(uche_client))
+		return "UCHE LPAC: unknown";
+
+	if ((uche_client_id != 1) && (uche_client_id != 4) &&
+			 (uche_client_id != 7))
+		return "UCHE LPAC: Invalid";
+
+	snprintf(str, sizeof(str), "UCHE LPAC: %s",
+			uche_client[uche_client_id]);
+
+	return str;
+}
+
 static const char *gen7_iommu_fault_block(struct kgsl_device *device,
 		unsigned int fsynr1)
 {
@@ -1009,6 +1052,8 @@ static const char *gen7_iommu_fault_block(struct kgsl_device *device,
 		return "Flag cache";
 	case 0x7:
 		return "GMU";
+	case 0x8:
+		return gen7_fault_block_uche_lpac(device, mid);
 	}
 
 	return "Unknown";
