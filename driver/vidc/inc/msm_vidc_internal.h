@@ -6,6 +6,7 @@
 #ifndef _MSM_VIDC_INTERNAL_H_
 #define _MSM_VIDC_INTERNAL_H_
 
+#include <linux/version.h>
 #include <linux/bits.h>
 #include <linux/workqueue.h>
 #include <media/v4l2-dev.h>
@@ -785,6 +786,9 @@ struct msm_vidc_alloc {
 	u8                          secure:1;
 	u8                          map_kernel:1;
 	struct dma_buf             *dmabuf;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,15,0))
+	struct dma_buf_map          dmabuf_map;
+#endif
 	void                       *kvaddr;
 };
 
