@@ -1183,6 +1183,8 @@ static int msm_vdec_subscribe_metadata(struct msm_vidc_inst *inst,
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
 	static const u32 metadata_list[] = {
+		META_BITSTREAM_RESOLUTION,
+		META_CROP_OFFSETS,
 		META_DPB_MISR,
 		META_OPB_MISR,
 		META_INTERLACE,
