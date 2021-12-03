@@ -47,14 +47,15 @@ void print_psc_properties(const char *str, struct msm_vidc_inst *inst,
 
 	i_vpr_h(inst,
 		"%s: width %d, height %d, crop offsets[0] %#x, crop offsets[1] %#x, bit depth %#x, coded frames %d "
-		"fw min count %d, poc %d, color info %d, profile %d, level %d, tier %d\n",
+		"fw min count %d, poc %d, color info %d, profile %d, level %d, tier %d, fg present %d, sb enabled %d\n",
 		str, (subsc_params.bitstream_resolution & HFI_BITMASK_BITSTREAM_WIDTH) >> 16,
 		(subsc_params.bitstream_resolution & HFI_BITMASK_BITSTREAM_HEIGHT),
 		subsc_params.crop_offsets[0], subsc_params.crop_offsets[1],
 		subsc_params.bit_depth, subsc_params.coded_frames,
 		subsc_params.fw_min_count, subsc_params.pic_order_cnt,
 		subsc_params.color_info, subsc_params.profile, subsc_params.level,
-		subsc_params.tier);
+		subsc_params.tier, subsc_params.av1_film_grain_present,
+		subsc_params.av1_super_block_enabled);
 }
 
 static void print_sfr_message(struct msm_vidc_core *core)
@@ -574,7 +575,7 @@ static int get_driver_buffer_flags(struct msm_vidc_inst *inst, u32 hfi_flags)
 	} else if (inst->hfi_frame_info.picture_type & HFI_PICTURE_B) {
 		driver_flags |= MSM_VIDC_BUF_FLAG_BFRAME;
 	} else if (inst->hfi_frame_info.picture_type & HFI_PICTURE_I) {
-		if (inst->codec == MSM_VIDC_VP9)
+		if (inst->codec == MSM_VIDC_VP9 || inst->codec == MSM_VIDC_AV1)
 			driver_flags |= MSM_VIDC_BUF_FLAG_KEYFRAME;
 	} else if (inst->hfi_frame_info.picture_type & HFI_PICTURE_CRA) {
 		driver_flags |= MSM_VIDC_BUF_FLAG_KEYFRAME;
@@ -1386,6 +1387,12 @@ static int handle_session_property(struct msm_vidc_inst *inst,
 		break;
 	case HFI_PROP_TIER:
 		inst->subcr_params[port].tier = payload_ptr[0];
+		break;
+	case HFI_PROP_AV1_FILM_GRAIN_PRESENT:
+		inst->subcr_params[port].av1_film_grain_present = payload_ptr[0];
+		break;
+	case HFI_PROP_AV1_SUPER_BLOCK_ENABLED:
+		inst->subcr_params[port].av1_super_block_enabled = payload_ptr[0];
 		break;
 	case HFI_PROP_PICTURE_TYPE:
 		inst->hfi_frame_info.picture_type = payload_ptr[0];

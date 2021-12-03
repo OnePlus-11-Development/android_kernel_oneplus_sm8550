@@ -136,6 +136,7 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{PROFILE,                        "PROFILE"                    },
 	{LEVEL,                          "LEVEL"                      },
 	{HEVC_TIER,                      "HEVC_TIER"                  },
+	{AV1_TIER,                       "AV1_TIER"                   },
 	{LF_MODE,                        "LF_MODE"                    },
 	{LF_ALPHA,                       "LF_ALPHA"                   },
 	{LF_BETA,                        "LF_BETA"                    },
@@ -362,6 +363,7 @@ const char *v4l2_pixelfmt_name(u32 pixfmt)
 	case V4L2_PIX_FMT_HEVC:         return "HEVC";
 	case V4L2_PIX_FMT_HEIC:         return "HEIC";
 	case V4L2_PIX_FMT_VP9:          return "VP9";
+	case V4L2_PIX_FMT_AV1:          return "AV1";
 	/* meta port */
 	case V4L2_META_FMT_VIDC:        return "META";
 	}
@@ -507,6 +509,9 @@ enum msm_vidc_codec_type v4l2_codec_to_driver(u32 v4l2_codec, const char *func)
 	case V4L2_PIX_FMT_VP9:
 		codec = MSM_VIDC_VP9;
 		break;
+	case V4L2_PIX_FMT_AV1:
+		codec = MSM_VIDC_AV1;
+		break;
 	case V4L2_PIX_FMT_HEIC:
 		codec = MSM_VIDC_HEIC;
 		break;
@@ -530,6 +535,9 @@ u32 v4l2_codec_from_driver(enum msm_vidc_codec_type codec, const char *func)
 		break;
 	case MSM_VIDC_VP9:
 		v4l2_codec = V4L2_PIX_FMT_VP9;
+		break;
+	case MSM_VIDC_AV1:
+		v4l2_codec = V4L2_PIX_FMT_AV1;
 		break;
 	case MSM_VIDC_HEIC:
 		v4l2_codec = V4L2_PIX_FMT_HEIC;
@@ -5158,6 +5166,7 @@ static const char *get_codec_str(enum msm_vidc_codec_type type)
 	case MSM_VIDC_H264: return "h264";
 	case MSM_VIDC_HEVC: return "h265";
 	case MSM_VIDC_VP9:  return " vp9";
+	case MSM_VIDC_AV1:  return " av1";
 	case MSM_VIDC_HEIC: return "heic";
 	}
 

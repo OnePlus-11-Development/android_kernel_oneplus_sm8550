@@ -232,6 +232,8 @@ u32 get_hfi_codec(struct msm_vidc_inst *inst)
 			return HFI_CODEC_DECODE_HEVC;
 	case MSM_VIDC_VP9:
 		return HFI_CODEC_DECODE_VP9;
+	case MSM_VIDC_AV1:
+		return HFI_CODEC_DECODE_AV1;
 	default:
 		i_vpr_e(inst, "invalid codec %d, domain %d\n",
 			inst->codec, inst->domain);

@@ -55,6 +55,18 @@ static const u32 msm_vdec_subscribe_for_psc_vp9[] = {
 	HFI_PROP_LEVEL,
 };
 
+static const u32 msm_vdec_subscribe_for_psc_av1[] = {
+	HFI_PROP_BITSTREAM_RESOLUTION,
+	HFI_PROP_CROP_OFFSETS,
+	HFI_PROP_LUMA_CHROMA_BIT_DEPTH,
+	HFI_PROP_BUFFER_FW_MIN_OUTPUT_COUNT,
+	HFI_PROP_AV1_FILM_GRAIN_PRESENT,
+	HFI_PROP_AV1_SUPER_BLOCK_ENABLED,
+	HFI_PROP_PROFILE,
+	HFI_PROP_LEVEL,
+	HFI_PROP_TIER,
+};
+
 static const u32 msm_vdec_input_subscribe_for_properties[] = {
 	HFI_PROP_NO_OUTPUT,
 };
@@ -526,6 +538,66 @@ static int msm_vdec_set_tier(struct msm_vidc_inst *inst,
 	return rc;
 }
 
+static int msm_vdec_set_av1_film_grain_present(struct msm_vidc_inst *inst,
+	enum msm_vidc_port_type port)
+{
+	int rc = 0;
+	u32 fg_present;
+
+	if (port != INPUT_PORT && port != OUTPUT_PORT) {
+		i_vpr_e(inst, "%s: invalid port %d\n", __func__, port);
+		return -EINVAL;
+	}
+
+	inst->subcr_params[port].av1_film_grain_present =
+		inst->capabilities->cap[FILM_GRAIN].value;
+	fg_present = inst->subcr_params[port].av1_film_grain_present;
+	i_vpr_h(inst, "%s: film grain present: %d", __func__, fg_present);
+	rc = venus_hfi_session_property(inst,
+			HFI_PROP_AV1_FILM_GRAIN_PRESENT,
+			HFI_HOST_FLAGS_NONE,
+			get_hfi_port(inst, port),
+			HFI_PAYLOAD_U32_ENUM,
+			&fg_present,
+			sizeof(u32));
+	if (rc) {
+		i_vpr_e(inst, "%s: set property failed\n", __func__);
+		return rc;
+	}
+
+	return rc;
+}
+
+static int msm_vdec_set_av1_superblock_enabled(struct msm_vidc_inst *inst,
+	enum msm_vidc_port_type port)
+{
+	int rc = 0;
+	u32 sb_enabled;
+
+	if (port != INPUT_PORT && port != OUTPUT_PORT) {
+		i_vpr_e(inst, "%s: invalid port %d\n", __func__, port);
+		return -EINVAL;
+	}
+
+	inst->subcr_params[port].av1_super_block_enabled =
+		inst->capabilities->cap[SUPER_BLOCK].value;
+	sb_enabled = inst->subcr_params[port].av1_super_block_enabled;
+	i_vpr_h(inst, "%s: super block enabled: %d", __func__, sb_enabled);
+	rc = venus_hfi_session_property(inst,
+			HFI_PROP_AV1_SUPER_BLOCK_ENABLED,
+			HFI_HOST_FLAGS_NONE,
+			get_hfi_port(inst, port),
+			HFI_PAYLOAD_U32_ENUM,
+			&sb_enabled,
+			sizeof(u32));
+	if (rc) {
+		i_vpr_e(inst, "%s: set property failed\n", __func__);
+		return rc;
+	}
+
+	return rc;
+}
+
 static int msm_vdec_set_colorformat(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
@@ -921,6 +993,8 @@ static int msm_vdec_subscribe_input_port_settings_change(struct msm_vidc_inst *i
 		{HFI_PROP_PROFILE,                       msm_vdec_set_profile                },
 		{HFI_PROP_LEVEL,                         msm_vdec_set_level                  },
 		{HFI_PROP_TIER,                          msm_vdec_set_tier                   },
+		{HFI_PROP_AV1_FILM_GRAIN_PRESENT,        msm_vdec_set_av1_film_grain_present },
+		{HFI_PROP_AV1_SUPER_BLOCK_ENABLED,       msm_vdec_set_av1_superblock_enabled },
 	};
 
 	if (!inst || !inst->core) {
@@ -940,6 +1014,9 @@ static int msm_vdec_subscribe_input_port_settings_change(struct msm_vidc_inst *i
 	} else if (inst->codec == MSM_VIDC_VP9) {
 		subscribe_psc_size = ARRAY_SIZE(msm_vdec_subscribe_for_psc_vp9);
 		psc = msm_vdec_subscribe_for_psc_vp9;
+	} else if (inst->codec == MSM_VIDC_AV1) {
+		subscribe_psc_size = ARRAY_SIZE(msm_vdec_subscribe_for_psc_av1);
+		psc = msm_vdec_subscribe_for_psc_av1;
 	} else {
 		i_vpr_e(inst, "%s: unsupported codec: %d\n", __func__, inst->codec);
 		psc = NULL;
@@ -1324,6 +1401,12 @@ static int msm_vdec_read_input_subcr_params(struct msm_vidc_inst *inst)
 		msm_vidc_update_cap_value(inst, CODED_FRAMES, CODED_FRAMES_PROGRESSIVE, __func__);
 	else
 		msm_vidc_update_cap_value(inst, CODED_FRAMES, CODED_FRAMES_INTERLACE, __func__);
+	if (inst->codec == MSM_VIDC_AV1) {
+		msm_vidc_update_cap_value(inst, FILM_GRAIN,
+			subsc_params.av1_film_grain_present, __func__);
+		msm_vidc_update_cap_value(inst, SUPER_BLOCK,
+			subsc_params.av1_super_block_enabled, __func__);
+	}
 
 	return 0;
 }
@@ -1547,6 +1630,9 @@ static int msm_vdec_subscribe_output_port_settings_change(struct msm_vidc_inst *
 	} else if (inst->codec == MSM_VIDC_VP9) {
 		subscribe_psc_size = ARRAY_SIZE(msm_vdec_subscribe_for_psc_vp9);
 		psc = msm_vdec_subscribe_for_psc_vp9;
+	} else if (inst->codec == MSM_VIDC_AV1) {
+		subscribe_psc_size = ARRAY_SIZE(msm_vdec_subscribe_for_psc_av1);
+		psc = msm_vdec_subscribe_for_psc_av1;
 	} else {
 		i_vpr_e(inst, "%s: unsupported codec: %d\n", __func__, inst->codec);
 		psc = NULL;
@@ -1626,6 +1712,16 @@ static int msm_vdec_subscribe_output_port_settings_change(struct msm_vidc_inst *
 			break;
 		case HFI_PROP_TIER:
 			payload[0] = subsc_params.tier;
+			payload_size = sizeof(u32);
+			payload_type = HFI_PAYLOAD_U32;
+			break;
+		case HFI_PROP_AV1_FILM_GRAIN_PRESENT:
+			payload[0] = subsc_params.av1_film_grain_present;
+			payload_size = sizeof(u32);
+			payload_type = HFI_PAYLOAD_U32;
+			break;
+		case HFI_PROP_AV1_SUPER_BLOCK_ENABLED:
+			payload[0] = subsc_params.av1_super_block_enabled;
 			payload_size = sizeof(u32);
 			payload_type = HFI_PAYLOAD_U32;
 			break;

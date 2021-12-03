@@ -72,6 +72,10 @@ u32 msm_vidc_output_min_count(struct msm_vidc_inst *inst)
 		case MSM_VIDC_VP9:
 			output_min_count = 9;
 			break;
+		case MSM_VIDC_AV1:
+			// TODO: needs review
+			output_min_count = 11;
+			break;
 		case MSM_VIDC_HEIC:
 			output_min_count = 3;
 			break;
@@ -252,6 +256,7 @@ u32 msm_vidc_decoder_input_size(struct msm_vidc_inst *inst)
 
 	 /* multiply by 10/8 (1.25) to get size for 10 bit case */
 	if (f->fmt.pix_mp.pixelformat == V4L2_PIX_FMT_VP9 ||
+		f->fmt.pix_mp.pixelformat == V4L2_PIX_FMT_AV1 ||
 		f->fmt.pix_mp.pixelformat == V4L2_PIX_FMT_HEVC ||
 		f->fmt.pix_mp.pixelformat == V4L2_PIX_FMT_HEIC)
 		frame_size = frame_size + (frame_size >> 2);
