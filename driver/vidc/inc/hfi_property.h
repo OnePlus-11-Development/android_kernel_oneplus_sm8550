@@ -52,6 +52,7 @@ enum hfi_codec_type {
     HFI_CODEC_ENCODE_HEVC  = 4,
     HFI_CODEC_DECODE_VP9   = 5,
     HFI_CODEC_DECODE_MPEG2 = 6,
+    HFI_CODEC_DECODE_AV1   = 7,
 };
 #define HFI_PROP_CODEC                                          0x03000100
 
@@ -110,6 +111,12 @@ enum hfi_vp9_profile_type {
 enum hfi_mpeg2_profile_type {
     HFI_MP2_PROFILE_SIMPLE = 0,
     HFI_MP2_PROFILE_MAIN   = 1,
+};
+
+enum hfi_av1_profile_type {
+    HFI_AV1_PROFILE_MAIN = 0,
+    HFI_AV1_PROFILE_HIGH = 1,
+    HFI_AV1_PROFILE_PROF = 2,
 };
 
 #define HFI_PROP_PROFILE                                        0x03000107
@@ -175,6 +182,34 @@ enum hfi_mpeg2_level_type {
     HFI_MP2_LEVEL_HIGH      = 3,
 };
 
+enum hfi_av1_level_type {
+    HFI_AV1_LEVEL_2_0 = 0,
+    HFI_AV1_LEVEL_2_1 = 1,
+    HFI_AV1_LEVEL_2_2 = 2,
+    HFI_AV1_LEVEL_2_3 = 3,
+    HFI_AV1_LEVEL_3_0 = 4,
+    HFI_AV1_LEVEL_3_1 = 5,
+    HFI_AV1_LEVEL_3_2 = 6,
+    HFI_AV1_LEVEL_3_3 = 7,
+    HFI_AV1_LEVEL_4_0 = 8,
+    HFI_AV1_LEVEL_4_1 = 9,
+    HFI_AV1_LEVEL_4_2 = 10,
+    HFI_AV1_LEVEL_4_3 = 11,
+    HFI_AV1_LEVEL_5_0 = 12,
+    HFI_AV1_LEVEL_5_1 = 13,
+    HFI_AV1_LEVEL_5_2 = 14,
+    HFI_AV1_LEVEL_5_3 = 15,
+    HFI_AV1_LEVEL_6_0 = 16,
+    HFI_AV1_LEVEL_6_1 = 17,
+    HFI_AV1_LEVEL_6_2 = 18,
+    HFI_AV1_LEVEL_6_3 = 19,
+    HFI_AV1_LEVEL_7_0 = 20,
+    HFI_AV1_LEVEL_7_1 = 21,
+    HFI_AV1_LEVEL_7_2 = 22,
+    HFI_AV1_LEVEL_7_3 = 23,
+    HFI_AV1_LEVEL_MAX = 31,
+};
+
 enum hfi_codec_level_type {
     HFI_LEVEL_NONE = 0xFFFFFFFF,
 };
@@ -185,6 +220,12 @@ enum hfi_hevc_tier_type {
     HFI_H265_TIER_MAIN = 0,
     HFI_H265_TIER_HIGH = 1,
 };
+
+enum hfi_av1_tier_type {
+    HFI_AV1_TIER_MAIN = 0,
+    HFI_AV1_TIER_HIGH = 1,
+};
+
 #define HFI_PROP_TIER                                           0x03000109
 
 #define HFI_PROP_STAGE                                          0x0300010a
@@ -490,6 +531,14 @@ enum hfi_nal_length_field_type {
 #define HFI_PROP_TOTAL_PEAK_BITRATE                             0x0300017C
 
 #define HFI_PROP_MAINTAIN_MIN_QUALITY                           0x0300017D
+
+#define HFI_PROP_AV1_FILM_GRAIN_PRESENT                         0x03000180
+
+#define HFI_PROP_AV1_SUPER_BLOCK_ENABLED                        0x03000181
+
+#define HFI_PROP_AV1_OP_POINT                                   0x03000182
+
+#define HFI_PROP_OPB_ENABLE                                     0x03000184
 
 #define HFI_PROP_END                                            0x03FFFFFF
 
