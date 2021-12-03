@@ -13,7 +13,7 @@ ifeq ($(CONFIG_ARCH_KALAMA), y)
 	include $(KGSL_PATH)/config/gki_waipiodisp.conf
 endif
 
-ccflags-y += -I$(KGSL_PATH) -I$(KGSL_PATH)/include/linux -I$(KGSL_PATH)/include -I$(KERN_SRC)/drivers/devfreq -I$(KERN_SRC)/drivers/iommu
+ccflags-y += -I$(KGSL_PATH) -I$(KGSL_PATH)/include/linux -I$(KGSL_PATH)/include -I$(KERNEL_SRC)/drivers/devfreq -I$(KERNEL_SRC)/drivers/iommu
 
 obj-$(CONFIG_QCOM_KGSL) += msm_kgsl.o
 
