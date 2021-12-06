@@ -4,6 +4,7 @@
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
+#define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
 #include "sde_hw_ds.h"
 #include "sde_formats.h"
 #include "sde_dbg.h"

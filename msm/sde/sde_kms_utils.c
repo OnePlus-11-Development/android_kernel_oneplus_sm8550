@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
-#define pr_fmt(fmt)	"sde-kms_utils:[%s] " fmt, __func__
+#define pr_fmt(fmt)	"[sde-kms_utils:%s:%d] " fmt, __func__, __LINE__
 
 #include "sde_kms.h"
 

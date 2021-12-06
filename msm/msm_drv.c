@@ -297,7 +297,7 @@ void __iomem *msm_ioremap(struct platform_device *pdev, const char *name,
 
 	ptr = devm_ioremap(&pdev->dev, res->start, size);
 	if (!ptr) {
-		dev_err(&pdev->dev, "failed to ioremap: %s\n", name);
+		DISP_DEV_ERR(&pdev->dev, "failed to ioremap: %s\n", name);
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -331,13 +331,13 @@ unsigned long msm_get_phys_addr(struct platform_device *pdev, const char *name)
 	struct resource *res;
 
 	if (!name) {
-		dev_err(&pdev->dev, "invalid block name\n");
+		DISP_DEV_ERR(&pdev->dev, "invalid block name\n");
 		return 0;
 	}
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, name);
 	if (!res) {
-		dev_err(&pdev->dev, "failed to get memory resource: %s\n", name);
+		DISP_DEV_ERR(&pdev->dev, "failed to get memory resource: %s\n", name);
 		return 0;
 	}
 
@@ -651,7 +651,7 @@ static int msm_init_vram(struct drm_device *dev)
 		p = dma_alloc_attrs(dev->dev, size,
 				&priv->vram.paddr, GFP_KERNEL, attrs);
 		if (!p) {
-			dev_err(dev->dev, "failed to allocate VRAM\n");
+			DISP_DEV_ERR(dev->dev, "failed to allocate VRAM\n");
 			priv->vram.paddr = 0;
 			return -ENOMEM;
 		}
@@ -704,7 +704,7 @@ static int msm_drm_display_thread_create(struct msm_drm_private *priv, struct dr
 		kthread_flush_work(&priv->thread_priority_work);
 
 		if (IS_ERR(priv->disp_thread[i].thread)) {
-			dev_err(dev, "failed to create crtc_commit kthread\n");
+			DISP_DEV_ERR(dev, "failed to create crtc_commit kthread\n");
 			priv->disp_thread[i].thread = NULL;
 		}
 
@@ -729,7 +729,7 @@ static int msm_drm_display_thread_create(struct msm_drm_private *priv, struct dr
 		kthread_flush_work(&priv->thread_priority_work);
 
 		if (IS_ERR(priv->event_thread[i].thread)) {
-			dev_err(dev, "failed to create crtc_event kthread\n");
+			DISP_DEV_ERR(dev, "failed to create crtc_event kthread\n");
 			priv->event_thread[i].thread = NULL;
 		}
 
@@ -766,7 +766,7 @@ static int msm_drm_display_thread_create(struct msm_drm_private *priv, struct dr
 	kthread_flush_work(&priv->thread_priority_work);
 
 	if (IS_ERR(priv->pp_event_thread)) {
-		dev_err(dev, "failed to create pp_event kthread\n");
+		DISP_DEV_ERR(dev, "failed to create pp_event kthread\n");
 		ret = PTR_ERR(priv->pp_event_thread);
 		priv->pp_event_thread = NULL;
 		return ret;
@@ -805,7 +805,7 @@ static struct msm_kms *_msm_drm_component_init_helper(
 		 * and (for example) use dmabuf/prime to share buffers with
 		 * imx drm driver on iMX5
 		 */
-		dev_err(dev, "failed to load kms\n");
+		DISP_DEV_ERR(dev, "failed to load kms\n");
 		return kms;
 	}
 	priv->kms = kms;
@@ -821,7 +821,7 @@ static struct msm_kms *_msm_drm_component_init_helper(
 
 	ret = (kms)->funcs->hw_init(kms);
 	if (ret) {
-		dev_err(dev, "kms hw init failed: %d\n", ret);
+		DISP_DEV_ERR(dev, "kms hw init failed: %d\n", ret);
 		return ERR_PTR(ret);
 	}
 
@@ -838,7 +838,7 @@ static int msm_drm_device_init(struct platform_device *pdev,
 
 	ddev = drm_dev_alloc(drv, dev);
 	if (IS_ERR(ddev)) {
-		dev_err(dev, "failed to allocate drm_device\n");
+		DISP_DEV_ERR(dev, "failed to allocate drm_device\n");
 		return PTR_ERR(ddev);
 	}
 
@@ -862,7 +862,7 @@ static int msm_drm_device_init(struct platform_device *pdev,
 
 	ret = sde_dbg_init(&pdev->dev);
 	if (ret) {
-		dev_err(dev, "failed to init sde dbg: %d\n", ret);
+		DISP_DEV_ERR(dev, "failed to init sde dbg: %d\n", ret);
 		goto dbg_init_fail;
 	}
 
@@ -870,7 +870,7 @@ static int msm_drm_device_init(struct platform_device *pdev,
 
 	ret = pm_runtime_resume_and_get(dev);
 	if (ret < 0) {
-		dev_err(dev, "failed to enable power resource %d\n", ret);
+		DISP_DEV_ERR(dev, "failed to enable power resource %d\n", ret);
 		goto pm_runtime_error;
 	}
 
@@ -933,7 +933,7 @@ static int msm_drm_component_init(struct device *dev)
 
 	kms = _msm_drm_component_init_helper(priv, ddev, dev, pdev);
 	if (IS_ERR_OR_NULL(kms)) {
-		dev_err(dev, "msm_drm_component_init_helper failed\n");
+		DISP_DEV_ERR(dev, "msm_drm_component_init_helper failed\n");
 		goto fail;
 	}
 
@@ -943,13 +943,13 @@ static int msm_drm_component_init(struct device *dev)
 
 	ret = msm_drm_display_thread_create(priv, ddev, dev);
 	if (ret) {
-		dev_err(dev, "msm_drm_display_thread_create failed\n");
+		DISP_DEV_ERR(dev, "msm_drm_display_thread_create failed\n");
 		goto fail;
 	}
 
 	ret = drm_vblank_init(ddev, priv->num_crtcs);
 	if (ret < 0) {
-		dev_err(dev, "failed to initialize vblank\n");
+		DISP_DEV_ERR(dev, "failed to initialize vblank\n");
 		goto fail;
 	}
 
@@ -959,7 +959,7 @@ static int msm_drm_component_init(struct device *dev)
 	if (kms) {
 		ret = pm_runtime_resume_and_get(dev);
 		if (ret < 0) {
-			dev_err(dev, "failed to enable power resource %d\n", ret);
+			DISP_DEV_ERR(dev, "failed to enable power resource %d\n", ret);
 			goto fail;
 		}
 
@@ -970,7 +970,7 @@ static int msm_drm_component_init(struct device *dev)
 #endif
 		pm_runtime_put_sync(dev);
 		if (ret < 0) {
-			dev_err(dev, "failed to install IRQ handler\n");
+			DISP_DEV_ERR(dev, "failed to install IRQ handler\n");
 			goto fail;
 		}
 	}
@@ -985,7 +985,7 @@ static int msm_drm_component_init(struct device *dev)
 	if (kms && kms->funcs && kms->funcs->cont_splash_config) {
 		ret = kms->funcs->cont_splash_config(kms, NULL);
 		if (ret) {
-			dev_err(dev, "kms cont_splash config failed.\n");
+			DISP_DEV_ERR(dev, "kms cont_splash config failed.\n");
 			goto fail;
 		}
 	}
@@ -1009,7 +1009,7 @@ static int msm_drm_component_init(struct device *dev)
 
 	ret = sde_dbg_debugfs_register(dev);
 	if (ret) {
-		dev_err(dev, "failed to reg sde dbg debugfs: %d\n", ret);
+		DISP_DEV_ERR(dev, "failed to reg sde dbg debugfs: %d\n", ret);
 		goto fail;
 	}
 
@@ -1950,7 +1950,7 @@ static int add_components_mdp(struct device *mdp_dev,
 
 		ret = of_graph_parse_endpoint(ep_node, &ep);
 		if (ret) {
-			dev_err(mdp_dev, "unable to parse port endpoint\n");
+			DISP_DEV_ERR(mdp_dev, "unable to parse port endpoint\n");
 			of_node_put(ep_node);
 			return ret;
 		}
@@ -2017,13 +2017,13 @@ static int add_display_components(struct device *dev,
 	if (of_device_is_compatible(dev->of_node, "qcom,mdss")) {
 		ret = of_platform_populate(dev->of_node, NULL, NULL, dev);
 		if (ret) {
-			dev_err(dev, "failed to populate children devices\n");
+			DISP_DEV_ERR(dev, "failed to populate children devices\n");
 			return ret;
 		}
 
 		mdp_dev = device_find_child(dev, NULL, compare_name_mdp);
 		if (!mdp_dev) {
-			dev_err(dev, "failed to find MDSS MDP node\n");
+			DISP_DEV_ERR(dev, "failed to find MDSS MDP node\n");
 			of_platform_depopulate(dev);
 			return -ENODEV;
 		}
@@ -2162,7 +2162,7 @@ static int msm_drm_component_dependency_check(struct device *dev)
 			struct platform_device *pdev =
 					of_find_device_by_node(node);
 			if (!platform_get_drvdata(pdev)) {
-				dev_err(dev,
+				DISP_DEV_ERR(dev,
 					"qcom,sde_rscc not probed yet\n");
 				return -EPROBE_DEFER;
 			} else {
