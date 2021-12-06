@@ -173,7 +173,7 @@ enum {
 #define IS_UBWC_30_SUPPORTED(rev) \
 		IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_UBWC_VER_30)
 #define IS_UBWC_40_SUPPORTED(rev) \
-		IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_UBWC_VER_40)
+		IS_SDE_MAJOR_SAME((rev), SDE_HW_UBWC_VER_40)
 
 /**
  * Supported system cache settings
