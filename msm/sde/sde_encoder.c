@@ -4695,7 +4695,7 @@ int sde_encoder_helper_collect_misr(struct sde_encoder_phys *phys_enc,
 			nonblock, misr_value) : -ENOTSUPP;
 }
 
-#ifdef CONFIG_DEBUG_FS
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 static int _sde_encoder_status_show(struct seq_file *s, void *data)
 {
 	struct sde_encoder_virt *sde_enc;
@@ -4966,7 +4966,7 @@ static int _sde_encoder_init_debugfs(struct drm_encoder *drm_enc)
 static void _sde_encoder_destroy_debugfs(struct drm_encoder *drm_enc)
 {
 }
-#endif
+#endif /* CONFIG_DEBUG_FS */
 
 static int sde_encoder_late_register(struct drm_encoder *encoder)
 {

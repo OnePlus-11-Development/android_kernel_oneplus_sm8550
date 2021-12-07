@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -59,9 +60,9 @@ enum dp_aux_bridge_flag {
  * @head: to keep track of all added bridges
  */
 struct dp_aux_bridge {
-#ifdef CONFIG_OF
+#if IS_ENABLED(CONFIG_OF)
 	struct device_node *of_node;
-#endif
+#endif /* CONFIG_OF */
 	void *dev_priv;
 	u32 flag;
 	void *mst_ctx;
@@ -116,14 +117,14 @@ struct dp_aux_bridge {
  */
 int dp_aux_add_bridge(struct dp_aux_bridge *bridge);
 
-#ifdef CONFIG_OF
+#if IS_ENABLED(CONFIG_OF)
 /**
  * of_dp_aux_find_bridge - Find registered DP aux bridge
  * @np: device node pointer to the bridge
  * return: DP aux bridge pointer, NULL if not found
  */
 struct dp_aux_bridge *of_dp_aux_find_bridge(struct device_node *np);
-#endif
+#endif /* CONFIG_OF */
 
 #endif /* _DP_AUX_BRIDGE_H_ */
 

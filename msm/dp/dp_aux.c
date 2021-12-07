@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -46,7 +47,7 @@ struct dp_aux_private {
 	atomic_t aborted;
 };
 
-#ifdef CONFIG_DYNAMIC_DEBUG
+#if IS_ENABLED(CONFIG_DYNAMIC_DEBUG)
 static void dp_aux_hex_dump(struct drm_dp_aux *drm_aux,
 		struct drm_dp_aux_msg *msg)
 {
@@ -77,7 +78,7 @@ static void dp_aux_hex_dump(struct drm_dp_aux *drm_aux,
 		struct drm_dp_aux_msg *msg)
 {
 }
-#endif
+#endif /* CONFIG_DYNAMIC_DEBUG */
 
 static char *dp_aux_get_error(u32 aux_error)
 {

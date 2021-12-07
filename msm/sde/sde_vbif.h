@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -157,7 +158,7 @@ int sde_vbif_halt_plane_xin(struct sde_kms *sde_kms, u32 xin_id,
  */
 int sde_vbif_halt_xin_mask(struct sde_kms *sde_kms, u32 xin_id_mask, bool halt);
 
-#ifdef CONFIG_DEBUG_FS
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 int sde_debugfs_vbif_init(struct sde_kms *sde_kms, struct dentry *debugfs_root);
 void sde_debugfs_vbif_destroy(struct sde_kms *sde_kms);
 #else
@@ -169,5 +170,5 @@ static inline int sde_debugfs_vbif_init(struct sde_kms *sde_kms,
 static inline void sde_debugfs_vbif_destroy(struct sde_kms *sde_kms)
 {
 }
-#endif
+#endif /* CONFIG_DEBUG_FS */
 #endif /* __SDE_VBIF_H__ */

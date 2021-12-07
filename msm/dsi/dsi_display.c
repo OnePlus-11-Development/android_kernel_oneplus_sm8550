@@ -1363,7 +1363,7 @@ int dsi_display_set_power(struct drm_connector *connector,
 	return rc;
 }
 
-#ifdef CONFIG_DEBUG_FS
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 static bool dsi_display_is_te_based_esd(struct dsi_display *display)
 {
 	u32 status_mode = 0;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -1084,7 +1084,7 @@ void sde_core_perf_crtc_update(struct drm_crtc *crtc,
 
 }
 
-#ifdef CONFIG_DEBUG_FS
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 
 static ssize_t _sde_core_perf_threshold_high_write(struct file *file,
 		    const char __user *user_buf, size_t count, loff_t *ppos)
@@ -1409,7 +1409,7 @@ int sde_core_perf_debugfs_init(struct sde_core_perf *perf,
 {
 	return 0;
 }
-#endif
+#endif /* CONFIG_DEBUG_FS */
 
 void sde_core_perf_destroy(struct sde_core_perf *perf)
 {

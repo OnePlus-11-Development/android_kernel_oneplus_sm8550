@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
  */
 
@@ -3320,7 +3321,7 @@ int sde_rotator_runtime_idle(struct device *dev)
 
 #endif
 
-#ifdef CONFIG_PM_SLEEP
+#if IS_ENABLED(CONFIG_PM_SLEEP)
 /*
  * sde_rotator_pm_suspend - put the device in pm suspend state by cancelling
  *							 all active requests
@@ -3382,7 +3383,7 @@ int sde_rotator_pm_resume(struct device *dev)
 	sde_rot_mgr_unlock(mgr);
 	return 0;
 }
-#endif
+#endif /* CONFIG_PM_SLEEP */
 
 #if defined(CONFIG_PM) && !defined(CONFIG_PM_SLEEP)
 int sde_rotator_suspend(struct platform_device *dev, pm_message_t state)

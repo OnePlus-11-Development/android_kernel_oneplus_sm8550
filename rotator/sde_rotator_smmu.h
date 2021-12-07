@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -25,14 +26,14 @@ static inline int sde_smmu_dma_data_direction(int dir)
 	return dir;
 }
 
-#ifdef CONFIG_MSM_SDE_ROTATOR
+#if IS_ENABLED(CONFIG_MSM_SDE_ROTATOR)
 int sde_smmu_ctrl(int enable);
 #else
 static inline int sde_smmu_ctrl(int enable)
 {
 	return 0;
 }
-#endif
+#endif /* CONFIG_MSM_SDE_ROTATOR */
 
 struct dma_buf_attachment *sde_smmu_dma_buf_attach(
 		struct dma_buf *dma_buf, struct device *dev, int domain);

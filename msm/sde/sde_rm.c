@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -807,7 +808,7 @@ fail:
 	return rc;
 }
 
-#ifdef CONFIG_DEBUG_FS
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 static int _sde_rm_status_show(struct seq_file *s, void *data)
 {
 	struct sde_rm *rm;
@@ -853,7 +854,7 @@ void sde_rm_debugfs_init(struct sde_rm *sde_rm, struct dentry *parent)
 void sde_rm_debugfs_init(struct sde_rm *rm, struct dentry *parent)
 {
 }
-#endif
+#endif /* CONFIG_DEBUG_FS */
 
 int sde_rm_init(struct sde_rm *rm,
 		struct sde_mdss_cfg *cat,

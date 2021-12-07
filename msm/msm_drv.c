@@ -169,19 +169,19 @@ static const struct drm_mode_config_helper_funcs mode_config_helper_funcs = {
 	.atomic_commit_tail = msm_atomic_commit_tail,
 };
 
-#ifdef CONFIG_DRM_MSM_REGISTER_LOGGING
+#if IS_ENABLED(CONFIG_DRM_MSM_REGISTER_LOGGING)
 static bool reglog = false;
 MODULE_PARM_DESC(reglog, "Enable register read/write logging");
 module_param(reglog, bool, 0600);
 #else
 #define reglog 0
-#endif
+#endif /* CONFIG_DRM_MSM_REGISTER_LOGGING */
 
-#ifdef CONFIG_DRM_FBDEV_EMULATION
+#if IS_ENABLED(CONFIG_DRM_FBDEV_EMULATION)
 static bool fbdev = true;
 MODULE_PARM_DESC(fbdev, "Enable fbdev compat layer");
 module_param(fbdev, bool, 0600);
-#endif
+#endif /* CONFIG_DRM_FBDEV_EMULATION */
 
 static char *vram = "16m";
 MODULE_PARM_DESC(vram, "Configure VRAM size (for devices without IOMMU/GPUMMU)");
@@ -508,10 +508,10 @@ static int msm_drm_uninit(struct device *dev)
 		priv->registered = false;
 	}
 
-#ifdef CONFIG_DRM_FBDEV_EMULATION
+#if IS_ENABLED(CONFIG_DRM_FBDEV_EMULATION)
 	if (fbdev && priv->fbdev)
 		msm_fbdev_free(ddev);
-#endif
+#endif /* CONFIG_DRM_FBDEV_EMULATION */
 	drm_atomic_helper_shutdown(ddev);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	msm_irq_uninstall(ddev);
@@ -562,7 +562,7 @@ static int msm_drm_uninit(struct device *dev)
 
 static int get_mdp_ver(struct platform_device *pdev)
 {
-#ifdef CONFIG_OF
+#if IS_ENABLED(CONFIG_OF)
 	static const struct of_device_id match_types[] = { {
 		.compatible = "qcom,mdss_mdp",
 		.data	= (void	*)KMS_MDP5,
@@ -579,7 +579,7 @@ static int get_mdp_ver(struct platform_device *pdev)
 	match = of_match_node(match_types, dev->of_node);
 	if (match)
 		return (int)(unsigned long)match->data;
-#endif
+#endif /* CONFIG_OF */
 	return KMS_MDP4;
 }
 
@@ -662,7 +662,7 @@ static int msm_init_vram(struct drm_device *dev)
 	return ret;
 }
 
-#ifdef CONFIG_OF
+#if IS_ENABLED(CONFIG_OF)
 static int msm_component_bind_all(struct device *dev,
 				struct drm_device *drm_dev)
 {
@@ -680,7 +680,7 @@ static int msm_component_bind_all(struct device *dev,
 {
 	return 0;
 }
-#endif
+#endif /* CONFIG_OF */
 
 static int msm_drm_display_thread_create(struct msm_drm_private *priv, struct drm_device *ddev,
 	struct device *dev)
@@ -977,10 +977,10 @@ static int msm_drm_component_init(struct device *dev)
 		}
 	}
 
-#ifdef CONFIG_DRM_FBDEV_EMULATION
+#if IS_ENABLED(CONFIG_DRM_FBDEV_EMULATION)
 	if (fbdev)
 		priv->fbdev = msm_fbdev_init(ddev);
-#endif
+#endif /* CONFIG_DRM_FBDEV_EMULATION */
 
 	/* create drm client only when fbdev is not supported */
 	if (!priv->fbdev) {
@@ -1799,7 +1799,7 @@ static struct drm_driver msm_driver = {
 	.patchlevel         = MSM_VERSION_PATCHLEVEL,
 };
 
-#ifdef CONFIG_PM_SLEEP
+#if IS_ENABLED(CONFIG_PM_SLEEP)
 static int msm_pm_suspend(struct device *dev)
 {
 	struct drm_device *ddev;
@@ -1849,9 +1849,9 @@ static int msm_pm_resume(struct device *dev)
 
 	return 0;
 }
-#endif
+#endif /* CONFIG_PM_SLEEP */
 
-#ifdef CONFIG_PM
+#if IS_ENABLED(CONFIG_PM)
 static int msm_runtime_suspend(struct device *dev)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
@@ -1882,7 +1882,7 @@ static int msm_runtime_resume(struct device *dev)
 
 	return ret;
 }
-#endif
+#endif /* CONFIG_PM */
 
 static const struct dev_pm_ops msm_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(msm_pm_suspend, msm_pm_resume)

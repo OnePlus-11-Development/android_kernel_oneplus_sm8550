@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -310,14 +311,14 @@ int sde_rotator_base_init(struct sde_rot_data_type **pmdata,
 
 void sde_rotator_base_destroy(struct sde_rot_data_type *data);
 
-#ifdef CONFIG_MSM_SDE_ROTATOR
+#if IS_ENABLED(CONFIG_MSM_SDE_ROTATOR)
 struct sde_rot_data_type *sde_rot_get_mdata(void);
 #else
 static inline struct sde_rot_data_type *sde_rot_get_mdata(void)
 {
 	return NULL;
 }
-#endif
+#endif /* CONFIG_MSM_SDE_ROTATOR */
 
 struct reg_bus_client *sde_reg_bus_vote_client_create(char *client_name);
 

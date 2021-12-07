@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -10,7 +11,7 @@
 #include <linux/of_gpio.h>
 #include <linux/version.h>
 
-#ifdef CONFIG_DSI_PARSER
+#if IS_ENABLED(CONFIG_DSI_PARSER)
 void *dsi_parser_get(struct device *dev);
 void dsi_parser_put(void *data);
 int dsi_parser_dbg_init(void *parser, struct dentry *dir);

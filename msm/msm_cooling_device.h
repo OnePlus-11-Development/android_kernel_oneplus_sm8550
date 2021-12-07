@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
  */
 
@@ -19,7 +20,7 @@ struct sde_cdev {
 	unsigned int cdev_sf;
 };
 
-#ifdef CONFIG_THERMAL_OF
+#if IS_ENABLED(CONFIG_THERMAL_OF)
 struct sde_cdev *backlight_cdev_register(struct device *dev,
 					struct backlight_device *bd,
 					struct notifier_block *n);
@@ -33,6 +34,6 @@ backlight_cdev_register(struct device *dev,
 }
 static inline void backlight_cdev_unregister(struct sde_cdev *cdev)
 { }
-#endif
+#endif /* CONFIG_THERMAL_OF */
 
 #endif

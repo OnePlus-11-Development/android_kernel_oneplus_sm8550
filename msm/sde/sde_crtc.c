@@ -308,7 +308,7 @@ static void _sde_crtc_deinit_events(struct sde_crtc *sde_crtc)
 		return;
 }
 
-#ifdef CONFIG_DEBUG_FS
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 static int _sde_debugfs_fps_status_show(struct seq_file *s, void *data)
 {
 	struct sde_crtc *sde_crtc;
@@ -355,7 +355,7 @@ static int _sde_debugfs_fps_status(struct inode *inode, struct file *file)
 	return single_open(file, _sde_debugfs_fps_status_show,
 			inode->i_private);
 }
-#endif
+#endif /* CONFIG_DEBUG_FS */
 
 static ssize_t fps_periodicity_ms_store(struct device *device,
 		struct device_attribute *attr, const char *buf, size_t count)
@@ -6440,7 +6440,7 @@ void sde_crtc_get_misr_info(struct drm_crtc *crtc,
 	crtc_misr_info->misr_frame_count = sde_crtc->misr_frame_count;
 }
 
-#ifdef CONFIG_DEBUG_FS
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 static int _sde_debugfs_status_show(struct seq_file *s, void *data)
 {
 	struct sde_crtc *sde_crtc;

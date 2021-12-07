@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -87,7 +87,7 @@ static const struct dp_mst_sim_port output_port = {
 	0, 0, 2520, 2520, NULL, 0
 };
 
-#ifdef CONFIG_DYNAMIC_DEBUG
+#if IS_ENABLED(CONFIG_DYNAMIC_DEBUG)
 static void dp_sim_aux_hex_dump(struct drm_dp_aux_msg *msg)
 {
 	char prefix[64];
@@ -114,7 +114,7 @@ static void dp_sim_aux_hex_dump(struct drm_dp_aux_msg *msg)
 static void dp_sim_aux_hex_dump(struct drm_dp_aux_msg *msg)
 {
 }
-#endif
+#endif /* CONFIG_DYNAMIC_DEBUG */
 
 static int dp_sim_register_hpd(struct dp_aux_bridge *bridge,
 	int (*hpd_cb)(void *, bool, bool), void *dev)

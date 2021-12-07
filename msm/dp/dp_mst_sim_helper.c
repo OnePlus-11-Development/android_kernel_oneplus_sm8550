@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -84,7 +85,7 @@ struct dp_mst_notify_work {
 	u32 port_mask;
 };
 
-#ifdef CONFIG_DYNAMIC_DEBUG
+#if IS_ENABLED(CONFIG_DYNAMIC_DEBUG)
 static void dp_sideband_hex_dump(const char *name,
 		u32 address, u8 *buffer, size_t size)
 {
@@ -111,7 +112,7 @@ static void dp_sideband_hex_dump(const char *name,
 		u32 address, u8 *buffer, size_t size)
 {
 }
-#endif
+#endif /* CONFIG_DYNAMIC_DEBUG */
 
 static u8 dp_mst_sim_msg_header_crc4(const uint8_t *data, size_t num_nibbles)
 {

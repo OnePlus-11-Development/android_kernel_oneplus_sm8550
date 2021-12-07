@@ -4498,7 +4498,7 @@ void sde_plane_get_frame_data(struct drm_plane *plane,
 	}
 }
 
-#ifdef CONFIG_DEBUG_FS
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 static ssize_t _sde_plane_danger_read(struct file *file,
 			char __user *buff, size_t count, loff_t *ppos)
 {
@@ -4699,7 +4699,7 @@ static int _sde_plane_init_debugfs(struct drm_plane *plane)
 static void _sde_plane_destroy_debugfs(struct drm_plane *plane)
 {
 }
-#endif
+#endif /* CONFIG_DEBUG_FS */
 
 static int sde_plane_late_register(struct drm_plane *plane)
 {

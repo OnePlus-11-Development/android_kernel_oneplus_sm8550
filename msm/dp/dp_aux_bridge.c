@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -49,7 +50,7 @@ int dp_aux_add_bridge(struct dp_aux_bridge *bridge)
 	return 0;
 }
 
-#ifdef CONFIG_OF
+#if IS_ENABLED(CONFIG_OF)
 struct dp_aux_bridge *of_dp_aux_find_bridge(struct device_node *np)
 {
 	struct dp_aux_bridge *bridge;
@@ -66,5 +67,5 @@ struct dp_aux_bridge *of_dp_aux_find_bridge(struct device_node *np)
 	mutex_unlock(&dp_aux_bridge_lock);
 	return NULL;
 }
-#endif
+#endif /* CONFIG_OF */
 

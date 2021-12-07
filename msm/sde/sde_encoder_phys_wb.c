@@ -2250,7 +2250,7 @@ static void sde_encoder_phys_wb_get_hw_resources(struct sde_encoder_phys *phys_e
 		WBID(wb_enc), hw_res->wbs[hw_wb->idx - WB_0], hw_res->needs_cdm);
 }
 
-#ifdef CONFIG_DEBUG_FS
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 /**
  * sde_encoder_phys_wb_init_debugfs - initialize writeback encoder debugfs
  * @phys_enc:		Pointer to physical encoder
@@ -2274,7 +2274,7 @@ static int sde_encoder_phys_wb_init_debugfs(
 {
 	return 0;
 }
-#endif
+#endif /* CONFIG_DEBUG_FS */
 
 static int sde_encoder_phys_wb_late_register(struct sde_encoder_phys *phys_enc,
 		struct dentry *debugfs_root)

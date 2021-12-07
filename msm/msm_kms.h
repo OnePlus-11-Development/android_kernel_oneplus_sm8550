@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -119,10 +120,10 @@ struct msm_kms_funcs {
 	struct device *(*get_address_space_device)(
 			struct msm_kms *kms,
 			unsigned int domain);
-#ifdef CONFIG_DEBUG_FS
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 	/* debugfs: */
 	int (*debugfs_init)(struct msm_kms *kms, struct drm_minor *minor);
-#endif
+#endif /* CONFIG_DEBUG_FS */
 	/* destroys debugfs */
 	void (*debugfs_destroy)(struct msm_kms *kms);
 	/* handle continuous splash  */
@@ -170,12 +171,12 @@ static inline void msm_kms_init(struct msm_kms *kms,
 	kms->funcs = funcs;
 }
 
-#ifdef CONFIG_DRM_MSM_MDP4
+#if IS_ENABLED(CONFIG_DRM_MSM_MDP4)
 struct msm_kms *mdp4_kms_init(struct drm_device *dev);
 #else
 static inline
 struct msm_kms *mdp4_kms_init(struct drm_device *dev) { return NULL; };
-#endif
+#endif /* CONFIG_DRM_MSM_MDP4 */
 #if IS_ENABLED(CONFIG_DRM_MSM_MDP5)
 struct msm_kms *mdp5_kms_init(struct drm_device *dev);
 int msm_mdss_init(struct drm_device *dev);

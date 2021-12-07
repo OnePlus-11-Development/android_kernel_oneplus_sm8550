@@ -85,7 +85,7 @@ static const struct of_device_id msm_dsi_of_match[] = {
 	{}
 };
 
-#ifdef CONFIG_DEBUG_FS
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 static ssize_t debugfs_state_info_read(struct file *file,
 				       char __user *buff,
 				       size_t count,

@@ -1484,7 +1484,7 @@ void sde_dbg_ctrl(const char *name, ...)
 	va_end(args);
 }
 
-#ifdef CONFIG_DEBUG_FS
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 /*
  * sde_dbg_debugfs_open - debugfs open handler for evtlog dump
  * @inode: debugfs inode
@@ -2224,7 +2224,7 @@ static ssize_t sde_dbg_reg_base_offset_read(struct file *file,
 	return len;
 }
 
-#ifdef CONFIG_DYNAMIC_DEBUG
+#if IS_ENABLED(CONFIG_DYNAMIC_DEBUG)
 /**
  * sde_dbg_reg_base_reg_write - write to reg base hw at offset a given value
  * @file: file handler
@@ -2302,7 +2302,7 @@ end:
 
 	return count;
 }
-#endif
+#endif /* CONFIG_DYNAMIC_DEBUG */
 
 /**
  * sde_dbg_reg_base_reg_read - read len from reg base hw at current offset
@@ -2504,7 +2504,7 @@ int sde_dbg_debugfs_register(struct device *dev)
 	return 0;
 }
 
-#endif
+#endif /* CONFIG_DEBUG_FS */
 
 static void _sde_dbg_debugfs_destroy(void)
 {

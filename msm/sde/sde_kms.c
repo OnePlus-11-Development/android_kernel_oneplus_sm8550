@@ -123,7 +123,7 @@ bool sde_is_custom_client(void)
 	return sdecustom;
 }
 
-#ifdef CONFIG_DEBUG_FS
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 void *sde_debugfs_get_root(struct sde_kms *sde_kms)
 {
 	struct msm_drm_private *priv;
@@ -211,7 +211,7 @@ static int _sde_kms_dump_clks_state(struct sde_kms *sde_kms)
 {
 	return 0;
 }
-#endif
+#endif /* CONFIG_DEBUG_FS */
 
 static void sde_kms_wait_for_frame_transfer_complete(struct msm_kms *kms,
 		struct drm_crtc *crtc)

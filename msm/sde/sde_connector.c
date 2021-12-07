@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -2422,7 +2423,7 @@ static const struct file_operations conn_cmd_rx_fops = {
 	.write =        _sde_debugfs_conn_cmd_rx_write,
 };
 
-#ifdef CONFIG_DEBUG_FS
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 /**
  * sde_connector_init_debugfs - initialize connector debugfs
  * @connector: Pointer to drm connector
@@ -2472,7 +2473,7 @@ static int sde_connector_init_debugfs(struct drm_connector *connector)
 {
 	return 0;
 }
-#endif
+#endif /* CONFIG_DEBUG_FS */
 
 static int sde_connector_late_register(struct drm_connector *connector)
 {

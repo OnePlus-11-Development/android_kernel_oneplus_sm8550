@@ -1302,7 +1302,7 @@ static inline void __exit msm_mdp_unregister(void)
 }
 #endif /* CONFIG_DRM_MSM_MDP5 */
 
-#ifdef CONFIG_DEBUG_FS
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 int msm_debugfs_late_init(struct drm_device *dev);
 int msm_rd_debugfs_init(struct drm_minor *minor);
 void msm_rd_debugfs_cleanup(struct msm_drm_private *priv);
@@ -1318,7 +1318,7 @@ static inline void msm_rd_dump_submit(struct msm_rd_state *rd, struct msm_gem_su
 		const char *fmt, ...) {}
 static inline void msm_rd_debugfs_cleanup(struct msm_drm_private *priv) {}
 static inline void msm_perf_debugfs_cleanup(struct msm_drm_private *priv) {}
-#endif
+#endif /* CONFIG_DEBUG_FS */
 
 #if IS_ENABLED(CONFIG_DRM_MSM_DSI)
 void __init dsi_display_register(void);

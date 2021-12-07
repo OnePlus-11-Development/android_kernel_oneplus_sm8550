@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
  */
 #define pr_fmt(fmt)	"%s:%d: " fmt, __func__, __LINE__
@@ -56,10 +57,10 @@
 #ifndef CONFIG_MSM_SDE_ROTATOR_INIT_ONLY
 static void sde_rotator_submit_handler(struct kthread_work *work);
 static void sde_rotator_retire_handler(struct kthread_work *work);
-#ifdef CONFIG_COMPAT
+#if IS_ENABLED(CONFIG_COMPAT)
 static long sde_rotator_compat_ioctl32(struct file *file,
 	unsigned int cmd, unsigned long arg);
-#endif
+#endif /* CONFIG_COMPAT */
 
 /*
  * sde_rotator_ctx_from_fh - Get rotator context from v4l2 fh.
@@ -1909,9 +1910,9 @@ static const struct v4l2_file_operations sde_rotator_fops = {
 	.release        = sde_rotator_release,
 	.poll           = sde_rotator_poll,
 	.unlocked_ioctl = video_ioctl2,
-#ifdef CONFIG_COMPAT
+#if IS_ENABLED(CONFIG_COMPAT)
 	.compat_ioctl32 = sde_rotator_compat_ioctl32,
-#endif
+#endif /* CONFIG_COMPAT */
 };
 
 /*
@@ -2740,7 +2741,7 @@ static long sde_rotator_private_ioctl(struct file *file, void *fh,
 	return 0;
 }
 
-#ifdef CONFIG_COMPAT
+#if IS_ENABLED(CONFIG_COMPAT)
 /*
  * sde_rotator_compat_ioctl32 - Compat ioctl handler function.
  * @file: Pointer to file struct.
@@ -2809,7 +2810,7 @@ ioctl32_error:
 	SDEDEV_ERR(ctx->rot_dev->dev, "error handling ioctl32 cmd:%x\n", cmd);
 	return -EFAULT;
 }
-#endif
+#endif /* CONFIG_COMPAT */
 
 static int sde_rotator_ctrl_subscribe_event(struct v4l2_fh *fh,
 				const struct v4l2_event_subscription *sub)
