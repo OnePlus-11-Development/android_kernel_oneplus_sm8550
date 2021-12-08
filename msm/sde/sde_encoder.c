@@ -5248,6 +5248,13 @@ struct drm_encoder *sde_encoder_init(struct drm_device *dev, struct msm_display_
 			"input handler registration failed, rc = %d\n", ret);
 	}
 
+	/* Keep posted start as default configuration in driver
+	   if SBLUT is supported on target. Do not allow HAL to
+	   override driver's default frame trigger mode.
+	*/
+	if(sde_kms->catalog->dma_cfg.reg_dma_blks[REG_DMA_TYPE_SB].valid)
+		sde_enc->frame_trigger_mode = FRAME_DONE_WAIT_POSTED_START;
+
 	mutex_init(&sde_enc->rc_lock);
 	kthread_init_delayed_work(&sde_enc->delayed_off_work,
 			sde_encoder_off_work);
