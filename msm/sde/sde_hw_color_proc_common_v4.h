@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
  */
 #ifndef _SDE_HW_COLOR_PROC_COMMON_V4_H_
@@ -182,12 +183,17 @@ static inline void sde_ltm_get_phase_info(struct sde_hw_cp_cfg *hw_cfg,
 
 	info->init_h[LTM_0] = (1 << 23);
 	info->init_h[LTM_1] = (1 << 23);
+	info->init_h[LTM_2] = (1 << 23);
+	info->init_h[LTM_3] = (1 << 23);
 	info->init_v = (1 << 23);
 	info->inc_h = ((count_h - 1) << 24) / (hw_cfg->displayh - 1);
 	info->inc_v = ((count_v - 1) << 24) / (hw_cfg->displayv - 1);
-	if (info->merge_en)
+	if (info->merge_en) {
 		info->init_h[LTM_1] = info->init_h[LTM_0] +
 			info->inc_h * (hw_cfg->displayh / 2);
+		info->init_h[LTM_3] = info->init_h[LTM_2] +
+			info->inc_h * (hw_cfg->displayh / 2);
+	}
 }
 
 #endif /* _SDE_HW_COLOR_PROC_COMMON_V4_H_ */
