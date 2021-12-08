@@ -922,6 +922,19 @@ static int dsi_display_status_check_te(struct dsi_display *display,
 	return rc;
 }
 
+void dsi_display_toggle_error_interrupt_status(struct dsi_display * display, bool enable)
+{
+	int i = 0;
+	struct dsi_display_ctrl *ctrl;
+
+	display_for_each_ctrl(i, display) {
+		ctrl = &display->ctrl[i];
+		if (!ctrl->ctrl)
+			continue;
+		dsi_ctrl_toggle_error_interrupt_status(ctrl->ctrl, enable);
+	}
+}
+
 int dsi_display_check_status(struct drm_connector *connector, void *display,
 					bool te_check_override)
 {
@@ -967,6 +980,11 @@ int dsi_display_check_status(struct drm_connector *connector, void *display,
 
 	dsi_display_set_ctrl_esd_check_flag(dsi_display, true);
 
+	dsi_display_clk_ctrl(dsi_display->dsi_clk_handle, DSI_ALL_CLKS, DSI_CLK_ON);
+
+	/* Disable error interrupts while doing an ESD check */
+	dsi_display_toggle_error_interrupt_status(dsi_display, false);
+
 	if (status_mode == ESD_MODE_REG_READ) {
 		rc = dsi_display_status_reg_read(dsi_display);
 	} else if (status_mode == ESD_MODE_SW_BTA) {
@@ -991,7 +1009,11 @@ int dsi_display_check_status(struct drm_connector *connector, void *display,
 	/* Handle Panel failures during display disable sequence */
 	if (rc <=0)
 		atomic_set(&panel->esd_recovery_pending, 1);
+	else
+		/* Enable error interrupts post an ESD success */
+		dsi_display_toggle_error_interrupt_status(dsi_display, true);
 
+	dsi_display_clk_ctrl(dsi_display->dsi_clk_handle, DSI_ALL_CLKS, DSI_CLK_OFF);
 release_panel_lock:
 	dsi_panel_release_panel_lock(panel);
 	SDE_EVT32(SDE_EVTLOG_FUNC_EXIT, rc);
@@ -1041,18 +1063,23 @@ static int dsi_display_cmd_rx(struct dsi_display *display,
 
 	flags = DSI_CTRL_CMD_READ;
 
+	dsi_display_clk_ctrl(display->dsi_clk_handle, DSI_ALL_CLKS, DSI_CLK_ON);
+	dsi_display_toggle_error_interrupt_status(display, false);
 	cmd->ctrl_flags = flags;
 	dsi_display_set_cmd_tx_ctrl_flags(display, cmd);
 	rc = dsi_ctrl_transfer_prepare(m_ctrl->ctrl, cmd->ctrl_flags);
 	if (rc) {
 		DSI_ERR("prepare for rx cmd transfer failed rc = %d\n", rc);
-		goto release_panel_lock;
+		goto enable_error_interrupts;
 	}
 	rc = dsi_ctrl_cmd_transfer(m_ctrl->ctrl, cmd);
 	if (rc <= 0)
 		DSI_ERR("rx cmd transfer failed rc = %d\n", rc);
 	dsi_ctrl_transfer_unprepare(m_ctrl->ctrl, cmd->ctrl_flags);
 
+enable_error_interrupts:
+	dsi_display_toggle_error_interrupt_status(display, true);
+	dsi_display_clk_ctrl(display->dsi_clk_handle, DSI_ALL_CLKS, DSI_CLK_OFF);
 release_panel_lock:
 	dsi_panel_release_panel_lock(display->panel);
 	return rc;
@@ -1097,6 +1124,8 @@ int dsi_display_cmd_transfer(struct drm_connector *connector,
 		rc = -EPERM;
 		goto end;
 	}
+
+	SDE_EVT32(dsi_display->tx_cmd_buf_ndx, cmd_buf_len);
 
 	/*
 	 * Reset the dbgfs buffer if the commands sent exceed the available
@@ -1229,6 +1258,8 @@ int dsi_display_cmd_receive(void *display, const char *cmd_buf,
 		rc = -EPERM;
 		goto end;
 	}
+
+	SDE_EVT32(cmd_buf_len, recv_buf_len);
 
 	rc = dsi_display_cmd_rx(dsi_display, &cmd);
 	if (rc <= 0)
@@ -3554,6 +3585,21 @@ static void dsi_display_ctrl_isr_configure(struct dsi_display *display, bool en)
 	}
 }
 
+static void dsi_display_cleanup_post_esd_failure(struct dsi_display *display)
+{
+	int i = 0;
+	struct dsi_display_ctrl *ctrl;
+
+	display_for_each_ctrl(i, display) {
+		ctrl = &display->ctrl[i];
+		if (!ctrl->ctrl)
+			continue;
+
+		dsi_phy_lane_reset(ctrl->phy);
+		dsi_ctrl_soft_reset(ctrl->ctrl);
+	}
+}
+
 int dsi_pre_clkoff_cb(void *priv,
 			   enum dsi_clk_type clk,
 			   enum dsi_lclk_type l_type,
@@ -3565,6 +3611,14 @@ int dsi_pre_clkoff_cb(void *priv,
 
 	if ((clk & DSI_LINK_CLK) && (new_state == DSI_CLK_OFF) &&
 		(l_type & DSI_LINK_LP_CLK)) {
+
+		/*
+		 * Clean up the DSI controller on a previous ESD failure. This requires a DSI
+		 * controller soft reset. Also reset PHY lanes before resetting controller.
+		 */
+		if (atomic_read(&display->panel->esd_recovery_pending))
+			dsi_display_cleanup_post_esd_failure(display);
+
 		/*
 		 * If continuous clock is enabled then disable it
 		 * before entering into ULPS Mode.
@@ -3756,6 +3810,13 @@ int dsi_post_clkoff_cb(void *priv,
 	if (!display) {
 		DSI_ERR("%s: Invalid arg\n", __func__);
 		return -EINVAL;
+	}
+
+	/* Reset PHY to clear the PHY status once the HS clocks are turned off */
+	if ((clk_type & DSI_LINK_CLK) && (curr_state == DSI_CLK_OFF)
+			&& (l_type == DSI_LINK_HS_CLK)) {
+		if (atomic_read(&display->panel->esd_recovery_pending))
+			dsi_display_phy_sw_reset(display);
 	}
 
 	if ((clk_type & DSI_CORE_CLK) &&
@@ -4064,7 +4125,8 @@ error:
 static bool dsi_display_validate_panel_resources(struct dsi_display *display)
 {
 	if (!is_sim_panel(display)) {
-		if (!gpio_is_valid(display->panel->reset_config.reset_gpio)) {
+		if (!display->panel->host_config.ext_bridge_mode &&
+				!gpio_is_valid(display->panel->reset_config.reset_gpio)) {
 			DSI_ERR("invalid reset gpio for the panel\n");
 			return false;
 		}
@@ -6796,6 +6858,57 @@ static void _dsi_display_populate_bit_clks(struct dsi_display *display, int star
 	}
 }
 
+static int dsi_display_mode_dyn_clk_cpy(struct dsi_display *display,
+		struct dsi_display_mode *src, struct dsi_display_mode *dst)
+{
+	int rc = 0;
+	u32 count = 0;
+	struct dsi_dyn_clk_caps *dyn_clk_caps;
+	struct msm_dyn_clk_list *bit_clk_list;
+
+	dyn_clk_caps = &(display->panel->dyn_clk_caps);
+	if (!dyn_clk_caps->dyn_clk_support)
+		return rc;
+
+	count = dst->priv_info->bit_clk_list.count;
+	bit_clk_list = &dst->priv_info->bit_clk_list;
+	bit_clk_list->front_porches =
+			kcalloc(count, sizeof(u32), GFP_KERNEL);
+	if (!bit_clk_list->front_porches) {
+		DSI_ERR("failed to allocate space for front porch list\n");
+		rc = -ENOMEM;
+		goto error;
+	}
+
+	bit_clk_list->rates =
+			kcalloc(count, sizeof(u32), GFP_KERNEL);
+	if (!bit_clk_list->rates) {
+		DSI_ERR("failed to allocate space for rates list\n");
+		rc = -ENOMEM;
+		goto error;
+	}
+
+	memcpy(bit_clk_list->rates, src->priv_info->bit_clk_list.rates,
+			count*sizeof(u32));
+
+	bit_clk_list->pixel_clks_khz =
+			kcalloc(count, sizeof(u32), GFP_KERNEL);
+	if (!bit_clk_list->pixel_clks_khz) {
+		DSI_ERR("failed to allocate space for pixel clocks list\n");
+		rc = -ENOMEM;
+		goto error;
+	}
+
+	return rc;
+
+error:
+	kfree(bit_clk_list->rates);
+	kfree(bit_clk_list->front_porches);
+	kfree(bit_clk_list->pixel_clks_khz);
+
+	return rc;
+}
+
 int dsi_display_restore_bit_clk(struct dsi_display *display, struct dsi_display_mode *mode)
 {
 	int i;
@@ -6805,6 +6918,10 @@ int dsi_display_restore_bit_clk(struct dsi_display *display, struct dsi_display_
 		DSI_ERR("invalid arguments\n");
 		return -EINVAL;
 	}
+
+	/* avoid updating bit_clk for dyn clk feature disbaled usecase */
+	if (!display->panel->dyn_clk_caps.dyn_clk_support)
+		return 0;
 
 	clk_rate_hz = display->cached_clk_rate;
 
@@ -6891,6 +7008,7 @@ int dsi_display_get_modes(struct dsi_display *display,
 		int topology_override = NO_OVERRIDE;
 		bool is_preferred = false;
 		u32 frame_threshold_us = ctrl->ctrl->frame_threshold_time_us;
+		struct msm_dyn_clk_list *bit_clk_list;
 
 		memset(&display_mode, 0, sizeof(display_mode));
 
@@ -6984,9 +7102,23 @@ int dsi_display_get_modes(struct dsi_display *display,
 			 * Qsync min fps for the mode will be populated in the timing info
 			 * in dsi_panel_get_mode function.
 			 */
-			sub_mode->priv_info->qsync_min_fps = sub_mode->timing.qsync_min_fps;
+			display_mode.priv_info->qsync_min_fps = sub_mode->timing.qsync_min_fps;
 			if (!dfps_caps.dfps_support || !support_video_mode)
 				continue;
+
+			sub_mode->priv_info = kmemdup(display_mode.priv_info,
+					sizeof(*sub_mode->priv_info), GFP_KERNEL);
+			if (!sub_mode->priv_info) {
+				rc = -ENOMEM;
+				goto error;
+			}
+
+			rc = dsi_display_mode_dyn_clk_cpy(display,
+					&display_mode, sub_mode);
+			if (rc) {
+				DSI_ERR("unable to copy dyn clock list\n");
+				goto error;
+			}
 
 			sub_mode->mode_idx += (array_idx - 1);
 			curr_refresh_rate = sub_mode->timing.refresh_rate;
@@ -7009,6 +7141,17 @@ int dsi_display_get_modes(struct dsi_display *display,
 		if (is_preferred) {
 			/* Set first timing sub mode as preferred mode */
 			display->modes[start].is_preferred = true;
+		}
+
+		bit_clk_list = &display_mode.priv_info->bit_clk_list;
+		if (support_video_mode && dfps_caps.dfps_support) {
+			if (dyn_clk_caps->dyn_clk_support) {
+				kfree(bit_clk_list->rates);
+				kfree(bit_clk_list->front_porches);
+				kfree(bit_clk_list->pixel_clks_khz);
+			}
+
+			kfree(display_mode.priv_info);
 		}
 	}
 
@@ -7206,7 +7349,8 @@ int dsi_display_find_mode(struct dsi_display *display,
 			return rc;
 	}
 
-	priv_info = kzalloc(sizeof(struct dsi_display_mode_priv_info), GFP_KERNEL);
+	priv_info = kvzalloc(sizeof(struct dsi_display_mode_priv_info),
+			GFP_KERNEL);
 	if (ZERO_OR_NULL_PTR(priv_info))
 		return -ENOMEM;
 
@@ -7241,7 +7385,7 @@ int dsi_display_find_mode(struct dsi_display *display,
 	cmp->priv_info = NULL;
 
 	mutex_unlock(&display->display_lock);
-	kfree(priv_info);
+	kvfree(priv_info);
 
 	if (!*out_mode) {
 		DSI_ERR("[%s] failed to find mode for v_active %u h_active %u fps %u pclk %u\n",

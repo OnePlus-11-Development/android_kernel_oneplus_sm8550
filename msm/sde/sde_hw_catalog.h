@@ -50,6 +50,8 @@
 #define SDE_HW_VER_700	SDE_HW_VER(7, 0, 0) /* lahaina */
 #define SDE_HW_VER_720	SDE_HW_VER(7, 2, 0) /* yupik */
 #define SDE_HW_VER_810	SDE_HW_VER(8, 1, 0) /* waipio */
+#define SDE_HW_VER_820	SDE_HW_VER(8, 2, 0) /* diwali */
+#define SDE_HW_VER_850	SDE_HW_VER(8, 5, 0) /* cape */
 #define SDE_HW_VER_900	SDE_HW_VER(9, 0, 0) /* kalama */
 
 /* Avoid using below IS_XXX macros outside catalog, use feature bit instead */
@@ -77,6 +79,8 @@
 #define IS_LAHAINA_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_700)
 #define IS_YUPIK_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_720)
 #define IS_WAIPIO_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_810)
+#define IS_DIWALI_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_820)
+#define IS_CAPE_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_850)
 #define IS_KALAMA_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_900)
 
 #define SDE_HW_BLK_NAME_LEN	16
@@ -1173,6 +1177,7 @@ struct sde_mdp_cfg {
  *                          logging
  * @debugfs_ctrl:           uidle is enabled/disabled through debugfs
  * @perf_cntr_en:           performance counters are enabled/disabled
+ * @dirty:                  dirty flag for uidle update
  */
 struct sde_uidle_cfg {
 	SDE_HW_BLK_INFO;
@@ -1192,6 +1197,7 @@ struct sde_uidle_cfg {
 	u32 debugfs_perf;
 	bool debugfs_ctrl;
 	bool perf_cntr_en;
+	bool dirty;
 };
 
 /* struct sde_mdp_cfg : MDP TOP-BLK instance info

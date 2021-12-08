@@ -13,6 +13,7 @@
 #include <linux/soc/qcom/fsa4480-i2c.h>
 #include <linux/usb/phy.h>
 #include <linux/jiffies.h>
+#include <linux/pm_qos.h>
 
 #include "sde_connector.h"
 
@@ -201,6 +202,8 @@ struct dp_display_private {
 	u32 tot_dsc_blks_in_use;
 
 	bool process_hpd_connect;
+	struct dev_pm_qos_request pm_qos_req[NR_CPUS];
+	bool pm_qos_requested;
 
 	struct notifier_block usb_nb;
 };
@@ -283,6 +286,36 @@ static void dp_audio_enable(struct dp_display_private *dp, bool enable)
 			}
 		}
 	}
+}
+
+static void dp_display_qos_request(struct dp_display_private *dp, bool add_vote)
+{
+	struct device *cpu_dev;
+	int cpu = 0;
+	struct cpumask *cpu_mask;
+	u32 latency = dp->parser->qos_cpu_latency;
+	unsigned long mask = dp->parser->qos_cpu_mask;
+
+	if (!dp->parser->qos_cpu_mask || (dp->pm_qos_requested == add_vote))
+		return;
+
+	cpu_mask = to_cpumask(&mask);
+	for_each_cpu(cpu, cpu_mask) {
+		cpu_dev = get_cpu_device(cpu);
+		if (!cpu_dev) {
+			SDE_DEBUG("%s: failed to get cpu%d device\n", __func__, cpu);
+			continue;
+		}
+
+		if (add_vote)
+			dev_pm_qos_add_request(cpu_dev, &dp->pm_qos_req[cpu],
+				DEV_PM_QOS_RESUME_LATENCY, latency);
+		else
+			dev_pm_qos_remove_request(&dp->pm_qos_req[cpu]);
+	}
+
+	SDE_EVT32_EXTERNAL(add_vote, mask, latency);
+	dp->pm_qos_requested = add_vote;
 }
 
 static void dp_display_update_hdcp_status(struct dp_display_private *dp,
@@ -403,7 +436,7 @@ static void dp_display_hdcp_register_streams(struct dp_display_private *dp)
 static void dp_display_hdcp_deregister_stream(struct dp_display_private *dp,
 		enum dp_stream_id stream_id)
 {
-	if (dp->hdcp.ops->deregister_streams) {
+	if (dp->hdcp.ops->deregister_streams && dp->active_panels[stream_id]) {
 		struct stream_info stream = {stream_id,
 				dp->active_panels[stream_id]->vcpi};
 
@@ -498,6 +531,11 @@ static void dp_display_hdcp_process_state(struct dp_display_private *dp)
 	if (status->hdcp_state != HDCP_STATE_AUTHENTICATED &&
 		dp->debug->force_encryption && ops && ops->force_encryption)
 		ops->force_encryption(data, dp->debug->force_encryption);
+
+	if (status->hdcp_state == HDCP_STATE_AUTHENTICATED)
+		dp_display_qos_request(dp, false);
+	else
+		dp_display_qos_request(dp, true);
 
 	switch (status->hdcp_state) {
 	case HDCP_STATE_INACTIVE:
@@ -907,7 +945,7 @@ static int dp_display_send_hpd_notification(struct dp_display_private *dp)
 		if (!dp->mst.cbs.hpd)
 			goto skip_wait;
 
-		dp->mst.cbs.hpd(&dp->dp_display, true);
+		dp->mst.cbs.hpd(&dp->dp_display, hpd);
 	}
 
 	if (hpd) {
@@ -1289,21 +1327,18 @@ static void dp_display_process_mst_hpd_low(struct dp_display_private *dp)
 
 		/*
 		 * HPD unplug callflow:
-		 * 1. send hpd unplug event with status=disconnected
-		 * 2. send hpd unplug on base connector so usermode can disable
-		 * all external displays.
-		 * 3. unset mst state in the topology mgr so the branch device
+		 * 1. send hpd unplug on base connector so usermode can disable
+                 * all external displays.
+		 * 2. unset mst state in the topology mgr so the branch device
 		 *  can be cleaned up.
 		 */
-		if (dp->mst.cbs.hpd)
-			dp->mst.cbs.hpd(&dp->dp_display, false);
 
 		if ((dp_display_state_is(DP_STATE_CONNECT_NOTIFIED) ||
 				dp_display_state_is(DP_STATE_ENABLED)))
 			rc = dp_display_send_hpd_notification(dp);
 
-		dp_display_update_mst_state(dp, false);
 		dp_display_set_mst_mgr_state(dp, false);
+		dp_display_update_mst_state(dp, false);
 	}
 
 	DP_MST_DEBUG("mst_hpd_low. mst_active:%d\n", dp->mst.mst_active);
