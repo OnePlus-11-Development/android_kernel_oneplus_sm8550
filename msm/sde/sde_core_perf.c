@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -1385,6 +1386,14 @@ int sde_core_perf_debugfs_init(struct sde_core_perf *perf,
 
 	debugfs_create_u32("uidle_perf_cnt", 0600, perf->debugfs_root,
 			&sde_kms->catalog->uidle_cfg.debugfs_perf);
+	debugfs_create_u32("uidle_fal10_target_idle_time_us", 0600, perf->debugfs_root,
+			&sde_kms->catalog->uidle_cfg.fal10_target_idle_time);
+	debugfs_create_u32("uidle_fal1_target_idle_time_us", 0600, perf->debugfs_root,
+			&sde_kms->catalog->uidle_cfg.fal1_target_idle_time);
+	debugfs_create_u32("uidle_fal10_threshold_us", 0600, perf->debugfs_root,
+			&sde_kms->catalog->uidle_cfg.fal10_threshold);
+	debugfs_create_u32("uidle_fal1_max_threshold", 0600, perf->debugfs_root,
+			&sde_kms->catalog->uidle_cfg.fal1_max_threshold);
 	debugfs_create_bool("uidle_enable", 0600, perf->debugfs_root,
 			&sde_kms->catalog->uidle_cfg.debugfs_ctrl);
 
