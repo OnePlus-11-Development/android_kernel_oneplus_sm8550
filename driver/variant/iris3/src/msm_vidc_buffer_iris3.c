@@ -58,7 +58,9 @@ static u32 msm_vidc_decoder_bin_size_iris3(struct msm_vidc_inst *inst)
 	else if (inst->codec == MSM_VIDC_VP9)
 		HFI_BUFFER_BIN_VP9D(size, width, height,
 			0, num_vpp_pipes);
-
+	else if (inst->codec == MSM_VIDC_AV1)
+		HFI_BUFFER_BIN_AV1D(size, width, height, is_interlaced,
+			0, num_vpp_pipes);
 	i_vpr_l(inst, "%s: size %d\n", __func__, size);
 	return size;
 }
@@ -175,7 +177,9 @@ static u32 msm_vidc_decoder_line_size_iris3(struct msm_vidc_inst *inst)
 	else if (inst->codec == MSM_VIDC_VP9)
 		HFI_BUFFER_LINE_VP9D(size, width, height, out_min_count,
 			is_opb, num_vpp_pipes);
-
+	else if (inst->codec == MSM_VIDC_AV1)
+		HFI_BUFFER_LINE_AV1D(size, width, height, is_opb,
+			num_vpp_pipes);
 	i_vpr_l(inst, "%s: size %d\n", __func__, size);
 	return size;
 }
@@ -195,7 +199,8 @@ static u32 msm_vidc_decoder_persist_size_iris3(struct msm_vidc_inst *inst)
 		HFI_BUFFER_PERSIST_H265D(size);
 	else if (inst->codec == MSM_VIDC_VP9)
 		HFI_BUFFER_PERSIST_VP9D(size);
-
+	else if (inst->codec == MSM_VIDC_AV1)
+		HFI_BUFFER_PERSIST_AV1D(size);
 	i_vpr_l(inst, "%s: size %d\n", __func__, size);
 	return size;
 }

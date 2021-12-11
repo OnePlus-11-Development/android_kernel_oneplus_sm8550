@@ -154,6 +154,7 @@ enum msm_vidc_codec_type {
 	MSM_VIDC_HEVC              = BIT(1),
 	MSM_VIDC_VP9               = BIT(2),
 	MSM_VIDC_HEIC              = BIT(3),
+	MSM_VIDC_AV1               = BIT(4),
 };
 
 enum priority_level {
@@ -439,6 +440,7 @@ enum msm_vidc_inst_capability_type {
 	PROFILE,
 	LEVEL,
 	HEVC_TIER,
+	AV1_TIER,
 	LF_MODE,
 	LF_ALPHA,
 	LF_BETA,
@@ -467,6 +469,8 @@ enum msm_vidc_inst_capability_type {
 	PRIORITY,
 	ENC_IP_CR,
 	DPB_LIST,
+	FILM_GRAIN,
+	SUPER_BLOCK,
 	ALL_INTRA,
 	META_LTR_MARK_USE,
 	META_DPB_MISR,
@@ -711,6 +715,8 @@ struct msm_vidc_subscription_params {
 	u32                    profile;
 	u32                    level;
 	u32                    tier;
+	u32                    av1_film_grain_present;
+	u32                    av1_super_block_enabled;
 };
 
 struct msm_vidc_hfi_frame_info {
