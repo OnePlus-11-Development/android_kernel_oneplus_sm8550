@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -3398,7 +3398,7 @@ end:
 static int sde_cdm_parse_dt(struct device_node *np,
 				struct sde_mdss_cfg *sde_cfg)
 {
-	int rc, prop_count[HW_PROP_MAX], i;
+	int rc, prop_count[HW_PROP_MAX], i, j;
 	struct sde_prop_value *prop_value = NULL;
 	bool prop_exists[HW_PROP_MAX];
 	u32 off_count;
@@ -3410,15 +3410,13 @@ static int sde_cdm_parse_dt(struct device_node *np,
 		goto end;
 	}
 
-	prop_value = kzalloc(HW_PROP_MAX *
-			sizeof(struct sde_prop_value), GFP_KERNEL);
+	prop_value = kzalloc(HW_PROP_MAX * sizeof(struct sde_prop_value), GFP_KERNEL);
 	if (!prop_value) {
 		rc = -ENOMEM;
 		goto end;
 	}
 
-	rc = _validate_dt_entry(np, cdm_prop, ARRAY_SIZE(cdm_prop), prop_count,
-		&off_count);
+	rc = _validate_dt_entry(np, cdm_prop, ARRAY_SIZE(cdm_prop), prop_count, &off_count);
 	if (rc)
 		goto end;
 
@@ -3433,13 +3431,13 @@ static int sde_cdm_parse_dt(struct device_node *np,
 		cdm = sde_cfg->cdm + i;
 		cdm->base = PROP_VALUE_ACCESS(prop_value, HW_OFF, i);
 		cdm->id = CDM_0 + i;
-		snprintf(cdm->name, SDE_HW_BLK_NAME_LEN, "cdm_%u",
-				cdm->id - CDM_0);
+		snprintf(cdm->name, SDE_HW_BLK_NAME_LEN, "cdm_%u", cdm->id - CDM_0);
 		cdm->len = PROP_VALUE_ACCESS(prop_value, HW_LEN, 0);
 
-		/* intf3 and wb2 for cdm block */
-		cdm->wb_connect = sde_cfg->wb_count ? BIT(WB_2) : BIT(31);
-		cdm->intf_connect = sde_cfg->intf_count ? BIT(INTF_3) : BIT(31);
+		/* intf3 and wb(s) for cdm block */
+		for (j = 0; j < sde_cfg->wb_count; j++)
+			cdm->wb_connect |= BIT(sde_cfg->wb[j].id);
+		cdm->intf_connect = sde_cfg->intf_count ? BIT(INTF_3) : 0;
 
 		if (IS_SDE_CTL_REV_100(sde_cfg->ctl_rev))
 			set_bit(SDE_CDM_INPUT_CTRL, &cdm->features);
