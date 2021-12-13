@@ -796,6 +796,38 @@ static int msm_vdec_set_host_max_buf_count(struct msm_vidc_inst *inst,
 	return 0;
 }
 
+static int msm_vdec_set_av1_bitstream_format(struct msm_vidc_inst *inst,
+	enum msm_vidc_port_type port)
+{
+	int rc = 0;
+	u32 annex_b;
+
+	if (inst->codec != MSM_VIDC_AV1)
+		return 0;
+
+	if (inst->capabilities->cap[WITHOUT_STARTCODE].value) {
+		i_vpr_e(inst,
+			"%s: Annex-B format is not supported\n", __func__);
+		return -EINVAL;
+	}
+
+	annex_b = 0;
+	i_vpr_h(inst, "%s: annex_b: %u\n", __func__, annex_b);
+	rc = venus_hfi_session_property(inst,
+			HFI_PROP_NAL_LENGTH_FIELD,
+			HFI_HOST_FLAGS_NONE,
+			get_hfi_port(inst, port),
+			HFI_PAYLOAD_U32,
+			&annex_b,
+			sizeof(u32));
+	if (rc) {
+		i_vpr_e(inst, "%s: set property failed\n", __func__);
+		return rc;
+	}
+
+	return rc;
+}
+
 static int msm_vdec_set_input_properties(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
@@ -834,6 +866,10 @@ static int msm_vdec_set_input_properties(struct msm_vidc_inst *inst)
 		return rc;
 
 	rc = msm_vdec_set_host_max_buf_count(inst, INPUT_PORT);
+	if (rc)
+		return rc;
+
+	rc = msm_vdec_set_av1_bitstream_format(inst, INPUT_PORT);
 	if (rc)
 		return rc;
 

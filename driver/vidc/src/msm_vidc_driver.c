@@ -156,6 +156,8 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{QUALITY_MODE,                   "QUALITY_MODE"               },
 	{CODED_FRAMES,                   "CODED_FRAMES"               },
 	{BIT_DEPTH,                      "BIT_DEPTH"                  },
+	{FILM_GRAIN,                     "FILM_GRAIN"                 },
+	{SUPER_BLOCK,                    "SUPER_BLOCK"                },
 	{CODEC_CONFIG,                   "CODEC_CONFIG"               },
 	{BITSTREAM_SIZE_OVERWRITE,       "BITSTREAM_SIZE_OVERWRITE"   },
 	{THUMBNAIL_MODE,                 "THUMBNAIL_MODE"             },
