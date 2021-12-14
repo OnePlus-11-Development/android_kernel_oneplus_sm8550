@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -256,6 +257,8 @@ static void dp_bridge_mode_set(struct drm_bridge *drm_bridge,
 
 	dp->convert_to_dp_mode(dp, bridge->dp_panel, adjusted_mode,
 			&bridge->dp_mode);
+
+	dp->clear_reservation(dp, bridge->dp_panel);
 }
 
 static bool dp_bridge_mode_fixup(struct drm_bridge *drm_bridge,
@@ -289,6 +292,7 @@ static bool dp_bridge_mode_fixup(struct drm_bridge *drm_bridge,
 	dp = bridge->display;
 
 	dp->convert_to_dp_mode(dp, bridge->dp_panel, mode, &dp_mode);
+	dp->clear_reservation(dp, bridge->dp_panel);
 	convert_to_drm_mode(&dp_mode, adjusted_mode);
 end:
 	return ret;

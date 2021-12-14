@@ -105,6 +105,7 @@ struct dp_display {
 	int (*get_available_dp_resources)(struct dp_display *dp_display,
 			const struct msm_resource_caps_info *avail_res,
 			struct msm_resource_caps_info *max_dp_avail_res);
+	void (*clear_reservation)(struct dp_display *dp, struct dp_panel *panel);
 };
 
 void *get_ipc_log_context(void);
