@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -209,6 +210,8 @@ static u32 sspp_mapping[SSPP_MAX] = {
 	[SSPP_DMA1] = DMA1,
 	[SSPP_DMA2] = DMA2,
 	[SSPP_DMA3] = DMA3,
+	[SSPP_DMA4] = DMA4,
+	[SSPP_DMA5] = DMA5,
 };
 
 static u32 ltm_mapping[LTM_MAX] = {
