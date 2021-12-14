@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (C) 2014-2021 The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -420,7 +421,7 @@ int sde_plane_danger_signal_ctrl(struct drm_plane *plane, bool enable)
 	if (!psde->is_rt_pipe)
 		goto end;
 
-	rc = pm_runtime_get_sync(plane->dev->dev);
+	rc = pm_runtime_resume_and_get(plane->dev->dev);
 	if (rc < 0) {
 		SDE_ERROR("failed to enable power resource %d\n", rc);
 		SDE_EVT32(rc, SDE_EVTLOG_ERROR);

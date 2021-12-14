@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -858,9 +859,9 @@ static int msm_drm_device_init(struct platform_device *pdev,
 
 	pm_runtime_enable(dev);
 
-	ret = pm_runtime_get_sync(dev);
+	ret = pm_runtime_resume_and_get(dev);
 	if (ret < 0) {
-		dev_err(dev, "resource enable failed: %d\n", ret);
+		dev_err(dev, "failed to enable power resource %d\n", ret);
 		goto pm_runtime_error;
 	}
 
@@ -943,7 +944,12 @@ static int msm_drm_component_init(struct device *dev)
 		drm_crtc_vblank_reset(crtc);
 
 	if (kms) {
-		pm_runtime_get_sync(dev);
+		ret = pm_runtime_resume_and_get(dev);
+		if (ret < 0) {
+			dev_err(dev, "failed to enable power resource %d\n", ret);
+			goto fail;
+		}
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 		ret = msm_irq_install(ddev, platform_get_irq(pdev, 0));
 #else
@@ -1653,7 +1659,7 @@ int msm_ioctl_power_ctrl(struct drm_device *dev, void *data,
 
 	if (vote_req) {
 		if (power_ctrl->enable)
-			rc = pm_runtime_get_sync(dev->dev);
+			rc = pm_runtime_resume_and_get(dev->dev);
 		else
 			pm_runtime_put_sync(dev->dev);
 

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -5283,10 +5284,10 @@ int dsi_display_cont_splash_config(void *dsi_display)
 		return -EINVAL;
 	}
 
-	rc = pm_runtime_get_sync(display->drm_dev->dev);
+	rc = pm_runtime_resume_and_get(display->drm_dev->dev);
 	if (rc < 0) {
-		DSI_ERR("failed to vote gdsc for continuous splash, rc=%d\n",
-							rc);
+		DSI_ERR("failed to enable power resource %d\n", rc);
+		SDE_EVT32(rc, SDE_EVTLOG_ERROR);
 		return rc;
 	}
 

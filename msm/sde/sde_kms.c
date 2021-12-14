@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -497,9 +498,10 @@ static int _sde_kms_sui_misr_ctrl(struct sde_kms *sde_kms,
 	int ret;
 
 	if (enable) {
-		ret = pm_runtime_get_sync(sde_kms->dev->dev);
+		ret = pm_runtime_resume_and_get(sde_kms->dev->dev);
 		if (ret < 0) {
-			SDE_ERROR("failed to enable resource, ret:%d\n", ret);
+			SDE_ERROR("failed to enable power resource %d\n", ret);
+			SDE_EVT32(ret, SDE_EVTLOG_ERROR);
 			return ret;
 		}
 
@@ -1160,7 +1162,7 @@ static void sde_kms_prepare_commit(struct msm_kms *kms,
 	priv = dev->dev_private;
 
 	SDE_ATRACE_BEGIN("prepare_commit");
-	rc = pm_runtime_get_sync(sde_kms->dev->dev);
+	rc = pm_runtime_resume_and_get(sde_kms->dev->dev);
 	if (rc < 0) {
 		SDE_ERROR("failed to enable power resources %d\n", rc);
 		SDE_EVT32(rc, SDE_EVTLOG_ERROR);
@@ -4336,9 +4338,8 @@ static int sde_kms_pd_enable(struct generic_pm_domain *genpd)
 
 	SDE_DEBUG("\n");
 
-	rc = pm_runtime_get_sync(sde_kms->dev->dev);
-	if (rc > 0)
-		rc = 0;
+	rc = pm_runtime_resume_and_get(sde_kms->dev->dev);
+	rc = (rc > 0) ? 0 : rc;
 
 	SDE_EVT32(rc, genpd->device_count);
 
@@ -5065,7 +5066,12 @@ int sde_kms_vm_trusted_resource_init(struct sde_kms *sde_kms,
 	 * fill-in vote for the continuous splash hanodff path, which will be
 	 * removed on the successful first commit.
 	 */
-	pm_runtime_get_sync(sde_kms->dev->dev);
+	ret = pm_runtime_resume_and_get(sde_kms->dev->dev);
+	if (ret < 0) {
+		SDE_ERROR("failed to enable power resource %d\n", ret);
+		SDE_EVT32(ret, SDE_EVTLOG_ERROR);
+		goto error;
+	}
 
 	return 0;
 

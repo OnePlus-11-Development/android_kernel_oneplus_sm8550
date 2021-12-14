@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -1708,7 +1708,7 @@ static int _sde_encoder_resource_control_helper(struct drm_encoder *drm_enc,
 
 	if (enable) {
 		/* enable SDE core clks */
-		rc = pm_runtime_get_sync(drm_enc->dev->dev);
+		rc = pm_runtime_resume_and_get(drm_enc->dev->dev);
 		if (rc < 0) {
 			SDE_ERROR("failed to enable power resource %d\n", rc);
 			SDE_EVT32(rc, SDE_EVTLOG_ERROR);
@@ -4785,9 +4785,12 @@ static ssize_t _sde_encoder_misr_read(struct file *file,
 	}
 	drm_enc = &sde_enc->base;
 
-	rc = pm_runtime_get_sync(drm_enc->dev->dev);
-	if (rc < 0)
+	rc = pm_runtime_resume_and_get(drm_enc->dev->dev);
+	if (rc < 0) {
+		SDE_ERROR("failed to enable power resource %d\n", rc);
+		SDE_EVT32(rc, SDE_EVTLOG_ERROR);
 		return rc;
+	}
 
 	sde_vm_lock(sde_kms);
 	if (!sde_vm_owns_hw(sde_kms)) {
