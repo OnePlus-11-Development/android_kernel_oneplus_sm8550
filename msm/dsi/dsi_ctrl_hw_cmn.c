@@ -882,6 +882,8 @@ void dsi_ctrl_hw_cmn_kickoff_command(struct dsi_ctrl_hw *ctrl,
 
 	if (!(flags & DSI_CTRL_HW_CMD_WAIT_FOR_TRIGGER))
 		DSI_W32(ctrl, DSI_CMD_MODE_DMA_SW_TRIGGER, 0x1);
+
+	SDE_EVT32(ctrl->index, cmd->length, flags);
 }
 
 /**
@@ -1411,6 +1413,22 @@ void dsi_ctrl_hw_cmn_enable_error_interrupts(struct dsi_ctrl_hw *ctrl,
 {
 	u32 int_ctrl = 0;
 	u32 int_mask0 = 0x7FFF3BFF;
+	u32 dln0_phy_err = 0x11111;
+	u32 fifo_status = 0xCCCC0789;
+	u32 ack_error = 0x1193BFFF;
+	u32 timeout_status = 0x11111111;
+	u32 clk_status = 0x10000;
+	u32 dsi_status_error = 0x80000000;
+	u32 reg = 0;
+
+	DSI_W32(ctrl, DSI_DLN0_PHY_ERR, dln0_phy_err);
+	DSI_W32(ctrl, DSI_FIFO_STATUS, fifo_status);
+	DSI_W32(ctrl, DSI_TIMEOUT_STATUS, timeout_status);
+	DSI_W32(ctrl, DSI_ACK_ERR_STATUS, ack_error);
+	reg = DSI_R32(ctrl, DSI_CLK_STATUS);
+	DSI_W32(ctrl, DSI_CLK_STATUS, reg | clk_status);
+	reg = DSI_R32(ctrl, DSI_STATUS);
+	DSI_W32(ctrl, DSI_STATUS, reg | dsi_status_error);
 
 	int_ctrl = DSI_R32(ctrl, DSI_INT_CTRL);
 	if (errors)

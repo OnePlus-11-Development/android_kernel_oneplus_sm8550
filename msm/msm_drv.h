@@ -175,7 +175,6 @@ enum msm_mdp_crtc_property {
 	CRTC_PROP_ROT_CLK,
 	CRTC_PROP_ROI_V1,
 	CRTC_PROP_SECURITY_LEVEL,
-	CRTC_PROP_IDLE_TIMEOUT,
 	CRTC_PROP_DEST_SCALER,
 	CRTC_PROP_CAPTURE_OUTPUT,
 
@@ -979,6 +978,8 @@ struct msm_drm_private {
 
 	struct task_struct *pp_event_thread;
 	struct kthread_worker pp_event_worker;
+
+	struct kthread_work thread_priority_work;
 
 	unsigned int num_encoders;
 	struct drm_encoder *encoders[MAX_ENCODERS];

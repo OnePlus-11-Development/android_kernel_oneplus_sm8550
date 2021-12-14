@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -286,7 +287,6 @@ struct sde_frame_data {
  * @misr_reconfigure : boolean entry indicates misr reconfigure status
  * @misr_frame_count  : misr frame count provided by client
  * @misr_data     : store misr data before turning off the clocks.
- * @idle_notify_work: delayed worker to notify idle timeout to user space
  * @power_event   : registered power event handle
  * @cur_perf      : current performance committed to clock/bandwidth driver
  * @plane_mask_old: keeps track of the planes used in the previous commit
@@ -376,7 +376,6 @@ struct sde_crtc {
 	bool misr_enable_debugfs;
 	bool misr_reconfigure;
 	u32 misr_frame_count;
-	struct kthread_delayed_work idle_notify_work;
 
 	struct sde_power_event *power_event;
 
@@ -426,6 +425,7 @@ enum sde_crtc_dirty_flags {
 	SDE_CRTC_DIRTY_DEST_SCALER,
 	SDE_CRTC_DIRTY_DIM_LAYERS,
 	SDE_CRTC_NOISE_LAYER,
+	SDE_CRTC_DIRTY_UIDLE,
 	SDE_CRTC_DIRTY_MAX,
 };
 
@@ -1060,5 +1060,10 @@ void sde_crtc_cancel_delayed_work(struct drm_crtc *crtc);
  * @cstate:      Pointer to DRM crtc object
  */
 struct drm_encoder *sde_crtc_get_src_encoder_of_clone(struct drm_crtc *crtc);
+
+/*
+ * _sde_crtc_vm_release_notify- send event to usermode on vm release
+ */
+void _sde_crtc_vm_release_notify(struct drm_crtc *crtc);
 
 #endif /* _SDE_CRTC_H_ */
