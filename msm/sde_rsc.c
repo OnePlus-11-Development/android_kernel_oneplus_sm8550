@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -29,6 +30,9 @@
 
 #define SINGLE_TCS_EXECUTION_TIME_V1	1064000
 #define SINGLE_TCS_EXECUTION_TIME_V2	930000
+#define SINGLE_TCS_EXECUTION_TIME_V3	930000
+#define SINGLE_TCS_EXECUTION_TIME_V4	930000
+#define SINGLE_TCS_EXECUTION_TIME_V5	650000
 
 #define RSC_MODE_INSTRUCTION_TIME	100
 #define RSC_MODE_THRESHOLD_OVERHEAD	2700
@@ -1713,10 +1717,24 @@ static int sde_rsc_probe(struct platform_device *pdev)
 	of_property_read_u32(pdev->dev.of_node, "qcom,sde-rsc-version",
 								&rsc->version);
 
-	if (rsc->version >= SDE_RSC_REV_2)
-		rsc->single_tcs_execution_time = SINGLE_TCS_EXECUTION_TIME_V2;
-	else
+	switch (rsc->version) {
+	case SDE_RSC_REV_1:
 		rsc->single_tcs_execution_time = SINGLE_TCS_EXECUTION_TIME_V1;
+		break;
+	case SDE_RSC_REV_2:
+		rsc->single_tcs_execution_time = SINGLE_TCS_EXECUTION_TIME_V2;
+		break;
+	case SDE_RSC_REV_3:
+		rsc->single_tcs_execution_time = SINGLE_TCS_EXECUTION_TIME_V3;
+		break;
+	case SDE_RSC_REV_4:
+		rsc->single_tcs_execution_time = SINGLE_TCS_EXECUTION_TIME_V4;
+		break;
+	case SDE_RSC_REV_5:
+	default:
+		rsc->single_tcs_execution_time = SINGLE_TCS_EXECUTION_TIME_V5;
+		break;
+	}
 
 	if (rsc->version >= SDE_RSC_REV_3) {
 		rsc->time_slot_0_ns = rsc->single_tcs_execution_time

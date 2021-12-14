@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
  */
 
@@ -28,6 +29,7 @@
 #define SDE_RSC_REV_2			0x2
 #define SDE_RSC_REV_3			0x3
 #define SDE_RSC_REV_4			0x4
+#define SDE_RSC_REV_5			0x5
 
 #define SDE_RSC_HW_MAJOR_MINOR_STEP(major, minor, step) \
 	(((major & 0xff) << 16) |\
@@ -181,7 +183,7 @@ struct sde_rsc_bw_config {
  * primary_client:	A client which is allowed to make command state request
  *			and ab/ib vote on display rsc
  * single_tcs_execution_time: worst case time to execute one tcs vote
- *			(sleep/wake)
+ *			(sleep/wake), in ns
  * backoff_time_ns:	time to only wake tcs in any mode
  * mode_threshold_time_ns: time to wake TCS in mode-0, must be greater than
  *			backoff time
