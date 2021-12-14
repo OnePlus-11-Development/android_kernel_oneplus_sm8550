@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -275,7 +276,8 @@ static void dspp_rc(struct sde_hw_dspp *c)
 		return;
 	}
 
-	if (c->cap->sblk->rc.version == SDE_COLOR_PROCESS_VER(0x1, 0x0)) {
+	if (c->cap->sblk->rc.version == SDE_COLOR_PROCESS_VER(0x1, 0x0) ||
+			c->cap->sblk->rc.version == SDE_COLOR_PROCESS_VER(0x1, 0x1)) {
 		ret = sde_hw_rc_init(c);
 		if (ret) {
 			SDE_ERROR("rc init failed, ret %d\n", ret);
