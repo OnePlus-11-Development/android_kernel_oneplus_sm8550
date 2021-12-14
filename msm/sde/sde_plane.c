@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (C) 2014-2021 The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -3226,12 +3227,10 @@ static void _sde_plane_update_properties(struct drm_plane *plane,
 			SDE_PLANE_DIRTY_FORMAT))
 		_sde_plane_set_qos_lut(plane, crtc, fb);
 
-	if (plane->type != DRM_PLANE_TYPE_CURSOR) {
-		_sde_plane_set_qos_ctrl(plane, true, SDE_PLANE_QOS_PANIC_CTRL);
-		_sde_plane_set_ot_limit(plane, crtc);
-		if (pstate->dirty & SDE_PLANE_DIRTY_PERF)
-			_sde_plane_set_ts_prefill(plane, pstate);
-	}
+	_sde_plane_set_qos_ctrl(plane, true, SDE_PLANE_QOS_PANIC_CTRL);
+	_sde_plane_set_ot_limit(plane, crtc);
+	if (pstate->dirty & SDE_PLANE_DIRTY_PERF)
+		_sde_plane_set_ts_prefill(plane, pstate);
 
 	if (pstate->dirty & SDE_PLANE_DIRTY_QOS)
 		_sde_plane_set_qos_remap(plane);
@@ -3720,8 +3719,6 @@ static void _sde_plane_setup_capabilities_blob(struct sde_plane *psde,
 
 	if (SDE_SSPP_VALID_VIG(psde->pipe))
 		pipe_id = psde->pipe -  SSPP_VIG0;
-	else if (SDE_SSPP_VALID_RGB(psde->pipe))
-		pipe_id = psde->pipe -  SSPP_RGB0;
 	else if (SDE_SSPP_VALID_DMA(psde->pipe))
 		pipe_id = psde->pipe -  SSPP_DMA0;
 	else
@@ -4843,9 +4840,7 @@ struct drm_plane *sde_plane_init(struct drm_device *dev,
 		goto clean_sspp;
 	}
 
-	if (psde->features & BIT(SDE_SSPP_CURSOR))
-		type = DRM_PLANE_TYPE_CURSOR;
-	else if (primary_plane)
+	if (primary_plane)
 		type = DRM_PLANE_TYPE_PRIMARY;
 	else
 		type = DRM_PLANE_TYPE_OVERLAY;

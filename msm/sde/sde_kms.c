@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -2101,8 +2102,7 @@ static int _sde_kms_drm_obj_init(struct sde_kms *sde_kms)
 	for (i = 0; i < catalog->sspp_count; i++) {
 		bool primary = true;
 
-		if (catalog->sspp[i].features & BIT(SDE_SSPP_CURSOR)
-			|| primary_planes_idx >= max_crtc_count)
+		if (primary_planes_idx >= max_crtc_count)
 			primary = false;
 
 		plane = sde_plane_init(dev, catalog->sspp[i].id, primary,

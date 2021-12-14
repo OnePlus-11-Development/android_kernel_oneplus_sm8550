@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -270,7 +270,6 @@ enum {
 	SSPP_CLK_STATUS,
 	SSPP_SCALE_SIZE,
 	SSPP_VIG_BLOCKS,
-	SSPP_RGB_BLOCKS,
 	SSPP_DMA_BLOCKS,
 	SSPP_EXCL_RECT,
 	SSPP_SMART_DMA,
@@ -296,13 +295,6 @@ enum {
 	VIG_FP16_CSC_PROP,
 	VIG_FP16_UNMULT_PROP,
 	VIG_PROP_MAX,
-};
-
-enum {
-	RGB_SCALER_OFF,
-	RGB_SCALER_LEN,
-	RGB_PCC_PROP,
-	RGB_PROP_MAX,
 };
 
 enum {
@@ -688,7 +680,6 @@ static struct sde_prop_type sspp_prop[] = {
 		PROP_TYPE_BIT_OFFSET_ARRAY},
 	{SSPP_SCALE_SIZE, "qcom,sde-sspp-scale-size", false, PROP_TYPE_U32},
 	{SSPP_VIG_BLOCKS, "qcom,sde-sspp-vig-blocks", false, PROP_TYPE_NODE},
-	{SSPP_RGB_BLOCKS, "qcom,sde-sspp-rgb-blocks", false, PROP_TYPE_NODE},
 	{SSPP_DMA_BLOCKS, "qcom,sde-sspp-dma-blocks", false, PROP_TYPE_NODE},
 	{SSPP_EXCL_RECT, "qcom,sde-sspp-excl-rect", false, PROP_TYPE_U32_ARRAY},
 	{SSPP_SMART_DMA, "qcom,sde-sspp-smart-dma-priority", false,
@@ -730,12 +721,6 @@ static struct sde_prop_type vig_prop[] = {
 			PROP_TYPE_U32_ARRAY},
 	[VIG_FP16_UNMULT_PROP] = {VIG_FP16_UNMULT_PROP, "qcom,sde-fp16-unmult",
 			false, PROP_TYPE_U32_ARRAY},
-};
-
-static struct sde_prop_type rgb_prop[] = {
-	{RGB_SCALER_OFF, "qcom,sde-rgb-scaler-off", false, PROP_TYPE_U32},
-	{RGB_SCALER_LEN, "qcom,sde-rgb-scaler-size", false, PROP_TYPE_U32},
-	{RGB_PCC_PROP, "qcom,sde-rgb-pcc", false, PROP_TYPE_U32_ARRAY},
 };
 
 static struct sde_prop_type dma_prop[] = {
@@ -1661,103 +1646,6 @@ end:
 	return rc;
 }
 
-static void _sde_sspp_setup_rgbs_pp(struct sde_dt_props *props,
-		struct sde_mdss_cfg *sde_cfg, struct sde_sspp_cfg *sspp)
-{
-	struct sde_sspp_sub_blks *sblk = sspp->sblk;
-
-	sblk->pcc_blk.id = SDE_SSPP_PCC;
-	if (props->exists[RGB_PCC_PROP]) {
-		sblk->pcc_blk.base = PROP_VALUE_ACCESS(props->values,
-			RGB_PCC_PROP, 0);
-		sblk->pcc_blk.version = PROP_VALUE_ACCESS(props->values,
-			RGB_PCC_PROP, 1);
-		sblk->pcc_blk.len = 0;
-		set_bit(SDE_SSPP_PCC, &sspp->features);
-	}
-}
-
-static int _sde_sspp_setup_rgbs(struct device_node *np,
-		struct sde_mdss_cfg *sde_cfg)
-{
-	int i;
-	struct sde_dt_props *props;
-	struct device_node *snp = NULL;
-	int rgb_count = 0;
-	const char *type;
-
-	snp = of_get_child_by_name(np, sspp_prop[SSPP_RGB_BLOCKS].prop_name);
-	if (!snp)
-		return 0;
-
-	props = sde_get_dt_props(snp, RGB_PROP_MAX, rgb_prop,
-			ARRAY_SIZE(rgb_prop), NULL);
-	if (IS_ERR(props))
-		return PTR_ERR(props);
-
-	for (i = 0; i < sde_cfg->sspp_count; ++i) {
-		struct sde_sspp_cfg *sspp = sde_cfg->sspp + i;
-		struct sde_sspp_sub_blks *sblk = sspp->sblk;
-
-		of_property_read_string_index(np,
-				sspp_prop[SSPP_TYPE].prop_name, i, &type);
-		if (strcmp(type, "rgb"))
-			continue;
-
-		sblk->maxupscale = MAX_UPSCALE_RATIO;
-		sblk->maxdwnscale = MAX_DOWNSCALE_RATIO;
-		sspp->id = SSPP_RGB0 + rgb_count;
-		snprintf(sspp->name, SDE_HW_BLK_NAME_LEN, "sspp_%u",
-				sspp->id - SSPP_VIG0);
-		sspp->clk_ctrl = SDE_CLK_CTRL_RGB0 + rgb_count;
-		sspp->type = SSPP_TYPE_RGB;
-		set_bit(SDE_PERF_SSPP_QOS, &sspp->perf_features);
-		if (sde_cfg->vbif_qos_nlvl == 8)
-			set_bit(SDE_PERF_SSPP_QOS_8LVL, &sspp->perf_features);
-		rgb_count++;
-
-		if ((sde_cfg->qseed_sw_lib_rev == SDE_SSPP_SCALER_QSEED2) ||
-		    (sde_cfg->qseed_sw_lib_rev == SDE_SSPP_SCALER_QSEED3)) {
-			set_bit(SDE_SSPP_SCALER_RGB, &sspp->features);
-			sblk->scaler_blk.id = sde_cfg->qseed_sw_lib_rev;
-			sblk->scaler_blk.base = PROP_VALUE_ACCESS(props->values,
-					RGB_SCALER_OFF, 0);
-			sblk->scaler_blk.len = PROP_VALUE_ACCESS(props->values,
-					RGB_SCALER_LEN, 0);
-			snprintf(sblk->scaler_blk.name, SDE_HW_BLK_NAME_LEN,
-				"sspp_scaler%u", sspp->id - SSPP_VIG0);
-		}
-
-		_sde_sspp_setup_rgbs_pp(props, sde_cfg, sspp);
-
-		sblk->format_list = sde_cfg->dma_formats;
-		sblk->virt_format_list = NULL;
-	}
-
-	sde_put_dt_props(props);
-	return 0;
-}
-
-static void _sde_sspp_setup_cursor(struct sde_mdss_cfg *sde_cfg,
-	struct sde_sspp_cfg *sspp, struct sde_sspp_sub_blks *sblk,
-	struct sde_prop_value *prop_value, u32 *cursor_count)
-{
-	if (!IS_SDE_MAJOR_MINOR_SAME(sde_cfg->hw_rev, SDE_HW_VER_300))
-		SDE_ERROR("invalid sspp type %d, xin id %d\n",
-				sspp->type, sspp->xin_id);
-	set_bit(SDE_SSPP_CURSOR, &sspp->features);
-	sblk->maxupscale = SSPP_UNITY_SCALE;
-	sblk->maxdwnscale = SSPP_UNITY_SCALE;
-	sblk->format_list = sde_cfg->cursor_formats;
-	sblk->virt_format_list = NULL;
-	sspp->id = SSPP_CURSOR0 + *cursor_count;
-	snprintf(sspp->name, SDE_HW_BLK_NAME_LEN, "sspp_%u",
-			sspp->id - SSPP_VIG0);
-	sspp->clk_ctrl = SDE_CLK_CTRL_CURSOR0 + *cursor_count;
-	sspp->type = SSPP_TYPE_CURSOR;
-	(*cursor_count)++;
-}
-
 static void _sde_sspp_setup_dgm(struct sde_sspp_cfg *sspp,
 		const struct sde_dt_props *props, const char *name,
 		struct sde_pp_blk *blk, u32 type, u32 prop, bool versioned)
@@ -1996,10 +1884,8 @@ static int _sde_sspp_setup_cmn(struct device_node *np,
 {
 	int rc = 0, off_count, i, j;
 	struct sde_dt_props *props;
-	const char *type;
 	struct sde_sspp_cfg *sspp;
 	struct sde_sspp_sub_blks *sblk;
-	u32 cursor_count = 0;
 
 	props = sde_get_dt_props(np, SSPP_PROP_MAX, sspp_prop,
 			ARRAY_SIZE(sspp_prop), &off_count);
@@ -2033,14 +1919,6 @@ static int _sde_sspp_setup_cmn(struct device_node *np,
 
 		sspp->base = PROP_VALUE_ACCESS(props->values, SSPP_OFF, i);
 		sspp->len = PROP_VALUE_ACCESS(props->values, SSPP_SIZE, 0);
-
-		of_property_read_string_index(np,
-				sspp_prop[SSPP_TYPE].prop_name, i, &type);
-		if (!strcmp(type, "cursor")) {
-			/* No prop values for cursor pipes */
-			_sde_sspp_setup_cursor(sde_cfg, sspp, sblk, NULL,
-					&cursor_count);
-		}
 
 		snprintf(sblk->src_blk.name, SDE_HW_BLK_NAME_LEN, "sspp_src_%u",
 				sspp->id - SSPP_VIG0);
@@ -2094,10 +1972,6 @@ static int sde_sspp_parse_dt(struct device_node *np,
 		return rc;
 
 	rc = _sde_sspp_setup_vigs(np, sde_cfg);
-	if (rc)
-		return rc;
-
-	rc = _sde_sspp_setup_rgbs(np, sde_cfg);
 	if (rc)
 		return rc;
 
@@ -4725,25 +4599,10 @@ static int sde_hardware_format_caps(struct sde_mdss_cfg *sde_cfg,
 	int rc = 0;
 	uint32_t dma_list_size, vig_list_size, wb2_list_size;
 	uint32_t virt_vig_list_size, in_rot_list_size = 0;
-	uint32_t cursor_list_size = 0;
 	uint32_t index = 0;
 	uint32_t in_rot_restricted_list_size = 0;
 	const struct sde_format_extended *inline_fmt_tbl = NULL;
 	const struct sde_format_extended *inline_restricted_fmt_tbl = NULL;
-
-	/* cursor input formats */
-	if (test_bit(SDE_FEATURE_CURSOR, sde_cfg->features)) {
-		cursor_list_size = ARRAY_SIZE(cursor_formats);
-		sde_cfg->cursor_formats = kcalloc(cursor_list_size,
-			sizeof(struct sde_format_extended), GFP_KERNEL);
-		if (!sde_cfg->cursor_formats) {
-			rc = -ENOMEM;
-			goto out;
-		}
-		index = sde_copy_formats(sde_cfg->cursor_formats,
-			cursor_list_size, 0, cursor_formats,
-			ARRAY_SIZE(cursor_formats));
-	}
 
 	/* DMA pipe input formats */
 	dma_list_size = ARRAY_SIZE(plane_formats);
@@ -4754,7 +4613,7 @@ static int sde_hardware_format_caps(struct sde_mdss_cfg *sde_cfg,
 		sizeof(struct sde_format_extended), GFP_KERNEL);
 	if (!sde_cfg->dma_formats) {
 		rc = -ENOMEM;
-		goto free_cursor;
+		goto out;
 	}
 
 	index = sde_copy_formats(sde_cfg->dma_formats, dma_list_size,
@@ -4871,9 +4730,6 @@ free_vig:
 	kfree(sde_cfg->vig_formats);
 free_dma:
 	kfree(sde_cfg->dma_formats);
-free_cursor:
-	if (test_bit(SDE_FEATURE_CURSOR, sde_cfg->features))
-		kfree(sde_cfg->cursor_formats);
 out:
 	return rc;
 }
@@ -4959,7 +4815,6 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		sde_cfg->vbif_qos_nlvl = 4;
 		sde_cfg->ts_prefill_rev = 1;
 		set_bit(SDE_FEATURE_DECIMATION, sde_cfg->features);
-		set_bit(SDE_FEATURE_CURSOR, sde_cfg->features);
 		clear_bit(SDE_FEATURE_COMBINED_ALPHA, sde_cfg->features);
 		clear_bit(SDE_FEATURE_DELAY_PRG_FETCH, sde_cfg->features);
 		clear_bit(SDE_FEATURE_SUI_MISR, sde_cfg->features);
@@ -5423,7 +5278,6 @@ void sde_hw_catalog_deinit(struct sde_mdss_cfg *sde_cfg)
 	kfree(sde_cfg->perf.creq_lut);
 
 	kfree(sde_cfg->dma_formats);
-	kfree(sde_cfg->cursor_formats);
 	kfree(sde_cfg->vig_formats);
 	kfree(sde_cfg->wb_formats);
 	kfree(sde_cfg->virt_vig_formats);

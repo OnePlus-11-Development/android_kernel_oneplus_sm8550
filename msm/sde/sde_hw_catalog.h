@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -264,13 +264,11 @@ enum {
  * @SDE_SSPP_SRC             Src and fetch part of the pipes,
  * @SDE_SSPP_SCALER_QSEED2,  QSEED2 algorithm support
  * @SDE_SSPP_SCALER_QSEED3,  QSEED3 alogorithm support
- * @SDE_SSPP_SCALER_RGB,     RGB Scaler, supported by RGB pipes
  * @SDE_SSPP_CSC,            Support of Color space converion
  * @SDE_SSPP_CSC_10BIT,      Support of 10-bit Color space conversion
  * @SDE_SSPP_HSIC,           Global HSIC control
  * @SDE_SSPP_MEMCOLOR        Memory Color Support
  * @SDE_SSPP_PCC,            Color correction support
- * @SDE_SSPP_CURSOR,         SSPP can be used as a cursor layer
  * @SDE_SSPP_EXCL_RECT,      SSPP supports exclusion rect
  * @SDE_SSPP_SMART_DMA_V1,   SmartDMA 1.0 support
  * @SDE_SSPP_SMART_DMA_V2,   SmartDMA 2.0 support
@@ -301,13 +299,11 @@ enum {
 	SDE_SSPP_SRC = 0x1,
 	SDE_SSPP_SCALER_QSEED2,
 	SDE_SSPP_SCALER_QSEED3,
-	SDE_SSPP_SCALER_RGB,
 	SDE_SSPP_CSC,
 	SDE_SSPP_CSC_10BIT,
 	SDE_SSPP_HSIC,
 	SDE_SSPP_MEMCOLOR,
 	SDE_SSPP_PCC,
-	SDE_SSPP_CURSOR,
 	SDE_SSPP_EXCL_RECT,
 	SDE_SSPP_SMART_DMA_V1,
 	SDE_SSPP_SMART_DMA_V2,
@@ -662,7 +658,6 @@ enum {
  * @SDE_FEATURE_BASE_LAYER     Base Layer supported
  * @SDE_FEATURE_TOUCH_WAKEUP   Early wakeup with touch supported
  * @SDE_FEATURE_SRC_SPLIT      Source split supported
- * @SDE_FEATURE_CURSOR         Cursor supported
  * @SDE_FEATURE_VIG_P010       P010 ViG pipe format supported
  * @SDE_FEATURE_FP16           FP16 pipe format supported
  * @SDE_FEATURE_HDR            High Dynamic Range supported
@@ -703,7 +698,6 @@ enum sde_mdss_features {
 	SDE_FEATURE_BASE_LAYER,
 	SDE_FEATURE_TOUCH_WAKEUP,
 	SDE_FEATURE_SRC_SPLIT,
-	SDE_FEATURE_CURSOR,
 	SDE_FEATURE_VIG_P010,
 	SDE_FEATURE_FP16,
 	SDE_FEATURE_HDR,
@@ -1068,18 +1062,12 @@ enum sde_clk_ctrl_type {
 	SDE_CLK_CTRL_VIG2,
 	SDE_CLK_CTRL_VIG3,
 	SDE_CLK_CTRL_VIG4,
-	SDE_CLK_CTRL_RGB0,
-	SDE_CLK_CTRL_RGB1,
-	SDE_CLK_CTRL_RGB2,
-	SDE_CLK_CTRL_RGB3,
 	SDE_CLK_CTRL_DMA0,
 	SDE_CLK_CTRL_DMA1,
 	SDE_CLK_CTRL_DMA2,
 	SDE_CLK_CTRL_DMA3,
 	SDE_CLK_CTRL_DMA4,
 	SDE_CLK_CTRL_DMA5,
-	SDE_CLK_CTRL_CURSOR0,
-	SDE_CLK_CTRL_CURSOR1,
 	SDE_CLK_CTRL_WB0,
 	SDE_CLK_CTRL_WB1,
 	SDE_CLK_CTRL_WB2,
@@ -1089,8 +1077,8 @@ enum sde_clk_ctrl_type {
 };
 
 #define SDE_CLK_CTRL_VALID(x) (x > SDE_CLK_CTRL_NONE && x < SDE_CLK_CTRL_MAX)
-#define SDE_CLK_CTRL_SSPP_VALID(x) (x >= SDE_CLK_CTRL_VIG0 && x <= SDE_CLK_CTRL_CURSOR1)
-#define SDE_CLK_CTRL_WB_VALID(x) (x >= SDE_CLK_CTRL_WB0 && x <= SDE_CLK_CTRL_WB2)
+#define SDE_CLK_CTRL_SSPP_VALID(x) (x >= SDE_CLK_CTRL_VIG0 && x < SDE_CLK_CTRL_WB0)
+#define SDE_CLK_CTRL_WB_VALID(x) (x >= SDE_CLK_CTRL_WB0 && x < SDE_CLK_CTRL_LUTDMA)
 #define SDE_CLK_CTRL_LUTDMA_VALID(x) (x == SDE_CLK_CTRL_LUTDMA)
 #define SDE_CLK_CTRL_IPCC_MSI_VALID(x) (x == SDE_CLK_CTRL_IPCC_MSI)
 
@@ -1104,18 +1092,12 @@ static const char *sde_clk_ctrl_type_s[SDE_CLK_CTRL_MAX] = {
 	[SDE_CLK_CTRL_VIG2] = "VIG2",
 	[SDE_CLK_CTRL_VIG3] = "VIG3",
 	[SDE_CLK_CTRL_VIG4] = "VIG4",
-	[SDE_CLK_CTRL_RGB0] = "RGB0",
-	[SDE_CLK_CTRL_RGB1] = "RGB1",
-	[SDE_CLK_CTRL_RGB2] = "RGB2",
-	[SDE_CLK_CTRL_RGB3] = "RGB3",
 	[SDE_CLK_CTRL_DMA0] = "DMA0",
 	[SDE_CLK_CTRL_DMA1] = "DMA1",
 	[SDE_CLK_CTRL_DMA2] = "DMA2",
 	[SDE_CLK_CTRL_DMA3] = "DMA3",
 	[SDE_CLK_CTRL_DMA4] = "DMA4",
 	[SDE_CLK_CTRL_DMA5] = "DMA5",
-	[SDE_CLK_CTRL_CURSOR0] = "CURSOR0",
-	[SDE_CLK_CTRL_CURSOR1] = "CURSOR1",
 	[SDE_CLK_CTRL_WB0] = "WB0",
 	[SDE_CLK_CTRL_WB1] = "WB1",
 	[SDE_CLK_CTRL_WB2] = "WB2",
@@ -1791,7 +1773,6 @@ struct sde_perf_cfg {
  * @irq_offset_list     list of sde_intr_irq_offsets to initialize irq table
  * @features            bitmap of supported SDE_FEATUREs
  * @dma_formats         supported formats for dma pipe
- * @cursor_formats      supported formats for cursor pipe
  * @vig_formats         supported formats for vig pipe
  * @wb_formats          supported formats for wb
  * @virt_vig_formats    supported formats for virtual vig pipe
@@ -1902,7 +1883,6 @@ struct sde_mdss_cfg {
 
 	/* Supported Pixel Format Lists */
 	struct sde_format_extended *dma_formats;
-	struct sde_format_extended *cursor_formats;
 	struct sde_format_extended *vig_formats;
 	struct sde_format_extended *wb_formats;
 	struct sde_format_extended *virt_vig_formats;
@@ -1924,9 +1904,7 @@ struct sde_mdss_hw_cfg_handler {
 #define BLK_MDP(s) ((s)->mdp)
 #define BLK_CTL(s) ((s)->ctl)
 #define BLK_VIG(s) ((s)->vig)
-#define BLK_RGB(s) ((s)->rgb)
 #define BLK_DMA(s) ((s)->dma)
-#define BLK_CURSOR(s) ((s)->cursor)
 #define BLK_MIXER(s) ((s)->mixer)
 #define BLK_DSPP(s) ((s)->dspp)
 #define BLK_DS(s) ((s)->ds)

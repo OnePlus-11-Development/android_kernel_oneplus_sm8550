@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -30,8 +31,7 @@ struct sde_hw_pipe;
 /**
  * Define all scaler feature bits in catalog
  */
-#define SDE_SSPP_SCALER ((1UL << SDE_SSPP_SCALER_RGB) | \
-	(1UL << SDE_SSPP_SCALER_QSEED2) | \
+#define SDE_SSPP_SCALER ((1UL << SDE_SSPP_SCALER_QSEED2) | \
 	(1UL << SDE_SSPP_SCALER_QSEED3) | \
 	(1UL << SDE_SSPP_SCALER_QSEED3LITE))
 

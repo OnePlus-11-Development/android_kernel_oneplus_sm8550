@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -146,11 +146,6 @@ enum sde_sspp {
 	SSPP_VIG2,
 	SSPP_VIG3,
 	SSPP_VIG_MAX = SSPP_VIG3,
-	SSPP_RGB0,
-	SSPP_RGB1,
-	SSPP_RGB2,
-	SSPP_RGB3,
-	SSPP_RGB_MAX = SSPP_RGB3,
 	SSPP_DMA0,
 	SSPP_DMA1,
 	SSPP_DMA2,
@@ -158,23 +153,16 @@ enum sde_sspp {
 	SSPP_DMA4,
 	SSPP_DMA5,
 	SSPP_DMA_MAX = SSPP_DMA5,
-	SSPP_CURSOR0,
-	SSPP_CURSOR1,
-	SSPP_CURSOR_MAX = SSPP_CURSOR1,
 	SSPP_MAX
 };
 
 #define SDE_SSPP_VALID(x) ((x) > SSPP_NONE && (x) < SSPP_MAX)
 #define SDE_SSPP_VALID_VIG(x) ((x) >= SSPP_VIG0 && (x) <= SSPP_VIG_MAX)
-#define SDE_SSPP_VALID_RGB(x) ((x) >= SSPP_RGB0 && (x) <= SSPP_RGB_MAX)
 #define SDE_SSPP_VALID_DMA(x) ((x) >= SSPP_DMA0 && (x) <= SSPP_DMA_MAX)
-#define SDE_SSPP_VALID_CURSOR(x) ((x) >= SSPP_CURSOR0 && (x) <= SSPP_CURSOR_MAX)
 
 enum sde_sspp_type {
 	SSPP_TYPE_VIG,
-	SSPP_TYPE_RGB,
 	SSPP_TYPE_DMA,
-	SSPP_TYPE_CURSOR,
 	SSPP_TYPE_MAX
 };
 

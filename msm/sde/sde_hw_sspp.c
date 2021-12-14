@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -185,7 +186,6 @@ static inline int _sspp_subblk_offset(struct sde_hw_pipe *ctx,
 		break;
 	case SDE_SSPP_SCALER_QSEED2:
 	case SDE_SSPP_SCALER_QSEED3:
-	case SDE_SSPP_SCALER_RGB:
 		*idx = sblk->scaler_blk.base;
 		break;
 	case SDE_SSPP_CSC:
