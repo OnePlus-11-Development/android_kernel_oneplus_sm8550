@@ -286,27 +286,33 @@ void sde_rm_get_resource_info(struct sde_rm *rm,
 {
 	struct sde_rm_hw_blk *blk;
 	enum sde_hw_blk_type type;
-	struct sde_rm_rsvp rsvp;
 	const struct sde_lm_cfg *lm_cfg;
 	bool is_built_in, is_pref;
 	u32 lm_pref = (BIT(SDE_DISP_PRIMARY_PREF) | BIT(SDE_DISP_SECONDARY_PREF));
+
+	mutex_lock(&rm->rm_lock);
 
 	/* Get all currently available resources */
 	memcpy(avail_res, &rm->avail_res,
 			sizeof(rm->avail_res));
 
+	/**
+	 * When the encoder is null, assume display is external in order to return the count of
+	 * availalbe non-preferred LMs
+	 */
 	if (!drm_enc)
-		return;
-
-	is_built_in = sde_encoder_is_built_in_display(drm_enc);
-
-	rsvp.enc_id = drm_enc->base.id;
+		is_built_in = false;
+	else
+		is_built_in = sde_encoder_is_built_in_display(drm_enc);
 
 	for (type = 0; type < SDE_HW_BLK_MAX; type++) {
 		list_for_each_entry(blk, &rm->hw_blks[type], list) {
 			/* Add back resources allocated to the given encoder */
-			if (blk->rsvp && blk->rsvp->enc_id == rsvp.enc_id)
+			if (blk->rsvp && drm_enc && blk->rsvp->enc_id == drm_enc->base.id) {
 				_sde_rm_inc_resource_info(rm, avail_res, blk);
+				if (type == SDE_HW_BLK_LM)
+					avail_res->num_lm_in_use++;
+			}
 
 			/**
 			 * Remove unallocated preferred lms that cannot reserved
@@ -316,11 +322,13 @@ void sde_rm_get_resource_info(struct sde_rm *rm,
 				lm_cfg = to_sde_hw_mixer(blk->hw)->cap;
 				is_pref = lm_cfg->features & lm_pref;
 
-				if (!blk->rsvp && !is_built_in && is_pref)
+				if (!blk->rsvp && !blk->rsvp_nxt && !is_built_in && is_pref)
 					_sde_rm_dec_resource_info(rm, avail_res, blk);
 			}
 		}
 	}
+
+	mutex_unlock(&rm->rm_lock);
 }
 
 static void _sde_rm_print_rsvps(
