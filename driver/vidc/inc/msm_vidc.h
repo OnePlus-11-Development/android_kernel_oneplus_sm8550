@@ -25,10 +25,8 @@ int msm_vidc_s_selection(void* instance, struct v4l2_selection* s);
 int msm_vidc_g_selection(void* instance, struct v4l2_selection* s);
 int msm_vidc_s_param(void *instance, struct v4l2_streamparm *sp);
 int msm_vidc_g_param(void *instance, struct v4l2_streamparm *sp);
-int msm_vidc_s_ctrl(void *instance, struct v4l2_control *a);
 int msm_vidc_s_ext_ctrl(void *instance, struct v4l2_ext_controls *a);
 int msm_vidc_g_ext_ctrl(void *instance, struct v4l2_ext_controls *a);
-int msm_vidc_g_ctrl(void *instance, struct v4l2_control *a);
 int msm_vidc_reqbufs(void *instance, struct v4l2_requestbuffers *b);
 int msm_vidc_release_buffer(void *instance, int buffer_type,
 		unsigned int buffer_index);

@@ -535,6 +535,13 @@ exit:
 	return rc;
 }
 
+void msm_vidc_add_volatile_flag(struct v4l2_ctrl *ctrl)
+{
+	if (ctrl->id == V4L2_CID_MIN_BUFFERS_FOR_OUTPUT ||
+		ctrl->id == V4L2_CID_MIN_BUFFERS_FOR_CAPTURE)
+		ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
+}
+
 int msm_vidc_ctrl_deinit(struct msm_vidc_inst *inst)
 {
 	if (!inst) {
@@ -690,6 +697,7 @@ int msm_vidc_ctrl_init(struct msm_vidc_inst *inst)
 		 * TODO(AS)
 		 * ctrl->flags |= capability->cap[idx].flags;
 		 */
+		msm_vidc_add_volatile_flag(ctrl);
 		ctrl->flags |= V4L2_CTRL_FLAG_EXECUTE_ON_WRITE;
 		inst->ctrls[ctrl_idx] = ctrl;
 		ctrl_idx++;
@@ -786,6 +794,34 @@ static int msm_vidc_allow_secure_session(struct msm_vidc_inst *inst)
 	return rc;
 }
 
+int msm_v4l2_op_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
+{
+	int rc = 0;
+	struct msm_vidc_inst *inst;
+
+	if (!ctrl) {
+		d_vpr_e("%s: invalid ctrl parameter\n", __func__);
+		return -EINVAL;
+	}
+
+	inst = container_of(ctrl->handler,
+			    struct msm_vidc_inst, ctrl_handler);
+	if (!inst) {
+		d_vpr_e("%s: could not find inst for ctrl %s id %#x\n", __func__, ctrl->name, ctrl->id);
+		return -EINVAL;
+	}
+
+	rc = msm_vidc_get_control(inst, ctrl);
+	if (rc)
+		i_vpr_e(inst, "%s: failed for ctrl %s id %#x\n",
+			__func__, ctrl->name, ctrl->id);
+	else
+		i_vpr_h(inst, "%s: ctrl %s id %#x, value %d\n",
+			__func__, ctrl->name, ctrl->id, ctrl->val);
+
+	return rc;
+}
+
 int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 {
 	int rc = 0;
@@ -811,6 +847,12 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	i_vpr_h(inst, "%s: state %d, name %s, id 0x%x value %d\n",
 		__func__, inst->state, ctrl->name, ctrl->id, ctrl->val);
+
+	if (!msm_vidc_allow_s_ctrl(inst, ctrl->id)) {
+		i_vpr_e(inst, "%s: state %d, name %s, id %#x not allowed\n",
+			__func__, inst->state, ctrl->name, ctrl->id, ctrl->val);
+		return -EBUSY;
+	}
 
 	cap_id = msm_vidc_get_cap_id(inst, ctrl->id);
 	if (cap_id == INST_CAP_NONE) {

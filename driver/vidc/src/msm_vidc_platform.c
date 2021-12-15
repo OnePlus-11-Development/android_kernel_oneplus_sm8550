@@ -64,8 +64,6 @@ static struct v4l2_ioctl_ops msm_v4l2_ioctl_ops_enc = {
 	.vidioc_dqbuf                   = msm_v4l2_dqbuf,
 	.vidioc_streamon                = msm_v4l2_streamon,
 	.vidioc_streamoff               = msm_v4l2_streamoff,
-	.vidioc_s_ctrl                  = msm_v4l2_s_ctrl,
-	.vidioc_g_ctrl                  = msm_v4l2_g_ctrl,
 	.vidioc_queryctrl               = msm_v4l2_queryctrl,
 	.vidioc_querymenu               = msm_v4l2_querymenu,
 	.vidioc_subscribe_event         = msm_v4l2_subscribe_event,
@@ -102,8 +100,6 @@ static struct v4l2_ioctl_ops msm_v4l2_ioctl_ops_dec = {
 	.vidioc_dqbuf                   = msm_v4l2_dqbuf,
 	.vidioc_streamon                = msm_v4l2_streamon,
 	.vidioc_streamoff               = msm_v4l2_streamoff,
-	.vidioc_s_ctrl                  = msm_v4l2_s_ctrl,
-	.vidioc_g_ctrl                  = msm_v4l2_g_ctrl,
 	.vidioc_queryctrl               = msm_v4l2_queryctrl,
 	.vidioc_querymenu               = msm_v4l2_querymenu,
 	.vidioc_subscribe_event         = msm_v4l2_subscribe_event,
@@ -113,6 +109,7 @@ static struct v4l2_ioctl_ops msm_v4l2_ioctl_ops_dec = {
 
 static struct v4l2_ctrl_ops msm_v4l2_ctrl_ops = {
 	.s_ctrl                         = msm_v4l2_op_s_ctrl,
+	.g_volatile_ctrl                = msm_v4l2_op_g_volatile_ctrl,
 };
 
 static struct vb2_ops msm_vb2_ops = {

@@ -375,50 +375,6 @@ int msm_vidc_g_param(void *instance, struct v4l2_streamparm *param)
 }
 EXPORT_SYMBOL(msm_vidc_g_param);
 
-int msm_vidc_s_ctrl(void *instance, struct v4l2_control *control)
-{
-	struct msm_vidc_inst *inst = instance;
-
-	if (!inst || !control)
-		return -EINVAL;
-
-	if (!msm_vidc_allow_s_ctrl(inst, control->id))
-		return -EBUSY;
-
-	return v4l2_s_ctrl(NULL, &inst->ctrl_handler, control);
-}
-EXPORT_SYMBOL(msm_vidc_s_ctrl);
-
-int msm_vidc_g_ctrl(void *instance, struct v4l2_control *control)
-{
-	struct msm_vidc_inst *inst = instance;
-	struct v4l2_ctrl *ctrl = NULL;
-	int rc = 0;
-
-	if (!inst || !control) {
-		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
-	ctrl = v4l2_ctrl_find(&inst->ctrl_handler, control->id);
-	if (ctrl) {
-		rc = msm_vidc_get_control(inst, ctrl);
-		if (!rc)
-			control->value = ctrl->val;
-	} else {
-		i_vpr_e(inst, "%s: invalid control\n", __func__);
-		return -EINVAL;
-	}
-
-	if (rc)
-		i_vpr_e(inst, "%s: failed for control id %#x\n",
-			__func__, control->id);
-	else
-		i_vpr_h(inst, "%s: control id %#x, value %d\n",
-			__func__, control->id, control->value);
-	return rc;
-}
-EXPORT_SYMBOL(msm_vidc_g_ctrl);
-
 int msm_vidc_reqbufs(void *instance, struct v4l2_requestbuffers *b)
 {
 	int rc = 0;

@@ -45,7 +45,6 @@ int msm_v4l2_open(struct file *filp)
 		trace_msm_v4l2_vidc_open("END", NULL);
 		return -ENOMEM;
 	}
-	clear_bit(V4L2_FL_USES_V4L2_FH, &vdev->flags);
 	filp->private_data = &(inst->event_handler);
 	trace_msm_v4l2_vidc_open("END", inst);
 	return 0;
@@ -290,59 +289,6 @@ int msm_v4l2_g_parm(struct file *filp, void *fh,
 
 	inst_lock(inst, __func__);
 	rc = msm_vidc_g_param((void *)inst, a);
-	if (rc)
-		goto unlock;
-
-unlock:
-	inst_unlock(inst, __func__);
-	put_inst(inst);
-
-	return rc;
-}
-
-int msm_v4l2_s_ctrl(struct file *filp, void *fh,
-					struct v4l2_control *a)
-{
-	struct msm_vidc_inst *inst = get_vidc_inst(filp, fh);
-	int rc = 0;
-
-	inst = get_inst_ref(g_core, inst);
-	if (!inst) {
-		d_vpr_e("%s: invalid instance\n", __func__);
-		return -EINVAL;
-	}
-
-	inst_lock(inst, __func__);
-	if (is_session_error(inst)) {
-		i_vpr_e(inst, "%s: inst in error state\n", __func__);
-		rc = -EBUSY;
-		goto unlock;
-	}
-	rc = msm_vidc_s_ctrl((void *)inst, a);
-	if (rc)
-		goto unlock;
-
-unlock:
-	inst_unlock(inst, __func__);
-	put_inst(inst);
-
-	return rc;
-}
-
-int msm_v4l2_g_ctrl(struct file *filp, void *fh,
-					struct v4l2_control *a)
-{
-	struct msm_vidc_inst *inst = get_vidc_inst(filp, fh);
-	int rc = 0;
-
-	inst = get_inst_ref(g_core, inst);
-	if (!inst) {
-		d_vpr_e("%s: invalid instance\n", __func__);
-		return -EINVAL;
-	}
-
-	inst_lock(inst, __func__);
-	rc = msm_vidc_g_ctrl((void *)inst, a);
 	if (rc)
 		goto unlock;
 
