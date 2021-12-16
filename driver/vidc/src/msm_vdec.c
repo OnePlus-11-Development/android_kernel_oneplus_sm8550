@@ -828,6 +828,32 @@ static int msm_vdec_set_av1_bitstream_format(struct msm_vidc_inst *inst,
 	return rc;
 }
 
+static int msm_vdec_set_av1_operating_point(struct msm_vidc_inst *inst,
+	enum msm_vidc_port_type port)
+{
+	int rc = 0;
+	u32 op_point;
+
+	if (inst->codec != MSM_VIDC_AV1)
+		return 0;
+
+	op_point = inst->capabilities->cap[ENH_LAYER_COUNT].value;
+	i_vpr_h(inst, "%s: op_point: %u\n", __func__, op_point);
+	rc = venus_hfi_session_property(inst,
+			HFI_PROP_AV1_OP_POINT,
+			HFI_HOST_FLAGS_NONE,
+			get_hfi_port(inst, port),
+			HFI_PAYLOAD_U32,
+			&op_point,
+			sizeof(u32));
+	if (rc) {
+		i_vpr_e(inst, "%s: set property failed\n", __func__);
+		return rc;
+	}
+
+	return rc;
+}
+
 static int msm_vdec_set_input_properties(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
@@ -870,6 +896,10 @@ static int msm_vdec_set_input_properties(struct msm_vidc_inst *inst)
 		return rc;
 
 	rc = msm_vdec_set_av1_bitstream_format(inst, INPUT_PORT);
+	if (rc)
+		return rc;
+
+	rc = msm_vdec_set_av1_operating_point(inst, INPUT_PORT);
 	if (rc)
 		return rc;
 

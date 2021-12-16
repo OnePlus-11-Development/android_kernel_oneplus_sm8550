@@ -17,6 +17,7 @@
 #define DEFAULT_VIDEO_CONCEAL_COLOR_BLACK 0x8020010
 #define MAX_LTR_FRAME_COUNT     2
 #define MAX_BASE_LAYER_PRIORITY_ID 63
+#define MAX_OP_POINT            31
 #define MAX_BITRATE             220000000
 #define DEFAULT_BITRATE         20000000
 #define MINIMUM_FPS             1
@@ -843,6 +844,11 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		{BITRATE_MODE, META_EVA_STATS},
 		{GOP_SIZE, B_FRAME, BIT_RATE, MIN_QUALITY},
 		msm_vidc_adjust_layer_count, msm_vidc_set_layer_count_and_type},
+
+	{ENH_LAYER_COUNT, DEC, AV1,
+		0, MAX_OP_POINT, 1, 0,
+		0,
+		HFI_PROP_AV1_OP_POINT},
 
 	/*
 	 * layer bitrate is treated as BIT_RATE cap sibling and
