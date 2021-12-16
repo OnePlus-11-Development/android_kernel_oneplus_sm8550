@@ -1494,11 +1494,11 @@ struct sde_vbif_dynamic_ot_tbl {
 
 /**
  * struct sde_vbif_qos_tbl - QoS priority table
- * @npriority_lvl      num of priority level
+ * @count              count of entries - rp_remap + lvl_remap entries
  * @priority_lvl       pointer to array of priority level in ascending order
  */
 struct sde_vbif_qos_tbl {
-	u32 npriority_lvl;
+	u32 count;
 	u32 *priority_lvl;
 };
 
@@ -1508,6 +1508,7 @@ struct sde_vbif_qos_tbl {
  * @VBIF_NRT_CLIENT: non-realtime clients like writeback
  * @VBIF_CWB_CLIENT: concurrent writeback client
  * @VBIF_LUTDMA_CLIENT: LUTDMA client
+ * @VBIF_CNOC_CLIENT: HW fence client
  * @VBIF_MAX_CLIENT: max number of clients
  */
 enum sde_vbif_client_type {
@@ -1515,6 +1516,7 @@ enum sde_vbif_client_type {
 	VBIF_NRT_CLIENT,
 	VBIF_CWB_CLIENT,
 	VBIF_LUTDMA_CLIENT,
+	VBIF_CNOC_CLIENT,
 	VBIF_MAX_CLIENT
 };
 

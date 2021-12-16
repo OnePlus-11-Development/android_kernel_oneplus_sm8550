@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -579,6 +580,7 @@ void sde_vbif_set_qos_remap(struct sde_kms *sde_kms,
 	bool forced_on = false;
 	const struct sde_vbif_qos_tbl *qos_tbl;
 	int i;
+	u32 nlvl;
 
 	if (!sde_kms || !params || !sde_kms->hw_mdp) {
 		SDE_ERROR("invalid arguments\n");
@@ -616,7 +618,7 @@ void sde_vbif_set_qos_remap(struct sde_kms *sde_kms,
 	}
 
 	qos_tbl = &vbif->cap->qos_tbl[params->client_type];
-	if (!qos_tbl->npriority_lvl || !qos_tbl->priority_lvl) {
+	if (!qos_tbl->count || !qos_tbl->priority_lvl) {
 		SDE_DEBUG("qos tbl not defined\n");
 		return;
 	}
@@ -625,12 +627,13 @@ void sde_vbif_set_qos_remap(struct sde_kms *sde_kms,
 
 	forced_on = _sde_vbif_setup_clk_force_ctrl(sde_kms, params->clk_ctrl, true);
 
-	for (i = 0; i < qos_tbl->npriority_lvl; i++) {
-		SDE_DEBUG("vbif:%d xin:%d lvl:%d/%d\n",
-				params->vbif_idx, params->xin_id, i,
-				qos_tbl->priority_lvl[i]);
+	nlvl = qos_tbl->count / 2;
+	for (i = 0; i < nlvl; i++) {
+		SDE_DEBUG("vbif:%d xin:%d rp_remap:%d/%d, lv_remap:%d/%d\n",
+				params->vbif_idx, params->xin_id, i, qos_tbl->priority_lvl[i],
+				i + nlvl, qos_tbl->priority_lvl[i + nlvl]);
 		vbif->ops.set_qos_remap(vbif, params->xin_id, i,
-				qos_tbl->priority_lvl[i]);
+				qos_tbl->priority_lvl[i], qos_tbl->priority_lvl[i + nlvl]);
 	}
 
 	if (forced_on)

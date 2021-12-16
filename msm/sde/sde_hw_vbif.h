@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -72,10 +73,11 @@ struct sde_hw_vbif_ops {
 	 * @vbif: vbif context driver
 	 * @xin_id: client interface identifier
 	 * @level: priority level
-	 * @remap_level: remapped level
+	 * @rp_remap: rp_remap level
+	 * @lvl_remap: lvl_remap level
 	 */
 	void (*set_qos_remap)(struct sde_hw_vbif *vbif,
-			u32 xin_id, u32 level, u32 remap_level);
+			u32 xin_id, u32 level, u32 rp_remap, u32 lvl_remap);
 
 	/**
 	 * set_mem_type - set memory type

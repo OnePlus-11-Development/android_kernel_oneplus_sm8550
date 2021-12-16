@@ -501,6 +501,7 @@ enum {
 	VBIF_QOS_NRT_REMAP,
 	VBIF_QOS_CWB_REMAP,
 	VBIF_QOS_LUTDMA_REMAP,
+	VBIF_QOS_CNOC_REMAP,
 	VBIF_PROP_MAX,
 };
 
@@ -931,24 +932,17 @@ static struct sde_prop_type vbif_prop[] = {
 	{VBIF_OFF, "qcom,sde-vbif-off", true, PROP_TYPE_U32_ARRAY},
 	{VBIF_LEN, "qcom,sde-vbif-size", false, PROP_TYPE_U32},
 	{VBIF_ID, "qcom,sde-vbif-id", false, PROP_TYPE_U32_ARRAY},
-	{VBIF_DEFAULT_OT_RD_LIMIT, "qcom,sde-vbif-default-ot-rd-limit", false,
-		PROP_TYPE_U32},
-	{VBIF_DEFAULT_OT_WR_LIMIT, "qcom,sde-vbif-default-ot-wr-limit", false,
-		PROP_TYPE_U32},
-	{VBIF_DYNAMIC_OT_RD_LIMIT, "qcom,sde-vbif-dynamic-ot-rd-limit", false,
-		PROP_TYPE_U32_ARRAY},
-	{VBIF_DYNAMIC_OT_WR_LIMIT, "qcom,sde-vbif-dynamic-ot-wr-limit", false,
-		PROP_TYPE_U32_ARRAY},
+	{VBIF_DEFAULT_OT_RD_LIMIT, "qcom,sde-vbif-default-ot-rd-limit", false, PROP_TYPE_U32},
+	{VBIF_DEFAULT_OT_WR_LIMIT, "qcom,sde-vbif-default-ot-wr-limit", false, PROP_TYPE_U32},
+	{VBIF_DYNAMIC_OT_RD_LIMIT, "qcom,sde-vbif-dynamic-ot-rd-limit", false, PROP_TYPE_U32_ARRAY},
+	{VBIF_DYNAMIC_OT_WR_LIMIT, "qcom,sde-vbif-dynamic-ot-wr-limit", false, PROP_TYPE_U32_ARRAY},
 	{VBIF_MEMTYPE_0, "qcom,sde-vbif-memtype-0", false, PROP_TYPE_U32_ARRAY},
 	{VBIF_MEMTYPE_1, "qcom,sde-vbif-memtype-1", false, PROP_TYPE_U32_ARRAY},
-	{VBIF_QOS_RT_REMAP, "qcom,sde-vbif-qos-rt-remap", false,
-		PROP_TYPE_U32_ARRAY},
-	{VBIF_QOS_NRT_REMAP, "qcom,sde-vbif-qos-nrt-remap", false,
-		PROP_TYPE_U32_ARRAY},
-	{VBIF_QOS_CWB_REMAP, "qcom,sde-vbif-qos-cwb-remap", false,
-		PROP_TYPE_U32_ARRAY},
-	{VBIF_QOS_LUTDMA_REMAP, "qcom,sde-vbif-qos-lutdma-remap", false,
-		PROP_TYPE_U32_ARRAY},
+	{VBIF_QOS_RT_REMAP, "qcom,sde-vbif-qos-rt-remap", false, PROP_TYPE_U32_ARRAY},
+	{VBIF_QOS_NRT_REMAP, "qcom,sde-vbif-qos-nrt-remap", false, PROP_TYPE_U32_ARRAY},
+	{VBIF_QOS_CWB_REMAP, "qcom,sde-vbif-qos-cwb-remap", false, PROP_TYPE_U32_ARRAY},
+	{VBIF_QOS_LUTDMA_REMAP, "qcom,sde-vbif-qos-lutdma-remap", false, PROP_TYPE_U32_ARRAY},
+	{VBIF_QOS_CNOC_REMAP, "qcom,sde-vbif-qos-cnoc-remap", false, PROP_TYPE_U32_ARRAY},
 };
 
 static struct sde_prop_type uidle_prop[] = {
@@ -3715,42 +3709,39 @@ static int _sde_vbif_populate_ot_parsing(struct sde_vbif_cfg *vbif,
 }
 
 static int _sde_vbif_populate_qos_parsing(struct sde_mdss_cfg *sde_cfg,
-	struct sde_vbif_cfg *vbif, struct sde_prop_value *prop_value,
-	int *prop_count)
+	struct sde_vbif_cfg *vbif, struct sde_prop_value *prop_value, int *prop_count)
 {
-	int i, j;
-	int prop_index = VBIF_QOS_RT_REMAP;
+	int i, j, prop_index = VBIF_QOS_RT_REMAP;
+	u32 entries;
 
-	for (i = VBIF_RT_CLIENT;
-			((i < VBIF_MAX_CLIENT) && (prop_index < VBIF_PROP_MAX));
-				i++, prop_index++) {
-		vbif->qos_tbl[i].npriority_lvl = prop_count[prop_index];
-		SDE_DEBUG("qos_tbl[%d].npriority_lvl=%u\n",
-				i, vbif->qos_tbl[i].npriority_lvl);
+	for (i = VBIF_RT_CLIENT; ((i < VBIF_MAX_CLIENT) && (prop_index < VBIF_PROP_MAX));
+						i++, prop_index++) {
+		vbif->qos_tbl[i].count = prop_count[prop_index];
+		SDE_DEBUG("qos_tbl[%d].count=%u\n", i, vbif->qos_tbl[i].count);
 
-		if (vbif->qos_tbl[i].npriority_lvl == sde_cfg->vbif_qos_nlvl) {
-			vbif->qos_tbl[i].priority_lvl = kcalloc(
-					vbif->qos_tbl[i].npriority_lvl,
-					sizeof(u32), GFP_KERNEL);
-			if (!vbif->qos_tbl[i].priority_lvl)
+		entries = 2 * sde_cfg->vbif_qos_nlvl;
+		if (vbif->qos_tbl[i].count == entries) {
+			vbif->qos_tbl[i].priority_lvl = kcalloc(entries, sizeof(u32), GFP_KERNEL);
+			if (!vbif->qos_tbl[i].priority_lvl) {
+				vbif->qos_tbl[i].count = 0;
 				return -ENOMEM;
-		} else if (vbif->qos_tbl[i].npriority_lvl) {
-			vbif->qos_tbl[i].npriority_lvl = 0;
+			}
+		} else if (vbif->qos_tbl[i].count) {
+			vbif->qos_tbl[i].count = 0;
 			vbif->qos_tbl[i].priority_lvl = NULL;
-			SDE_ERROR("invalid qos table for client:%d, prop:%d\n",
-					i, prop_index);
+			SDE_ERROR("invalid qos table for client:%d, prop:%d\n", i, prop_index);
+			continue;
 		}
 
-		for (j = 0; j < vbif->qos_tbl[i].npriority_lvl; j++) {
+		for (j = 0; j < vbif->qos_tbl[i].count; j++) {
 			vbif->qos_tbl[i].priority_lvl[j] =
-				PROP_VALUE_ACCESS(prop_value, prop_index, j);
-			SDE_DEBUG("client:%d, prop:%d, lvl[%d]=%u\n",
-					i, prop_index, j,
+					PROP_VALUE_ACCESS(prop_value, prop_index, j);
+			SDE_DEBUG("client:%d, prop:%d, lvl[%d]=%u\n", i, prop_index, j,
 					vbif->qos_tbl[i].priority_lvl[j]);
 		}
 
-		if (vbif->qos_tbl[i].npriority_lvl)
-			set_bit(SDE_VBIF_QOS_REMAP, &vbif->features);
+		vbif->qos_tbl[i].count = entries;
+		set_bit(SDE_VBIF_QOS_REMAP, &vbif->features);
 	}
 
 	return 0;
@@ -3864,6 +3855,11 @@ static int sde_vbif_parse_dt(struct device_node *np,
 
 	rc = _validate_dt_entry(np, &vbif_prop[VBIF_QOS_LUTDMA_REMAP], 1,
 			&prop_count[VBIF_QOS_LUTDMA_REMAP], NULL);
+	if (rc)
+		goto end;
+
+	rc = _validate_dt_entry(np, &vbif_prop[VBIF_QOS_CNOC_REMAP], 1,
+			&prop_count[VBIF_QOS_CNOC_REMAP], NULL);
 	if (rc)
 		goto end;
 
