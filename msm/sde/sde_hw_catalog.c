@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -4349,33 +4349,29 @@ static int _sde_qos_parse_dt_cfg(struct sde_mdss_cfg *cfg, int *prop_count,
 	cfg->perf.qos_refresh_count = qos_count;
 
 	cfg->perf.danger_lut = kcalloc(qos_count,
-		sizeof(u64) * SDE_QOS_LUT_USAGE_MAX, GFP_KERNEL);
+		sizeof(u64) * SDE_QOS_LUT_USAGE_MAX * SDE_DANGER_SAFE_LUT_TYPE_MAX, GFP_KERNEL);
 	cfg->perf.safe_lut = kcalloc(qos_count,
-		sizeof(u64) * SDE_QOS_LUT_USAGE_MAX, GFP_KERNEL);
+		sizeof(u64) * SDE_QOS_LUT_USAGE_MAX * SDE_DANGER_SAFE_LUT_TYPE_MAX, GFP_KERNEL);
 	cfg->perf.creq_lut = kcalloc(qos_count,
 		sizeof(u64) * SDE_QOS_LUT_USAGE_MAX * SDE_CREQ_LUT_TYPE_MAX, GFP_KERNEL);
 	if (!cfg->perf.creq_lut || !cfg->perf.safe_lut || !cfg->perf.danger_lut)
 		goto end;
 
 	if (prop_exists[QOS_DANGER_LUT] &&
-	    prop_count[QOS_DANGER_LUT] >= (SDE_QOS_LUT_USAGE_MAX * qos_count)) {
+			(prop_count[QOS_DANGER_LUT] >=
+			    (SDE_QOS_LUT_USAGE_MAX * qos_count * SDE_DANGER_SAFE_LUT_TYPE_MAX))) {
 		for (i = 0; i < prop_count[QOS_DANGER_LUT]; i++) {
-			cfg->perf.danger_lut[i] =
-				PROP_VALUE_ACCESS(prop_value,
-						QOS_DANGER_LUT, i);
-			SDE_DEBUG("danger usage:%i lut:0x%llx\n",
-					i, cfg->perf.danger_lut[i]);
+			cfg->perf.danger_lut[i] = PROP_VALUE_ACCESS(prop_value, QOS_DANGER_LUT, i);
+			SDE_DEBUG("danger usage:%i lut:0x%llx\n", i, cfg->perf.danger_lut[i]);
 		}
 	}
 
 	if (prop_exists[QOS_SAFE_LUT] &&
-	    prop_count[QOS_SAFE_LUT] >= (SDE_QOS_LUT_USAGE_MAX * qos_count)) {
+			(prop_count[QOS_SAFE_LUT] >=
+			    (SDE_QOS_LUT_USAGE_MAX * qos_count * SDE_DANGER_SAFE_LUT_TYPE_MAX))) {
 		for (i = 0; i < prop_count[QOS_SAFE_LUT]; i++) {
-			cfg->perf.safe_lut[i] =
-				PROP_VALUE_ACCESS(prop_value,
-					QOS_SAFE_LUT, i);
-			SDE_DEBUG("safe usage:%d lut:0x%llx\n",
-				i, cfg->perf.safe_lut[i]);
+			cfg->perf.safe_lut[i] = PROP_VALUE_ACCESS(prop_value, QOS_SAFE_LUT, i);
+			SDE_DEBUG("safe usage:%d lut:0x%llx\n", i, cfg->perf.safe_lut[i]);
 		}
 	}
 

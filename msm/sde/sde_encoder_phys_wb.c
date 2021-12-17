@@ -155,7 +155,7 @@ static void sde_encoder_phys_wb_set_qos(struct sde_encoder_phys *phys_enc)
 	struct sde_hw_wb *hw_wb;
 	struct sde_hw_wb_qos_cfg qos_cfg = {0};
 	struct sde_perf_cfg *perf;
-	u32 fps_index = 0, lut_index, index, frame_rate, qos_count;
+	u32 fps_index = 0, lut_index, creq_index, ds_index, frame_rate, qos_count;
 
 	if (!phys_enc || !phys_enc->sde_kms || !phys_enc->sde_kms->catalog) {
 		SDE_ERROR("invalid parameter(s)\n");
@@ -190,10 +190,14 @@ static void sde_encoder_phys_wb_set_qos(struct sde_encoder_phys *phys_enc)
 	else
 		lut_index = SDE_QOS_LUT_USAGE_NRT;
 
-	index = (fps_index * SDE_QOS_LUT_USAGE_MAX) + lut_index;
-	qos_cfg.danger_lut = perf->danger_lut[index];
-	qos_cfg.safe_lut = (u32) perf->safe_lut[index];
-	qos_cfg.creq_lut = perf->creq_lut[index * SDE_CREQ_LUT_TYPE_MAX];
+	creq_index = lut_index * SDE_CREQ_LUT_TYPE_MAX;
+	creq_index += (fps_index * SDE_QOS_LUT_USAGE_MAX * SDE_CREQ_LUT_TYPE_MAX);
+	qos_cfg.creq_lut = perf->creq_lut[creq_index];
+
+	ds_index = lut_index * SDE_DANGER_SAFE_LUT_TYPE_MAX;
+	ds_index += (fps_index * SDE_QOS_LUT_USAGE_MAX * SDE_DANGER_SAFE_LUT_TYPE_MAX);
+	qos_cfg.danger_lut = perf->danger_lut[ds_index];
+	qos_cfg.safe_lut = (u32) perf->safe_lut[ds_index];
 
 	SDE_DEBUG("[enc:%d wb:%d] fps:%d mode:%d luts[0x%x,0x%x 0x%llx]\n",
 		DRMID(phys_enc->parent), WBID(wb_enc), frame_rate, phys_enc->in_clone_mode,
@@ -341,14 +345,15 @@ static void _sde_encoder_phys_wb_setup_cdp(struct sde_encoder_phys *phys_enc,
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
 	struct sde_hw_wb *hw_wb = wb_enc->hw_wb;
 	struct sde_hw_wb_cdp_cfg *cdp_cfg = &wb_enc->cdp_cfg;
+	u32 cdp_index;
 
 	if (!hw_wb->ops.setup_cdp)
 		return;
 
 	memset(cdp_cfg, 0, sizeof(struct sde_hw_wb_cdp_cfg));
 
-	cdp_cfg->enable = phys_enc->sde_kms->catalog->perf.cdp_cfg
-		[SDE_PERF_CDP_USAGE_NRT].wr_enable;
+	cdp_index = phys_enc->in_clone_mode ? SDE_PERF_CDP_USAGE_RT : SDE_PERF_CDP_USAGE_NRT;
+	cdp_cfg->enable = phys_enc->sde_kms->catalog->perf.cdp_cfg[cdp_index].wr_enable;
 	cdp_cfg->ubwc_meta_enable = SDE_FORMAT_IS_UBWC(wb_cfg->dest.format);
 	cdp_cfg->tile_amortize_enable = SDE_FORMAT_IS_UBWC(wb_cfg->dest.format) ||
 						SDE_FORMAT_IS_TILE(wb_cfg->dest.format);

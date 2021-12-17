@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (C) 2014-2021 The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -257,10 +258,11 @@ static void _sde_plane_set_qos_lut(struct drm_plane *plane,
 {
 	struct sde_plane *psde;
 	const struct sde_format *fmt = NULL;
-	u32 frame_rate, qos_count, fps_index = 0, lut_index, creq_lut_index, index;
+	u32 frame_rate, qos_count, fps_index = 0, lut_index, creq_lut_index, ds_lut_index;
 	struct sde_perf_cfg *perf;
 	struct sde_plane_state *pstate;
-	bool inline_rot = false;
+	bool inline_rot = false, landscape = false;
+	struct drm_display_mode *mode;
 
 	if (!plane || !fb) {
 		SDE_ERROR("invalid arguments\n");
@@ -276,6 +278,9 @@ static void _sde_plane_set_qos_lut(struct drm_plane *plane,
 	} else if (!psde->pipe_hw->ops.setup_qos_lut) {
 		return;
 	}
+
+	mode = &crtc->state->adjusted_mode;
+	landscape = mode->hdisplay > mode->vdisplay ? true : false;
 
 	frame_rate = drm_mode_vrefresh(&crtc->mode);
 	perf = &psde->catalog->perf;
@@ -299,38 +304,32 @@ static void _sde_plane_set_qos_lut(struct drm_plane *plane,
 			lut_index = SDE_QOS_LUT_USAGE_LINEAR;
 		else
 			lut_index = SDE_QOS_LUT_USAGE_MACROTILE;
-
-		creq_lut_index = lut_index * SDE_CREQ_LUT_TYPE_MAX;
-		if (psde->scaler3_cfg.enable)
-			creq_lut_index += SDE_CREQ_LUT_TYPE_QSEED;
 	} else {
 		lut_index = SDE_QOS_LUT_USAGE_NRT;
-		creq_lut_index = lut_index * SDE_CREQ_LUT_TYPE_MAX;
 	}
 
-	index = (fps_index * SDE_QOS_LUT_USAGE_MAX) + lut_index;
-	psde->pipe_qos_cfg.danger_lut = perf->danger_lut[index];
-	psde->pipe_qos_cfg.safe_lut = perf->safe_lut[index];
-
+	creq_lut_index = lut_index * SDE_CREQ_LUT_TYPE_MAX;
+	if (psde->scaler3_cfg.enable)
+		creq_lut_index += SDE_CREQ_LUT_TYPE_QSEED;
 	creq_lut_index += (fps_index * SDE_QOS_LUT_USAGE_MAX * SDE_CREQ_LUT_TYPE_MAX);
 	psde->pipe_qos_cfg.creq_lut = perf->creq_lut[creq_lut_index];
 
-	trace_sde_perf_set_qos_luts(psde->pipe - SSPP_VIG0,
-			(fmt) ? fmt->base.pixel_format : 0,
-			(fmt) ? fmt->fetch_mode : 0,
-			psde->pipe_qos_cfg.danger_lut,
-			psde->pipe_qos_cfg.safe_lut,
-			psde->pipe_qos_cfg.creq_lut);
+	ds_lut_index = lut_index * SDE_DANGER_SAFE_LUT_TYPE_MAX;
+	if (landscape)
+		ds_lut_index += SDE_DANGER_SAFE_LUT_TYPE_LANDSCAPE;
+	ds_lut_index += (fps_index * SDE_QOS_LUT_USAGE_MAX * SDE_DANGER_SAFE_LUT_TYPE_MAX);
+	psde->pipe_qos_cfg.danger_lut = perf->danger_lut[ds_lut_index];
+	psde->pipe_qos_cfg.safe_lut = perf->safe_lut[ds_lut_index];
 
-	SDE_DEBUG(
-		"plane%u: pnum:%d fmt:%4.4s fps:%d mode:%d luts[0x%x,0x%x 0x%llx]\n",
-		plane->base.id,
-		psde->pipe - SSPP_VIG0,
+	trace_sde_perf_set_qos_luts(psde->pipe - SSPP_VIG0, (fmt) ? fmt->base.pixel_format : 0,
+			(fmt) ? fmt->fetch_mode : 0, psde->pipe_qos_cfg.danger_lut,
+			psde->pipe_qos_cfg.safe_lut, psde->pipe_qos_cfg.creq_lut);
+
+	SDE_DEBUG("plane%u: pnum:%d fmt:%4.4s fps:%d mode:%d luts[0x%x,0x%x 0x%llx]\n",
+		plane->base.id, psde->pipe - SSPP_VIG0,
 		fmt ? (char *)&fmt->base.pixel_format : NULL, frame_rate,
-		fmt ? fmt->fetch_mode : -1,
-		psde->pipe_qos_cfg.danger_lut,
-		psde->pipe_qos_cfg.safe_lut,
-		psde->pipe_qos_cfg.creq_lut);
+		fmt ? fmt->fetch_mode : -1, psde->pipe_qos_cfg.danger_lut,
+		psde->pipe_qos_cfg.safe_lut, psde->pipe_qos_cfg.creq_lut);
 
 	psde->pipe_hw->ops.setup_qos_lut(psde->pipe_hw, &psde->pipe_qos_cfg);
 }
@@ -371,6 +370,7 @@ static void _sde_plane_set_qos_ctrl(struct drm_plane *plane,
 		/* this feature overrules previous VBLANK_CTRL */
 		psde->pipe_qos_cfg.vblank_en = false;
 		psde->pipe_qos_cfg.creq_vblank = 0; /* clear vblank bits */
+		psde->pipe_qos_cfg.danger_vblank = 0;
 	}
 
 	if (flags & SDE_PLANE_QOS_PANIC_CTRL)

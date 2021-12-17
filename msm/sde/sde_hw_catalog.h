@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -861,6 +861,16 @@ enum sde_creq_lut_types {
 	SDE_CREQ_LUT_TYPE_NOQSEED,
 	SDE_CREQ_LUT_TYPE_QSEED,
 	SDE_CREQ_LUT_TYPE_MAX,
+};
+
+/**
+ * enum sde_danger_safe_lut_types - define danger/safe LUT types possible for all use cases
+ * This is second dimension to sde_qos_lut_usage enum.
+ */
+enum sde_danger_safe_lut_types {
+	SDE_DANGER_SAFE_LUT_TYPE_PORTRAIT,
+	SDE_DANGER_SAFE_LUT_TYPE_LANDSCAPE,
+	SDE_DANGER_SAFE_LUT_TYPE_MAX,
 };
 
 /**
