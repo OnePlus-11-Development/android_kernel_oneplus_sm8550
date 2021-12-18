@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -719,6 +719,12 @@ u32 sde_crtc_get_fps_mode(struct drm_crtc *crtc);
  * @crtc: Pointert to crtc
  */
 u32 sde_crtc_get_dfps_maxfps(struct drm_crtc *crtc);
+
+/**
+ * sde_crtc_get_wb_usage_type - get writeback usage type
+ * @crtc: Pointert to crtc
+ */
+enum sde_wb_usage_type sde_crtc_get_wb_usage_type(struct drm_crtc *crtc);
 
 /**
  * sde_crtc_get_client_type - check the crtc type- rt, rsc_rt, etc.

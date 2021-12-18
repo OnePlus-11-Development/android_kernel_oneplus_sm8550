@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -498,6 +498,18 @@ enum sde_sys_cache_state {
 	CACHE_STATE_PRE_CACHE,
 	CACHE_STATE_FRAME_WRITE,
 	CACHE_STATE_FRAME_READ
+};
+
+/**
+ * enum sde_wb_usage_type: Type of usage of the WB connector
+ * WB_USAGE_WFD: WB connector used for WFD
+ * WB_USAGE_CWB: WB connector used for concurrent writeback
+ * WB_USAGE_OFFLINE_WB: WB connector used for 2-pass composition
+ */
+enum sde_wb_usage_type {
+	WB_USAGE_WFD,
+	WB_USAGE_CWB,
+	WB_USAGE_OFFLINE_WB,
 };
 
 /** struct sde_format - defines the format configuration which
