@@ -2648,7 +2648,11 @@ static int handle3_egress_format_v2(struct net_device *dev,
  * later
  * -EFAULT: Error while transmitting the skb
  */
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(5, 14, 14))
 static int ipa3_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+#else
+static int ipa3_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, void __user *data, int cmd)
+#endif
 {
 	int rc = 0;
 	int mru = 1000, epid = 1, mux_index, len, epid_ll = 5;
@@ -3158,7 +3162,11 @@ static const struct net_device_ops ipa3_wwan_ops_ip = {
 	.ndo_stop = ipa3_wwan_stop,
 	.ndo_start_xmit = ipa3_wwan_xmit,
 	.ndo_tx_timeout = ipa3_wwan_tx_timeout,
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(5, 14, 14))
 	.ndo_do_ioctl = ipa3_wwan_ioctl,
+#else
+	.ndo_siocdevprivate = ipa3_wwan_ioctl,
+#endif
 	.ndo_change_mtu = ipa3_wwan_change_mtu,
 	.ndo_set_mac_address = 0,
 	.ndo_validate_addr = 0,
