@@ -8121,6 +8121,51 @@ int ipa3_cfg_ep_status(u32 clnt_hdl,
 }
 
 /**
+ * ipa3_cfg_ep_cfg_pipe_replicate() - IPA end-point cfg
+ * pipe replication
+ * @clnt_hdl:   [in] opaque client handle assigned by IPA to client
+ *
+ * Return value: none
+ */
+void ipa3_cfg_ep_cfg_pipe_replicate(u32 clnt_hdl)
+{
+	/* Enable ADPL v6 Feature for certain IPA clients */
+	if (ipa3_ctx->ipa_hw_type >= IPA_HW_v5_5) {
+		switch (ipa3_get_client_mapping(clnt_hdl)) {
+		case IPA_CLIENT_USB_PROD:
+		case IPA_CLIENT_APPS_WAN_PROD:
+		case IPA_CLIENT_WLAN2_PROD:
+		case IPA_CLIENT_WIGIG_PROD:
+		case IPA_CLIENT_APPS_LAN_PROD:
+		case IPA_CLIENT_APPS_WAN_LOW_LAT_DATA_PROD:
+		case IPA_CLIENT_APPS_LAN_COAL_CONS:
+		case IPA_CLIENT_APPS_LAN_CONS:
+		case IPA_CLIENT_APPS_WAN_COAL_CONS:
+		case IPA_CLIENT_APPS_WAN_CONS:
+		case IPA_CLIENT_WIGIG1_CONS:
+		case IPA_CLIENT_WLAN2_CONS:
+		case IPA_CLIENT_WLAN2_CONS1:
+		case IPA_CLIENT_USB_CONS:
+		case IPA_CLIENT_APPS_WAN_LOW_LAT_DATA_CONS:
+		case IPA_CLIENT_WIGIG2_CONS:
+		case IPA_CLIENT_WIGIG3_CONS:
+		case IPA_CLIENT_WLAN3_PROD:
+		case IPA_CLIENT_ETHERNET2_PROD:
+		case IPA_CLIENT_USB2_PROD:
+		case IPA_CLIENT_ETHERNET_PROD:
+		case IPA_CLIENT_ETHERNET_CONS:
+		case IPA_CLIENT_ETHERNET2_CONS:
+		case IPA_CLIENT_USB2_CONS:
+		case IPA_CLIENT_WLAN4_CONS:
+			ipa3_ctx->ep[clnt_hdl].cfg.cfg.pipe_replicate_en = 1;
+			break;
+		default:
+			ipa3_ctx->ep[clnt_hdl].cfg.cfg.pipe_replicate_en = 0;
+		}
+	}
+}
+
+/**
  * ipa3_cfg_ep_cfg() - IPA end-point cfg configuration
  * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
  * @ipa_ep_cfg:	[in] IPA end-point configuration params
@@ -8145,16 +8190,20 @@ int ipa3_cfg_ep_cfg(u32 clnt_hdl, const struct ipa_ep_cfg_cfg *cfg)
 	/* copy over EP cfg */
 	ipa3_ctx->ep[clnt_hdl].cfg.cfg = *cfg;
 
+	ipa3_cfg_ep_cfg_pipe_replicate(clnt_hdl);
+
 	/* Override QMB master selection */
 	qmb_master_sel = ipa3_get_qmb_master_sel(ipa3_ctx->ep[clnt_hdl].client);
 	ipa3_ctx->ep[clnt_hdl].cfg.cfg.gen_qmb_master_sel = qmb_master_sel;
 	IPADBG(
-	       "pipe=%d, frag_ofld_en=%d cs_ofld_en=%d mdata_hdr_ofst=%d gen_qmb_master_sel=%d\n",
+	       "pipe=%d, frag_ofld_en=%d cs_ofld_en=%d mdata_hdr_ofst=%d "
+	       "gen_qmb_master_sel=%d pipe_replicate_en=%d\n",
 			clnt_hdl,
 			ipa3_ctx->ep[clnt_hdl].cfg.cfg.frag_offload_en,
 			ipa3_ctx->ep[clnt_hdl].cfg.cfg.cs_offload_en,
 			ipa3_ctx->ep[clnt_hdl].cfg.cfg.cs_metadata_hdr_offset,
-			ipa3_ctx->ep[clnt_hdl].cfg.cfg.gen_qmb_master_sel);
+			ipa3_ctx->ep[clnt_hdl].cfg.cfg.gen_qmb_master_sel,
+			ipa3_ctx->ep[clnt_hdl].cfg.cfg.pipe_replicate_en);
 
 	IPA_ACTIVE_CLIENTS_INC_EP(ipa3_get_client_mapping(clnt_hdl));
 
