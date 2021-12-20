@@ -12,6 +12,8 @@
 
 struct msm_vidc_core;
 
+#define MAX_EVENTS 30
+
 #define call_venus_op(d, op, ...)			\
 	(((d) && (d)->venus_ops && (d)->venus_ops->op) ? \
 	((d)->venus_ops->op(__VA_ARGS__)):0)
