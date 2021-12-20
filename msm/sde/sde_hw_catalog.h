@@ -1795,6 +1795,7 @@ struct sde_perf_cfg {
  * @max_mixer_width     max layer mixer line width
  * @max_mixer_blendstages       max layer mixer blend stages (z orders)
  * @vbif_qos_nlvl       number of vbif QoS priority levels
+ * @qos_target_time_ns  normalized qos target time for line-based qos
  * @macrotile_mode      UBWC parameter for macro tile channel distribution
  * @pipe_order_type     indicates if it is required to specify pipe order
  * @csc_type            csc or csc_10bit support
@@ -1904,6 +1905,7 @@ struct sde_mdss_cfg {
 
 	/* Configs */
 	u32 vbif_qos_nlvl;
+	u32 qos_target_time_ns;
 	u32 macrotile_mode;
 	u32 pipe_order_type;
 	u32 csc_type;
