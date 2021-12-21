@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -527,6 +528,7 @@ static void _sde_encoder_phys_wb_setup_cwb(struct sde_encoder_phys *phys_enc, bo
 	struct sde_hw_dnsc_blur *hw_dnsc_blur = phys_enc->hw_dnsc_blur;
 	bool need_merge = (crtc->num_mixers > 1);
 	int i = 0;
+	const int num_wb = 1;
 
 	if (!phys_enc->in_clone_mode) {
 		SDE_DEBUG("[enc:%d wb:%d] not in CWB mode. early return\n",
@@ -545,6 +547,9 @@ static void _sde_encoder_phys_wb_setup_cwb(struct sde_encoder_phys *phys_enc, bo
 			(test_bit(SDE_WB_CWB_CTRL, &hw_wb->caps->features) ||
 			test_bit(SDE_WB_DCWB_CTRL, &hw_wb->caps->features))) {
 		struct sde_hw_intf_cfg_v1 intf_cfg = { 0, };
+
+		intf_cfg.wb_count = num_wb;
+		intf_cfg.wb[0] = hw_wb->idx;
 
 		for (i = 0; i < crtc->num_mixers; i++)
 			intf_cfg.cwb[intf_cfg.cwb_count++] = (enum sde_cwb)

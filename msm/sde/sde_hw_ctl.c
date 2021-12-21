@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -1136,7 +1137,11 @@ static int sde_hw_ctl_update_intf_cfg(struct sde_hw_ctl *ctx,
 					enable);
 		}
 
-		wb_active = enable ? BIT(2) : 0;
+		for (i = 0; i < cfg->wb_count; i++) {
+			if (cfg->wb[i] && enable)
+				wb_active |= BIT(cfg->wb[i] - WB_0);
+		}
+
 		SDE_REG_WRITE(c, CTL_CWB_ACTIVE, cwb_active);
 		SDE_REG_WRITE(c, CTL_WB_ACTIVE, wb_active);
 	}
