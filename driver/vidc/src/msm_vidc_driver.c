@@ -1957,7 +1957,9 @@ int msm_vidc_get_control(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 		i_vpr_h(inst, "g_min: input buffers %d\n", ctrl->val);
 		break;
 	default:
-		break;
+		i_vpr_e(inst, "invalid ctrl %s id %d\n",
+			ctrl->name, ctrl->id);
+		return -EINVAL;
 	}
 
 	return rc;
@@ -3516,6 +3518,7 @@ int msm_vidc_event_queue_init(struct msm_vidc_inst *inst)
 		return -EINVAL;
 
 	v4l2_fh_init(&inst->event_handler, &core->vdev[index].vdev);
+	inst->event_handler.ctrl_handler = &inst->ctrl_handler;
 	v4l2_fh_add(&inst->event_handler);
 
 	return rc;

@@ -13,6 +13,7 @@
 int msm_vidc_ctrl_init(struct msm_vidc_inst *inst);
 int msm_vidc_ctrl_deinit(struct msm_vidc_inst *inst);
 int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl);
+int msm_v4l2_op_g_volatile_ctrl(struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_bitrate(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_dynamic_layer_bitrate(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_bitrate_mode(void *instance, struct v4l2_ctrl *ctrl);
