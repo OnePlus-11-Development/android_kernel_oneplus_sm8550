@@ -1839,8 +1839,7 @@ int gsi_deregister_device(unsigned long dev_hdl, bool force)
 	devm_free_irq(gsi_ctx->dev, gsi_ctx->per.irq, gsi_ctx);
 	gsihal_destroy();
 	gsi_unmap_base();
-	memset(gsi_ctx, 0, sizeof(*gsi_ctx));
-
+	gsi_ctx->per_registered = false;
 	return GSI_STATUS_SUCCESS;
 }
 EXPORT_SYMBOL(gsi_deregister_device);
