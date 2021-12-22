@@ -50,8 +50,12 @@ int msm_v4l2_subscribe_event(struct v4l2_fh *fh,
 		const struct v4l2_event_subscription *sub);
 int msm_v4l2_unsubscribe_event(struct v4l2_fh *fh,
 		const struct v4l2_event_subscription *sub);
+int msm_v4l2_try_decoder_cmd(struct file *file, void *fh,
+		struct v4l2_decoder_cmd *enc);
 int msm_v4l2_decoder_cmd(struct file *file, void *fh,
 		struct v4l2_decoder_cmd *dec);
+int msm_v4l2_try_encoder_cmd(struct file *file, void *fh,
+		struct v4l2_encoder_cmd *enc);
 int msm_v4l2_encoder_cmd(struct file *file, void *fh,
 		struct v4l2_encoder_cmd *enc);
 int msm_v4l2_enum_framesizes(struct file *file, void *fh,

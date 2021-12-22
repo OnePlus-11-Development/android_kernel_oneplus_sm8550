@@ -608,6 +608,37 @@ exit:
 }
 EXPORT_SYMBOL(msm_vidc_streamoff);
 
+int msm_vidc_try_cmd(void *instance, union msm_v4l2_cmd *cmd)
+{
+	int rc = 0;
+	struct msm_vidc_inst *inst = instance;
+	struct v4l2_decoder_cmd *dec = NULL;
+	struct v4l2_encoder_cmd *enc = NULL;
+
+	if (is_decode_session(inst)) {
+		dec = (struct v4l2_decoder_cmd *)cmd;
+		i_vpr_h(inst, "%s: cmd %d\n", __func__, dec->cmd);
+		if (dec->cmd != V4L2_DEC_CMD_STOP && dec->cmd != V4L2_DEC_CMD_START)
+			return -EINVAL;
+		dec->flags = 0;
+		if (dec->cmd == V4L2_DEC_CMD_STOP) {
+			dec->stop.pts = 0;
+		} else if (dec->cmd == V4L2_DEC_CMD_START) {
+			dec->start.speed = 0;
+			dec->start.format = V4L2_DEC_START_FMT_NONE;
+		}
+	} else if (is_encode_session(inst)) {
+		enc = (struct v4l2_encoder_cmd *)cmd;
+		i_vpr_h(inst, "%s: cmd %d\n", __func__, enc->cmd);
+		if (enc->cmd != V4L2_ENC_CMD_STOP && enc->cmd != V4L2_ENC_CMD_START)
+			return -EINVAL;
+		enc->flags = 0;
+	}
+
+	return rc;
+}
+EXPORT_SYMBOL(msm_vidc_try_cmd);
+
 int msm_vidc_cmd(void *instance, union msm_v4l2_cmd *cmd)
 {
 	int rc = 0;
