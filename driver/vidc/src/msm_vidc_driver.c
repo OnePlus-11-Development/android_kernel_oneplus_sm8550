@@ -1474,7 +1474,8 @@ enum msm_vidc_allow msm_vidc_allow_stop(struct msm_vidc_inst *inst)
 		inst->state == MSM_VIDC_DRC_LAST_FLAG ||
 		inst->state == MSM_VIDC_DRC_DRAIN) {
 		allow = MSM_VIDC_ALLOW;
-	} else if (inst->state == MSM_VIDC_START_INPUT) {
+	} else if (inst->state == MSM_VIDC_START_INPUT ||
+		   inst->state == MSM_VIDC_OPEN) {
 		allow = MSM_VIDC_IGNORE;
 		i_vpr_e(inst, "%s: stop ignored in state %s\n",
 			__func__, state_name(inst->state));
