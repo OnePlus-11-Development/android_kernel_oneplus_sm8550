@@ -43,7 +43,18 @@ ipam-$(CONFIG_IPA3_MHI_PRIME_MANAGER) += ipa_v3/ipa_mpm.o
 
 ipam-$(CONFIG_IPA3_MHI_PROXY) += ipa_v3/ipa_mhi_proxy.o
 ipam-$(CONFIG_IPA_EMULATION) += ipa_v3/ipa_dt_replacement.o
-ipam-$(CONFIG_IPA3_REGDUMP) += ipa_v3/dump/ipa_reg_dump.o
+
+ifneq (,$(filter $(CONFIG_IPA3_REGDUMP_IPA_4_5),y m))
+ipam-$(CONFIG_IPA3_REGDUMP) += ipa_v3/dump/ipa4.5/ipa_reg_dump.o
+endif
+
+ifneq (,$(filter $(CONFIG_IPA3_REGDUMP_IPA_5_0),y m))
+ipam-$(CONFIG_IPA3_REGDUMP) += ipa_v3/dump/ipa5.0/ipa_reg_dump.o
+endif
+
+ifneq (,$(filter $(CONFIG_IPA3_REGDUMP_IPA_5_5),y m))
+ipam-$(CONFIG_IPA3_REGDUMP) += ipa_v3/dump/ipa5.5/ipa_reg_dump.o
+endif
 
 ipam-$(CONFIG_IPA_UT) += test/ipa_ut_framework.o test/ipa_test_example.o \
 	test/ipa_test_mhi.o test/ipa_test_dma.o \
