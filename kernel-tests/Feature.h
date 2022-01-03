@@ -61,22 +61,26 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
  */
 
-#ifndef FILTERING_H_
-#define FILTERING_H_
+#ifndef FEATURE_H_
+#define FEATURE_H_
 
 #include <stdint.h>
+#include <string>
+#include <iostream>
 #include "linux/msm_ipa.h"
-#include "Feature.h"
 
-class Filtering: public Feature
+using std::cout;
+using std::endl;
+
+class Feature
 {
 public:
-	bool AddFilteringRule(struct ipa_ioc_add_flt_rule const *ruleTable);
-	bool AddFilteringRule(ipa_ioc_add_flt_rule_v2 const *ruleTable);
-	bool DeleteFilteringRule(struct ipa_ioc_del_flt_rule *ruleTable);
-	bool Commit(enum ipa_ip_type ip);
-	bool Reset(enum ipa_ip_type ip);
+	Feature();
+	~Feature();
+	bool DeviceNodeIsOpened();
+
+protected:
+	int m_fd;
 };
 
 #endif
-
