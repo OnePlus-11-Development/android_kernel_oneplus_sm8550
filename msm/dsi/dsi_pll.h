@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __DSI_PLL_H
@@ -59,6 +60,7 @@ struct lpfr_cfg {
 };
 
 enum {
+	DSI_PLL_4NM,
 	DSI_PLL_5NM,
 	DSI_PLL_10NM,
 	DSI_UNKNOWN_PLL,
@@ -203,6 +205,7 @@ static inline struct dsi_pll_clk *to_pll_clk_hw(struct clk_hw *hw)
 
 int dsi_pll_clock_register_5nm(struct platform_device *pdev,
 				  struct dsi_pll_resource *pll_res);
+int dsi_pll_clock_register_4nm(struct platform_device *pdev, struct dsi_pll_resource *pll_res);
 
 int dsi_pll_init(struct platform_device *pdev,
 				struct dsi_pll_resource **pll_res);
