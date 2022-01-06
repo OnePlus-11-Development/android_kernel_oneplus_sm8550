@@ -879,3 +879,11 @@ void dsi_phy_hw_v5_0_set_continuous_clk(struct dsi_phy_hw *phy, bool enable)
 
 	wmb(); /* make sure request is set */
 }
+
+void dsi_phy_hw_v5_0_phy_idle_off(struct dsi_phy_hw *phy)
+{
+	/* enable clamping of PADS */
+	DSI_W32(phy, DSIPHY_CMN_CTRL_4, 0x1);
+	DSI_W32(phy, DSIPHY_CMN_CTRL_3, 0x0);
+	wmb();
+}
