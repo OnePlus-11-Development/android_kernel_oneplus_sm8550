@@ -49,4 +49,5 @@ ipa_kernel_tests_SOURCES =\
 		NatTest.cpp \
 		IPv6CTTest.cpp \
 		UlsoTest.cpp \
+		Feature.cpp \
 		main.cpp

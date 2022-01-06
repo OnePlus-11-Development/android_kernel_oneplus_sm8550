@@ -61,22 +61,39 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
  */
 
-#ifndef FILTERING_H_
-#define FILTERING_H_
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <cstring>
+#include <fcntl.h>
 
-#include <stdint.h>
-#include "linux/msm_ipa.h"
 #include "Feature.h"
 
-class Filtering: public Feature
+/*
+ * All interaction through the driver are
+ * made through this inode.
+ */
+static const char* DEVICE_NAME = "/dev/ipa";
+
+Feature::Feature()
 {
-public:
-	bool AddFilteringRule(struct ipa_ioc_add_flt_rule const *ruleTable);
-	bool AddFilteringRule(ipa_ioc_add_flt_rule_v2 const *ruleTable);
-	bool DeleteFilteringRule(struct ipa_ioc_del_flt_rule *ruleTable);
-	bool Commit(enum ipa_ip_type ip);
-	bool Reset(enum ipa_ip_type ip);
-};
+	m_fd = open(DEVICE_NAME, O_RDWR);
+	if (!m_fd)
+	{
+		cout << "Failed to open " << DEVICE_NAME << endl;
+	}
+}
 
-#endif
+Feature::~Feature()
+{
+	if (m_fd)
+	{
+		close(m_fd);
+	}
+}
 
+bool Feature::DeviceNodeIsOpened()
+{
+	return (m_fd > 0 && fcntl(m_fd, F_GETFL) >= 0);
+}
