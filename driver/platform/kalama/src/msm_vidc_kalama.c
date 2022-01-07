@@ -478,21 +478,12 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		{0},
 		msm_vidc_adjust_b_frame, msm_vidc_set_u32},
 
-	{BLUR_TYPES, ENC, CODECS_ALL,
-		VIDC_BLUR_NONE, VIDC_BLUR_ADAPTIVE, 1, VIDC_BLUR_ADAPTIVE,
-		V4L2_CID_MPEG_VIDC_VIDEO_BLUR_TYPES,
-		HFI_PROP_BLUR_TYPES,
-		CAP_FLAG_OUTPUT_PORT,
-		{PIX_FMTS, BITRATE_MODE, CONTENT_ADAPTIVE_CODING},
-		{BLUR_RESOLUTION},
-		msm_vidc_adjust_blur_type, msm_vidc_set_u32_enum},
-
 	{BLUR_TYPES, ENC, H264|HEVC,
 		VIDC_BLUR_NONE, VIDC_BLUR_ADAPTIVE, 1, VIDC_BLUR_ADAPTIVE,
 		V4L2_CID_MPEG_VIDC_VIDEO_BLUR_TYPES,
 		HFI_PROP_BLUR_TYPES,
 		CAP_FLAG_OUTPUT_PORT,
-		{PIX_FMTS, BITRATE_MODE, CONTENT_ADAPTIVE_CODING, MIN_QUALITY},
+		{PIX_FMTS, BITRATE_MODE, MIN_QUALITY},
 		{BLUR_RESOLUTION},
 		msm_vidc_adjust_blur_type, msm_vidc_set_u32_enum},
 
@@ -608,7 +599,7 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		HFI_PROP_CONTENT_ADAPTIVE_CODING,
 		CAP_FLAG_OUTPUT_PORT,
 		{BITRATE_MODE, MIN_QUALITY},
-		{BLUR_TYPES},
+		{0},
 		msm_vidc_adjust_cac,
 		msm_vidc_set_vbr_related_properties},
 
@@ -644,7 +635,7 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		msm_vidc_set_vbr_related_properties},
 
 	{VBV_DELAY, ENC, H264|HEVC,
-		200, 300, 100, 300,
+		100, 300, 100, 300,
 		V4L2_CID_MPEG_VIDEO_VBV_DELAY,
 		HFI_PROP_VBV_DELAY,
 		CAP_FLAG_OUTPUT_PORT,

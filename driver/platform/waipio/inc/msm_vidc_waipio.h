@@ -7,6 +7,9 @@
 #define _MSM_VIDC_WAIPIO_H_
 
 #include "msm_vidc_core.h"
+#if defined(CONFIG_MSM_VIDC_IRIS2)
+#include "msm_vidc_iris2.h"
+#endif
 
 #if defined(CONFIG_MSM_VIDC_WAIPIO)
 int msm_vidc_init_platform_waipio(struct msm_vidc_core *core, struct device *dev);

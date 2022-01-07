@@ -2,7 +2,6 @@
 /*
  * Copyright (c) 2020-2021,, The Linux Foundation. All rights reserved.
  */
-
 #include "msm_vidc_iris2.h"
 #include "msm_vidc_buffer_iris2.h"
 #include "msm_vidc_power_iris2.h"
@@ -15,6 +14,7 @@
 #include "msm_vidc_internal.h"
 #include "msm_vidc_buffer.h"
 #include "msm_vidc_debug.h"
+#include "msm_vidc_control.h"
 
 #define VIDEO_ARCH_LX 1
 
@@ -1075,6 +1075,56 @@ int msm_vidc_decide_work_route_iris2(struct msm_vidc_inst* inst)
 exit:
 	i_vpr_h(inst, "Configuring work route = %u", work_route);
 	msm_vidc_update_cap_value(inst, PIPE, work_route, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_blur_type_iris2(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst_capability *capability;
+	s32 adjusted_value;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	s32 rc_type = -1, cac = -1;
+	s32 pix_fmts = -1, min_quality = -1;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val :
+		capability->cap[BLUR_TYPES].value;
+
+	if (adjusted_value == VIDC_BLUR_NONE)
+		return 0;
+
+	if (msm_vidc_get_parent_value(inst, BLUR_TYPES, BITRATE_MODE,
+		&rc_type, __func__) ||
+		msm_vidc_get_parent_value(inst, BLUR_TYPES,
+		CONTENT_ADAPTIVE_CODING, &cac, __func__) ||
+		msm_vidc_get_parent_value(inst, BLUR_TYPES, PIX_FMTS,
+		&pix_fmts, __func__) ||
+		msm_vidc_get_parent_value(inst, BLUR_TYPES, MIN_QUALITY,
+		&min_quality, __func__))
+		return -EINVAL;
+
+	if (adjusted_value == VIDC_BLUR_EXTERNAL) {
+		if (is_scaling_enabled(inst) || min_quality) {
+			adjusted_value = VIDC_BLUR_NONE;
+		}
+	} else if (adjusted_value == VIDC_BLUR_ADAPTIVE) {
+		if (is_scaling_enabled(inst) || min_quality ||
+			(rc_type != HFI_RC_VBR_CFR) ||
+			!cac ||
+			is_10bit_colorformat(pix_fmts)) {
+			adjusted_value = VIDC_BLUR_NONE;
+		}
+	}
+
+	msm_vidc_update_cap_value(inst, BLUR_TYPES,
+		adjusted_value, __func__);
 
 	return 0;
 }

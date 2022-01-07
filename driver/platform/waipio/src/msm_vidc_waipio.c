@@ -467,15 +467,6 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		{ALL_INTRA},
 		msm_vidc_adjust_b_frame, msm_vidc_set_u32},
 
-	{BLUR_TYPES, ENC, CODECS_ALL,
-		VIDC_BLUR_NONE, VIDC_BLUR_ADAPTIVE, 1, VIDC_BLUR_ADAPTIVE,
-		V4L2_CID_MPEG_VIDC_VIDEO_BLUR_TYPES,
-		HFI_PROP_BLUR_TYPES,
-		CAP_FLAG_OUTPUT_PORT,
-		{PIX_FMTS, BITRATE_MODE, CONTENT_ADAPTIVE_CODING},
-		{BLUR_RESOLUTION},
-		msm_vidc_adjust_blur_type, msm_vidc_set_u32_enum},
-
 	{BLUR_TYPES, ENC, H264|HEVC,
 		VIDC_BLUR_NONE, VIDC_BLUR_ADAPTIVE, 1, VIDC_BLUR_ADAPTIVE,
 		V4L2_CID_MPEG_VIDC_VIDEO_BLUR_TYPES,
@@ -483,7 +474,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		CAP_FLAG_OUTPUT_PORT,
 		{PIX_FMTS, BITRATE_MODE, CONTENT_ADAPTIVE_CODING, MIN_QUALITY},
 		{BLUR_RESOLUTION},
-		msm_vidc_adjust_blur_type, msm_vidc_set_u32_enum},
+		msm_vidc_adjust_blur_type_iris2, msm_vidc_set_u32_enum},
 
 	{BLUR_RESOLUTION, ENC, CODECS_ALL,
 		0, S32_MAX, 1, 0,
