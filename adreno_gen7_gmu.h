@@ -95,6 +95,8 @@ struct gen7_gmu_device {
 	void __iomem *rdpm_mx_virt;
 	/** @num_oob_perfcntr: Number of active oob_perfcntr requests */
 	u32 num_oob_perfcntr;
+	/** @acd_debug_val: DVM value to calibrate ACD for a level */
+	u32 acd_debug_val;
 };
 
 /* Helper function to get to gen7 gmu device from adreno device */

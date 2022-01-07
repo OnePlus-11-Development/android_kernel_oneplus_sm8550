@@ -5,6 +5,7 @@
  */
 
 #include <linux/clk/qcom.h>
+#include <linux/debugfs.h>
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/of_fdt.h>
@@ -96,6 +97,44 @@ static const u32 gen7_ifpc_pwrup_reglist[] = {
 	GEN7_CP_PROTECT_REG+47,
 	GEN7_CP_AHB_CNTL,
 };
+
+#define F_PWR_ACD_CALIBRATE 78
+
+static int acd_calibrate_set(void *data, u64 val)
+{
+	struct kgsl_device *device = data;
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
+	u32 debug_val = (u32) val;
+	int ret;
+
+	mutex_lock(&device->mutex);
+	ret = adreno_active_count_get(adreno_dev);
+	if (ret)
+		goto err;
+
+	ret = gen7_hfi_send_set_value(adreno_dev, HFI_VALUE_DBG, F_PWR_ACD_CALIBRATE, debug_val);
+	if (!ret)
+		gmu->acd_debug_val = debug_val;
+
+	adreno_active_count_put(adreno_dev);
+err:
+	mutex_unlock(&device->mutex);
+	return ret;
+}
+
+static int acd_calibrate_get(void *data, u64 *val)
+{
+	struct kgsl_device *device = data;
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
+
+	*val = (u64) gmu->acd_debug_val;
+
+	return 0;
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE(acd_cal_fops, acd_calibrate_get, acd_calibrate_set, "%llu\n");
 
 void gen7_cp_init_cmds(struct adreno_device *adreno_dev, u32 *cmds)
 {
@@ -1114,6 +1153,8 @@ int gen7_probe_common(struct platform_device *pdev,
 	const struct adreno_gpu_core *gpucore)
 {
 	const struct adreno_gpudev *gpudev = gpucore->gpudev;
+	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
+	int ret;
 
 	adreno_dev->gpucore = gpucore;
 	adreno_dev->chipid = chipid;
@@ -1126,7 +1167,14 @@ int gen7_probe_common(struct platform_device *pdev,
 	adreno_dev->preempt.skipsaverestore = true;
 	adreno_dev->preempt.usesgmem = true;
 
-	return adreno_device_probe(pdev, adreno_dev);
+	ret = adreno_device_probe(pdev, adreno_dev);
+	if (ret)
+		return ret;
+
+	/* debugfs node for ACD calibration */
+	debugfs_create_file("acd_calibrate", 0644, device->d_debugfs, device, &acd_cal_fops);
+
+	return 0;
 }
 
 /* Register offset defines for Gen7, in order of enum adreno_regs */
