@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -1117,10 +1118,10 @@ static int dsi_ctrl_enable_supplies(struct dsi_ctrl *dsi_ctrl, bool enable)
 	int rc = 0;
 
 	if (enable) {
-		rc = pm_runtime_get_sync(dsi_ctrl->drm_dev->dev);
+		rc = pm_runtime_resume_and_get(dsi_ctrl->drm_dev->dev);
 		if (rc < 0) {
-			DSI_CTRL_ERR(dsi_ctrl,
-				"Power resource enable failed, rc=%d\n", rc);
+			DSI_CTRL_ERR(dsi_ctrl, "failed to enable power resource %d\n", rc);
+			SDE_EVT32(rc, SDE_EVTLOG_ERROR);
 			goto error;
 		}
 
@@ -3392,9 +3393,10 @@ int dsi_ctrl_transfer_prepare(struct dsi_ctrl *dsi_ctrl, u32 flags)
 	SDE_EVT32(SDE_EVTLOG_FUNC_ENTRY, dsi_ctrl->cell_index, flags);
 
 	/* Vote for clocks, gdsc, enable command engine, mask overflow */
-	rc = pm_runtime_get_sync(dsi_ctrl->drm_dev->dev);
+	rc = pm_runtime_resume_and_get(dsi_ctrl->drm_dev->dev);
 	if (rc < 0) {
-		DSI_CTRL_ERR(dsi_ctrl, "failed gdsc voting\n");
+		DSI_CTRL_ERR(dsi_ctrl, "failed to enable power resource %d\n", rc);
+		SDE_EVT32(rc, SDE_EVTLOG_ERROR);
 		return rc;
 	}
 

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -436,7 +437,7 @@ void sde_core_irq_preinstall(struct sde_kms *sde_kms)
 	}
 
 	if (!sde_in_trusted_vm(sde_kms)) {
-		rc = pm_runtime_get_sync(sde_kms->dev->dev);
+		rc = pm_runtime_resume_and_get(sde_kms->dev->dev);
 		if (rc < 0) {
 			SDE_ERROR("failed to enable power resource %d\n", rc);
 			SDE_EVT32(rc, SDE_EVTLOG_ERROR);
@@ -489,7 +490,7 @@ void sde_core_irq_uninstall(struct sde_kms *sde_kms)
 		return;
 	}
 
-	rc = pm_runtime_get_sync(sde_kms->dev->dev);
+	rc = pm_runtime_resume_and_get(sde_kms->dev->dev);
 	if (rc < 0) {
 		SDE_ERROR("failed to enable power resource %d\n", rc);
 		SDE_EVT32(rc, SDE_EVTLOG_ERROR);

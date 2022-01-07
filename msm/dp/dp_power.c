@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -784,9 +785,9 @@ static int dp_power_init(struct dp_power *dp_power, bool flip)
 		goto err_gpio;
 	}
 
-	rc = pm_runtime_get_sync(dp_power->drm_dev->dev);
+	rc = pm_runtime_resume_and_get(dp_power->drm_dev->dev);
 	if (rc < 0) {
-		DP_ERR("Power resource enable failed\n");
+		DP_ERR("failed to enable power resource %d\n", rc);
 		goto err_sde_power;
 	}
 

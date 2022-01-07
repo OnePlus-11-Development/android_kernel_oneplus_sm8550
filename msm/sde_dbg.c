@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2009-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -1160,9 +1161,9 @@ static void _sde_dump_array(bool do_panic, const char *name, bool dump_secure, u
 		sde_evtlog_dump_all(dbg_base->evtlog);
 
 	if (!skip_power) {
-		rc = pm_runtime_get_sync(dbg_base->dev);
+		rc = pm_runtime_resume_and_get(dbg_base->dev);
 		if (rc < 0) {
-			pr_err("failed to enable power %d\n", rc);
+			pr_err("failed to enable power resource %d\n", rc);
 			return;
 		}
 	}
@@ -2099,9 +2100,9 @@ static ssize_t sde_dbg_reg_base_reg_write(struct file *file,
 		}
 	}
 
-	rc = pm_runtime_get_sync(sde_dbg_base.dev);
+	rc = pm_runtime_resume_and_get(sde_dbg_base.dev);
 	if (rc < 0) {
-		pr_err("failed to enable power %d\n", rc);
+		pr_err("failed to enable power resource %d\n", rc);
 		count = rc;
 		goto end;
 	}
@@ -2174,9 +2175,9 @@ static ssize_t sde_dbg_reg_base_reg_read(struct file *file,
 		ptr = dbg->base + dbg->off;
 		tot = 0;
 
-		rc = pm_runtime_get_sync(sde_dbg_base.dev);
+		rc = pm_runtime_resume_and_get(sde_dbg_base.dev);
 		if (rc < 0) {
-			pr_err("failed to enable power %d\n", rc);
+			pr_err("failed to enable power resource %d\n", rc);
 			len = rc;
 			goto end;
 		}
