@@ -114,7 +114,9 @@ static inline bool is_output_meta_enabled(struct msm_vidc_inst *inst)
 	bool enabled = false;
 
 	if (is_decode_session(inst)) {
-		enabled = (inst->capabilities->cap[META_DPB_MISR].value ||
+		enabled = (inst->capabilities->cap[META_BITSTREAM_RESOLUTION].value ||
+			inst->capabilities->cap[META_CROP_OFFSETS].value ||
+			inst->capabilities->cap[META_DPB_MISR].value ||
 			inst->capabilities->cap[META_OPB_MISR].value ||
 			inst->capabilities->cap[META_INTERLACE].value ||
 			inst->capabilities->cap[META_CONCEALED_MB_CNT].value ||

@@ -123,6 +123,10 @@ enum v4l2_mpeg_vidc_blur_types {
 	(V4L2_CID_MPEG_VIDC_BASE + 0x22)
 #define V4L2_CID_MPEG_VIDC_MIN_BITSTREAM_SIZE_OVERWRITE                       \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x23)
+#define V4L2_CID_MPEG_VIDC_METADATA_BITSTREAM_RESOLUTION                      \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x24)
+#define V4L2_CID_MPEG_VIDC_METADATA_CROP_OFFSETS                              \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x25)
 
 /* Encoder Super frame control */
 #define V4L2_CID_MPEG_VIDC_SUPERFRAME           (V4L2_CID_MPEG_VIDC_BASE + 0x28)
@@ -296,6 +300,8 @@ struct msm_vidc_metapayload_header {
 	__u32 reserved[3];
 };
 enum v4l2_mpeg_vidc_metadata {
+	METADATA_BITSTREAM_RESOLUTION         = 0x03000103,
+	METADATA_CROP_OFFSETS                 = 0x03000105,
 	METADATA_LTR_MARK_USE_DETAILS         = 0x03000137,
 	METADATA_SEQ_HEADER_NAL               = 0x0300014a,
 	METADATA_DPB_LUMA_CHROMA_MISR         = 0x03000153,
