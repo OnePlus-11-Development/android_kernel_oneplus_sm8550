@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _IPAHAL_REG_H_
@@ -43,6 +44,7 @@ enum ipahal_reg_name {
 	IPA_STATE,
 	IPA_STATE_RX_ACTIVE,
 	IPA_STATE_TX0,
+	IPA_STATE_TSP,
 	IPA_STATE_AGGR_ACTIVE,
 	IPA_COUNTER_CFG,
 	IPA_STATE_GSI_TLV,
@@ -145,6 +147,7 @@ enum ipahal_reg_name {
 	IPA_COAL_EVICT_LRU,
 	IPA_COAL_QMAP_CFG,
 	IPA_FLAVOR_0,
+	IPA_FLAVOR_9,
 	IPA_STATE_AGGR_ACTIVE_n,
 	IPA_AGGR_FORCE_CLOSE_n,
 	IPA_STAT_QUOTA_MASK_EE_n_REG_k,
@@ -166,6 +169,15 @@ enum ipahal_reg_name {
 	IPA_ULSO_CFG_IP_ID_MAX_VALUE_n,
 	IPA_ENDP_INIT_ULSO_CFG_n,
 	IPA_ENDP_INIT_NAT_EXC_SUPPRESS_n,
+	IPA_TSP_QM_EXTERNAL_BADDR_LSB,
+	IPA_TSP_QM_EXTERNAL_BADDR_MSB,
+	IPA_TSP_QM_EXTERNAL_SIZE,
+	IPA_TSP_INGRESS_POLICING_CFG,
+	IPA_TSP_EGRESS_POLICING_CFG,
+	IPA_STAT_TSP_DROP_BASE,
+	IPA_RAM_INGRESS_POLICER_DB_BASE_ADDR,
+	IPA_RAM_EGRESS_SHAPING_PROD_DB_BASE_ADDR,
+	IPA_RAM_EGRESS_SHAPING_TC_DB_BASE_ADDR,
 	IPA_REG_MAX,
 };
 
@@ -807,6 +819,42 @@ struct ipahal_ipa_flavor_0 {
 };
 
 /*
+ * struct ipahal_ipa_flavor_9 - IPA_FLAVOR_9 register
+ * @ipa_tsp_max_ingr_tc: Maximal number of ingress (consumer-based) traffic-classes.
+ *                       Does not include invalid traffic-class 0x00.
+ * @ipa_tsp_max_egr_tc: Maximal number of egress (producer-based) traffic-classes.
+ *                      Does not include invalid traffic-class 0x00.
+ * @ipa_tsp_max_prod: Maximal number of TSP-enabled producers.
+ * @reserved: Reserved
+ */
+struct ipahal_ipa_flavor_9 {
+	u8 ipa_tsp_max_ingr_tc;
+	u8 ipa_tsp_max_egr_tc;
+	u8 ipa_tsp_max_prod;
+	u8 reserved;
+};
+
+/*
+ * struct ipahal_ipa_state_tsp - TSP engine state register
+ * @traffic_shaper_idle: Traffic-Shaper module IDLE indication
+ * @traffic_shaper_fifo_empty: Traffic-Shaper FIFO empty indication
+ * @queue_mngr_idle: QMNGR overall IDLE indication
+ * @queue_mngr_head_idle: QMNGR head module IDLE indication
+ * @queue_mngr_shared_idle: QMNGR shared module IDLE indication
+ * @queue_mngr_tail_idle: QMNGR tail module IDLE indication
+ * @queue_mngr_block_ctrl_idle: Block control module IDLE indication
+ */
+struct ipahal_ipa_state_tsp {
+	bool traffic_shaper_idle;
+	bool traffic_shaper_fifo_empty;
+	bool queue_mngr_idle;
+	bool queue_mngr_head_idle;
+	bool queue_mngr_shared_idle;
+	bool queue_mngr_tail_idle;
+	bool queue_mngr_block_ctrl_idle;
+};
+
+/*
  * struct ipahal_reg_nat_uc_local_cfg -  IPA_NAT_UC_EXTERNAL_CFG register
  * @nat_uc_external_table_addr_lsb: 32 LSb bits of system-memory address of
  * external UC-activation entry table.
@@ -959,6 +1007,17 @@ static inline void ipahal_write_reg(enum ipahal_reg_name reg,
 	u32 val)
 {
 	ipahal_write_reg_mn(reg, 0, 0, val);
+}
+
+/*
+ * ipahal_write_reg_mask() - Overwrite a masked raw value in reg
+ */
+static inline void ipahal_write_reg_mask(enum ipahal_reg_name reg, u32 val, u32 mask)
+{
+	u32 new_val = ipahal_read_reg(reg);
+	new_val &= !mask;
+	new_val &= (val & mask);
+	ipahal_write_reg(reg, val);
 }
 
 /*

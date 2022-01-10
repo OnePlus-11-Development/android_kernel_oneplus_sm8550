@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -46,6 +47,7 @@ static const char *ipareg_name_to_str[IPA_REG_MAX] = {
 	__stringify(IPA_STATE),
 	__stringify(IPA_STATE_RX_ACTIVE),
 	__stringify(IPA_STATE_TX0),
+	__stringify(IPA_STATE_TSP),
 	__stringify(IPA_STATE_AGGR_ACTIVE),
 	__stringify(IPA_COUNTER_CFG),
 	__stringify(IPA_STATE_GSI_TLV),
@@ -148,6 +150,7 @@ static const char *ipareg_name_to_str[IPA_REG_MAX] = {
 	__stringify(IPA_COAL_EVICT_LRU),
 	__stringify(IPA_COAL_QMAP_CFG),
 	__stringify(IPA_FLAVOR_0),
+	__stringify(IPA_FLAVOR_9),
 	__stringify(IPA_STATE_AGGR_ACTIVE_n),
 	__stringify(IPA_AGGR_FORCE_CLOSE_n),
 	__stringify(IPA_STAT_QUOTA_MASK_EE_n_REG_k),
@@ -168,6 +171,15 @@ static const char *ipareg_name_to_str[IPA_REG_MAX] = {
 	__stringify(IPA_ULSO_CFG_IP_ID_MIN_VALUE_n),
 	__stringify(IPA_ULSO_CFG_IP_ID_MAX_VALUE_n),
 	__stringify(IPA_ENDP_INIT_ULSO_CFG_n),
+	__stringify(IPA_TSP_QM_EXTERNAL_BADDR_LSB),
+	__stringify(IPA_TSP_QM_EXTERNAL_BADDR_MSB),
+	__stringify(IPA_TSP_QM_EXTERNAL_SIZE),
+	__stringify(IPA_TSP_INGRESS_POLICING_CFG),
+	__stringify(IPA_TSP_EGRESS_POLICING_CFG),
+	__stringify(IPA_STAT_TSP_DROP_BASE),
+	__stringify(IPA_RAM_INGRESS_POLICER_DB_BASE_ADDR),
+	__stringify(IPA_RAM_EGRESS_SHAPING_PROD_DB_BASE_ADDR),
+	__stringify(IPA_RAM_EGRESS_SHAPING_TC_DB_BASE_ADDR),
 };
 
 static void ipareg_construct_dummy(enum ipahal_reg_name reg,
@@ -2021,6 +2033,34 @@ static void ipareg_construct_endp_init_prod_cfg_n_v5_5(
 			IPA_ENDP_INIT_PROD_CFG_n_EGRESS_TC_HIGHEST_BMASK);
 }
 
+static void ipareg_parse_endp_init_prod_cfg_n_v5_5(enum ipahal_reg_name reg,
+	void *fields, u32 val)
+{
+	struct ipa_ep_cfg_prod_cfg *cfg =
+		(struct ipa_ep_cfg_prod_cfg *)fields;
+
+	cfg->tx_instance =
+		((val & IPA_ENDP_INIT_PROD_CFG_n_TX_SEL_BMASK) >>
+		IPA_ENDP_INIT_PROD_CFG_n_TX_SEL_SHIFT);
+	cfg->tsp_enable =
+		((val & IPA_ENDP_INIT_PROD_CFG_n_TSP_ENABLE_BMASK) >>
+		IPA_ENDP_INIT_PROD_CFG_n_TSP_ENABLE_SHIFT);
+	cfg->max_output_size_drop_enable =
+		((val & IPA_ENDP_INIT_PROD_CFG_n_MAX_OUTPUT_SIZE_DROP_ENABLE_BMASK) >>
+		IPA_ENDP_INIT_PROD_CFG_n_MAX_OUTPUT_SIZE_DROP_ENABLE_SHIFT);
+	cfg->tsp_idx =
+		((val & IPA_ENDP_INIT_PROD_CFG_n_TSP_INDEX_BMASK) >>
+		IPA_ENDP_INIT_PROD_CFG_n_TSP_INDEX_SHIFT);
+	cfg->max_output_size =
+		((val & IPA_ENDP_INIT_PROD_CFG_n_MAX_OUTPUT_SIZE_BMASK) >>
+		IPA_ENDP_INIT_PROD_CFG_n_MAX_OUTPUT_SIZE_SHIFT);
+	cfg->egress_tc_lowest =
+		((val & IPA_ENDP_INIT_PROD_CFG_n_EGRESS_TC_LOWEST_BMASK) >>
+		IPA_ENDP_INIT_PROD_CFG_n_EGRESS_TC_LOWEST_SHIFT);
+	cfg->egress_tc_highest =
+		((val & IPA_ENDP_INIT_PROD_CFG_n_EGRESS_TC_HIGHEST_BMASK) >>
+		IPA_ENDP_INIT_PROD_CFG_n_EGRESS_TC_HIGHEST_SHIFT);
+}
 
 static void ipareg_construct_endp_init_deaggr_n(
 		enum ipahal_reg_name reg, const void *fields, u32 *val)
@@ -3311,6 +3351,56 @@ static void ipareg_parse_ipa_flavor_0(enum ipahal_reg_name reg,
 	ipa_flavor->ipa_prod_lowest = IPA_GETFIELD_FROM_REG(val,
 		IPA_FLAVOR_0_IPA_PROD_LOWEST_SHFT,
 		IPA_FLAVOR_0_IPA_PROD_LOWEST_BMSK);
+}
+
+static void ipareg_parse_ipa_flavor_9(enum ipahal_reg_name reg,
+	void *fields, u32 val)
+{
+	struct ipahal_ipa_flavor_9 *ipa_flavor =
+		(struct ipahal_ipa_flavor_9 *)fields;
+
+	memset(ipa_flavor, 0, sizeof(*ipa_flavor));
+
+	ipa_flavor->ipa_tsp_max_ingr_tc = IPA_GETFIELD_FROM_REG(val,
+		IPA_FLAVOR_9_IPA_TSP_MAX_INGR_TC_SHFT,
+		IPA_FLAVOR_9_IPA_TSP_MAX_INGR_TC_BMSK);
+	ipa_flavor->ipa_tsp_max_egr_tc = IPA_GETFIELD_FROM_REG(val,
+		IPA_FLAVOR_9_IPA_TSP_MAX_EGR_TC_SHFT,
+		IPA_FLAVOR_9_IPA_TSP_MAX_EGR_TC_BMSK);
+	ipa_flavor->ipa_tsp_max_prod = IPA_GETFIELD_FROM_REG(val,
+		IPA_FLAVOR_9_IPA_TSP_MAX_PROD_SHFT,
+		IPA_FLAVOR_9_IPA_TSP_MAX_PROD_BMSK);
+}
+
+static void ipareg_parse_state_tsp(enum ipahal_reg_name reg,
+	void *fields, u32 val)
+{
+	struct ipahal_ipa_state_tsp *state_tsp =
+		(struct ipahal_ipa_state_tsp *)fields;
+
+	memset(state_tsp, 0, sizeof(*state_tsp));
+
+	state_tsp->traffic_shaper_idle = IPA_GETFIELD_FROM_REG(val,
+		IPA_STATE_TSP_TRAFFIC_SHAPER_IDLE_SHFT,
+		IPA_STATE_TSP_TRAFFIC_SHAPER_IDLE_BMSK);
+	state_tsp->traffic_shaper_fifo_empty = IPA_GETFIELD_FROM_REG(val,
+		IPA_STATE_TSP_TRAFFIC_SHAPER_FIFO_EMPTY_SHFT,
+		IPA_STATE_TSP_TRAFFIC_SHAPER_FIFO_EMPTY_BMSK);
+	state_tsp->queue_mngr_idle = IPA_GETFIELD_FROM_REG(val,
+		IPA_STATE_TSP_QUEUE_MNGR_IDLE_SHFT,
+		IPA_STATE_TSP_QUEUE_MNGR_IDLE_BMSK);
+	state_tsp->queue_mngr_head_idle = IPA_GETFIELD_FROM_REG(val,
+		IPA_STATE_TSP_QUEUE_MNGR_HEAD_IDLE_SHFT,
+		IPA_STATE_TSP_QUEUE_MNGR_HEAD_IDLE_BMSK);
+	state_tsp->queue_mngr_shared_idle = IPA_GETFIELD_FROM_REG(val,
+		IPA_STATE_TSP_QUEUE_MNGR_SHARED_IDLE_SHFT,
+		IPA_STATE_TSP_QUEUE_MNGR_SHARED_IDLE_BMSK);
+	state_tsp->queue_mngr_tail_idle = IPA_GETFIELD_FROM_REG(val,
+		IPA_STATE_TSP_QUEUE_MNGR_TAIL_IDLE_SHFT,
+		IPA_STATE_TSP_QUEUE_MNGR_TAIL_IDLE_BMSK);
+	state_tsp->queue_mngr_block_ctrl_idle = IPA_GETFIELD_FROM_REG(val,
+		IPA_STATE_TSP_QUEUE_MNGR_BLOCK_CTRL_IDLE_SHFT,
+		IPA_STATE_TSP_QUEUE_MNGR_BLOCK_CTRL_IDLE_BMSK);
 }
 
 static void ipareg_construct_nat_uc_external_cfg(enum ipahal_reg_name reg,
@@ -4786,6 +4876,9 @@ static struct ipahal_reg_obj ipahal_reg_objs[IPA_HW_MAX][IPA_REG_MAX] = {
 	[IPA_HW_v5_5][IPA_FLAVOR_0] = {
 		ipareg_construct_dummy, ipareg_parse_ipa_flavor_0,
 		0x00000000, 0, 0, 0, 0, 0},
+	[IPA_HW_v5_5][IPA_FLAVOR_9] = {
+		ipareg_construct_dummy, ipareg_parse_ipa_flavor_9,
+		0x00000000, 0, 0, 0, 0, 0},
 	[IPA_HW_v5_5][IPA_ENABLED_PIPES] = {
 		ipareg_construct_dummy, ipareg_parse_dummy,
 		-1, 0, 0, 0, 0, 0},
@@ -4837,6 +4930,9 @@ static struct ipahal_reg_obj ipahal_reg_objs[IPA_HW_MAX][IPA_REG_MAX] = {
 	[IPA_HW_v5_5][IPA_STATE_TX0] = {
 		ipareg_construct_dummy, ipareg_parse_dummy,
 		-1, 0, 0, 0, 1, 0},
+	[IPA_HW_v5_5][IPA_STATE_TSP] = {
+		ipareg_construct_dummy, ipareg_parse_state_tsp,
+		0x0000011C, 0, 0, 0, 1, 0},
 	[IPA_HW_v5_5][IPA_STATE_AGGR_ACTIVE] = {
 		ipareg_construct_dummy, ipareg_parse_dummy,
 		-1, 0, 0, 0, 1, 0},
@@ -5028,7 +5124,7 @@ static struct ipahal_reg_obj ipahal_reg_objs[IPA_HW_MAX][IPA_REG_MAX] = {
 		ipareg_parse_dummy,
 		0x00001030, 0x80, 13, 30, 1, 0},
 	[IPA_HW_v5_5][IPA_ENDP_INIT_PROD_CFG_n] = {
-		ipareg_construct_endp_init_prod_cfg_n_v5_5, ipareg_parse_dummy,
+		ipareg_construct_endp_init_prod_cfg_n_v5_5, ipareg_parse_endp_init_prod_cfg_n_v5_5,
 		0x0000106C, 0x80, 13, 30, 1, 0},
 	[IPA_HW_v5_5][IPA_COAL_EVICT_LRU] = {
 		ipareg_construct_coal_evict_lru_v5_5, ipareg_parse_coal_evict_lru_v5_5,
@@ -5042,6 +5138,24 @@ static struct ipahal_reg_obj ipahal_reg_objs[IPA_HW_MAX][IPA_REG_MAX] = {
 	[IPA_HW_v5_5][IPA_ULSO_CFG_IP_ID_MAX_VALUE_n] = {
 		ipareg_construct_dummy, ipareg_parse_dummy,
 		0x00000924, 0x4, 0, 0, 0, 0},
+	[IPA_HW_v5_5][IPA_TSP_QM_EXTERNAL_BADDR_LSB] = {
+		ipareg_construct_dummy, ipareg_parse_dummy,
+		0x00000A00, 0, 0, 0, 0, 0},
+	[IPA_HW_v5_5][IPA_TSP_QM_EXTERNAL_BADDR_MSB] = {
+		ipareg_construct_dummy, ipareg_parse_dummy,
+		0x00000A04, 0, 0, 0, 0, 0},
+	[IPA_HW_v5_5][IPA_TSP_QM_EXTERNAL_SIZE] = {
+		ipareg_construct_dummy, ipareg_parse_dummy,
+		0x00000A08, 0, 0, 0, 0, 0},
+	[IPA_HW_v5_5][IPA_TSP_INGRESS_POLICING_CFG] = {
+		ipareg_construct_dummy, ipareg_parse_dummy,
+		0x00000A0C, 0, 0, 0, 0, 0},
+	[IPA_HW_v5_5][IPA_TSP_EGRESS_POLICING_CFG] = {
+		ipareg_construct_dummy, ipareg_parse_dummy,
+		0x00000A10, 0, 0, 0, 0, 0},
+	[IPA_HW_v5_5][IPA_STAT_TSP_DROP_BASE] = {
+		ipareg_construct_dummy, ipareg_parse_dummy,
+		0x00000A14, 0, 0, 0, 0, 0},
 	[IPA_HW_v5_5][IPA_ENDP_INIT_ULSO_CFG_n] = {
 		ipareg_construct_dummy, ipareg_parse_dummy,
 		0x00001070, 0x80, 0, 0, 0, 0},
@@ -5076,6 +5190,15 @@ static struct ipahal_reg_obj ipahal_reg_objs[IPA_HW_MAX][IPA_REG_MAX] = {
 	[IPA_HW_v5_5][IPA_HPS_SEQUENCER_LAST] = {
 		ipareg_construct_dummy, ipareg_parse_dummy,
 		0x00008590, 0, 0, 0, 0, 0},
+	[IPA_HW_v5_5][IPA_RAM_INGRESS_POLICER_DB_BASE_ADDR] = {
+		ipareg_construct_dummy, ipareg_parse_dummy,
+		0x000085DC, 0, 0, 0, 0, 0},
+	[IPA_HW_v5_5][IPA_RAM_EGRESS_SHAPING_PROD_DB_BASE_ADDR] = {
+		ipareg_construct_dummy, ipareg_parse_dummy,
+		0x000085E0, 0, 0, 0, 0, 0},
+	[IPA_HW_v5_5][IPA_RAM_EGRESS_SHAPING_TC_DB_BASE_ADDR] = {
+		ipareg_construct_dummy, ipareg_parse_dummy,
+		0x000085E4, 0, 0, 0, 0, 0},
 	[IPA_HW_v5_5][IPA_ENDP_GSI_CFG1_n] = {
 		ipareg_construct_dummy, ipareg_parse_dummy,
 		0x00008800, 0x4, 0, 30, 0, 0},
