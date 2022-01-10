@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2019, 2021 The Linux Foundation. All rights reserved.
  */
 
@@ -72,8 +73,6 @@ static const struct sde_format_extended plane_formats_vig[] = {
 	{DRM_FORMAT_NV12, 0},
 	{DRM_FORMAT_NV12, DRM_FORMAT_MOD_QCOM_COMPRESSED},
 	{DRM_FORMAT_NV21, 0},
-	{DRM_FORMAT_NV16, 0},
-	{DRM_FORMAT_NV61, 0},
 	{DRM_FORMAT_VYUY, 0},
 	{DRM_FORMAT_UYVY, 0},
 	{DRM_FORMAT_YUYV, 0},
