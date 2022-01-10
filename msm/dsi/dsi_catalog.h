@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _DSI_CATALOG_H_
@@ -124,6 +125,24 @@ void dsi_phy_hw_v4_0_toggle_resync_fifo(struct dsi_phy_hw *phy);
 void dsi_phy_hw_v4_0_reset_clk_en_sel(struct dsi_phy_hw *phy);
 void dsi_phy_hw_v4_0_set_continuous_clk(struct dsi_phy_hw *phy, bool enable);
 void dsi_phy_hw_v4_0_commit_phy_timing(struct dsi_phy_hw *phy,
+		struct dsi_phy_per_lane_cfgs *timing);
+
+/* Definitions for 4nm PHY hardware driver */
+void dsi_phy_hw_v5_0_enable(struct dsi_phy_hw *phy, struct dsi_phy_cfg *cfg);
+void dsi_phy_hw_v5_0_disable(struct dsi_phy_hw *phy, struct dsi_phy_cfg *cfg);
+int dsi_phy_hw_v5_0_wait_for_lane_idle(struct dsi_phy_hw *phy, u32 lanes);
+void dsi_phy_hw_v5_0_ulps_request(struct dsi_phy_hw *phy,
+		struct dsi_phy_cfg *cfg, u32 lanes);
+void dsi_phy_hw_v5_0_ulps_exit(struct dsi_phy_hw *phy, struct dsi_phy_cfg *cfg, u32 lanes);
+u32 dsi_phy_hw_v5_0_get_lanes_in_ulps(struct dsi_phy_hw *phy);
+bool dsi_phy_hw_v5_0_is_lanes_in_ulps(u32 lanes, u32 ulps_lanes);
+int dsi_phy_hw_timing_val_v5_0(struct dsi_phy_per_lane_cfgs *timing_cfg, u32 *timing_val,
+		u32 size);
+int dsi_phy_hw_v5_0_lane_reset(struct dsi_phy_hw *phy);
+void dsi_phy_hw_v5_0_toggle_resync_fifo(struct dsi_phy_hw *phy);
+void dsi_phy_hw_v5_0_reset_clk_en_sel(struct dsi_phy_hw *phy);
+void dsi_phy_hw_v5_0_set_continuous_clk(struct dsi_phy_hw *phy, bool enable);
+void dsi_phy_hw_v5_0_commit_phy_timing(struct dsi_phy_hw *phy,
 		struct dsi_phy_per_lane_cfgs *timing);
 
 /* DSI controller common ops */
@@ -279,6 +298,17 @@ void dsi_phy_hw_v4_0_dyn_refresh_pipe_delay(struct dsi_phy_hw *phy,
 int dsi_phy_hw_v4_0_cache_phy_timings(struct dsi_phy_per_lane_cfgs *timings,
 				      u32 *dst, u32 size);
 
+void dsi_phy_hw_v5_0_dyn_refresh_trigger_sel(struct dsi_phy_hw *phy,
+		bool is_master);
+void dsi_phy_hw_v5_0_dyn_refresh_helper(struct dsi_phy_hw *phy, u32 offset);
+void dsi_phy_hw_v5_0_dyn_refresh_config(struct dsi_phy_hw *phy,
+				struct dsi_phy_cfg *cfg, bool is_master);
+void dsi_phy_hw_v5_0_dyn_refresh_pipe_delay(struct dsi_phy_hw *phy,
+					    struct dsi_dyn_clk_delay *delay);
+
+int dsi_phy_hw_v5_0_cache_phy_timings(struct dsi_phy_per_lane_cfgs *timings,
+				      u32 *dst, u32 size);
+void dsi_phy_hw_v5_0_phy_idle_off(struct dsi_phy_hw *phy);
 void dsi_ctrl_hw_22_configure_cmddma_window(struct dsi_ctrl_hw *ctrl,
 		struct dsi_ctrl_cmd_dma_info *cmd,
 		u32 line_no, u32 window);
@@ -290,6 +320,8 @@ u32 dsi_ctrl_hw_22_log_line_count(struct dsi_ctrl_hw *ctrl, bool cmd_mode);
 int dsi_catalog_phy_pll_setup(struct dsi_phy_hw *phy, u32 pll_ver);
 int dsi_pll_5nm_configure(void *pll, bool commit);
 int dsi_pll_5nm_toggle(void *pll, bool prepare);
+int dsi_pll_4nm_configure(void *pll, bool commit);
+int dsi_pll_4nm_toggle(void *pll, bool prepare);
 
 void dsi_ctrl_hw_22_configure_splitlink(struct dsi_ctrl_hw *ctrl,
 		struct dsi_host_common_cfg *common_cfg, u32 sublink);
