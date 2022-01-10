@@ -2027,6 +2027,11 @@ int msm_vidc_get_control(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 			inst->buffers.input.extra_count;
 		i_vpr_h(inst, "g_min: input buffers %d\n", ctrl->val);
 		break;
+	case V4L2_CID_MPEG_VIDC_AV1D_FILM_GRAIN_PRESENT:
+		ctrl->val = inst->capabilities->cap[FILM_GRAIN].value;
+		i_vpr_h(inst, "%s: film grain present: %d\n",
+			 __func__, ctrl->val);
+		break;
 	default:
 		i_vpr_e(inst, "invalid ctrl %s id %d\n",
 			ctrl->name, ctrl->id);

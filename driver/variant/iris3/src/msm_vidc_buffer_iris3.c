@@ -220,15 +220,22 @@ static u32 msm_vidc_decoder_dpb_size_iris3(struct msm_vidc_inst *inst)
 		return size;
 	}
 
+	/*
+	 * For legacy codecs (non-AV1), DPB is calculated only
+	 * for linear formats. For AV1, DPB is needed for film-grain
+	 * enabled bitstreams (UBWC & linear).
+	 */
 	color_fmt = inst->capabilities->cap[PIX_FMTS].value;
-	if (!is_linear_colorformat(color_fmt))
+	if (!is_linear_colorformat(color_fmt) &&
+		inst->codec != MSM_VIDC_AV1)
 		return size;
 
 	f = &inst->fmts[OUTPUT_PORT];
 	width = f->fmt.pix_mp.width;
 	height = f->fmt.pix_mp.height;
 
-	if (color_fmt == MSM_VIDC_FMT_NV12) {
+	if (color_fmt == MSM_VIDC_FMT_NV12 ||
+		color_fmt == MSM_VIDC_FMT_NV12C) {
 		v4l2_fmt = V4L2_PIX_FMT_VIDC_NV12C;
 		HFI_NV12_UBWC_IL_CALC_BUF_SIZE_V2(size, width, height,
 			VIDEO_Y_STRIDE_BYTES(v4l2_fmt, width), VIDEO_Y_SCANLINES(v4l2_fmt, height),
@@ -237,7 +244,8 @@ static u32 msm_vidc_decoder_dpb_size_iris3(struct msm_vidc_inst *inst)
 				height),
 			VIDEO_UV_META_STRIDE(v4l2_fmt, width), VIDEO_UV_META_SCANLINES(v4l2_fmt,
 				height));
-	} else if (color_fmt == MSM_VIDC_FMT_P010) {
+	} else if (color_fmt == MSM_VIDC_FMT_P010 ||
+		color_fmt == MSM_VIDC_FMT_TP10C) {
 		v4l2_fmt = V4L2_PIX_FMT_VIDC_TP10C;
 		HFI_YUV420_TP10_UBWC_CALC_BUF_SIZE(size,
 			VIDEO_Y_STRIDE_BYTES(v4l2_fmt, width), VIDEO_Y_SCANLINES(v4l2_fmt, height),
@@ -605,7 +613,9 @@ static int msm_buffer_dpb_count(struct msm_vidc_inst *inst)
 	/* decoder dpb buffer count */
 	if (is_decode_session(inst)) {
 		color_fmt = inst->capabilities->cap[PIX_FMTS].value;
-		if (is_linear_colorformat(color_fmt))
+		if (is_linear_colorformat(color_fmt) ||
+			(inst->codec == MSM_VIDC_AV1 &&
+			(inst->capabilities->cap[FILM_GRAIN].value)))
 			count = inst->buffers.output.min_count;
 
 		return count;

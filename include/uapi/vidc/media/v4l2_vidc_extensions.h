@@ -191,6 +191,9 @@ enum v4l2_mpeg_video_av1_tier {
 };
 /* Decoder Timestamp Reorder control */
 #define V4L2_CID_MPEG_VIDC_TS_REORDER           (V4L2_CID_MPEG_VIDC_BASE + 0x34)
+/* AV1 Decoder Film Grain */
+#define V4L2_CID_MPEG_VIDC_AV1D_FILM_GRAIN_PRESENT                           \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x35)
 
 /* Deprecate below controls once availble in gki and gsi bionic header */
 #ifndef V4L2_CID_MPEG_VIDEO_BASELAYER_PRIORITY_ID
