@@ -2467,7 +2467,10 @@ static int sde_wb_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
 			set_bit(SDE_WB_HAS_DCWB, &wb->features);
 			if (IS_SDE_CTL_REV_100(sde_cfg->ctl_rev))
 				set_bit(SDE_WB_DCWB_CTRL, &wb->features);
-			if (major_version >= SDE_HW_MAJOR(SDE_HW_VER_810)) {
+			if (major_version >= SDE_HW_MAJOR(SDE_HW_VER_900)) {
+				sde_cfg->cwb_blk_off = 0x67200;
+				sde_cfg->cwb_blk_stride = 0x400;
+			} else if (major_version >= SDE_HW_MAJOR(SDE_HW_VER_810)) {
 				sde_cfg->cwb_blk_off = 0x66A00;
 				sde_cfg->cwb_blk_stride = 0x400;
 			} else {
