@@ -140,6 +140,26 @@ static inline struct sde_kms *_sde_crtc_get_kms(struct drm_crtc *crtc)
 	return to_sde_kms(priv->kms);
 }
 
+enum sde_wb_usage_type sde_crtc_get_wb_usage_type(struct drm_crtc *crtc)
+{
+	struct drm_connector *conn;
+	struct drm_connector_list_iter conn_iter;
+	enum sde_wb_usage_type usage_type = 0;
+
+	drm_connector_list_iter_begin(crtc->dev, &conn_iter);
+	drm_for_each_connector_iter(conn, &conn_iter) {
+		if (conn->state && (conn->state->crtc == crtc)
+				&& (conn->connector_type == DRM_MODE_CONNECTOR_VIRTUAL)) {
+			usage_type = sde_connector_get_property(conn->state,
+					CONNECTOR_PROP_WB_USAGE_TYPE);
+			break;
+		}
+	}
+	drm_connector_list_iter_end(&conn_iter);
+
+	return usage_type;
+}
+
 static inline struct drm_connector_state *_sde_crtc_get_virt_conn_state(
 		struct drm_crtc *crtc, struct drm_crtc_state *crtc_state)
 {

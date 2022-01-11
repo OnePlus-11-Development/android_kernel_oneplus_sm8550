@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -682,6 +683,7 @@ struct sde_connector {
  * @dnsc_blur_count: Number of downscale blur blocks used
  * @dnsc_blur_cfg: Configs for the downscale blur block
  * @dnsc_blur_lut: LUT idx used for the Gaussian filter LUTs in downscale blur block
+ * @usage_type: WB connector usage type
  */
 struct sde_connector_state {
 	struct drm_connector_state base;
@@ -702,6 +704,7 @@ struct sde_connector_state {
 	u32 dnsc_blur_count;
 	struct sde_drm_dnsc_blur_cfg dnsc_blur_cfg[DNSC_BLUR_MAX_COUNT];
 	u32 dnsc_blur_lut;
+	enum sde_wb_usage_type usage_type;
 };
 
 /**

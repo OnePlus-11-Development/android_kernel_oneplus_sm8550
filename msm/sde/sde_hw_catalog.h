@@ -844,6 +844,7 @@ enum sde_qos_lut_usage {
 	SDE_QOS_LUT_USAGE_CWB_TILE,
 	SDE_QOS_LUT_USAGE_INLINE,
 	SDE_QOS_LUT_USAGE_INLINE_RESTRICTED_FMTS,
+	SDE_QOS_LUT_USAGE_OFFLINE_WB,
 	SDE_QOS_LUT_USAGE_MAX,
 };
 
@@ -1491,6 +1492,7 @@ struct sde_vbif_qos_tbl {
  * @VBIF_CWB_CLIENT: concurrent writeback client
  * @VBIF_LUTDMA_CLIENT: LUTDMA client
  * @VBIF_CNOC_CLIENT: HW fence client
+ * @VBIF_OFFLINE_WB_CLIENT: Offline WB client used in 2-pass composition
  * @VBIF_MAX_CLIENT: max number of clients
  */
 enum sde_vbif_client_type {
@@ -1499,6 +1501,7 @@ enum sde_vbif_client_type {
 	VBIF_CWB_CLIENT,
 	VBIF_LUTDMA_CLIENT,
 	VBIF_CNOC_CLIENT,
+	VBIF_OFFLINE_WB_CLIENT,
 	VBIF_MAX_CLIENT
 };
 

@@ -488,6 +488,18 @@ enum sde_sys_cache_state {
 	CACHE_STATE_FRAME_READ
 };
 
+/**
+ * enum sde_wb_usage_type: Type of usage of the WB connector
+ * WB_USAGE_WFD: WB connector used for WFD
+ * WB_USAGE_CWB: WB connector used for concurrent writeback
+ * WB_USAGE_OFFLINE_WB: WB connector used for 2-pass composition
+ */
+enum sde_wb_usage_type {
+	WB_USAGE_WFD,
+	WB_USAGE_CWB,
+	WB_USAGE_OFFLINE_WB,
+};
+
 /** struct sde_format - defines the format configuration which
  * allows SDE HW to correctly fetch and decode the format
  * @base: base msm_format struture containing fourcc code

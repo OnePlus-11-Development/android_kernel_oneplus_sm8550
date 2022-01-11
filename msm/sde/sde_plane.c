@@ -78,18 +78,6 @@ enum sde_plane_qos {
 	SDE_PLANE_QOS_PANIC_CTRL = BIT(2),
 };
 
-/*
- * struct sde_plane - local sde plane structure
- * @aspace: address space pointer
- * @csc_cfg: Decoded user configuration for csc
- * @csc_usr_ptr: Points to csc_cfg if valid user config available
- * @csc_ptr: Points to sde_csc_cfg structure to use for current
- * @mplane_list: List of multirect planes of the same pipe
- * @catalog: Points to sde catalog structure
- * @revalidate: force revalidation of all the plane properties
- * @xin_halt_forced_clk: whether or not clocks were forced on for xin halt
- * @blob_rot_caps: Pointer to rotator capability blob
- */
 struct sde_plane {
 	struct drm_plane base;
 
@@ -108,6 +96,7 @@ struct sde_plane {
 	uint32_t color_fill;
 	bool is_error;
 	bool is_rt_pipe;
+	enum sde_wb_usage_type wb_usage_type;
 	bool is_virtual;
 	struct list_head mplane_list;
 	struct sde_mdss_cfg *catalog;
@@ -305,7 +294,8 @@ static void _sde_plane_set_qos_lut(struct drm_plane *plane,
 		else
 			lut_index = SDE_QOS_LUT_USAGE_MACROTILE;
 	} else {
-		lut_index = SDE_QOS_LUT_USAGE_NRT;
+		lut_index = (psde->wb_usage_type == WB_USAGE_OFFLINE_WB) ?
+					SDE_QOS_LUT_USAGE_OFFLINE_WB : SDE_QOS_LUT_USAGE_NRT;
 	}
 
 	creq_lut_index = lut_index * SDE_CREQ_LUT_TYPE_MAX;
@@ -325,11 +315,12 @@ static void _sde_plane_set_qos_lut(struct drm_plane *plane,
 			(fmt) ? fmt->fetch_mode : 0, psde->pipe_qos_cfg.danger_lut,
 			psde->pipe_qos_cfg.safe_lut, psde->pipe_qos_cfg.creq_lut);
 
-	SDE_DEBUG("plane%u: pnum:%d fmt:%4.4s fps:%d mode:%d luts[0x%x,0x%x 0x%llx]\n",
+	SDE_DEBUG("plane%u: pnum:%d fmt:%4.4s fps:%d mode:%d lut[0x%x,0x%x 0x%llx] rt:%d type:%d\n",
 		plane->base.id, psde->pipe - SSPP_VIG0,
 		fmt ? (char *)&fmt->base.pixel_format : NULL, frame_rate,
 		fmt ? fmt->fetch_mode : -1, psde->pipe_qos_cfg.danger_lut,
-		psde->pipe_qos_cfg.safe_lut, psde->pipe_qos_cfg.creq_lut);
+		psde->pipe_qos_cfg.safe_lut, psde->pipe_qos_cfg.creq_lut,
+		psde->is_rt_pipe, psde->wb_usage_type);
 
 	psde->pipe_hw->ops.setup_qos_lut(psde->pipe_hw, &psde->pipe_qos_cfg);
 }
@@ -472,7 +463,8 @@ static void _sde_plane_set_ot_limit(struct drm_plane *plane,
 	ot_params.num = psde->pipe_hw->idx - SSPP_NONE;
 	ot_params.width = psde->pipe_cfg.src_rect.w;
 	ot_params.height = psde->pipe_cfg.src_rect.h;
-	ot_params.is_wfd = !psde->is_rt_pipe;
+	ot_params.is_wfd = ((psde->is_rt_pipe)
+				|| (psde->wb_usage_type == WB_USAGE_OFFLINE_WB)) ? false : true;
 	ot_params.frame_rate = drm_mode_vrefresh(&crtc->mode);
 	ot_params.vbif_idx = VBIF_RT;
 	ot_params.clk_ctrl = psde->pipe_hw->cap->clk_ctrl;
@@ -515,8 +507,11 @@ static void _sde_plane_set_qos_remap(struct drm_plane *plane)
 	qos_params.clk_ctrl = psde->pipe_hw->cap->clk_ctrl;
 	qos_params.xin_id = psde->pipe_hw->cap->xin_id;
 	qos_params.num = psde->pipe_hw->idx - SSPP_VIG0;
-	qos_params.client_type = psde->is_rt_pipe ?
-					VBIF_RT_CLIENT : VBIF_NRT_CLIENT;
+	if (psde->is_rt_pipe)
+		qos_params.client_type =  VBIF_RT_CLIENT;
+	else
+		qos_params.client_type = (psde->wb_usage_type == WB_USAGE_OFFLINE_WB) ?
+						VBIF_OFFLINE_WB_CLIENT : VBIF_NRT_CLIENT;
 
 	SDE_DEBUG("plane%d pipe:%d vbif:%d xin:%d rt:%d, clk_ctrl:%d\n",
 			plane->base.id, qos_params.num,
@@ -3329,6 +3324,7 @@ static int sde_plane_sspp_atomic_update(struct drm_plane *plane,
 	is_rt = sde_crtc_is_rt_client(crtc, crtc->state);
 	if (is_rt != psde->is_rt_pipe || crtc->state->mode_changed) {
 		psde->is_rt_pipe = is_rt;
+		psde->wb_usage_type = psde->is_rt_pipe ? 0 : sde_crtc_get_wb_usage_type(crtc);
 		pstate->dirty |= SDE_PLANE_DIRTY_QOS;
 	}
 

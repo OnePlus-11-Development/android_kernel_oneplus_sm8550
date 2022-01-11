@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -233,6 +234,7 @@ enum msm_mdp_conn_property {
 	CONNECTOR_PROP_AVR_STEP,
 	CONNECTOR_PROP_CACHE_STATE,
 	CONNECTOR_PROP_DSC_MODE,
+	CONNECTOR_PROP_WB_USAGE_TYPE,
 
 	/* total # of properties */
 	CONNECTOR_PROP_COUNT

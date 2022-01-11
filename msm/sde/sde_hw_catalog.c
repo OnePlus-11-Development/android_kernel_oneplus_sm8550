@@ -494,6 +494,7 @@ enum {
 	VBIF_QOS_CWB_REMAP,
 	VBIF_QOS_LUTDMA_REMAP,
 	VBIF_QOS_CNOC_REMAP,
+	VBIF_QOS_OFFLINE_WB_REMAP,
 	VBIF_PROP_MAX,
 };
 
@@ -928,6 +929,8 @@ static struct sde_prop_type vbif_prop[] = {
 	{VBIF_QOS_CWB_REMAP, "qcom,sde-vbif-qos-cwb-remap", false, PROP_TYPE_U32_ARRAY},
 	{VBIF_QOS_LUTDMA_REMAP, "qcom,sde-vbif-qos-lutdma-remap", false, PROP_TYPE_U32_ARRAY},
 	{VBIF_QOS_CNOC_REMAP, "qcom,sde-vbif-qos-cnoc-remap", false, PROP_TYPE_U32_ARRAY},
+	{VBIF_QOS_OFFLINE_WB_REMAP, "qcom,sde-vbif-qos-offline-wb-remap", false,
+		PROP_TYPE_U32_ARRAY},
 };
 
 static struct sde_prop_type uidle_prop[] = {
@@ -3732,6 +3735,11 @@ static int sde_vbif_parse_dt(struct device_node *np,
 
 	rc = _validate_dt_entry(np, &vbif_prop[VBIF_QOS_CNOC_REMAP], 1,
 			&prop_count[VBIF_QOS_CNOC_REMAP], NULL);
+	if (rc)
+		goto end;
+
+	rc = _validate_dt_entry(np, &vbif_prop[VBIF_QOS_OFFLINE_WB_REMAP], 1,
+			&prop_count[VBIF_QOS_OFFLINE_WB_REMAP], NULL);
 	if (rc)
 		goto end;
 

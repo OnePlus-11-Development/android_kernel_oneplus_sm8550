@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -602,6 +603,12 @@ int sde_wb_connector_post_init(struct drm_connector *connector, void *display)
 		{CACHE_STATE_ENABLED, "cache_state_enabled"},
 	};
 
+	static const struct drm_prop_enum_list e_wb_usage_type[] = {
+		{WB_USAGE_WFD, "wb_usage_wfd"},
+		{WB_USAGE_CWB, "wb_usage_cwb"},
+		{WB_USAGE_OFFLINE_WB, "wb_usage_offline_wb"},
+	};
+
 	if (!connector || !display || !wb_dev->wb_cfg || !wb_dev->drm_dev->dev_private) {
 		SDE_ERROR("invalid params\n");
 		return -EINVAL;
@@ -654,8 +661,11 @@ int sde_wb_connector_post_init(struct drm_connector *connector, void *display)
 		msm_property_install_range(&c_conn->property_info, "dnsc_blur",
 			0x0, 0, ~0, 0, CONNECTOR_PROP_DNSC_BLUR);
 
-	_sde_wb_connector_install_dither_property(wb_dev);
+	msm_property_install_enum(&c_conn->property_info, "wb_usage_type",
+			0x0, 0, e_wb_usage_type, ARRAY_SIZE(e_wb_usage_type),
+			0, CONNECTOR_PROP_WB_USAGE_TYPE);
 
+	_sde_wb_connector_install_dither_property(wb_dev);
 
 	return 0;
 }

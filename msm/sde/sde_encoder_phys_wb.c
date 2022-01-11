@@ -78,19 +78,24 @@ static enum sde_intr_type sde_encoder_phys_wb_get_intr_type(
  * sde_encoder_phys_wb_set_ot_limit - set OT limit for writeback interface
  * @phys_enc:	Pointer to physical encoder
  */
-static void sde_encoder_phys_wb_set_ot_limit(
-		struct sde_encoder_phys *phys_enc)
+static void sde_encoder_phys_wb_set_ot_limit(struct sde_encoder_phys *phys_enc)
 {
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
 	struct sde_hw_wb *hw_wb = wb_enc->hw_wb;
+	struct drm_connector_state *conn_state;
 	struct sde_vbif_set_ot_params ot_params;
+	enum sde_wb_usage_type usage_type;
+
+	conn_state = phys_enc->connector->state;
+	usage_type = sde_connector_get_property(conn_state, CONNECTOR_PROP_WB_USAGE_TYPE);
 
 	memset(&ot_params, 0, sizeof(ot_params));
 	ot_params.xin_id = hw_wb->caps->xin_id;
 	ot_params.num = hw_wb->idx - WB_0;
 	ot_params.width = wb_enc->wb_roi.w;
 	ot_params.height = wb_enc->wb_roi.h;
-	ot_params.is_wfd = !(phys_enc->in_clone_mode);
+	ot_params.is_wfd = ((phys_enc->in_clone_mode) || (usage_type == WB_USAGE_OFFLINE_WB)) ?
+					false : true;
 	ot_params.frame_rate = drm_mode_vrefresh(&phys_enc->cached_mode);
 	ot_params.vbif_idx = hw_wb->caps->vbif_idx;
 	ot_params.clk_ctrl = hw_wb->caps->clk_ctrl;
@@ -108,7 +113,9 @@ static void sde_encoder_phys_wb_set_qos_remap(struct sde_encoder_phys *phys_enc)
 	struct sde_encoder_phys_wb *wb_enc;
 	struct sde_hw_wb *hw_wb;
 	struct drm_crtc *crtc;
+	struct drm_connector_state *conn_state;
 	struct sde_vbif_set_qos_params qos_params;
+	enum sde_wb_usage_type usage_type;
 
 	if (!phys_enc || !phys_enc->parent || !phys_enc->parent->crtc) {
 		SDE_ERROR("invalid arguments\n");
@@ -122,6 +129,8 @@ static void sde_encoder_phys_wb_set_qos_remap(struct sde_encoder_phys *phys_enc)
 	}
 
 	crtc = wb_enc->crtc;
+	conn_state = phys_enc->connector->state;
+	usage_type = sde_connector_get_property(conn_state, CONNECTOR_PROP_WB_USAGE_TYPE);
 
 	if (!wb_enc->hw_wb || !wb_enc->hw_wb->caps) {
 		SDE_ERROR("[enc:%d wb:%d] invalid WB HW\n", DRMID(phys_enc->parent), WBID(wb_enc));
@@ -135,8 +144,12 @@ static void sde_encoder_phys_wb_set_qos_remap(struct sde_encoder_phys *phys_enc)
 	qos_params.xin_id = hw_wb->caps->xin_id;
 	qos_params.clk_ctrl = hw_wb->caps->clk_ctrl;
 	qos_params.num = hw_wb->idx - WB_0;
-	qos_params.client_type = phys_enc->in_clone_mode ?
-					VBIF_CWB_CLIENT : VBIF_NRT_CLIENT;
+	if (phys_enc->in_clone_mode)
+		qos_params.client_type = VBIF_CWB_CLIENT;
+	else if (usage_type == WB_USAGE_OFFLINE_WB)
+		qos_params.client_type = VBIF_OFFLINE_WB_CLIENT;
+	else
+		qos_params.client_type = VBIF_NRT_CLIENT;
 
 	SDE_DEBUG("[enc:%d wb:%d] qos_remap - wb:%d vbif:%d xin:%d clone:%d\n",
 		DRMID(phys_enc->parent), WBID(wb_enc), qos_params.num,
@@ -153,9 +166,11 @@ static void sde_encoder_phys_wb_set_qos(struct sde_encoder_phys *phys_enc)
 {
 	struct sde_encoder_phys_wb *wb_enc;
 	struct sde_hw_wb *hw_wb;
+	struct drm_connector_state *conn_state;
 	struct sde_hw_wb_qos_cfg qos_cfg = {0};
 	struct sde_perf_cfg *perf;
 	u32 fps_index = 0, lut_index, creq_index, ds_index, frame_rate, qos_count;
+	enum sde_wb_usage_type usage_type;
 
 	if (!phys_enc || !phys_enc->sde_kms || !phys_enc->sde_kms->catalog) {
 		SDE_ERROR("invalid parameter(s)\n");
@@ -167,6 +182,9 @@ static void sde_encoder_phys_wb_set_qos(struct sde_encoder_phys *phys_enc)
 		SDE_ERROR("[enc:%d wb:%d] invalid WB HW\n", DRMID(phys_enc->parent), WBID(wb_enc));
 		return;
 	}
+
+	conn_state = phys_enc->connector->state;
+	usage_type = sde_connector_get_property(conn_state, CONNECTOR_PROP_WB_USAGE_TYPE);
 
 	perf = &phys_enc->sde_kms->catalog->perf;
 	frame_rate = drm_mode_vrefresh(&phys_enc->cached_mode);
@@ -182,13 +200,13 @@ static void sde_encoder_phys_wb_set_qos(struct sde_encoder_phys *phys_enc)
 
 	qos_cfg.danger_safe_en = true;
 
-	if (phys_enc->in_clone_mode && (SDE_FORMAT_IS_TILE(wb_enc->wb_fmt) ||
-				SDE_FORMAT_IS_UBWC(wb_enc->wb_fmt)))
-		lut_index = SDE_QOS_LUT_USAGE_CWB_TILE;
-	else if (phys_enc->in_clone_mode)
-		lut_index = SDE_QOS_LUT_USAGE_CWB;
+	if (phys_enc->in_clone_mode)
+		lut_index = (SDE_FORMAT_IS_TILE(wb_enc->wb_fmt)
+				|| SDE_FORMAT_IS_UBWC(wb_enc->wb_fmt)) ?
+					SDE_QOS_LUT_USAGE_CWB_TILE : SDE_QOS_LUT_USAGE_CWB;
 	else
-		lut_index = SDE_QOS_LUT_USAGE_NRT;
+		lut_index = (usage_type == WB_USAGE_OFFLINE_WB) ?
+					SDE_QOS_LUT_USAGE_OFFLINE_WB : SDE_QOS_LUT_USAGE_NRT;
 
 	creq_index = lut_index * SDE_CREQ_LUT_TYPE_MAX;
 	creq_index += (fps_index * SDE_QOS_LUT_USAGE_MAX * SDE_CREQ_LUT_TYPE_MAX);
@@ -199,9 +217,9 @@ static void sde_encoder_phys_wb_set_qos(struct sde_encoder_phys *phys_enc)
 	qos_cfg.danger_lut = perf->danger_lut[ds_index];
 	qos_cfg.safe_lut = (u32) perf->safe_lut[ds_index];
 
-	SDE_DEBUG("[enc:%d wb:%d] fps:%d mode:%d luts[0x%x,0x%x 0x%llx]\n",
+	SDE_DEBUG("[enc:%d wb:%d] fps:%d mode:%d type:%d luts[0x%x,0x%x 0x%llx]\n",
 		DRMID(phys_enc->parent), WBID(wb_enc), frame_rate, phys_enc->in_clone_mode,
-		qos_cfg.danger_lut, qos_cfg.safe_lut, qos_cfg.creq_lut);
+		usage_type, qos_cfg.danger_lut, qos_cfg.safe_lut, qos_cfg.creq_lut);
 
 	if (hw_wb->ops.setup_qos_lut)
 		hw_wb->ops.setup_qos_lut(hw_wb, &qos_cfg);
