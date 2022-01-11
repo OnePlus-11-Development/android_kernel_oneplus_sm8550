@@ -858,6 +858,16 @@ enum sde_creq_lut_types {
 };
 
 /**
+ * enum sde_danger_safe_lut_types - define danger/safe LUT types possible for all use cases
+ * This is second dimension to sde_qos_lut_usage enum.
+ */
+enum sde_danger_safe_lut_types {
+	SDE_DANGER_SAFE_LUT_TYPE_PORTRAIT,
+	SDE_DANGER_SAFE_LUT_TYPE_LANDSCAPE,
+	SDE_DANGER_SAFE_LUT_TYPE_MAX,
+};
+
+/**
  * struct sde_sspp_sub_blks : SSPP sub-blocks
  * @maxlinewidth: max source pipe line width support
  * @scaling_linewidth: max vig source pipe linewidth for scaling usecases
