@@ -106,6 +106,7 @@
 
 #define MAX_XIN_COUNT 16
 #define SSPP_SUBBLK_COUNT_MAX 2
+#define MAX_CWB_SESSIONS 1
 
 #define SDE_CTL_CFG_VERSION_1_0_0       0x100
 #define MAX_INTF_PER_CTL_V1                 2
@@ -1804,6 +1805,7 @@ struct sde_perf_cfg {
  * @max_dsc_width       max dsc line width
  * @max_mixer_width     max layer mixer line width
  * @max_mixer_blendstages       max layer mixer blend stages (z orders)
+ * @max_cwb             max number of cwb supported
  * @vbif_qos_nlvl       number of vbif QoS priority levels
  * @qos_target_time_ns  normalized qos target time for line-based qos
  * @macrotile_mode      UBWC parameter for macro tile channel distribution
@@ -1913,6 +1915,7 @@ struct sde_mdss_cfg {
 	u32 max_dsc_width;
 	u32 max_mixer_width;
 	u32 max_mixer_blendstages;
+	u32 max_cwb;
 
 	/* Configs */
 	u32 vbif_qos_nlvl;
