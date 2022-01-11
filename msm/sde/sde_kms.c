@@ -2103,8 +2103,7 @@ static int _sde_kms_drm_obj_init(struct sde_kms *sde_kms)
 	for (i = 0; i < catalog->sspp_count; i++) {
 		bool primary = true;
 
-		if (catalog->sspp[i].features & BIT(SDE_SSPP_CURSOR)
-			|| primary_planes_idx >= max_crtc_count)
+		if (primary_planes_idx >= max_crtc_count)
 			primary = false;
 
 		plane = sde_plane_init(dev, catalog->sspp[i].id, primary,

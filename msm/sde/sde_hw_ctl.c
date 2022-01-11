@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -76,8 +77,7 @@
 /**
  * List of SSPP bits in CTL_FLUSH
  */
-static const u32 sspp_tbl[SSPP_MAX] = { SDE_NONE, 0, 1, 2, 18, 3, 4, 5,
-	19, 11, 12, 24, 25, 13, 14, SDE_NONE, SDE_NONE};
+static const u32 sspp_tbl[SSPP_MAX] = { SDE_NONE, 0, 1, 2, 18, 11, 12, 24, 25, 13, 14};
 
 /**
  * List of layer mixer bits in CTL_FLUSH
@@ -125,9 +125,7 @@ static const u32 intf_tbl[INTF_MAX] = {SDE_NONE, 31, 30, 29, 28};
 /**
  * List of SSPP bits in CTL_FETCH_PIPE_ACTIVE
  */
-static const u32 fetch_tbl[SSPP_MAX] = {CTL_INVALID_BIT, 16, 17, 18, 19,
-	CTL_INVALID_BIT, CTL_INVALID_BIT, CTL_INVALID_BIT, CTL_INVALID_BIT, 0,
-	1, 2, 3, 4, 5, CTL_INVALID_BIT, CTL_INVALID_BIT};
+static const u32 fetch_tbl[SSPP_MAX] = {CTL_INVALID_BIT, 16, 17, 18, 19, 0, 1, 2, 3, 4, 5};
 
 /**
  * list of WB bits in CTL_WB_FLUSH
@@ -214,18 +212,12 @@ sspp_reg_cfg_tbl[SSPP_MAX][CTL_SSPP_MAX_RECTS] = {
 	/* SSPP_VIG1 */{ {0, 3, 3, BIT(2)}, {3, 4, 4, 0} },
 	/* SSPP_VIG2 */{ {0, 6, 3, BIT(4)}, {3, 8, 4, 0} },
 	/* SSPP_VIG3 */{ {0, 26, 3, BIT(6)}, {3, 12, 4, 0} },
-	/* SSPP_RGB0 */{ {0, 9, 3, BIT(8)}, {0, 0, 0, 0} },
-	/* SSPP_RGB1 */{ {0, 12, 3, BIT(10)}, {0, 0, 0, 0} },
-	/* SSPP_RGB2 */{ {0, 15, 3, BIT(12)}, {0, 0, 0, 0} },
-	/* SSPP_RGB3 */{ {0, 29, 3, BIT(14)}, {0, 0, 0, 0} },
 	/* SSPP_DMA0 */{ {0, 18, 3, BIT(16)}, {2, 8, 4, 0} },
 	/* SSPP_DMA1 */{ {0, 21, 3, BIT(18)}, {2, 12, 4, 0} },
 	/* SSPP_DMA2 */{ {2, 0, 4, 0}, {2, 16, 4, 0} },
 	/* SSPP_DMA3 */{ {2, 4, 4, 0}, {2, 20, 4, 0} },
 	/* SSPP_DMA4 */{ {4, 0, 4, 0}, {4, 8, 4, 0} },
 	/* SSPP_DMA5 */{ {4, 4, 4, 0}, {4, 12, 4, 0} },
-	/* SSPP_CURSOR0 */{ {1, 20, 4, 0}, {0, 0, 0, 0} },
-	/* SSPP_CURSOR1 */{ {1, 26, 4, 0}, {0, 0, 0, 0} }
 };
 
 /**
