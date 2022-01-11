@@ -250,8 +250,10 @@ static void _sde_plane_set_qos_lut(struct drm_plane *plane,
 	u32 frame_rate, qos_count, fps_index = 0, lut_index, creq_lut_index, ds_lut_index;
 	struct sde_perf_cfg *perf;
 	struct sde_plane_state *pstate;
+	struct sde_crtc *sde_crtc = to_sde_crtc(crtc);
 	bool inline_rot = false, landscape = false;
 	struct drm_display_mode *mode;
+	u32 fl_require0 = 0;
 
 	if (!plane || !fb) {
 		SDE_ERROR("invalid arguments\n");
@@ -305,8 +307,13 @@ static void _sde_plane_set_qos_lut(struct drm_plane *plane,
 	psde->pipe_qos_cfg.creq_lut = perf->creq_lut[creq_lut_index];
 
 	ds_lut_index = lut_index * SDE_DANGER_SAFE_LUT_TYPE_MAX;
-	if (landscape)
-		ds_lut_index += SDE_DANGER_SAFE_LUT_TYPE_LANDSCAPE;
+	if (landscape) {
+		if (psde->catalog->qos_target_time_ns && sde_crtc->line_time_in_ns)
+			fl_require0 = psde->catalog->qos_target_time_ns /
+							(sde_crtc->line_time_in_ns * 2);
+		if (!fl_require0 || fl_require0 < 4.5)
+			ds_lut_index += SDE_DANGER_SAFE_LUT_TYPE_LANDSCAPE;
+	}
 	ds_lut_index += (fps_index * SDE_QOS_LUT_USAGE_MAX * SDE_DANGER_SAFE_LUT_TYPE_MAX);
 	psde->pipe_qos_cfg.danger_lut = perf->danger_lut[ds_lut_index];
 	psde->pipe_qos_cfg.safe_lut = perf->safe_lut[ds_lut_index];
