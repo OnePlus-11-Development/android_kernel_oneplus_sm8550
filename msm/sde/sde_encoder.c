@@ -1481,6 +1481,61 @@ static int _sde_encoder_rsc_client_update_vsync_wait(
 	return ret;
 }
 
+static int _sde_encoder_rsc_state_trigger(struct drm_encoder *drm_enc, enum sde_rsc_state rsc_state)
+{
+	struct sde_encoder_virt *sde_enc;
+	struct msm_display_info *disp_info;
+	struct sde_rsc_cmd_config *rsc_config;
+	struct drm_crtc *crtc;
+	int wait_vblank_crtc_id = SDE_RSC_INVALID_CRTC_ID;
+	int ret;
+
+	/**
+	 * Already checked drm_enc, sde_enc is valid in function
+	 * _sde_encoder_update_rsc_client() which pass the parameters
+	 * to this function.
+	 */
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	crtc = sde_enc->crtc;
+	disp_info = &sde_enc->disp_info;
+	rsc_config = &sde_enc->rsc_config;
+
+	if (rsc_state != SDE_RSC_IDLE_STATE && !sde_enc->rsc_state_init
+			&& (disp_info->display_type == SDE_CONNECTOR_PRIMARY)) {
+		/* update it only once */
+		sde_enc->rsc_state_init = true;
+
+		ret = sde_rsc_client_state_update(sde_enc->rsc_client,
+			rsc_state, rsc_config, crtc->base.id,
+			&wait_vblank_crtc_id);
+	} else {
+		ret = sde_rsc_client_state_update(sde_enc->rsc_client,
+			rsc_state, NULL, crtc->base.id,
+			&wait_vblank_crtc_id);
+	}
+
+	/**
+	 * if RSC performed a state change that requires a VBLANK wait, it will
+	 * set wait_vblank_crtc_id to the CRTC whose VBLANK we must wait on.
+	 *
+	 * if we are the primary display, we will need to enable and wait
+	 * locally since we hold the commit thread
+	 *
+	 * if we are an external display, we must send a signal to the primary
+	 * to enable its VBLANK and wait one, since the RSC hardware is driven
+	 * by the primary panel's VBLANK signals
+	 */
+	SDE_EVT32_VERBOSE(DRMID(drm_enc), wait_vblank_crtc_id);
+	if (ret) {
+		SDE_ERROR_ENC(sde_enc, "sde rsc client update failed ret:%d\n", ret);
+	} else if (wait_vblank_crtc_id != SDE_RSC_INVALID_CRTC_ID) {
+		ret = _sde_encoder_rsc_client_update_vsync_wait(drm_enc,
+			sde_enc, wait_vblank_crtc_id);
+	}
+
+	return ret;
+}
+
 static int _sde_encoder_update_rsc_client(
 		struct drm_encoder *drm_enc, bool enable)
 {
@@ -1491,7 +1546,6 @@ static int _sde_encoder_update_rsc_client(
 	int ret;
 	struct msm_display_info *disp_info;
 	struct msm_mode_info *mode_info;
-	int wait_vblank_crtc_id = SDE_RSC_INVALID_CRTC_ID;
 	u32 qsync_mode = 0, v_front_porch;
 	struct drm_display_mode *mode;
 	bool is_vid_mode;
@@ -1575,42 +1629,7 @@ static int _sde_encoder_update_rsc_client(
 	SDE_EVT32(DRMID(drm_enc), rsc_state, qsync_mode,
 				 rsc_config->fps, sde_enc->rsc_state_init);
 
-	if (rsc_state != SDE_RSC_IDLE_STATE && !sde_enc->rsc_state_init
-			&& (disp_info->display_type == SDE_CONNECTOR_PRIMARY)) {
-		/* update it only once */
-		sde_enc->rsc_state_init = true;
-
-		ret = sde_rsc_client_state_update(sde_enc->rsc_client,
-			rsc_state, rsc_config, crtc->base.id,
-			&wait_vblank_crtc_id);
-	} else {
-		ret = sde_rsc_client_state_update(sde_enc->rsc_client,
-			rsc_state, NULL, crtc->base.id,
-			&wait_vblank_crtc_id);
-	}
-
-	/**
-	 * if RSC performed a state change that requires a VBLANK wait, it will
-	 * set wait_vblank_crtc_id to the CRTC whose VBLANK we must wait on.
-	 *
-	 * if we are the primary display, we will need to enable and wait
-	 * locally since we hold the commit thread
-	 *
-	 * if we are an external display, we must send a signal to the primary
-	 * to enable its VBLANK and wait one, since the RSC hardware is driven
-	 * by the primary panel's VBLANK signals
-	 */
-	SDE_EVT32_VERBOSE(DRMID(drm_enc), wait_vblank_crtc_id);
-	if (ret) {
-		SDE_ERROR_ENC(sde_enc,
-				"sde rsc client update failed ret:%d\n", ret);
-		return ret;
-	} else if (wait_vblank_crtc_id == SDE_RSC_INVALID_CRTC_ID) {
-		return ret;
-	}
-
-	ret = _sde_encoder_rsc_client_update_vsync_wait(drm_enc,
-			sde_enc, wait_vblank_crtc_id);
+	ret = _sde_encoder_rsc_state_trigger(drm_enc, rsc_state);
 
 	return ret;
 }
@@ -4281,6 +4300,50 @@ void sde_encoder_needs_hw_reset(struct drm_encoder *drm_enc)
 	}
 }
 
+static int _sde_encoder_prepare_for_kickoff_processing(struct drm_encoder *drm_enc,
+		struct sde_encoder_kickoff_params *params,
+		struct sde_encoder_virt *sde_enc,
+		struct sde_kms *sde_kms,
+		bool needs_hw_reset, bool is_cmd_mode)
+{
+	int rc, ret = 0;
+
+	/* if any phys needs reset, reset all phys, in-order */
+	if (needs_hw_reset)
+		sde_encoder_needs_hw_reset(drm_enc);
+
+	_sde_encoder_update_master(drm_enc, params);
+
+	_sde_encoder_update_roi(drm_enc);
+
+	if (sde_enc->cur_master && sde_enc->cur_master->connector) {
+		rc = sde_connector_pre_kickoff(sde_enc->cur_master->connector);
+		if (rc) {
+			SDE_ERROR_ENC(sde_enc, "kickoff conn%d failed rc %d\n",
+					sde_enc->cur_master->connector->base.id, rc);
+			ret = rc;
+		}
+	}
+
+	if (sde_enc->cur_master &&
+			((is_cmd_mode && sde_enc->cur_master->cont_splash_enabled) ||
+			!sde_enc->cur_master->cont_splash_enabled)) {
+		rc = sde_encoder_dce_setup(sde_enc, params);
+		if (rc) {
+			SDE_ERROR_ENC(sde_enc, "failed to setup DSC: %d\n", rc);
+			ret = rc;
+		}
+	}
+
+	sde_encoder_dce_flush(sde_enc);
+
+	if (sde_enc->cur_master && !sde_enc->cur_master->cont_splash_enabled)
+		sde_configure_qdss(sde_enc, sde_enc->cur_master->hw_qdss,
+				sde_enc->cur_master, sde_kms->qdss_enabled);
+
+	return ret;
+}
+
 int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 		struct sde_encoder_kickoff_params *params)
 {
@@ -4354,39 +4417,8 @@ int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 		goto end;
 	}
 
-	/* if any phys needs reset, reset all phys, in-order */
-	if (needs_hw_reset)
-		sde_encoder_needs_hw_reset(drm_enc);
-
-	_sde_encoder_update_master(drm_enc, params);
-
-	_sde_encoder_update_roi(drm_enc);
-
-	if (sde_enc->cur_master && sde_enc->cur_master->connector) {
-		rc = sde_connector_pre_kickoff(sde_enc->cur_master->connector);
-		if (rc) {
-			SDE_ERROR_ENC(sde_enc, "kickoff conn%d failed rc %d\n",
-					sde_enc->cur_master->connector->base.id,
-					rc);
-			ret = rc;
-		}
-	}
-
-	if (sde_enc->cur_master &&
-		((is_cmd_mode && sde_enc->cur_master->cont_splash_enabled) ||
-			!sde_enc->cur_master->cont_splash_enabled)) {
-		rc = sde_encoder_dce_setup(sde_enc, params);
-		if (rc) {
-			SDE_ERROR_ENC(sde_enc, "failed to setup DSC: %d\n", rc);
-			ret = rc;
-		}
-	}
-
-	sde_encoder_dce_flush(sde_enc);
-
-	if (sde_enc->cur_master && !sde_enc->cur_master->cont_splash_enabled)
-		sde_configure_qdss(sde_enc, sde_enc->cur_master->hw_qdss,
-				sde_enc->cur_master, sde_kms->qdss_enabled);
+	ret = _sde_encoder_prepare_for_kickoff_processing(drm_enc, params, sde_enc, sde_kms,
+			needs_hw_reset, is_cmd_mode);
 
 end:
 	SDE_ATRACE_END("sde_encoder_prepare_for_kickoff");
