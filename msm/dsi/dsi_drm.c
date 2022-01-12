@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -406,10 +406,8 @@ static bool _dsi_bridge_mode_validate_and_fixup(struct drm_bridge *bridge,
 	struct sde_connector_state *old_conn_state;
 	struct drm_display_mode *cur_mode;
 
-	if (!bridge->encoder || !bridge->encoder->crtc || !crtc_state->crtc) {
-		DSI_ERR("invalid params\n");
-		return -EINVAL;
-	}
+	if (!bridge->encoder || !bridge->encoder->crtc || !crtc_state->crtc)
+		return 0;
 
 	cur_mode = &crtc_state->crtc->state->mode;
 	old_conn_state = to_sde_connector_state(display->drm_conn->state);
