@@ -2474,20 +2474,6 @@ long kgsl_ioctl_cmdstream_freememontimestamp_ctxtid(
 	return ret;
 }
 
-static int check_vma_flags(struct vm_area_struct *vma,
-		unsigned int flags)
-{
-	unsigned long flags_requested = (VM_READ | VM_WRITE);
-
-	if (flags & KGSL_MEMFLAGS_GPUREADONLY)
-		flags_requested &= ~(unsigned long)VM_WRITE;
-
-	if ((vma->vm_flags & flags_requested) == flags_requested)
-		return 0;
-
-	return -EFAULT;
-}
-
 static int check_vma(unsigned long hostptr, u64 size)
 {
 	struct vm_area_struct *vma;
@@ -2610,8 +2596,6 @@ static int kgsl_setup_useraddr(struct kgsl_device *device,
 		struct kgsl_mem_entry *entry,
 		unsigned long hostptr, size_t offset, size_t size)
 {
-	int ret;
-
 	if (hostptr == 0 || !IS_ALIGNED(hostptr, PAGE_SIZE))
 		return -EINVAL;
 
@@ -4619,8 +4603,8 @@ static int _register_device(struct kgsl_device *device)
 
 	set_dma_ops(device->dev, NULL);
 
-	kobject_init_and_add(&device->gpu_sysfs_kobj, &kgsl_gpu_sysfs_ktype,
-		kernel_kobj, "gpu");
+	WARN_ON(kobject_init_and_add(&device->gpu_sysfs_kobj, &kgsl_gpu_sysfs_ktype,
+		kernel_kobj, "gpu"));
 
 	return 0;
 }

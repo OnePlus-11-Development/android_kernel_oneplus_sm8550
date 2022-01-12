@@ -251,8 +251,6 @@ static int
 kgsl_iopgtbl_map_child(struct kgsl_pagetable *pt, struct kgsl_memdesc *memdesc,
 	u64 offset, struct kgsl_memdesc *child, u64 child_offset, u64 length)
 {
-	struct kgsl_iommu *iommu = &pt->mmu->iommu;
-	struct iommu_domain *domain = to_iommu_domain(&iommu->user_context);
 	struct kgsl_iommu_pt *iommu_pt = to_iommu_pt(pt);
 	struct sg_table sgt;
 	u32 flags;
@@ -312,7 +310,6 @@ static size_t _iopgtbl_map_page_to_range(struct kgsl_iommu_pt *pt,
 static int kgsl_iopgtbl_map_zero_page_to_range(struct kgsl_pagetable *pt,
 		struct kgsl_memdesc *memdesc, u64 offset, u64 length)
 {
-	struct kgsl_iommu *iommu = &pt->mmu->iommu;
 	/*
 	 * The SMMU only does the PRT compare at the bottom level of the page table, because
 	 * there is not an easy way for the hardware to perform this check at earlier levels.
@@ -342,7 +339,6 @@ static int kgsl_iopgtbl_map(struct kgsl_pagetable *pagetable,
 		struct kgsl_memdesc *memdesc)
 {
 	struct kgsl_iommu_pt *pt = to_iommu_pt(pagetable);
-	struct kgsl_iommu *iommu = &pagetable->mmu->iommu;
 	size_t mapped, padding;
 	int prot;
 
@@ -1089,7 +1085,7 @@ static void kgsl_iommu_enable_clk(struct kgsl_mmu *mmu)
 	if (!IS_ERR_OR_NULL(iommu->cx_gdsc))
 		WARN_ON(regulator_enable(iommu->cx_gdsc));
 
-	clk_bulk_prepare_enable(iommu->num_clks, iommu->clks);
+	WARN_ON(clk_bulk_prepare_enable(iommu->num_clks, iommu->clks));
 
 	atomic_inc(&iommu->clk_enable_count);
 }

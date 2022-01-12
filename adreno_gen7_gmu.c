@@ -1892,7 +1892,6 @@ static int gen7_gmu_reg_probe(struct adreno_device *adreno_dev)
 
 static int gen7_gmu_clk_probe(struct adreno_device *adreno_dev)
 {
-	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
 	int ret, i;
 	int tbl_size;
@@ -2068,7 +2067,7 @@ int gen7_gmu_probe(struct kgsl_device *device,
 	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
 	struct device *dev = &pdev->dev;
 	struct resource *res;
-	int ret, i;
+	int ret;
 
 	gmu->pdev = pdev;
 
@@ -2133,7 +2132,7 @@ int gen7_gmu_probe(struct kgsl_device *device,
 	gmu->log_group_mask = 0x3;
 
 	/* GMU sysfs nodes setup */
-	kobject_init_and_add(&gmu->log_kobj, &log_kobj_type, &dev->kobj, "log");
+	(void) kobject_init_and_add(&gmu->log_kobj, &log_kobj_type, &dev->kobj, "log");
 
 	of_property_read_u32(gmu->pdev->dev.of_node, "qcom,gmu-perf-ddr-bw",
 		&gmu->perf_ddr_bw);
