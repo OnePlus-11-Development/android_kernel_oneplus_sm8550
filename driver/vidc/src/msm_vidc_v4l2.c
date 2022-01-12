@@ -696,3 +696,30 @@ unlock:
 
 	return rc;
 }
+
+int msm_v4l2_request_validate(struct media_request *req)
+{
+	return vb2_request_validate(req);
+}
+
+void msm_v4l2_request_queue(struct media_request *req)
+{
+	v4l2_m2m_request_queue(req);
+}
+
+void msm_v4l2_m2m_device_run(void *priv)
+{
+	d_vpr_l("%s: \n", __func__);
+}
+
+void msm_v4l2_m2m_job_abort(void *priv)
+{
+	struct msm_vidc_inst *inst = priv;
+
+	if (!inst) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return;
+	}
+	i_vpr_h(inst, "%s: m2m job aborted\n", __func__);
+	v4l2_m2m_job_finish(inst->m2m_dev, inst->m2m_ctx);
+}

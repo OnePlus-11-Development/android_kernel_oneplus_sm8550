@@ -24,13 +24,13 @@ struct vb2_queue *msm_vidc_get_vb2q(struct msm_vidc_inst *inst,
 		return NULL;
 	}
 	if (type == INPUT_MPLANE) {
-		q = &inst->vb2q[INPUT_PORT];
+		q = inst->bufq[INPUT_PORT].vb2q;
 	} else if (type == OUTPUT_MPLANE) {
-		q = &inst->vb2q[OUTPUT_PORT];
+		q = inst->bufq[OUTPUT_PORT].vb2q;
 	} else if (type == INPUT_META_PLANE) {
-		q = &inst->vb2q[INPUT_META_PORT];
+		q = inst->bufq[INPUT_META_PORT].vb2q;
 	} else if (type == OUTPUT_META_PLANE) {
-		q = &inst->vb2q[OUTPUT_META_PORT];
+		q = inst->bufq[OUTPUT_META_PORT].vb2q;
 	} else {
 		i_vpr_e(inst, "%s: invalid buffer type %d\n",
 			__func__, type);
@@ -263,8 +263,8 @@ int msm_vidc_start_streaming(struct vb2_queue *q, unsigned int count)
 	if (rc)
 		goto error;
 
-	if ((q->type == INPUT_MPLANE && inst->vb2q[OUTPUT_PORT].streaming) ||
-		(q->type == OUTPUT_MPLANE && inst->vb2q[INPUT_PORT].streaming)) {
+	if ((q->type == INPUT_MPLANE && inst->bufq[OUTPUT_PORT].vb2q->streaming) ||
+		(q->type == OUTPUT_MPLANE && inst->bufq[INPUT_PORT].vb2q->streaming)) {
 		rc = msm_vidc_get_properties(inst);
 		if (rc)
 			goto error;
@@ -345,6 +345,28 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 		return;
 	}
 
+	/*
+	 * As part of every qbuf initalise request to true.
+	 * If there are any dynamic controls associated with qbuf,
+	 * they will set as part s_ctrl() from v4l2_ctrl_request_setup().
+	 * Once v4l2_ctrl_request_setup() is done, reset request variable.
+	 * If the buffer does not have any requests with it, then
+	 * v4l2_ctrl_request_setup() will return 0.
+	 */
+	inst->request = true;
+	rc = v4l2_ctrl_request_setup(vb2->req_obj.req,
+			&inst->ctrl_handler);
+	if (rc) {
+		inst->request = false;
+		i_vpr_e(inst, "%s: request setup failed, error %d\n",
+			__func__, rc);
+		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
+		v4l2_ctrl_request_complete(vb2->req_obj.req, &inst->ctrl_handler);
+		vb2_buffer_done(vb2, VB2_BUF_STATE_ERROR);
+		return;
+	}
+	inst->request = false;
+
 	if (is_decode_session(inst))
 		rc = msm_vdec_qbuf(inst, vb2);
 	else if (is_encode_session(inst))
@@ -355,10 +377,28 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 	if (rc) {
 		print_vb2_buffer("failed vb2-qbuf", inst, vb2);
 		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
+		v4l2_ctrl_request_complete(vb2->req_obj.req, &inst->ctrl_handler);
 		vb2_buffer_done(vb2, VB2_BUF_STATE_ERROR);
 	}
 }
 
 void msm_vidc_buf_cleanup(struct vb2_buffer *vb)
 {
+}
+
+int msm_vidc_buf_out_validate(struct vb2_buffer *vb)
+{
+	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
+
+	vbuf->field = V4L2_FIELD_NONE;
+	return 0;
+}
+
+void msm_vidc_buf_request_complete(struct vb2_buffer *vb)
+{
+	struct msm_vidc_inst *inst = vb2_get_drv_priv(vb->vb2_queue);
+
+	i_vpr_l(inst, "%s: vb type %d, index %d\n",
+		__func__, vb->type, vb->index);
+	v4l2_ctrl_request_complete(vb->req_obj.req, &inst->ctrl_handler);
 }

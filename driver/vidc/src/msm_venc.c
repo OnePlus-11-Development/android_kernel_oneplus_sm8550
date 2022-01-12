@@ -815,7 +815,7 @@ int msm_venc_streamon_input(struct msm_vidc_inst *inst)
 	}
 
 	if (is_input_meta_enabled(inst) &&
-		!inst->vb2q[INPUT_META_PORT].streaming) {
+		!inst->bufq[INPUT_META_PORT].vb2q->streaming) {
 		i_vpr_e(inst,
 			"%s: Meta port must be streamed on before data port\n",
 			__func__);
@@ -923,8 +923,8 @@ int msm_venc_process_cmd(struct msm_vidc_inst *inst, u32 cmd)
 		i_vpr_h(inst, "received cmd: resume\n");
 		if (!msm_vidc_allow_start(inst))
 			return -EBUSY;
-		vb2_clear_last_buffer_dequeued(&inst->vb2q[OUTPUT_META_PORT]);
-		vb2_clear_last_buffer_dequeued(&inst->vb2q[OUTPUT_PORT]);
+		vb2_clear_last_buffer_dequeued(inst->bufq[OUTPUT_META_PORT].vb2q);
+		vb2_clear_last_buffer_dequeued(inst->bufq[OUTPUT_PORT].vb2q);
 
 		rc = msm_vidc_state_change_start(inst);
 		if (rc)
@@ -989,7 +989,7 @@ int msm_venc_streamon_output(struct msm_vidc_inst *inst)
 	}
 
 	if (is_output_meta_enabled(inst) &&
-		!inst->vb2q[OUTPUT_META_PORT].streaming) {
+		!inst->bufq[OUTPUT_META_PORT].vb2q->streaming) {
 		i_vpr_e(inst,
 			"%s: Meta port must be streamed on before data port\n",
 			__func__);
@@ -1619,8 +1619,8 @@ int msm_venc_s_param(struct msm_vidc_inst *inst,
 	msm_vidc_update_cap_value(inst, is_frame_rate ? FRAME_RATE : OPERATING_RATE,
 		q16_rate, __func__);
 	if (is_realtime_session(inst) &&
-		((s_parm->type == INPUT_MPLANE && inst->vb2q[INPUT_PORT].streaming) ||
-		(s_parm->type == OUTPUT_MPLANE && inst->vb2q[OUTPUT_PORT].streaming))) {
+		((s_parm->type == INPUT_MPLANE && inst->bufq[INPUT_PORT].vb2q->streaming) ||
+		(s_parm->type == OUTPUT_MPLANE && inst->bufq[OUTPUT_PORT].vb2q->streaming))) {
 		rc = msm_vidc_check_core_mbps(inst);
 		if (rc) {
 			i_vpr_e(inst, "%s: unsupported load\n", __func__);
@@ -1646,7 +1646,7 @@ int msm_venc_s_param(struct msm_vidc_inst *inst,
 	 * FRAME_RATE cap id.
 	 * In dynamic case, frame rate is set like below.
 	 */
-	if (inst->vb2q[OUTPUT_PORT].streaming) {
+	if (inst->bufq[OUTPUT_PORT].vb2q->streaming) {
 		rc = venus_hfi_session_property(inst,
 			HFI_PROP_FRAME_RATE,
 			HFI_HOST_FLAGS_NONE,

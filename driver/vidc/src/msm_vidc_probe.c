@@ -142,6 +142,11 @@ static void msm_vidc_unregister_video_device(struct msm_vidc_core *core,
 	else
 		return;
 
+
+#ifdef CONFIG_MEDIA_CONTROLLER
+	v4l2_m2m_unregister_media_controller(core->vdev[index].m2m_dev);
+	v4l2_m2m_release(core->vdev[index].m2m_dev);
+#endif
 	//rc = device_create_file(&core->vdev[index].vdev.dev, &dev_attr_link_name);
 	video_set_drvdata(&core->vdev[index].vdev, NULL);
 	video_unregister_device(&core->vdev[index].vdev);
@@ -152,16 +157,19 @@ static int msm_vidc_register_video_device(struct msm_vidc_core *core,
 		enum msm_vidc_domain_type type, int nr)
 {
 	int rc = 0;
-	int index;
+	int index, media_index;
 
 	d_vpr_h("%s()\n", __func__);
 
-	if (type == MSM_VIDC_DECODER)
+	if (type == MSM_VIDC_DECODER) {
 		index = 0;
-	else if (type == MSM_VIDC_ENCODER)
+		media_index = MEDIA_ENT_F_PROC_VIDEO_DECODER;
+	} else if (type == MSM_VIDC_ENCODER) {
 		index = 1;
-	else
+		media_index = MEDIA_ENT_F_PROC_VIDEO_ENCODER;
+	} else {
 		return -EINVAL;
+	}
 
 	core->vdev[index].vdev.release =
 		msm_vidc_release_video_device;
@@ -189,11 +197,34 @@ static int msm_vidc_register_video_device(struct msm_vidc_core *core,
 	//rc = device_create_file(&core->vdev[index].vdev.dev, &dev_attr_link_name);
 	if (rc) {
 		d_vpr_e("Failed to create video device file\n");
-		video_unregister_device(&core->vdev[index].vdev);
-		return rc;
+		goto video_reg_failed;
 	}
+#ifdef CONFIG_MEDIA_CONTROLLER
+	core->vdev[index].m2m_dev = v4l2_m2m_init(core->v4l2_m2m_ops);
+	if (IS_ERR(core->vdev[index].m2m_dev)) {
+		d_vpr_e("Failed to initialize V4L2 M2M device\n");
+		rc = PTR_ERR(core->vdev[index].m2m_dev);
+		goto m2m_init_failed;
+	}
+	rc = v4l2_m2m_register_media_controller(core->vdev[index].m2m_dev,
+			&core->vdev[index].vdev, media_index);
+	if (rc) {
+		d_vpr_e("%s: m2m_dev controller register failed for session type %d\n",
+			__func__, index);
+		goto m2m_mc_failed;
+	}
+#endif
 
 	return 0;
+#ifdef CONFIG_MEDIA_CONTROLLER
+m2m_mc_failed:
+	v4l2_m2m_release(core->vdev[index].m2m_dev);
+m2m_init_failed:
+#endif
+video_reg_failed:
+	video_unregister_device(&core->vdev[index].vdev);
+
+	return rc;
 }
 
 static int msm_vidc_check_mmrm_support(struct msm_vidc_core *core)
@@ -333,12 +364,18 @@ static int msm_vidc_remove(struct platform_device* pdev)
 	msm_vidc_core_deinit(core, true);
 	of_platform_depopulate(&pdev->dev);
 
+#ifdef CONFIG_MEDIA_CONTROLLER
+	media_device_unregister(&core->media_dev);
+#endif
 	msm_vidc_unregister_video_device(core, MSM_VIDC_ENCODER);
 	msm_vidc_unregister_video_device(core, MSM_VIDC_DECODER);
 	//device_remove_file(&core->vdev[MSM_VIDC_ENCODER].vdev.dev,
 		//&dev_attr_link_name);
 	//device_remove_file(&core->vdev[MSM_VIDC_DECODER].vdev.dev,
 		//&dev_attr_link_name);
+#ifdef CONFIG_MEDIA_CONTROLLER
+	media_device_cleanup(&core->media_dev);
+#endif
 	v4l2_device_unregister(&core->v4l2_dev);
 	sysfs_remove_group(&pdev->dev.kobj, &msm_vidc_core_attr_group);
 
@@ -428,6 +465,14 @@ static int msm_vidc_probe_video_device(struct platform_device *pdev)
 		goto v4l2_reg_failed;
 	}
 
+#ifdef CONFIG_MEDIA_CONTROLLER
+	core->media_dev.dev = &core->pdev->dev;
+	strscpy(core->media_dev.model, "msm_vidc_media", sizeof(core->media_dev.model));
+	media_device_init(&core->media_dev);
+	core->media_dev.ops = core->media_device_ops;
+	core->v4l2_dev.mdev = &core->media_dev;
+#endif
+
 	/* setup the decoder device */
 	rc = msm_vidc_register_video_device(core, MSM_VIDC_DECODER, nr);
 	if (rc) {
@@ -441,7 +486,13 @@ static int msm_vidc_probe_video_device(struct platform_device *pdev)
 		d_vpr_e("Failed to register video encoder\n");
 		goto enc_reg_failed;
 	}
-
+#ifdef CONFIG_MEDIA_CONTROLLER
+	rc = media_device_register(&core->media_dev);
+	if (rc) {
+		d_vpr_e("%s: media_device_register failed with %d\n", __func__, rc);
+		goto media_reg_failed;
+	}
+#endif
 	rc = msm_vidc_check_mmrm_support(core);
 	if (rc) {
 		d_vpr_e("Failed to check MMRM scaling support\n");
@@ -477,6 +528,10 @@ static int msm_vidc_probe_video_device(struct platform_device *pdev)
 core_init_failed:
 	of_platform_depopulate(&pdev->dev);
 sub_dev_failed:
+#ifdef CONFIG_MEDIA_CONTROLLER
+	media_device_unregister(&core->media_dev);
+media_reg_failed:
+#endif
 	msm_vidc_unregister_video_device(core, MSM_VIDC_ENCODER);
 enc_reg_failed:
 	msm_vidc_unregister_video_device(core, MSM_VIDC_DECODER);

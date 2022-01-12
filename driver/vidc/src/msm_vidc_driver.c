@@ -1285,11 +1285,11 @@ bool msm_vidc_allow_s_ctrl(struct msm_vidc_inst *inst, u32 id)
 		goto exit;
 	}
 	if (is_decode_session(inst)) {
-		if (!inst->vb2q[INPUT_PORT].streaming) {
+		if (!inst->bufq[INPUT_PORT].vb2q->streaming) {
 			allow = true;
 			goto exit;
 		}
-		if (inst->vb2q[INPUT_PORT].streaming) {
+		if (inst->bufq[INPUT_PORT].vb2q->streaming) {
 			switch (id) {
 			case V4L2_CID_MPEG_VIDC_CODEC_CONFIG:
 			case V4L2_CID_MPEG_VIDC_PRIORITY:
@@ -1544,20 +1544,20 @@ enum msm_vidc_allow msm_vidc_allow_streamoff(struct msm_vidc_inst *inst, u32 typ
 		return MSM_VIDC_DISALLOW;
 	}
 	if (type == INPUT_MPLANE) {
-		if (!inst->vb2q[INPUT_PORT].streaming)
+		if (!inst->bufq[INPUT_PORT].vb2q->streaming)
 			allow = MSM_VIDC_IGNORE;
 	} else if (type == INPUT_META_PLANE) {
-		if (inst->vb2q[INPUT_PORT].streaming)
+		if (inst->bufq[INPUT_PORT].vb2q->streaming)
 			allow = MSM_VIDC_DISALLOW;
-		else if (!inst->vb2q[INPUT_META_PORT].streaming)
+		else if (!inst->bufq[INPUT_META_PORT].vb2q->streaming)
 			allow = MSM_VIDC_IGNORE;
 	} else if (type == OUTPUT_MPLANE) {
-		if (!inst->vb2q[OUTPUT_PORT].streaming)
+		if (!inst->bufq[OUTPUT_PORT].vb2q->streaming)
 			allow = MSM_VIDC_IGNORE;
 	} else if (type == OUTPUT_META_PLANE) {
-		if (inst->vb2q[OUTPUT_PORT].streaming)
+		if (inst->bufq[OUTPUT_PORT].vb2q->streaming)
 			allow = MSM_VIDC_DISALLOW;
-		else if (!inst->vb2q[OUTPUT_META_PORT].streaming)
+		else if (!inst->bufq[OUTPUT_META_PORT].vb2q->streaming)
 			allow = MSM_VIDC_IGNORE;
 	}
 	if (allow != MSM_VIDC_ALLOW)
@@ -1582,7 +1582,7 @@ enum msm_vidc_allow msm_vidc_allow_qbuf(struct msm_vidc_inst *inst, u32 type)
 		return MSM_VIDC_DISALLOW;
 
 	/* defer queuing if streamon not completed */
-	if (!inst->vb2q[port].streaming)
+	if (!inst->bufq[port].vb2q->streaming)
 		return MSM_VIDC_DEFER;
 
 	if (type == INPUT_META_PLANE || type == OUTPUT_META_PLANE)
@@ -3641,7 +3641,7 @@ int msm_vidc_vb2_buffer_done(struct msm_vidc_inst *inst,
 	if (port < 0)
 		return -EINVAL;
 
-	q = &inst->vb2q[port];
+	q = inst->bufq[port].vb2q;
 	if (!q->streaming) {
 		i_vpr_e(inst, "%s: port %d is not streaming\n",
 			__func__, port);
@@ -3675,6 +3675,7 @@ int msm_vidc_vb2_buffer_done(struct msm_vidc_inst *inst,
 	vbuf->flags = buf->flags;
 	vb2->timestamp = buf->timestamp;
 	vb2->planes[0].bytesused = buf->data_size + vb2->planes[0].data_offset;
+	v4l2_ctrl_request_complete(vb2->req_obj.req, &inst->ctrl_handler);
 	vb2_buffer_done(vb2, state);
 
 	return 0;
@@ -3754,45 +3755,112 @@ static int vb2q_init(struct msm_vidc_inst *inst,
 	return rc;
 }
 
+static int m2m_queue_init(void *priv, struct vb2_queue *src_vq,
+	struct vb2_queue *dst_vq)
+{
+	int rc = 0;
+	struct msm_vidc_inst *inst = priv;
+	struct msm_vidc_core *core;
+
+	if (!inst || !inst->core || !src_vq || !dst_vq) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	core = inst->core;
+
+	src_vq->supports_requests = 1;
+	src_vq->lock = &inst->request_lock;
+	src_vq->dev = &core->pdev->dev;
+	rc = vb2q_init(inst, src_vq, INPUT_MPLANE);
+	if (rc)
+		goto fail_input_vb2q_init;
+	inst->bufq[INPUT_PORT].vb2q = src_vq;
+
+	dst_vq->lock = src_vq->lock;
+	dst_vq->dev = &core->pdev->dev;
+	rc = vb2q_init(inst, dst_vq, OUTPUT_MPLANE);
+	if (rc)
+		goto fail_out_vb2q_init;
+	inst->bufq[OUTPUT_PORT].vb2q = dst_vq;
+	return rc;
+
+fail_out_vb2q_init:
+	vb2_queue_release(inst->bufq[INPUT_PORT].vb2q);
+fail_input_vb2q_init:
+	return rc;
+}
+
 int msm_vidc_vb2_queue_init(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
+	struct msm_vidc_core *core;
 
-	if (!inst) {
-		i_vpr_e(inst, "%s: invalid params\n", __func__);
+	if (!inst || !inst->core) {
+		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
+	core = inst->core;
 
 	if (inst->vb2q_init) {
 		i_vpr_h(inst, "%s: vb2q already inited\n", __func__);
 		return 0;
 	}
 
-	rc = vb2q_init(inst, &inst->vb2q[INPUT_PORT], INPUT_MPLANE);
-	if (rc)
-		goto exit;
+	inst->m2m_dev = v4l2_m2m_init(core->v4l2_m2m_ops);
+	if (IS_ERR(inst->m2m_dev)) {
+		i_vpr_e(inst, "%s: failed to initialize v4l2 m2m device\n", __func__);
+		rc = PTR_ERR(inst->m2m_dev);
+		goto fail_m2m_init;
+	}
 
-	rc = vb2q_init(inst, &inst->vb2q[OUTPUT_PORT], OUTPUT_MPLANE);
-	if (rc)
-		goto fail_out_vb2q_init;
+	/* v4l2_m2m_ctx_init will do input & output queues initialization */
+	inst->m2m_ctx = v4l2_m2m_ctx_init(inst->m2m_dev, inst, m2m_queue_init);
+	if (!inst->m2m_ctx) {
+		i_vpr_e(inst, "%s: v4l2_m2m_ctx_init failed\n", __func__);
+		goto fail_m2m_ctx_init;
+	}
+	inst->event_handler.m2m_ctx = inst->m2m_ctx;
 
-	rc = vb2q_init(inst, &inst->vb2q[INPUT_META_PORT], INPUT_META_PLANE);
+	inst->bufq[INPUT_META_PORT].vb2q = kzalloc(sizeof(struct vb2_queue), GFP_KERNEL);
+	if (!inst->bufq[INPUT_META_PORT].vb2q) {
+		i_vpr_e(inst, "%s: queue allocation failed for input meta port\n", __func__);
+		goto fail_in_meta_alloc;
+	}
+
+	/* do input meta port queues initialization */
+	rc = vb2q_init(inst, inst->bufq[INPUT_META_PORT].vb2q, INPUT_META_PLANE);
 	if (rc)
 		goto fail_in_meta_vb2q_init;
 
-	rc = vb2q_init(inst, &inst->vb2q[OUTPUT_META_PORT], OUTPUT_META_PLANE);
+	inst->bufq[OUTPUT_META_PORT].vb2q = kzalloc(sizeof(struct vb2_queue), GFP_KERNEL);
+	if (!inst->bufq[OUTPUT_META_PORT].vb2q) {
+		i_vpr_e(inst, "%s: queue allocation failed for output meta port\n", __func__);
+		goto fail_out_meta_alloc;
+	}
+
+	/* do output meta port queues initialization */
+	rc = vb2q_init(inst, inst->bufq[OUTPUT_META_PORT].vb2q, OUTPUT_META_PLANE);
 	if (rc)
 		goto fail_out_meta_vb2q_init;
 	inst->vb2q_init = true;
 
 	return 0;
+
 fail_out_meta_vb2q_init:
-	vb2_queue_release(&inst->vb2q[INPUT_META_PORT]);
+	kfree(inst->bufq[OUTPUT_META_PORT].vb2q);
+	inst->bufq[OUTPUT_META_PORT].vb2q = NULL;
+fail_out_meta_alloc:
+	vb2_queue_release(inst->bufq[INPUT_META_PORT].vb2q);
 fail_in_meta_vb2q_init:
-	vb2_queue_release(&inst->vb2q[OUTPUT_PORT]);
-fail_out_vb2q_init:
-	vb2_queue_release(&inst->vb2q[INPUT_PORT]);
-exit:
+	kfree(inst->bufq[INPUT_META_PORT].vb2q);
+	inst->bufq[INPUT_META_PORT].vb2q = NULL;
+fail_in_meta_alloc:
+	v4l2_m2m_ctx_release(inst->m2m_ctx);
+	inst->bufq[OUTPUT_PORT].vb2q = NULL;
+	inst->bufq[INPUT_PORT].vb2q = NULL;
+fail_m2m_ctx_init:
+	v4l2_m2m_release(inst->m2m_dev);
+fail_m2m_init:
 	return rc;
 }
 
@@ -3809,10 +3877,20 @@ int msm_vidc_vb2_queue_deinit(struct msm_vidc_inst *inst)
 		return 0;
 	}
 
-	vb2_queue_release(&inst->vb2q[OUTPUT_META_PORT]);
-	vb2_queue_release(&inst->vb2q[INPUT_META_PORT]);
-	vb2_queue_release(&inst->vb2q[OUTPUT_PORT]);
-	vb2_queue_release(&inst->vb2q[INPUT_PORT]);
+	vb2_queue_release(inst->bufq[OUTPUT_META_PORT].vb2q);
+	kfree(inst->bufq[OUTPUT_META_PORT].vb2q);
+	inst->bufq[OUTPUT_META_PORT].vb2q = NULL;
+	vb2_queue_release(inst->bufq[INPUT_META_PORT].vb2q);
+	kfree(inst->bufq[INPUT_META_PORT].vb2q);
+	inst->bufq[INPUT_META_PORT].vb2q = NULL;
+	/*
+	 * vb2_queue_release() for input and output queues
+	 * is called from v4l2_m2m_ctx_release()
+	 */
+	v4l2_m2m_ctx_release(inst->m2m_ctx);
+	inst->bufq[OUTPUT_PORT].vb2q = NULL;
+	inst->bufq[INPUT_PORT].vb2q = NULL;
+	v4l2_m2m_release(inst->m2m_dev);
 	inst->vb2q_init = false;
 
 	return rc;
@@ -5169,6 +5247,8 @@ static void msm_vidc_close_helper(struct kref *kref)
 	if (inst->response_workq)
 		destroy_workqueue(inst->response_workq);
 	msm_vidc_remove_dangling_session(inst);
+	mutex_destroy(&inst->request_lock);
+	mutex_destroy(&inst->lock);
 	kfree(inst->capabilities);
 	kfree(inst);
 }
@@ -5371,7 +5451,7 @@ int msm_vidc_update_buffer_count(struct msm_vidc_inst *inst, u32 port)
 			inst->buffers.input.actual_count);
 		break;
 	case OUTPUT_PORT:
-		if (!inst->vb2q[INPUT_PORT].streaming)
+		if (!inst->bufq[INPUT_PORT].vb2q->streaming)
 			inst->buffers.output.min_count = call_session_op(core,
 				min_count, inst, MSM_VIDC_BUF_OUTPUT);
 		inst->buffers.output.extra_count = call_session_op(core,

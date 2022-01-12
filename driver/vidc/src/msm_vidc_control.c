@@ -173,7 +173,7 @@ static u32 msm_vidc_get_port_info(struct msm_vidc_inst *inst,
 
 	if (capability->cap[cap_id].flags & CAP_FLAG_INPUT_PORT &&
 		capability->cap[cap_id].flags & CAP_FLAG_OUTPUT_PORT) {
-		if (inst->vb2q[OUTPUT_PORT].streaming)
+		if (inst->bufq[OUTPUT_PORT].vb2q->streaming)
 			return get_hfi_port(inst, INPUT_PORT);
 		else
 			return get_hfi_port(inst, OUTPUT_PORT);
@@ -844,11 +844,8 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 	i_vpr_h(inst, "%s: state %d, name %s, id 0x%x value %d\n",
 		__func__, inst->state, ctrl->name, ctrl->id, ctrl->val);
 
-	if (!msm_vidc_allow_s_ctrl(inst, ctrl->id)) {
-		i_vpr_e(inst, "%s: state %d, name %s, id %#x not allowed\n",
-			__func__, inst->state, ctrl->name, ctrl->id, ctrl->val);
-		return -EBUSY;
-	}
+	if (!msm_vidc_allow_s_ctrl(inst, ctrl->id))
+		return -EINVAL;
 
 	cap_id = msm_vidc_get_cap_id(inst, ctrl->id);
 	if (cap_id == INST_CAP_NONE) {
@@ -859,7 +856,7 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	capability->cap[cap_id].flags |= CAP_FLAG_CLIENT_SET;
 	/* Static setting */
-	if (!inst->vb2q[OUTPUT_PORT].streaming) {
+	if (!inst->bufq[OUTPUT_PORT].vb2q->streaming) {
 		msm_vidc_update_cap_value(inst, cap_id, ctrl->val, __func__);
 
 		if (ctrl->id == V4L2_CID_MPEG_VIDC_SECURE) {
@@ -927,7 +924,7 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 	}
 
 	/* check if dynamic adjustment is allowed */
-	if (inst->vb2q[OUTPUT_PORT].streaming &&
+	if (inst->bufq[OUTPUT_PORT].vb2q->streaming &&
 		!(capability->cap[cap_id].flags & CAP_FLAG_DYNAMIC_ALLOWED)) {
 		i_vpr_e(inst,
 			"%s: dynamic setting of cap[%d] %s is not allowed\n",
@@ -951,8 +948,12 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 	}
 
 	/* dynamic controls with request will be set along with qbuf */
-	if (inst->request)
+	if (inst->request) {
+		i_vpr_l(inst,
+			"%s: request api enabled, dynamic ctrls to be set with qbuf\n",
+			__func__);
 		return 0;
+	}
 
 	/* Dynamic set control ASAP */
 	rc = msm_vidc_set_v4l2_properties(inst);
@@ -1574,7 +1575,7 @@ int msm_vidc_adjust_layer_count(void *instance, struct v4l2_ctrl *ctrl)
 		META_EVA_STATS, __func__))
 		return -EINVAL;
 
-	if (!inst->vb2q[OUTPUT_PORT].streaming) {
+	if (!inst->bufq[OUTPUT_PORT].vb2q->streaming) {
 		rc = msm_vidc_adjust_static_layer_count_and_type(inst,
 			client_layer_count);
 		if (rc)
@@ -1742,7 +1743,7 @@ int msm_vidc_adjust_bitrate(void *instance, struct v4l2_ctrl *ctrl)
 		return 0;
 	}
 
-	if (inst->vb2q[OUTPUT_PORT].streaming)
+	if (inst->bufq[OUTPUT_PORT].vb2q->streaming)
 		return 0;
 
 	if (msm_vidc_get_parent_value(inst, BIT_RATE,
@@ -1821,7 +1822,7 @@ int msm_vidc_adjust_dynamic_layer_bitrate(void *instance, struct v4l2_ctrl *ctrl
 	if (capability->cap[BIT_RATE].flags & CAP_FLAG_CLIENT_SET)
 		return 0;
 
-	if (!inst->vb2q[OUTPUT_PORT].streaming)
+	if (!inst->bufq[OUTPUT_PORT].vb2q->streaming)
 		return 0;
 
 	/*
@@ -2167,7 +2168,7 @@ int msm_vidc_adjust_cac(void *instance, struct v4l2_ctrl *ctrl)
 	adjusted_value = ctrl ? ctrl->val :
 		capability->cap[CONTENT_ADAPTIVE_CODING].value;
 
-	if (inst->vb2q[OUTPUT_PORT].streaming)
+	if (inst->bufq[OUTPUT_PORT].vb2q->streaming)
 		return 0;
 
 	if (msm_vidc_get_parent_value(inst, CONTENT_ADAPTIVE_CODING,
@@ -2213,7 +2214,7 @@ int msm_vidc_adjust_bitrate_boost(void *instance, struct v4l2_ctrl *ctrl)
 	adjusted_value = ctrl ? ctrl->val :
 		capability->cap[BITRATE_BOOST].value;
 
-	if (inst->vb2q[OUTPUT_PORT].streaming)
+	if (inst->bufq[OUTPUT_PORT].vb2q->streaming)
 		return 0;
 
 	if (msm_vidc_get_parent_value(inst, BITRATE_BOOST,
@@ -2267,7 +2268,7 @@ int msm_vidc_adjust_min_quality(void *instance, struct v4l2_ctrl *ctrl)
 	 * Therefore, below streaming check is required to avoid
 	 * runtime modification of MIN_QUALITY.
 	 */
-	if (inst->vb2q[OUTPUT_PORT].streaming)
+	if (inst->bufq[OUTPUT_PORT].vb2q->streaming)
 		return 0;
 
 	if (msm_vidc_get_parent_value(inst, MIN_QUALITY,
@@ -2886,7 +2887,7 @@ int msm_vidc_set_frame_qp(void *instance,
 		BITRATE_MODE, &rc_type, __func__))
 		return -EINVAL;
 
-	if (inst->vb2q[OUTPUT_PORT].streaming) {
+	if (inst->bufq[OUTPUT_PORT].vb2q->streaming) {
 		if (rc_type != HFI_RC_OFF) {
 			i_vpr_h(inst,
 				"%s: dynamic qp not allowed for rc type %d\n",
@@ -3068,7 +3069,7 @@ int msm_vidc_set_layer_count_and_type(void *instance,
 		return -EINVAL;
 	}
 
-	if (!inst->vb2q[OUTPUT_PORT].streaming) {
+	if (!inst->bufq[OUTPUT_PORT].vb2q->streaming) {
 		/* set layer type */
 		hfi_layer_type = inst->hfi_layer_type;
 		cap_id = LAYER_TYPE;
@@ -3112,7 +3113,7 @@ int msm_vidc_set_gop_size(void *instance,
 		return -EINVAL;
 	}
 
-	if (inst->vb2q[OUTPUT_PORT].streaming) {
+	if (inst->bufq[OUTPUT_PORT].vb2q->streaming) {
 		if (inst->hfi_layer_type == HFI_HIER_B) {
 			i_vpr_l(inst,
 				"%s: HB dyn GOP setting is not supported\n",
@@ -3155,7 +3156,7 @@ int msm_vidc_set_bitrate(void *instance,
 	 * In this case, client did not change bitrate, hence, no need to set
 	 * to fw.
 	 */
-	if (inst->vb2q[OUTPUT_PORT].streaming)
+	if (inst->bufq[OUTPUT_PORT].vb2q->streaming)
 		return 0;
 
 	if (msm_vidc_get_parent_value(inst, BIT_RATE,
@@ -3218,7 +3219,7 @@ int msm_vidc_set_dynamic_layer_bitrate(void *instance,
 		return -EINVAL;
 	}
 
-	if (!inst->vb2q[OUTPUT_PORT].streaming)
+	if (!inst->bufq[OUTPUT_PORT].vb2q->streaming)
 		return 0;
 
 	/* set Total Bitrate */
@@ -3311,7 +3312,7 @@ int msm_vidc_set_flip(void *instance,
 	if (vflip)
 		hfi_value |= HFI_VERTICAL_FLIP;
 
-	if (inst->vb2q[OUTPUT_PORT].streaming) {
+	if (inst->bufq[OUTPUT_PORT].vb2q->streaming) {
 		if (hfi_value != HFI_DISABLE_FLIP) {
 			rc = msm_vidc_set_req_sync_frame(inst,
 				REQUEST_I_FRAME);

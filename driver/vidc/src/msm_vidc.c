@@ -51,7 +51,7 @@ static int get_poll_flags(struct msm_vidc_inst *inst, u32 port)
 			__func__, inst, port);
 		return poll;
 	}
-	q = &inst->vb2q[port];
+	q = inst->bufq[port].vb2q;
 
 	spin_lock_irqsave(&q->done_lock, flags);
 	if (!list_empty(&q->done_list))
@@ -85,10 +85,10 @@ int msm_vidc_poll(void *instance, struct file *filp,
 	}
 
 	poll_wait(filp, &inst->event_handler.wait, wait);
-	poll_wait(filp, &inst->vb2q[INPUT_META_PORT].done_wq, wait);
-	poll_wait(filp, &inst->vb2q[OUTPUT_META_PORT].done_wq, wait);
-	poll_wait(filp, &inst->vb2q[INPUT_PORT].done_wq, wait);
-	poll_wait(filp, &inst->vb2q[OUTPUT_PORT].done_wq, wait);
+	poll_wait(filp, &inst->bufq[INPUT_META_PORT].vb2q->done_wq, wait);
+	poll_wait(filp, &inst->bufq[OUTPUT_META_PORT].vb2q->done_wq, wait);
+	poll_wait(filp, &inst->bufq[INPUT_PORT].vb2q->done_wq, wait);
+	poll_wait(filp, &inst->bufq[OUTPUT_PORT].vb2q->done_wq, wait);
 
 	if (v4l2_event_pending(&inst->event_handler))
 		poll |= POLLPRI;
@@ -402,7 +402,7 @@ int msm_vidc_reqbufs(void *instance, struct v4l2_requestbuffers *b)
 		goto exit;
 	}
 
-	rc = vb2_reqbufs(&inst->vb2q[port], b);
+	rc = vb2_reqbufs(inst->bufq[port].vb2q, b);
 	if (rc) {
 		i_vpr_e(inst, "%s: vb2_reqbufs(%d) failed, %d\n",
 			__func__, b->type, rc);
@@ -511,7 +511,7 @@ int msm_vidc_streamon(void *instance, enum v4l2_buf_type type)
 		goto exit;
 	}
 
-	rc = vb2_streamon(&inst->vb2q[port], type);
+	rc = vb2_streamon(inst->bufq[port].vb2q, type);
 	if (rc) {
 		i_vpr_e(inst, "%s: vb2_streamon(%d) failed, %d\n",
 			__func__, type, rc);
@@ -556,7 +556,7 @@ int msm_vidc_streamoff(void *instance, enum v4l2_buf_type type)
 		goto exit;
 	}
 
-	rc = vb2_streamoff(&inst->vb2q[port], type);
+	rc = vb2_streamoff(inst->bufq[port].vb2q, type);
 	if (rc) {
 		i_vpr_e(inst, "%s: vb2_streamoff(%d) failed, %d\n",
 			__func__, type, rc);
@@ -833,6 +833,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	inst->auto_framerate = DEFAULT_FPS << 16;
 	kref_init(&inst->kref);
 	mutex_init(&inst->lock);
+	mutex_init(&inst->request_lock);
 	msm_vidc_update_debug_str(inst);
 	i_vpr_h(inst, "Opening video instance: %d\n", session_type);
 
@@ -903,10 +904,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 		goto error;
 	}
 
-	if (is_decode_session(inst))
-		rc = msm_vdec_inst_init(inst);
-	else if (is_encode_session(inst))
-		rc = msm_venc_inst_init(inst);
+	rc = msm_vidc_event_queue_init(inst);
 	if (rc)
 		goto error;
 
@@ -914,7 +912,10 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	if (rc)
 		goto error;
 
-	rc = msm_vidc_event_queue_init(inst);
+	if (is_decode_session(inst))
+		rc = msm_vdec_inst_init(inst);
+	else if (is_encode_session(inst))
+		rc = msm_venc_inst_init(inst);
 	if (rc)
 		goto error;
 

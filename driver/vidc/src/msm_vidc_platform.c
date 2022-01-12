@@ -120,6 +120,8 @@ static struct vb2_ops msm_vb2_ops = {
 	.buf_queue                      = msm_vidc_buf_queue,
 	.buf_cleanup                    = msm_vidc_buf_cleanup,
 	.stop_streaming                 = msm_vidc_stop_streaming,
+	.buf_out_validate               = msm_vidc_buf_out_validate,
+	.buf_request_complete           = msm_vidc_buf_request_complete,
 };
 
 static struct vb2_mem_ops msm_vb2_mem_ops = {
@@ -129,6 +131,16 @@ static struct vb2_mem_ops msm_vb2_mem_ops = {
 	.detach_dmabuf                  = msm_vb2_detach_dmabuf,
 	.map_dmabuf                     = msm_vb2_map_dmabuf,
 	.unmap_dmabuf                   = msm_vb2_unmap_dmabuf,
+};
+
+static struct media_device_ops msm_v4l2_media_ops = {
+	.req_validate                   = msm_v4l2_request_validate,
+	.req_queue                      = msm_v4l2_request_queue,
+};
+
+static struct v4l2_m2m_ops msm_v4l2_m2m_ops = {
+	.device_run                     = msm_v4l2_m2m_device_run,
+	.job_abort                      = msm_v4l2_m2m_job_abort,
 };
 
 static int msm_vidc_init_ops(struct msm_vidc_core *core)
@@ -145,6 +157,8 @@ static int msm_vidc_init_ops(struct msm_vidc_core *core)
 	core->v4l2_ctrl_ops = &msm_v4l2_ctrl_ops;
 	core->vb2_ops = &msm_vb2_ops;
 	core->vb2_mem_ops = &msm_vb2_mem_ops;
+	core->media_device_ops = &msm_v4l2_media_ops;
+	core->v4l2_m2m_ops = &msm_v4l2_m2m_ops;
 
 	return 0;
 }

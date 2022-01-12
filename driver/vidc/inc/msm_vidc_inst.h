@@ -86,9 +86,14 @@ enum msm_vidc_inst_state {
 	MSM_VIDC_ERROR                     = 12,
 };
 
+struct buf_queue {
+	struct vb2_queue *vb2q;
+};
+
 struct msm_vidc_inst {
 	struct list_head                   list;
 	struct mutex                       lock;
+	struct mutex                       request_lock;
 	enum msm_vidc_inst_state           state;
 	enum msm_vidc_domain_type          domain;
 	enum msm_vidc_codec_type           codec;
@@ -101,6 +106,8 @@ struct msm_vidc_inst {
 	struct v4l2_format                 fmts[MAX_PORT];
 	struct v4l2_ctrl_handler           ctrl_handler;
 	struct v4l2_fh                     event_handler;
+	struct v4l2_m2m_dev               *m2m_dev;
+	struct v4l2_m2m_ctx               *m2m_ctx;
 	struct v4l2_ctrl                 **ctrls;
 	u32                                num_ctrls;
 	struct msm_vidc_inst_cap_entry     children;
@@ -108,7 +115,7 @@ struct msm_vidc_inst {
 	enum hfi_rate_control              hfi_rc_type;
 	enum hfi_layer_encoding_type       hfi_layer_type;
 	bool                               request;
-	struct vb2_queue                   vb2q[MAX_PORT];
+	struct buf_queue                   bufq[MAX_PORT];
 	struct msm_vidc_rectangle          crop;
 	struct msm_vidc_rectangle          compose;
 	struct msm_vidc_power              power;

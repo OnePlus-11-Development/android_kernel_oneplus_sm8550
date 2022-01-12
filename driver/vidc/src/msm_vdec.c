@@ -1511,7 +1511,7 @@ int msm_vdec_input_port_settings_change(struct msm_vidc_inst *inst)
 	u32 rc = 0;
 	struct v4l2_event event = {0};
 
-	if (!inst->vb2q[INPUT_PORT].streaming) {
+	if (!inst->bufq[INPUT_PORT].vb2q->streaming) {
 		i_vpr_e(inst, "%s: input port not streaming\n",
 			__func__);
 		return 0;
@@ -1588,7 +1588,7 @@ int msm_vdec_streamon_input(struct msm_vidc_inst *inst)
 	}
 
 	if (is_input_meta_enabled(inst) &&
-		!inst->vb2q[INPUT_META_PORT].streaming) {
+		!inst->bufq[INPUT_META_PORT].vb2q->streaming) {
 		i_vpr_e(inst,
 			"%s: Meta port must be streamed on before data port\n",
 			__func__);
@@ -1897,7 +1897,7 @@ int msm_vdec_streamon_output(struct msm_vidc_inst *inst)
 	capability = inst->capabilities;
 
 	if (is_output_meta_enabled(inst) &&
-		!inst->vb2q[OUTPUT_META_PORT].streaming) {
+		!inst->bufq[OUTPUT_META_PORT].vb2q->streaming) {
 		i_vpr_e(inst,
 			"%s: Meta port must be streamed on before data port\n",
 			__func__);
@@ -2347,8 +2347,8 @@ int msm_vdec_process_cmd(struct msm_vidc_inst *inst, u32 cmd)
 			return rc;
 	} else if (cmd == V4L2_DEC_CMD_START) {
 		i_vpr_h(inst, "received cmd: resume\n");
-		vb2_clear_last_buffer_dequeued(&inst->vb2q[OUTPUT_META_PORT]);
-		vb2_clear_last_buffer_dequeued(&inst->vb2q[OUTPUT_PORT]);
+		vb2_clear_last_buffer_dequeued(inst->bufq[OUTPUT_META_PORT].vb2q);
+		vb2_clear_last_buffer_dequeued(inst->bufq[OUTPUT_PORT].vb2q);
 
 		if (capability->cap[CODED_FRAMES].value == CODED_FRAMES_INTERLACE &&
 			!is_ubwc_colorformat(capability->cap[PIX_FMTS].value)) {
@@ -2417,7 +2417,7 @@ int msm_vdec_try_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 			pix_fmt = v4l2_codec_to_driver(f->fmt.pix_mp.pixelformat, __func__);
 		}
 	} else if (f->type == OUTPUT_MPLANE) {
-		if (inst->vb2q[INPUT_PORT].streaming) {
+		if (inst->bufq[INPUT_PORT].vb2q->streaming) {
 			f->fmt.pix_mp.height = inst->fmts[INPUT_PORT].fmt.pix_mp.height;
 			f->fmt.pix_mp.width = inst->fmts[INPUT_PORT].fmt.pix_mp.width;
 		}
@@ -2558,7 +2558,7 @@ int msm_vdec_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 	} else if (f->type == OUTPUT_MPLANE) {
 		fmt = &inst->fmts[OUTPUT_PORT];
 		fmt->type = OUTPUT_MPLANE;
-		if (inst->vb2q[INPUT_PORT].streaming) {
+		if (inst->bufq[INPUT_PORT].vb2q->streaming) {
 			f->fmt.pix_mp.height = inst->fmts[INPUT_PORT].fmt.pix_mp.height;
 			f->fmt.pix_mp.width = inst->fmts[INPUT_PORT].fmt.pix_mp.width;
 		}
@@ -2576,7 +2576,7 @@ int msm_vdec_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 		fmt->fmt.pix_mp.plane_fmt[0].sizeimage = call_session_op(core,
 			buffer_size, inst, MSM_VIDC_BUF_OUTPUT);
 
-		if (!inst->vb2q[INPUT_PORT].streaming)
+		if (!inst->bufq[INPUT_PORT].vb2q->streaming)
 			inst->buffers.output.min_count = call_session_op(core,
 				min_count, inst, MSM_VIDC_BUF_OUTPUT);
 		inst->buffers.output.extra_count = call_session_op(core,
@@ -2594,7 +2594,7 @@ int msm_vdec_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 		msm_vidc_update_cap_value(inst, PIX_FMTS, pix_fmt, __func__);
 
 		/* update crop while input port is not streaming */
-		if (!inst->vb2q[INPUT_PORT].streaming) {
+		if (!inst->bufq[INPUT_PORT].vb2q->streaming) {
 			inst->crop.top = 0;
 			inst->crop.left = 0;
 			inst->crop.width = f->fmt.pix_mp.width;
@@ -2762,8 +2762,8 @@ set_default:
 	msm_vidc_update_cap_value(inst, is_frame_rate ? FRAME_RATE : OPERATING_RATE,
 		q16_rate, __func__);
 	if (is_realtime_session(inst) &&
-		((s_parm->type == INPUT_MPLANE && inst->vb2q[INPUT_PORT].streaming) ||
-		(s_parm->type == OUTPUT_MPLANE && inst->vb2q[OUTPUT_PORT].streaming))) {
+		((s_parm->type == INPUT_MPLANE && inst->bufq[INPUT_PORT].vb2q->streaming) ||
+		(s_parm->type == OUTPUT_MPLANE && inst->bufq[OUTPUT_PORT].vb2q->streaming))) {
 		rc = msm_vidc_check_core_mbps(inst);
 		if (rc) {
 			i_vpr_e(inst, "%s: unsupported load\n", __func__);
@@ -2833,7 +2833,7 @@ static int msm_vdec_check_colorformat_supported(struct msm_vidc_inst* inst,
 	bool supported = true;
 
 	/* do not reject coloformats before streamon */
-	if (!inst->vb2q[INPUT_PORT].streaming)
+	if (!inst->bufq[INPUT_PORT].vb2q->streaming)
 		return true;
 
 	/*

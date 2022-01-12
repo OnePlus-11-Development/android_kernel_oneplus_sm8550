@@ -47,6 +47,7 @@ struct msm_vidc_iface_q_info {
 struct msm_video_device {
 	enum msm_vidc_domain_type              type;
 	struct video_device                    vdev;
+	struct v4l2_m2m_dev                   *m2m_dev;
 };
 
 struct msm_vidc_core_power {
@@ -65,6 +66,7 @@ struct msm_vidc_core {
 	struct platform_device                *pdev;
 	struct msm_video_device                vdev[2];
 	struct v4l2_device                     v4l2_dev;
+	struct media_device                    media_dev;
 	struct list_head                       instances;
 	struct list_head                       dangling_instances;
 	struct dentry                         *debugfs_parent;
@@ -104,9 +106,11 @@ struct msm_vidc_core {
 	struct v4l2_ctrl_ops                  *v4l2_ctrl_ops;
 	struct vb2_ops                        *vb2_ops;
 	struct vb2_mem_ops                    *vb2_mem_ops;
+	struct v4l2_m2m_ops                   *v4l2_m2m_ops;
 	struct msm_vidc_venus_ops             *venus_ops;
 	struct msm_vidc_session_ops           *session_ops;
 	struct msm_vidc_memory_ops            *mem_ops;
+	struct media_device_ops               *media_device_ops;
 	u32                                    header_id;
 	u32                                    packet_id;
 	u32                                    sys_init_id;
