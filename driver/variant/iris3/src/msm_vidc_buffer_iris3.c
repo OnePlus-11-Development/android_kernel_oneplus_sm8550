@@ -154,9 +154,11 @@ static u32 msm_vidc_decoder_line_size_iris3(struct msm_vidc_inst *inst)
 		is_opb = false;
 	/*
 	 * assume worst case, since color format is unknown at this
-	 * time
+	 * time. The exception is AV1D, where line buffer size is larger
+	 * in DPB-only mode.
 	 */
-	is_opb = true;
+	if (inst->codec != MSM_VIDC_AV1)
+		is_opb = true;
 
 	if (inst->decode_vpp_delay.enable)
 		vpp_delay = inst->decode_vpp_delay.size;
