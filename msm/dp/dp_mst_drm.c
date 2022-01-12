@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -43,6 +44,7 @@
 #include "sde_connector.h"
 #include "dp_drm.h"
 #include "dp_debug.h"
+#include "dp_parser.h"
 
 #define DP_MST_DEBUG(fmt, ...) DP_DEBUG(fmt, ##__VA_ARGS__)
 #define DP_MST_INFO(fmt, ...) DP_DEBUG(fmt, ##__VA_ARGS__)
@@ -1875,7 +1877,7 @@ int dp_mst_init(struct dp_display *dp_display)
 					dp_mst.caps.drm_aux,
 					dp_mst.caps.max_dpcd_transaction_bytes,
 					dp_mst.caps.max_streams_supported,
-					4, DP_LINK_BW_8_1, conn_base_id);
+					4, DP_MAX_LINK_CLK_KHZ, conn_base_id);
 #else
 	ret = drm_dp_mst_topology_mgr_init(&dp_mst.mst_mgr, dev,
 					dp_mst.caps.drm_aux,
