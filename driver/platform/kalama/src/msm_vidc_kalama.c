@@ -60,7 +60,7 @@ static struct msm_platform_core_capability core_data_kalama[] = {
 	{MAX_SESSION_COUNT, 16},
 	{MAX_NUM_720P_SESSIONS, 16},
 	{MAX_NUM_1080P_SESSIONS, 8},
-	{MAX_NUM_4K_SESSIONS, 4},
+	{MAX_NUM_4K_SESSIONS, 6},
 	{MAX_NUM_8K_SESSIONS, 2},
 	{MAX_SECURE_SESSION_COUNT, 3},
 	{MAX_RT_MBPF, 173056},	/* (8192x4320)/256 + (4096x2176)/256*/
