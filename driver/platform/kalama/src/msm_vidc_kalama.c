@@ -1506,6 +1506,14 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		{LTR_COUNT, IR_RANDOM, SLICE_MODE},
 		msm_vidc_adjust_all_intra, NULL},
 
+	{INPUT_METADATA_FD, ENC|DEC, CODECS_ALL,
+		-1, INT_MAX, 1, -1,
+		V4L2_CID_MPEG_VIDC_INPUT_METADATA_FD,
+		0,
+		CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED,
+		{0}, {0},
+		NULL, NULL},
+
 	{META_LTR_MARK_USE, ENC, H264|HEVC,
 		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,

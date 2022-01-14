@@ -194,7 +194,11 @@ enum v4l2_mpeg_video_av1_tier {
 /* AV1 Decoder Film Grain */
 #define V4L2_CID_MPEG_VIDC_AV1D_FILM_GRAIN_PRESENT                           \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x35)
+/* Control to set input metadata buffer fd */
+#define V4L2_CID_MPEG_VIDC_INPUT_METADATA_FD                                 \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x36)
 
+/* add new controls above this line */
 /* Deprecate below controls once availble in gki and gsi bionic header */
 #ifndef V4L2_CID_MPEG_VIDEO_BASELAYER_PRIORITY_ID
 #define V4L2_CID_MPEG_VIDEO_BASELAYER_PRIORITY_ID                            \
