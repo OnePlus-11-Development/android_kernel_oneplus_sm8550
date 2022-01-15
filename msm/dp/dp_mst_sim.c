@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -1683,34 +1684,3 @@ int dp_sim_remove(struct platform_device *pdev)
 
 	return 0;
 }
-
-#if 0
-static const struct of_device_id dt_match[] = {
-	{ .compatible = "qcom,dp-mst-sim"},
-	{},
-};
-
-static struct platform_driver dp_sim_driver = {
-	.probe = dp_sim_probe,
-	.remove = dp_sim_remove,
-	.driver = {
-		.name = "dp_sim",
-		.of_match_table = dt_match,
-		.suppress_bind_attrs = true,
-	},
-};
-
-static int __init dp_sim_register(void)
-{
-	return platform_driver_register(&dp_sim_driver);
-}
-
-static void __exit dp_sim_unregister(void)
-{
-	platform_driver_unregister(&dp_sim_driver);
-}
-
-module_init(dp_sim_register);
-module_exit(dp_sim_unregister);
-
-#endif
