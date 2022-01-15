@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -192,19 +193,34 @@ exit:
 	return off;
 }
 
-void sde_evtlog_dump_all(struct sde_dbg_evtlog *evtlog)
+u32 sde_evtlog_count(struct sde_dbg_evtlog *evtlog)
 {
-	char buf[SDE_EVTLOG_BUF_MAX];
-	bool update_last_entry = true;
+	u32 first, next, last, last_dump;
 
-	if (!evtlog || !(evtlog->dump_mode & (SDE_DBG_DUMP_IN_LOG | SDE_DBG_DUMP_IN_LOG_LIMITED)))
-		return;
+	if (!evtlog)
+		return 0;
 
-	while (sde_evtlog_dump_to_buffer(evtlog, buf, sizeof(buf),
-				update_last_entry, false)) {
-		pr_info("%s\n", buf);
-		update_last_entry = false;
+	first = evtlog->first;
+	next = evtlog->next;
+	last = evtlog->last;
+	last_dump = evtlog->last_dump;
+
+	first = next;
+	last_dump = last;
+
+	if (last_dump == first)
+		return 0;
+
+	if (last_dump < first) {
+		first %= SDE_EVTLOG_ENTRY;
+		if (last_dump < first)
+			last_dump += SDE_EVTLOG_ENTRY;
 	}
+
+	if ((last_dump - first) > SDE_EVTLOG_PRINT_ENTRY)
+		return SDE_EVTLOG_ENTRY;
+
+	return last_dump - first;
 }
 
 struct sde_dbg_evtlog *sde_evtlog_init(void)
