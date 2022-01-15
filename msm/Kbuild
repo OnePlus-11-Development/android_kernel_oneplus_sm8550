@@ -23,8 +23,13 @@ ifeq ($(CONFIG_ARCH_PARROT), y)
 endif
 
 #ifeq ($(CONFIG_ARCH_KALAMA), y)
+ifeq ($(CONFIG_ARCH_QTI_VM), y)
+        include $(DISPLAY_ROOT)/config/gki_kalamadisptui.conf
+        LINUX_INC += -include $(DISPLAY_ROOT)/config/gki_kalamadisptuiconf.h
+else
 	include $(DISPLAY_ROOT)/config/gki_kalamadisp.conf
 	LINUX_INC += -include $(DISPLAY_ROOT)/config/gki_kalamadispconf.h
+endif
 #endif
 
 LINUX_INC +=	-Iinclude/linux \
