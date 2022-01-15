@@ -73,8 +73,6 @@ static const struct sde_format_extended plane_formats_vig[] = {
 	{DRM_FORMAT_NV12, 0},
 	{DRM_FORMAT_NV12, DRM_FORMAT_MOD_QCOM_COMPRESSED},
 	{DRM_FORMAT_NV21, 0},
-	{DRM_FORMAT_NV16, 0},
-	{DRM_FORMAT_NV61, 0},
 	{DRM_FORMAT_VYUY, 0},
 	{DRM_FORMAT_UYVY, 0},
 	{DRM_FORMAT_YUYV, 0},
