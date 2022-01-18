@@ -847,6 +847,11 @@ struct adreno_gpudev {
 	 */
 	int (*send_recurring_cmdobj)(struct adreno_device *adreno_dev,
 		struct kgsl_drawobj_cmd *cmdobj);
+	/**
+	 * @perfcounter_remove: Remove perfcounter from the power up list
+	 */
+	int (*perfcounter_remove)(struct adreno_device *adreno_dev,
+			struct adreno_perfcount_register *reg, u32 groupid);
 };
 
 /**

@@ -345,11 +345,6 @@ static void gen7_patch_pwrup_reglist(struct adreno_device *adreno_dev)
 		}
 	}
 
-	/* This needs to be at the end of the dynamic list */
-	*dest++ = FIELD_PREP(GENMASK(13, 12), PIPE_NONE);
-	*dest++ = GEN7_RBBM_PERFCTR_CNTL;
-	*dest++ = 1;
-
 	/*
 	 * The overall register list is composed of
 	 * 1. Static IFPC-only registers
@@ -365,7 +360,7 @@ static void gen7_patch_pwrup_reglist(struct adreno_device *adreno_dev)
 	 * (<aperture, shifted 12 bits> <address> <data>), and the length is
 	 * stored as number for triplets in dynamic_list_len.
 	 */
-	lock->dynamic_list_len = 1;
+	lock->dynamic_list_len = 0;
 }
 
 /* _llc_configure_gpu_scid() - Program the sub-cache ID for all GPU blocks */
@@ -479,9 +474,6 @@ int gen7_start(struct adreno_device *adreno_dev)
 
 	/* Set the AHB default slave response to "ERROR" */
 	kgsl_regwrite(device, GEN7_CP_AHB_CNTL, 0x1);
-
-	/* Turn on performance counters */
-	kgsl_regwrite(device, GEN7_RBBM_PERFCTR_CNTL, 0x1);
 
 	/* Turn on the IFPC counter (countable 4 on XOCLK4) */
 	kgsl_regwrite(device, GEN7_GMU_CX_GMU_POWER_COUNTER_SELECT_1,
@@ -1200,6 +1192,91 @@ static unsigned int gen7_register_offsets[ADRENO_REG_REGISTER_MAX] = {
 			GEN7_GMU_GMU2HOST_INTR_MASK),
 };
 
+
+static u32 _get_pipeid(u32 groupid)
+{
+	if (groupid == KGSL_PERFCOUNTER_GROUP_BV_TSE || groupid == KGSL_PERFCOUNTER_GROUP_BV_RAS
+						|| groupid == KGSL_PERFCOUNTER_GROUP_BV_LRZ
+						|| groupid == KGSL_PERFCOUNTER_GROUP_BV_HLSQ)
+		return PIPE_BV;
+	else if (groupid == KGSL_PERFCOUNTER_GROUP_HLSQ || groupid == KGSL_PERFCOUNTER_GROUP_TSE
+						|| groupid == KGSL_PERFCOUNTER_GROUP_RAS
+						|| groupid == KGSL_PERFCOUNTER_GROUP_LRZ)
+		return PIPE_BR;
+	else
+		return PIPE_NONE;
+}
+
+int gen7_perfcounter_remove(struct adreno_device *adreno_dev,
+	struct adreno_perfcount_register *reg, u32 groupid)
+{
+	void *ptr = adreno_dev->pwrup_reglist->hostptr;
+	struct cpu_gpu_lock *lock = ptr;
+	u32 *data = ptr + sizeof(*lock);
+	int offset = (lock->ifpc_list_len + lock->preemption_list_len) * 2;
+	int i, second_last_offset, last_offset;
+	bool remove_counter = false;
+	u32 pipe = _get_pipeid(groupid);
+
+	if (kgsl_hwlock(lock)) {
+		kgsl_hwunlock(lock);
+		return -EBUSY;
+	}
+
+	if (lock->dynamic_list_len < 2) {
+		kgsl_hwunlock(lock);
+		return -EINVAL;
+	}
+
+	second_last_offset = offset + (lock->dynamic_list_len - 2) * 3;
+	last_offset = second_last_offset + 3;
+
+	/* Look for the perfcounter to remove in the list */
+	for (i = 0; i < lock->dynamic_list_len - 1; i++) {
+		if ((data[offset + 1] == reg->select) && (data[offset] == pipe) ) {
+			remove_counter = true;
+			break;
+		}
+		offset += 3;
+	}
+
+	if (!remove_counter) {
+		kgsl_hwunlock(lock);
+		return -ENOENT;
+	}
+
+	/*
+	 * If the entry is found, remove it from the list by overwriting with second last
+	 * entry. Skip this if data at offset is already second last entry
+	 */
+	if (offset != second_last_offset)
+		memcpy(&data[offset], &data[second_last_offset], 3 * sizeof(u32));
+
+	/*
+	 * Overwrite the second last entry with last entry as last entry always has to be
+	 * GEN7_RBBM_PERFCTR_CNTL.
+	 */
+	memcpy(&data[second_last_offset], &data[last_offset], 3 * sizeof(u32));
+
+	/* Clear the last entry */
+	memset(&data[last_offset], 0, 3 * sizeof(u32));
+
+	lock->dynamic_list_len--;
+
+	/*
+	 * If dynamic list length is 1, the only entry in the list is the GEN7_RBBM_PERFCTR_CNTL.
+	 * Remove the same as we can disable perfcounters now.
+	 */
+	if (lock->dynamic_list_len == 1) {
+		memset(&data[offset], 0, 3 * sizeof(u32));
+		lock->dynamic_list_len = 0;
+		kgsl_regwrite(KGSL_DEVICE(adreno_dev), GEN7_RBBM_PERFCTR_CNTL, 0x0);
+	}
+
+	kgsl_hwunlock(lock);
+	return 0;
+}
+
 int gen7_perfcounter_update(struct adreno_device *adreno_dev,
 	struct adreno_perfcount_register *reg, bool update_reg, u32 pipe)
 {
@@ -1244,6 +1321,12 @@ int gen7_perfcounter_update(struct adreno_device *adreno_dev,
 	data[offset++] = 1;
 
 	lock->dynamic_list_len++;
+
+	/* If this is the first entry, enable perfcounters */
+	if (lock->dynamic_list_len == 1) {
+		lock->dynamic_list_len++;
+		kgsl_regwrite(KGSL_DEVICE(adreno_dev), GEN7_RBBM_PERFCTR_CNTL, 0x1);
+	}
 
 update:
 	if (update_reg)
@@ -1411,6 +1494,7 @@ const struct gen7_gpudev adreno_gen7_hwsched_gpudev = {
 		.add_to_va_minidump = gen7_hwsched_add_to_minidump,
 		.gx_is_on = gen7_gmu_gx_is_on,
 		.send_recurring_cmdobj = gen7_hwsched_send_recurring_cmdobj,
+		.perfcounter_remove = gen7_perfcounter_remove,
 	},
 	.hfi_probe = gen7_hwsched_hfi_probe,
 	.hfi_remove = gen7_hwsched_hfi_remove,
@@ -1438,6 +1522,7 @@ const struct gen7_gpudev adreno_gen7_gmu_gpudev = {
 		.setproperty = gen7_setproperty,
 		.add_to_va_minidump = gen7_gmu_add_to_minidump,
 		.gx_is_on = gen7_gmu_gx_is_on,
+		.perfcounter_remove = gen7_perfcounter_remove,
 	},
 	.hfi_probe = gen7_gmu_hfi_probe,
 	.handle_watchdog = gen7_gmu_handle_watchdog,

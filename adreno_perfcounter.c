@@ -480,7 +480,9 @@ int adreno_perfcounter_put(struct adreno_device *adreno_dev,
 	const struct adreno_perfcounters *counters =
 		ADRENO_PERFCOUNTERS(adreno_dev);
 	const struct adreno_perfcount_group *group;
+	const struct adreno_gpudev *gpudev = ADRENO_GPU_DEVICE(adreno_dev);
 	unsigned int i;
+	int ret = 0;
 
 	if (counters == NULL || groupid >= counters->group_count)
 		return -EINVAL;
@@ -505,11 +507,15 @@ int adreno_perfcounter_put(struct adreno_device *adreno_dev,
 
 			/* mark available if not used anymore */
 			if (group->regs[i].kernelcount == 0 &&
-					group->regs[i].usercount == 0)
-				group->regs[i].countable =
-					KGSL_PERFCOUNTER_NOT_USED;
+					group->regs[i].usercount == 0) {
+				if (gpudev->perfcounter_remove)
+					ret = gpudev->perfcounter_remove(adreno_dev,
+							&group->regs[i], groupid);
+				if (!ret)
+					group->regs[i].countable = KGSL_PERFCOUNTER_NOT_USED;
+			}
 
-			return 0;
+			return ret;
 		}
 	}
 
