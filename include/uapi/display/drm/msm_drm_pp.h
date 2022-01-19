@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -480,7 +481,7 @@ struct drm_msm_ad4_roi_cfg {
 #define LTM_DATA_SIZE_3 33
 #define LTM_BUFFER_SIZE 5
 #define LTM_GUARD_BYTES 255
-#define LTM_BLOCK_SIZE 2
+#define LTM_BLOCK_SIZE 4
 
 #define LTM_STATS_SAT (1 << 1)
 #define LTM_STATS_MERGE_SAT (1 << 2)
