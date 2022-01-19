@@ -110,7 +110,7 @@
 
 #define SDE_DBG_LOG_ENTRY(off, x0, x4, x8, xc, log) \
 	if (log) \
-		dev_info(sde_dbg_base.dev, "0x%lx : %08x %08x %08x %08x\n", off, x0, x4, x8, xc)
+		dev_info(sde_dbg_base.dev, "0x%08x| %08x %08x %08x %08x\n", off, x0, x4, x8, xc)
 
 #define SDE_DBG_LOG_DUMP_ADDR(name, addr, size, off, log) \
 	if (log) \
@@ -344,6 +344,8 @@ static void _sde_debug_bus_ppb1_dump(u32 wr_addr, u32 block_id, u32 test_id, u32
 	SDE_DBG_LOG_DEBUGBUS("pp1", wr_addr, block_id, test_id, val);
 }
 
+static u32 dsi_block_offset[] = {0x4000, 0x6000};
+
 static struct sde_debug_bus_entry dbg_bus_sde_limited[] = {
 	{ DBGBUS_SSPP0, DBGBUS_DSPP_STATUS, 0, 9, 0, 8 },
 	{ DBGBUS_SSPP0, DBGBUS_DSPP_STATUS, 20, 34, 0, 8 },
@@ -526,7 +528,7 @@ static void _sde_dump_reg(const char *dump_name, u32 reg_dump_flag,
 
 		if (dump_addr && in_dump && sde_dbg_base.coredump_reading)
 			drm_printf(sde_dbg_base.sde_dbg_printer,
-				"0x%lx : %08x %08x %08x %08x\n",
+				"0x%08x| %08x %08x %08x %08x\n",
 				(unsigned long)(addr - base_addr),
 				dump_addr[i * 4],
 				dump_addr[i * 4 + 1],
@@ -1005,12 +1007,13 @@ static bool _is_dbg_bus_limited_valid(struct sde_dbg_sde_debug_bus *bus,
 
 static void _sde_dbg_dump_bus_entry(struct sde_dbg_sde_debug_bus *bus,
 		struct sde_debug_bus_entry *entries, u32 bus_size,
-		void __iomem *mem_base, u32 *dump_addr, u32 enable_mask)
+		void __iomem *mem_base, u32 *dump_addr, u32 enable_mask, u32 hw_idx)
 {
 	u32 status = 0;
 	int i, j, k;
 	bool in_mem, in_log, in_dump, in_log_limited;
 	struct sde_debug_bus_entry *entry;
+	u32 test_id, block_id, wr_addr;
 
 	if (!bus->read_tp || !bus->clear_tp)
 		return;
@@ -1031,20 +1034,35 @@ static void _sde_dbg_dump_bus_entry(struct sde_dbg_sde_debug_bus *bus,
 				status = bus->read_tp(mem_base, entry->wr_addr,
 							entry->rd_addr, i, j);
 
-				if (!entry->analyzer && (in_log || (in_log_limited &&
-					    _is_dbg_bus_limited_valid(bus, entry->wr_addr, i, j))))
-					SDE_DBG_LOG_ENTRY(0, entry->wr_addr, i, j, status, true);
+				wr_addr = entry->wr_addr;
+				block_id = i;
+				test_id = j;
 
-				if (dump_addr && (in_mem || in_dump) && (!sde_dbg_base.coredump_reading)) {
-					*dump_addr++ = entry->wr_addr;
-					*dump_addr++ = i;
-					*dump_addr++ = j;
+				if (!strcmp(bus->cmn.name, DBGBUS_NAME_VBIF_RT))
+					block_id = 1 << block_id;
+				else if (!strcmp(bus->cmn.name, DBGBUS_NAME_DSI) &&
+						(hw_idx < ARRAY_SIZE(dsi_block_offset)))
+					wr_addr = entry->wr_addr + dsi_block_offset[hw_idx];
+
+				if (!entry->analyzer && (in_log || (in_log_limited &&
+						_is_dbg_bus_limited_valid(
+							bus, entry->wr_addr, block_id, test_id))))
+					SDE_DBG_LOG_ENTRY(0, wr_addr, block_id,
+							test_id, status, true);
+
+				if (dump_addr && (in_mem || in_dump)
+						&& (!sde_dbg_base.coredump_reading)) {
+					*dump_addr++ = wr_addr;
+					*dump_addr++ = block_id;
+					*dump_addr++ = test_id;
 					*dump_addr++ = status;
 				}
 
 				if (dump_addr && in_dump && sde_dbg_base.coredump_reading) {
-					drm_printf(sde_dbg_base.sde_dbg_printer, "%08x %08x %08x %08x\n",
-						*dump_addr, *(dump_addr + 1), *(dump_addr + 2), *(dump_addr + 3));
+					drm_printf(sde_dbg_base.sde_dbg_printer,
+						"0x%08x| %08x %08x %08x %08x\n", 0,
+						*dump_addr, *(dump_addr + 1),
+						*(dump_addr + 2), *(dump_addr + 3));
 					dump_addr += 4;
 				}
 
@@ -1108,7 +1126,7 @@ static void _sde_dbg_dump_sde_dbg_bus(struct sde_dbg_sde_debug_bus *bus, u32 ena
 	dump_addr = *dump_mem;
 	SDE_DBG_LOG_DUMP_ADDR(bus->cmn.name, dump_addr, list_size, 0, in_log);
 
-	_sde_dbg_dump_bus_entry(bus, entries, bus_size, mem_base, dump_addr, enable_mask);
+	_sde_dbg_dump_bus_entry(bus, entries, bus_size, mem_base, dump_addr, enable_mask, 0);
 }
 
 static void _sde_dbg_dump_dsi_dbg_bus(struct sde_dbg_sde_debug_bus *bus, u32 enable_mask)
@@ -1152,13 +1170,15 @@ static void _sde_dbg_dump_dsi_dbg_bus(struct sde_dbg_sde_debug_bus *bus, u32 ena
 	}
 	dump_addr = *dump_mem;
 
+	i = 0;
 	list_for_each_entry(ctl_entry, &sde_dbg_dsi_list, list) {
 		SDE_DBG_LOG_DUMP_ADDR(ctl_entry->name, dump_addr, list_size / dsi_count, 0, in_log);
 
 		_sde_dbg_dump_bus_entry(bus, entries, bus_size, ctl_entry->base,
-					dump_addr, enable_mask);
+					dump_addr, enable_mask, i);
 		if (dump_addr)
 			dump_addr += list_size / (sizeof(u32) * dsi_count);
+		i++;
 	}
 	mutex_unlock(&sde_dbg_dsi_mutex);
 }
