@@ -993,12 +993,14 @@ struct sde_lm_sub_blks {
  * @version: HW Algorithm version.
  * @idx: HW block instance id.
  * @mem_total_size: data memory size.
+ * @min_region_width: minimum region width in pixels.
  */
 struct sde_dspp_rc {
 	SDE_HW_SUBBLK_INFO;
 	u32 version;
 	u32 idx;
 	u32 mem_total_size;
+	u32 min_region_width;
 };
 
 struct sde_dspp_sub_blks {

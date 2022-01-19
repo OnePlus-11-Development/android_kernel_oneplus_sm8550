@@ -431,6 +431,7 @@ enum {
 	RC_LEN,
 	RC_VERSION,
 	RC_MEM_TOTAL_SIZE,
+	RC_MIN_REGION_WIDTH,
 	RC_PROP_MAX,
 };
 
@@ -818,6 +819,7 @@ static struct sde_prop_type rc_prop[] = {
 	{RC_LEN, "qcom,sde-dspp-rc-size", false, PROP_TYPE_U32},
 	{RC_VERSION, "qcom,sde-dspp-rc-version", false, PROP_TYPE_U32},
 	{RC_MEM_TOTAL_SIZE, "qcom,sde-dspp-rc-mem-size", false, PROP_TYPE_U32},
+	{RC_MIN_REGION_WIDTH, "qcom,sde-dspp-rc-min-region-width", false, PROP_TYPE_U32},
 };
 
 static struct sde_prop_type spr_prop[] = {
@@ -2779,6 +2781,13 @@ static int _sde_rc_parse_dt(struct device_node *np,
 					RC_VERSION, 0);
 			sblk->rc.mem_total_size = PROP_VALUE_ACCESS(
 					props->values, RC_MEM_TOTAL_SIZE, 0);
+
+			if (!props->exists[RC_MIN_REGION_WIDTH])
+				sblk->rc.min_region_width = 4;
+			else
+				sblk->rc.min_region_width = PROP_VALUE_ACCESS(
+						props->values, RC_MIN_REGION_WIDTH, 0);
+
 			sblk->rc.idx = i;
 			set_bit(SDE_DSPP_RC, &dspp->features);
 		}
