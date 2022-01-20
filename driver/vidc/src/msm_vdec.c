@@ -600,6 +600,36 @@ static int msm_vdec_set_av1_superblock_enabled(struct msm_vidc_inst *inst,
 	return rc;
 }
 
+static int msm_vdec_set_opb_enable(struct msm_vidc_inst *inst)
+{
+	int rc = 0;
+	u32 color_fmt;
+	u32 opb_enable = 0;
+
+	if (inst->codec != MSM_VIDC_AV1)
+		return 0;
+
+	color_fmt = inst->capabilities->cap[PIX_FMTS].value;
+	if (is_linear_colorformat(color_fmt) ||
+		inst->capabilities->cap[FILM_GRAIN].value)
+		opb_enable = 1;
+
+	i_vpr_h(inst, "%s: OPB enable: %d",  __func__, opb_enable);
+	rc = venus_hfi_session_property(inst,
+			HFI_PROP_OPB_ENABLE,
+			HFI_HOST_FLAGS_NONE,
+			get_hfi_port(inst, OUTPUT_PORT),
+			HFI_PAYLOAD_U32,
+			&opb_enable,
+			sizeof(u32));
+	if (rc) {
+		i_vpr_e(inst, "%s: set property failed\n", __func__);
+		return rc;
+	}
+
+	return rc;
+}
+
 static int msm_vdec_set_colorformat(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
@@ -916,6 +946,10 @@ static int msm_vdec_set_output_properties(struct msm_vidc_inst *inst)
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
+
+	rc = msm_vdec_set_opb_enable(inst);
+	if (rc)
+		return rc;
 
 	rc = msm_vdec_set_colorformat(inst);
 	if (rc)
