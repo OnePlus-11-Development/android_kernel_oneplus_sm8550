@@ -643,6 +643,7 @@ struct sde_mdss_color {
  * @skip_blend_plane: plane which has been skipped staging into layer mixer
  * @skip_blend_plane_w: skip plane width
  * @skip_blend_plane_h: skip plane height
+ * @num_ds_enabled: Number of destination scalers enabled
  */
 struct sde_hw_cp_cfg {
 	void *payload;
@@ -661,6 +662,7 @@ struct sde_hw_cp_cfg {
 	enum sde_sspp skip_blend_plane;
 	u32 skip_blend_plane_w;
 	u32 skip_blend_plane_h;
+	u32 num_ds_enabled;
 };
 
 /**
