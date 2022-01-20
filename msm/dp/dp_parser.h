@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -131,12 +132,14 @@ enum dp_phy_aux_config_type {
  * enum dp_phy_version - version of the dp phy
  * @DP_PHY_VERSION_UNKNOWN: Unknown controller version
  * @DP_PHY_VERSION_4_2_0:   DP phy v4.2.0 controller
+ * @DP_PHY_VERSION_6_0_0:   DP phy v6.0.0 controller
  * @DP_PHY_VERSION_MAX:     max version
  */
 enum dp_phy_version {
 	DP_PHY_VERSION_UNKNOWN,
 	DP_PHY_VERSION_2_0_0 = 0x200,
 	DP_PHY_VERSION_4_2_0 = 0x420,
+	DP_PHY_VERSION_6_0_0 = 0x600,
 	DP_PHY_VERSION_MAX
 };
 
