@@ -16,6 +16,7 @@
 #include "msm_vidc_debug.h"
 #include "msm_vidc_control.h"
 #include "msm_vidc_power.h"
+#include "msm_vidc_fence.h"
 #include "msm_vidc_memory.h"
 #include "venus_hfi_response.h"
 #include "msm_vidc.h"
@@ -977,6 +978,10 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 		rc = msm_vdec_inst_init(inst);
 	else if (is_encode_session(inst))
 		rc = msm_venc_inst_init(inst);
+	if (rc)
+		goto error;
+
+	rc = msm_vidc_fence_init(inst);
 	if (rc)
 		goto error;
 

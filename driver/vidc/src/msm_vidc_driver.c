@@ -19,6 +19,7 @@
 #include "msm_vidc.h"
 #include "msm_vdec.h"
 #include "msm_venc.h"
+#include "msm_vidc_fence.h"
 #include "venus_hfi.h"
 #include "venus_hfi_response.h"
 #include "hfi_packet.h"
@@ -3255,6 +3256,7 @@ int msm_vidc_queue_buffer_single(struct msm_vidc_inst *inst, struct vb2_buffer *
 	int rc = 0;
 	struct msm_vidc_buffer *buf;
 	enum msm_vidc_allow allow;
+	const int fence_enabled = 0;
 
 	if (!inst || !vb2) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -3265,21 +3267,35 @@ int msm_vidc_queue_buffer_single(struct msm_vidc_inst *inst, struct vb2_buffer *
 	if (!buf)
 		return -EINVAL;
 
+	if (fence_enabled && is_decode_session(inst) &&
+	    is_output_buffer(buf->type)) {
+		rc = msm_vidc_fence_create(inst, buf);
+		if (rc)
+			return rc;
+	}
+
 	allow = msm_vidc_allow_qbuf(inst, vb2->type);
 	if (allow == MSM_VIDC_DISALLOW) {
 		i_vpr_e(inst, "%s: qbuf not allowed\n", __func__);
-		return -EINVAL;
+		rc = -EINVAL;
+		goto exit;
 	} else if (allow == MSM_VIDC_DEFER) {
 		print_vidc_buffer(VIDC_LOW, "low ", "qbuf deferred", inst, buf);
-		return 0;
+		rc = 0;
+		goto exit;
 	}
 
 	msm_vidc_scale_power(inst, is_input_buffer(buf->type));
 
 	rc = msm_vidc_queue_buffer(inst, buf);
 	if (rc)
-		return rc;
+		goto exit;
 
+exit:
+	if (rc) {
+		i_vpr_e(inst, "%s: qbuf failed\n", __func__);
+		msm_vidc_fence_destroy(inst, buf);
+	}
 	return rc;
 }
 
@@ -5196,6 +5212,7 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 
 		list_for_each_entry_safe(buf, dummy, &buffers->list, list) {
 			print_vidc_buffer(VIDC_ERR, "err ", "destroying ", inst, buf);
+			msm_vidc_fence_destroy(inst, buf);
 			if (!(buf->attr & MSM_VIDC_ATTR_BUFFER_DONE))
 				msm_vidc_vb2_buffer_done(inst, buf);
 			msm_vidc_put_driver_buf(inst, buf);
@@ -5244,6 +5261,7 @@ static void msm_vidc_close_helper(struct kref *kref)
 		struct msm_vidc_inst, kref);
 
 	i_vpr_h(inst, "%s()\n", __func__);
+	msm_vidc_fence_deinit(inst);
 	msm_vidc_event_queue_deinit(inst);
 	msm_vidc_vb2_queue_deinit(inst);
 	msm_vidc_debugfs_deinit_inst(inst);

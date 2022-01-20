@@ -153,6 +153,7 @@ struct msm_vidc_inst {
 	struct msm_vidc_statistics         stats;
 	struct msm_vidc_inst_capability   *capabilities;
 	struct completion                  completions[MAX_SIGNAL];
+	struct msm_vidc_fence_context      fence;
 	enum priority_level                priority_level;
 	u32                                firmware_priority;
 	bool                               active;

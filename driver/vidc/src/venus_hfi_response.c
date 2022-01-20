@@ -13,6 +13,7 @@
 #include "msm_vdec.h"
 #include "msm_vidc_control.h"
 #include "msm_vidc_memory.h"
+#include "msm_vidc_fence.h"
 
 #define in_range(range, val) (((range.begin) < (val)) && ((range.end) > (val)))
 
@@ -822,6 +823,9 @@ static int handle_output_buffer(struct msm_vidc_inst *inst,
 		print_vidc_buffer(VIDC_ERR, "err ", "not queued", inst, buf);
 		return 0;
 	}
+
+	/* signal the fence asap */
+	msm_vidc_fence_signal(inst, buf);
 
 	buf->data_offset = buffer->data_offset;
 	buf->data_size = buffer->data_size;

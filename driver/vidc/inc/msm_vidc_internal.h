@@ -9,6 +9,9 @@
 #include <linux/version.h>
 #include <linux/bits.h>
 #include <linux/workqueue.h>
+#include <linux/spinlock.h>
+#include <linux/sync_file.h>
+#include <linux/dma-fence.h>
 #include <media/v4l2-dev.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-ioctl.h>
@@ -780,6 +783,20 @@ struct msm_vidc_power {
 	u32                    fw_cf;
 };
 
+struct msm_vidc_fence_context {
+        char name[MAX_NAME_LENGTH];
+        u64 ctx_num;
+        u64 seq_num;
+};
+
+struct msm_vidc_fence {
+        struct dma_fence dma_fence;
+        char name[MAX_NAME_LENGTH];
+        spinlock_t lock;
+        struct sync_file *sync_file;
+        int fd;
+};
+
 struct msm_vidc_alloc {
 	struct list_head            list;
 	enum msm_vidc_buffer_type   type;
@@ -827,6 +844,7 @@ struct msm_vidc_buffer {
 	u32                                flags;
 	u64                                timestamp;
 	enum msm_vidc_buffer_attributes    attr;
+	struct msm_vidc_fence             *fence;
 };
 
 struct msm_vidc_buffers {
