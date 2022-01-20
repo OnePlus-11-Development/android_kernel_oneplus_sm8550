@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 #include <drm/msm_drm_pp.h>
@@ -316,8 +317,40 @@ void sde_setup_dspp_ltm_hist_bufferv1(struct sde_hw_dspp *ctx, u64 addr)
 			(hs_addr & 0xFFFFFF00));
 }
 
+static void sde_setup_dspp_ltm_hist_ctrl_common(struct sde_hw_dspp *ctx,
+					u64 addr, u32 op_mode,
+					struct sde_ltm_phase_info *phase)
+{
+	u32 offset;
+
+	if (ctx->idx >= DSPP_MAX) {
+		DRM_ERROR("Invalid idx %d\n", ctx->idx);
+		return;
+	}
+
+	if (phase->portrait_en)
+		op_mode |= BIT(2);
+	else
+		op_mode &= ~BIT(2);
+
+	offset = ctx->cap->sblk->ltm.base + 0x8;
+	SDE_REG_WRITE(&ctx->hw, offset, (phase->init_h[ctx->idx] & 0x7FFFFFF));
+	offset += 4;
+	SDE_REG_WRITE(&ctx->hw, offset, (phase->init_v & 0xFFFFFF));
+	offset += 4;
+	SDE_REG_WRITE(&ctx->hw, offset, (phase->inc_h & 0xFFFFFF));
+	offset += 4;
+	SDE_REG_WRITE(&ctx->hw, offset, (phase->inc_v & 0xFFFFFF));
+
+	op_mode |= BIT(0);
+	sde_setup_dspp_ltm_hist_bufferv1(ctx, addr);
+
+	SDE_REG_WRITE(&ctx->hw, ctx->cap->sblk->ltm.base + 0x4,
+			(op_mode & 0x1FFFFFF));
+}
+
 void sde_setup_dspp_ltm_hist_ctrlv1(struct sde_hw_dspp *ctx, void *cfg,
-				    bool enable, u64 addr)
+					bool enable, u64 addr)
 {
 	struct sde_hw_cp_cfg *hw_cfg = cfg;
 	struct sde_ltm_phase_info phase;
@@ -347,38 +380,58 @@ void sde_setup_dspp_ltm_hist_ctrlv1(struct sde_hw_dspp *ctx, void *cfg,
 		return;
 	}
 
-	if (ctx->idx >= DSPP_MAX) {
-		DRM_ERROR("Invalid idx %d\n", ctx->idx);
+	memset(&phase, 0, sizeof(phase));
+	sde_ltm_get_phase_info(hw_cfg, &phase);
+	if (phase.merge_en)
+		op_mode |= BIT(16);
+	else
+		op_mode &= ~LTM_CONFIG_MERGE_MODE_ONLY;
+
+	sde_setup_dspp_ltm_hist_ctrl_common(ctx, addr, op_mode, &phase);
+}
+
+void sde_setup_dspp_ltm_hist_ctrlv1_2(struct sde_hw_dspp *ctx, void *cfg,
+					bool enable, u64 addr)
+{
+	struct sde_hw_cp_cfg *hw_cfg = cfg;
+	struct sde_ltm_phase_info phase;
+	u32 op_mode, offset;
+	u32 merge_mode = 0;
+
+	if (!ctx) {
+		DRM_ERROR("invalid parameters ctx %pK\n", ctx);
+		return;
+	}
+
+	if (enable && (!addr || !cfg)) {
+		DRM_ERROR("invalid addr 0x%llx cfg %pK\n", addr, cfg);
+		return;
+	}
+
+	offset = ctx->cap->sblk->ltm.base + 0x4;
+	op_mode = SDE_REG_READ(&ctx->hw, offset);
+	if (!enable) {
+		if (op_mode & BIT(1))
+			op_mode &= ~BIT(0);
+		else
+			op_mode = 0x0;
+
+		SDE_REG_WRITE(&ctx->hw, ctx->cap->sblk->ltm.base + 0x4,
+			(op_mode & 0x1FFFFFF));
 		return;
 	}
 
 	memset(&phase, 0, sizeof(phase));
 	sde_ltm_get_phase_info(hw_cfg, &phase);
 
-	if (phase.portrait_en)
-		op_mode |= BIT(2);
-	else
-		op_mode &= ~BIT(2);
-
+	offset = ctx->cap->sblk->ltm.base + 0x18;
 	if (phase.merge_en)
-		op_mode |= BIT(16);
+		merge_mode = BIT(0);
 	else
-		op_mode &= ~(BIT(16) | BIT(17));
+		merge_mode = 0x0;
+	SDE_REG_WRITE(&ctx->hw, offset, (merge_mode & 0x3));
 
-	offset = ctx->cap->sblk->ltm.base + 0x8;
-	SDE_REG_WRITE(&ctx->hw, offset, (phase.init_h[ctx->idx] & 0x7FFFFFF));
-	offset += 4;
-	SDE_REG_WRITE(&ctx->hw, offset, (phase.init_v & 0xFFFFFF));
-	offset += 4;
-	SDE_REG_WRITE(&ctx->hw, offset, (phase.inc_h & 0xFFFFFF));
-	offset += 4;
-	SDE_REG_WRITE(&ctx->hw, offset, (phase.inc_v & 0xFFFFFF));
-
-	op_mode |= BIT(0);
-	sde_setup_dspp_ltm_hist_bufferv1(ctx, addr);
-
-	SDE_REG_WRITE(&ctx->hw, ctx->cap->sblk->ltm.base + 0x4,
-			(op_mode & 0x1FFFFFF));
+	sde_setup_dspp_ltm_hist_ctrl_common(ctx, addr, op_mode, &phase);
 }
 
 void sde_ltm_read_intr_status(struct sde_hw_dspp *ctx, u32 *status)
@@ -397,6 +450,17 @@ void sde_ltm_read_intr_status(struct sde_hw_dspp *ctx, u32 *status)
 	clear = SDE_REG_READ(&ctx->hw, ctx->cap->sblk->ltm.base + 0x58);
 	clear |= BIT(1) | BIT(2);
 	SDE_REG_WRITE(&ctx->hw, ctx->cap->sblk->ltm.base + 0x58, clear);
+}
+
+void sde_ltm_clear_merge_modev1_2(struct sde_hw_dspp *ctx)
+{
+	if (!ctx) {
+		DRM_ERROR("invalid parameters ctx %pK\n", ctx);
+		return;
+	}
+
+	/* clear the merge_mode bit */
+	SDE_REG_WRITE(&ctx->hw, ctx->cap->sblk->ltm.base + 0x18, 0x0);
 }
 
 void sde_ltm_clear_merge_mode(struct sde_hw_dspp *ctx)
