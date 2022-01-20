@@ -223,6 +223,7 @@ enum sde_prop {
 	MAX_TRUSTED_VM_DISPLAYS,
 	TVM_INCLUDE_REG,
 	IPCC_PROTOCOL_ID,
+	SDE_EMULATED_ENV,
 	SDE_PROP_MAX,
 };
 
@@ -622,6 +623,7 @@ static struct sde_prop_type sde_prop[] = {
 			PROP_TYPE_U32},
 	{TVM_INCLUDE_REG, "qcom,tvm-include-reg", false, PROP_TYPE_U32_ARRAY},
 	{IPCC_PROTOCOL_ID, "qcom,sde-ipcc-protocol-id", false, PROP_TYPE_U32},
+	{SDE_EMULATED_ENV, "qcom,sde-emulated-env", false, PROP_TYPE_BOOL},
 };
 
 static struct sde_prop_type sde_perf_prop[] = {
@@ -4029,6 +4031,9 @@ static void _sde_top_parse_dt_helper(struct sde_mdss_cfg *cfg,
 						i * 2 + 1);
 		}
 	}
+
+	if (PROP_VALUE_ACCESS(props->values, SDE_EMULATED_ENV, 0))
+		set_bit(SDE_FEATURE_EMULATED_ENV, cfg->features);
 }
 
 static int sde_top_parse_dt(struct device_node *np, struct sde_mdss_cfg *cfg)

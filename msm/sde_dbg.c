@@ -21,6 +21,7 @@
 #include "sde_dbg.h"
 #include "sde/sde_hw_catalog.h"
 #include "sde/sde_kms.h"
+#include "sde/sde_hw_util.h"
 
 #define SDE_DBG_BASE_MAX		10
 
@@ -2296,6 +2297,7 @@ static ssize_t sde_dbg_reg_base_reg_write(struct file *file,
 	u32 data, cnt;
 	char buf[24];
 	int rc;
+	struct sde_hw_blk_reg_map c = {0};
 
 	if (!file)
 		return -EINVAL;
@@ -2347,7 +2349,9 @@ static ssize_t sde_dbg_reg_base_reg_write(struct file *file,
 		goto end;
 	}
 
-	writel_relaxed(data, dbg->base + off);
+	c.base_off = dbg->base;
+
+	SDE_REG_WRITE(&c, off, data);
 
 	pm_runtime_put_sync(sde_dbg_base.dev);
 
@@ -2394,9 +2398,9 @@ static ssize_t sde_dbg_reg_base_reg_read(struct file *file,
 	}
 
 	if (!dbg->buf) {
+		struct sde_hw_blk_reg_map c = {0};
 		char dump_buf[64];
-		char *ptr;
-		int cnt, tot;
+		u32 cur_offset = 0, tot = 0;
 
 		dbg->buf_len = sizeof(dump_buf) *
 			DIV_ROUND_UP(dbg->cnt, ROW_BYTES);
@@ -2412,9 +2416,6 @@ static ssize_t sde_dbg_reg_base_reg_read(struct file *file,
 			goto end;
 		}
 
-		ptr = dbg->base + dbg->off;
-		tot = 0;
-
 		rc = pm_runtime_resume_and_get(sde_dbg_base.dev);
 		if (rc < 0) {
 			pr_err("failed to enable power resource %d\n", rc);
@@ -2422,21 +2423,30 @@ static ssize_t sde_dbg_reg_base_reg_read(struct file *file,
 			goto end;
 		}
 
-		for (cnt = dbg->cnt; cnt > 0; cnt -= ROW_BYTES) {
-			hex_dump_to_buffer(ptr, min(cnt, ROW_BYTES),
-					   ROW_BYTES, GROUP_BYTES, dump_buf,
-					   sizeof(dump_buf), false);
-			len = scnprintf(dbg->buf + tot, dbg->buf_len - tot,
-					"0x%08x: %s\n",
-					((int) (unsigned long) ptr) -
-					((int) (unsigned long) dbg->base),
-					dump_buf);
+		c.base_off = dbg->base;
+		c.blk_off = dbg->off;
 
-			ptr += ROW_BYTES;
-			tot += len;
+		while (cur_offset < dbg->cnt) {
+			u32 reg_val;
+
+			if (cur_offset == 0) {
+				tot += scnprintf(dbg->buf + tot, dbg->buf_len - tot,
+					"0x%08x:", ((int) dbg->off) - cur_offset);
+			} else if (!(cur_offset % ROW_BYTES)) { // Header
+				tot += scnprintf(dbg->buf + tot, dbg->buf_len - tot,
+					"\n0x%08x:", ((int) dbg->off) - cur_offset);
+			}
+
+			reg_val = SDE_REG_READ(&c, cur_offset);
+			cur_offset += sizeof(reg_val);
+
+			tot += scnprintf(dbg->buf + tot, dbg->buf_len - tot,
+					" %08x", reg_val);
 			if (tot >= dbg->buf_len)
 				break;
 		}
+
+		tot += scnprintf(dbg->buf + tot, dbg->buf_len - tot, "\n");
 
 		pm_runtime_put_sync(sde_dbg_base.dev);
 

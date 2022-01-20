@@ -26,6 +26,9 @@
 /* wait for at most 2 vsync for lowest refresh rate (24hz) */
 #define DEFAULT_KICKOFF_TIMEOUT_MS		84
 
+/* wait 1 sec for the emulated targets */
+#define MAX_KICKOFF_TIMEOUT_MS                  100000
+
 #define MAX_TE_PROFILE_COUNT		5
 /**
  * enum sde_enc_split_role - Role this physical encoder will play in a
