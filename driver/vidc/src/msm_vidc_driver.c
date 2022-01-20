@@ -3837,6 +3837,12 @@ int msm_vidc_add_session(struct msm_vidc_inst *inst)
 	}
 
 	core_lock(core, __func__);
+	if (core->state != MSM_VIDC_CORE_INIT) {
+		i_vpr_e(inst, "%s: invalid state %s\n",
+			__func__, core_state_name(core->state));
+		rc = -EINVAL;
+		goto unlock;
+	}
 	list_for_each_entry(i, &core->instances, list)
 		count++;
 
@@ -3847,6 +3853,7 @@ int msm_vidc_add_session(struct msm_vidc_inst *inst)
 			__func__, core->capabilities[MAX_SESSION_COUNT].value, count);
 		rc = -EINVAL;
 	}
+unlock:
 	core_unlock(core, __func__);
 
 	return rc;
@@ -4442,9 +4449,9 @@ int msm_vidc_core_deinit(struct msm_vidc_core *core, bool force)
 	return rc;
 }
 
-static int msm_vidc_core_init_wait(struct msm_vidc_core *core)
+int msm_vidc_core_init_wait(struct msm_vidc_core *core)
 {
-	const int interval = 40;
+	const int interval = 10;
 	int max_tries, count = 0, rc = 0;
 
 	if (!core || !core->capabilities) {
@@ -4452,21 +4459,18 @@ static int msm_vidc_core_init_wait(struct msm_vidc_core *core)
 		return -EINVAL;
 	}
 
-	rc = __strict_check(core, __func__);
-	if (rc)
-		return rc;
-
-	if (core->state != MSM_VIDC_CORE_INIT_WAIT)
-		return 0;
+	core_lock(core, __func__);
+	if (core->state == MSM_VIDC_CORE_INIT) {
+		rc = 0;
+		goto unlock;
+	} else if (core->state == MSM_VIDC_CORE_DEINIT) {
+		rc = -EINVAL;
+		goto unlock;
+	}
 
 	d_vpr_h("%s(): waiting for state change\n", __func__);
 	max_tries = core->capabilities[HW_RESPONSE_TIMEOUT].value / interval;
-	/**
-	 * attempt one more time to ensure triggering init_done
-	 * timeout sequence for 1st session, incase response not
-	 * received in reverse thread.
-	 */
-	while (count < max_tries + 1) {
+	while (count < max_tries) {
 		if (core->state != MSM_VIDC_CORE_INIT_WAIT)
 			break;
 
@@ -4478,12 +4482,20 @@ static int msm_vidc_core_init_wait(struct msm_vidc_core *core)
 	d_vpr_h("%s: state %s, interval %u, count %u, max_tries %u\n", __func__,
 		core_state_name(core->state), interval, count, max_tries);
 
-	/* treat as fatal and fail session_open */
-	if (core->state == MSM_VIDC_CORE_INIT_WAIT) {
-		d_vpr_e("%s: state change failed\n", __func__);
+	if (core->state == MSM_VIDC_CORE_INIT) {
+		d_vpr_h("%s: sys init successful\n", __func__);
+		rc = 0;
+		goto unlock;
+	} else {
+		d_vpr_h("%s: sys init wait timedout. state %s\n",
+			__func__, core_state_name(core->state));
 		rc = -EINVAL;
+		goto unlock;
 	}
-
+unlock:
+	if (rc)
+		msm_vidc_core_deinit_locked(core, true);
+	core_unlock(core, __func__);
 	return rc;
 }
 
@@ -4497,11 +4509,8 @@ int msm_vidc_core_init(struct msm_vidc_core *core)
 	}
 
 	core_lock(core, __func__);
-	rc = msm_vidc_core_init_wait(core);
-	if (rc)
-		goto unlock;
-
-	if (core->state == MSM_VIDC_CORE_INIT)
+	if (core->state == MSM_VIDC_CORE_INIT ||
+			core->state == MSM_VIDC_CORE_INIT_WAIT)
 		goto unlock;
 
 	msm_vidc_change_core_state(core, MSM_VIDC_CORE_INIT_WAIT, __func__);
@@ -4513,21 +4522,6 @@ int msm_vidc_core_init(struct msm_vidc_core *core)
 	if (rc) {
 		d_vpr_e("%s: core init failed\n", __func__);
 		goto unlock;
-	}
-
-	d_vpr_h("%s(): waiting for sys_init_done, %d ms\n", __func__,
-		core->capabilities[HW_RESPONSE_TIMEOUT].value);
-	core_unlock(core, __func__);
-	rc = wait_for_completion_timeout(&core->init_done, msecs_to_jiffies(
-			core->capabilities[HW_RESPONSE_TIMEOUT].value));
-	core_lock(core, __func__);
-	if (!rc) {
-		d_vpr_e("%s: core init timed out\n", __func__);
-		rc = -ETIMEDOUT;
-	} else {
-		msm_vidc_change_core_state(core, MSM_VIDC_CORE_INIT, __func__);
-		d_vpr_h("%s: system init wait completed\n", __func__);
-		rc = 0;
 	}
 
 unlock:

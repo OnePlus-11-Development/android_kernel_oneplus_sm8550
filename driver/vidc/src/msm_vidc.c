@@ -812,6 +812,10 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	if (rc)
 		return NULL;
 
+	rc = msm_vidc_core_init_wait(core);
+	if (rc)
+		return NULL;
+
 	inst = kzalloc(sizeof(*inst), GFP_KERNEL);
 	if (!inst) {
 		d_vpr_e("%s: failed to allocate inst memory\n", __func__);

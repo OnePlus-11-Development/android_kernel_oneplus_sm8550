@@ -480,8 +480,19 @@ static int handle_system_init(struct msm_vidc_core *core,
 	struct hfi_packet *pkt)
 {
 	if (pkt->flags & HFI_FW_FLAGS_SUCCESS) {
-		d_vpr_h("%s: successful\n", __func__);
-		complete(&core->init_done);
+		core_lock(core, __func__);
+		if (core->state == MSM_VIDC_CORE_INIT_WAIT &&
+				pkt->packet_id == core->sys_init_id) {
+			msm_vidc_change_core_state(core, MSM_VIDC_CORE_INIT, __func__);
+			d_vpr_h("%s: successful\n", __func__);
+		} else if (core->state != MSM_VIDC_CORE_INIT_WAIT) {
+			d_vpr_e("%s: invalid core state %s\n", __func__,
+				core_state_name(core->state));
+		} else if (pkt->packet_id != core->sys_init_id) {
+			d_vpr_e("%s: invalid pkt id %u, expected %u\n", __func__,
+				pkt->packet_id, core->sys_init_id);
+		}
+		core_unlock(core, __func__);
 	} else {
 		d_vpr_h("%s: unhandled. flags=%d\n", __func__, pkt->flags);
 	}

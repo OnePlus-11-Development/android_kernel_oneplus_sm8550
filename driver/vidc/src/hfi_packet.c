@@ -388,6 +388,7 @@ int hfi_packet_sys_init(struct msm_vidc_core *core,
 	/* HFI_CMD_SYSTEM_INIT */
 	payload = HFI_VIDEO_ARCH_LX;
 	d_vpr_h("%s: arch %d\n", __func__, payload);
+	core->sys_init_id = core->packet_id++;
 	rc = hfi_create_packet(pkt, pkt_size,
 				   HFI_CMD_INIT,
 				   (HFI_HOST_FLAGS_RESPONSE_REQUIRED |
@@ -395,7 +396,7 @@ int hfi_packet_sys_init(struct msm_vidc_core *core,
 				   HFI_HOST_FLAGS_NON_DISCARDABLE),
 				   HFI_PAYLOAD_U32,
 				   HFI_PORT_NONE,
-				   core->packet_id++,
+				   core->sys_init_id,
 				   &payload,
 				   sizeof(u32));
 	if (rc)

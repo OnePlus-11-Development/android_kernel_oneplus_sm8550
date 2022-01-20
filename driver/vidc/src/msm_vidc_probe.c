@@ -291,7 +291,6 @@ static int msm_vidc_initialize_core(struct msm_vidc_core *core)
 	}
 
 	mutex_init(&core->lock);
-	init_completion(&core->init_done);
 	INIT_LIST_HEAD(&core->instances);
 	INIT_LIST_HEAD(&core->dangling_instances);
 
@@ -332,6 +331,7 @@ static int msm_vidc_remove(struct platform_device* pdev)
 	d_vpr_h("%s()\n", __func__);
 
 	msm_vidc_core_deinit(core, true);
+	of_platform_depopulate(&pdev->dev);
 
 	msm_vidc_unregister_video_device(core, MSM_VIDC_ENCODER);
 	msm_vidc_unregister_video_device(core, MSM_VIDC_DECODER);
@@ -466,8 +466,16 @@ static int msm_vidc_probe_video_device(struct platform_device *pdev)
 		goto sub_dev_failed;
 	}
 
+	rc = msm_vidc_core_init(core);
+	if (rc) {
+		d_vpr_e("%s: sys init failed\n", __func__);
+		goto core_init_failed;
+	}
+
 	return rc;
 
+core_init_failed:
+	of_platform_depopulate(&pdev->dev);
 sub_dev_failed:
 	msm_vidc_unregister_video_device(core, MSM_VIDC_ENCODER);
 enc_reg_failed:

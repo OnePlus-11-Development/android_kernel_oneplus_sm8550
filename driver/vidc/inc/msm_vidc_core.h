@@ -109,7 +109,7 @@ struct msm_vidc_core {
 	struct msm_vidc_memory_ops            *mem_ops;
 	u32                                    header_id;
 	u32                                    packet_id;
-	struct completion                      init_done;
+	u32                                    sys_init_id;
 	bool                                   handoff_done;
 	bool                                   hw_power_control;
 	bool                                   pm_suspended;
