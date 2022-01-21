@@ -1594,24 +1594,18 @@ void reg_dmav1_setup_dspp_pa_hsicv17(struct sde_hw_dspp *ctx, void *cfg)
 		DRM_ERROR("failed to kick off ret %d\n", rc);
 }
 
-void reg_dmav1_setup_dspp_sixzonev17(struct sde_hw_dspp *ctx, void *cfg)
+static int reg_dma_validate_sixzone_config(struct sde_hw_dspp *ctx, void *cfg,
+		u32 *num_of_mixers, u32 *blk, struct sde_hw_dspp *dspp_list[])
 {
-	struct sde_hw_reg_dma_ops *dma_ops;
-	struct sde_reg_dma_kickoff_cfg kick_off;
 	struct sde_hw_cp_cfg *hw_cfg = cfg;
-	struct sde_reg_dma_setup_ops_cfg dma_write_cfg;
-	struct drm_msm_sixzone *sixzone;
-	struct sde_hw_dspp *dspp_list[DSPP_MAX];
-	u32 reg = 0, local_hold = 0;
-	u32 opcode = 0, local_opcode = 0;
-	u32 num_of_mixers, blk = 0;
-	int rc, i;
+	u32 opcode = 0;
+	int rc;
 
 	opcode = SDE_REG_READ(&ctx->hw, ctx->cap->sblk->hsic.base);
 
 	rc = reg_dma_dspp_check(ctx, cfg, SIX_ZONE);
 	if (rc)
-		return;
+		return rc;
 
 	if (!hw_cfg->payload) {
 		DRM_DEBUG_DRIVER("disable sixzone feature\n");
@@ -1621,31 +1615,51 @@ void reg_dmav1_setup_dspp_sixzonev17(struct sde_hw_dspp *ctx, void *cfg)
 			opcode &= ~PA_EN;
 		SDE_REG_WRITE(&ctx->hw, ctx->cap->sblk->hsic.base, opcode);
 		LOG_FEATURE_OFF;
-		return;
+		return -EALREADY;
 	}
 
 	if (hw_cfg->len != sizeof(struct drm_msm_sixzone)) {
 		DRM_ERROR("invalid size of payload len %d exp %zd\n",
 			hw_cfg->len, sizeof(struct drm_msm_sixzone));
-		return;
+		return -EINVAL;
 	}
 
-	rc = reg_dmav1_get_dspp_blk(hw_cfg, ctx->idx, &blk,
-		&num_of_mixers);
+	rc = reg_dmav1_get_dspp_blk(hw_cfg, ctx->idx, blk,
+		num_of_mixers);
 	if (rc == -EINVAL) {
 		DRM_ERROR("unable to determine LUTDMA DSPP blocks\n");
-		return;
+		return rc;
 	} else if (rc == -EALREADY) {
-		return;
-	} else if (num_of_mixers > DSPP_MAX) {
+		return rc;
+	} else if (*num_of_mixers > DSPP_MAX) {
 		DRM_ERROR("unable to process more than %d DSPP blocks\n",
 			DSPP_MAX);
-		return;
-	} else if (num_of_mixers > 1) {
+		return -EINVAL;
+	} else if (*num_of_mixers > 1) {
 		memcpy(dspp_list, hw_cfg->dspp,
-			sizeof(struct sde_hw_dspp *) * num_of_mixers);
+			sizeof(struct sde_hw_dspp *) * (*num_of_mixers));
 	} else {
 		dspp_list[0] = ctx;
+	}
+	return 0;
+}
+
+void reg_dmav1_setup_dspp_sixzonev17(struct sde_hw_dspp *ctx, void *cfg)
+{
+	struct sde_hw_reg_dma_ops *dma_ops;
+	struct sde_reg_dma_kickoff_cfg kick_off;
+	struct sde_hw_cp_cfg *hw_cfg = cfg;
+	struct sde_reg_dma_setup_ops_cfg dma_write_cfg;
+	struct drm_msm_sixzone *sixzone;
+	struct sde_hw_dspp *dspp_list[DSPP_MAX];
+	u32 reg = 0;
+	u32 local_opcode = 0, local_hold = 0;
+	u32 num_of_mixers, blk = 0;
+	int i, rc;
+
+	rc = reg_dma_validate_sixzone_config(ctx, cfg, &num_of_mixers, &blk, dspp_list);
+	if (rc) {
+		return;
 	}
 
 	sixzone = hw_cfg->payload;
@@ -1742,6 +1756,7 @@ void reg_dmav1_setup_dspp_sixzonev17(struct sde_hw_dspp *ctx, void *cfg)
 			return;
 		}
 	}
+
 	REG_DMA_SETUP_KICKOFF(kick_off, hw_cfg->ctl,
 		dspp_buf[SIX_ZONE][ctx->idx],
 		REG_DMA_WRITE, DMA_CTL_QUEUE0, WRITE_IMMEDIATE, SIX_ZONE);
