@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/delay.h>
@@ -480,14 +481,19 @@ int gen7_hfi_process_queue(struct gen7_gmu_device *gmu,
 
 int gen7_hfi_send_bcl_feature_ctrl(struct adreno_device *adreno_dev)
 {
-	int ret;
+	const struct adreno_gen7_core *gen7_core = to_gen7_core(adreno_dev);
 
 	if (!adreno_dev->bcl_enabled)
 		return 0;
 
-	ret = gen7_hfi_send_feature_ctrl(adreno_dev, HFI_FEATURE_BCL, 1, 0);
-
-	return ret;
+	/*
+	 * BCL data is expected by gmu in below format
+	 * BIT[0] - response type
+	 * BIT[1:7] - Throttle level 1 (optional)
+	 * BIT[8:14] - Throttle level 2 (optional)
+	 * BIT[15:21] - Throttle level 3 (optional)
+	 */
+	return gen7_hfi_send_feature_ctrl(adreno_dev, HFI_FEATURE_BCL, 1, gen7_core->bcl_data);
 }
 
 #define EVENT_PWR_ACD_THROTTLE_PROF 44

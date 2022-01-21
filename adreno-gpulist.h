@@ -2057,6 +2057,7 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_2_0 = {
 	.highest_bank_bit = 16,
 	.gmu_hub_clk_freq = 200000000,
 	.gen7_snapshot_block_list = &gen7_2_0_snapshot_block_list,
+	.bcl_data = 1,
 };
 
 static const struct adreno_gen7_core adreno_gpu_core_gen7_2_1 = {
@@ -2087,6 +2088,7 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_2_1 = {
 	.highest_bank_bit = 16,
 	.gmu_hub_clk_freq = 200000000,
 	.gen7_snapshot_block_list = &gen7_2_0_snapshot_block_list,
+	.bcl_data = 1,
 };
 
 static const struct adreno_gen7_core adreno_gpu_core_gen7_4_0 = {
