@@ -2937,6 +2937,7 @@ static void _dspp_sixzone_install_property(struct drm_crtc *crtc)
 	version = catalog->dspp[0].sblk->sixzone.version >> 16;
 	switch (version) {
 	case 1:
+	case 2:
 		snprintf(feature_name, ARRAY_SIZE(feature_name), "%s%d",
 			"SDE_DSPP_PA_SIXZONE_V", version);
 		_sde_cp_crtc_install_blob_property(crtc, feature_name,

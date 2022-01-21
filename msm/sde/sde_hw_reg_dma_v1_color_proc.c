@@ -262,6 +262,10 @@ static int reg_dma_sspp_check(struct sde_hw_pipe *ctx, void *cfg,
 		enum sde_sspp_multirect_index idx);
 static int reg_dma_ltm_check(struct sde_hw_dspp *ctx, void *cfg,
 		enum sde_reg_dma_features feature);
+static void _perform_sbdma_kickoff(struct sde_hw_dspp *ctx,
+		struct sde_hw_cp_cfg *hw_cfg,
+		struct sde_hw_reg_dma_ops *dma_ops,
+		u32 blk, enum sde_reg_dma_features feature);
 
 static int reg_dma_buf_init(struct sde_reg_dma_buffer **buf, u32 size)
 {
@@ -1764,6 +1768,198 @@ void reg_dmav1_setup_dspp_sixzonev17(struct sde_hw_dspp *ctx, void *cfg)
 	rc = dma_ops->kick_off(&kick_off);
 	if (rc)
 		DRM_ERROR("failed to kick off ret %d\n", rc);
+}
+
+void reg_dmav2_setup_dspp_sixzonev2(struct sde_hw_dspp *ctx, void *cfg)
+{
+	struct sde_hw_reg_dma_ops *dma_ops;
+	struct sde_hw_cp_cfg *hw_cfg = cfg;
+	struct sde_reg_dma_setup_ops_cfg dma_write_cfg;
+	struct drm_msm_sixzone *sixzone;
+	struct sde_hw_dspp *dspp_list[DSPP_MAX];
+	u32 local_opcode = 0, local_hold = 0, sv_ctl = 0;
+	u32 num_of_mixers, blk = 0, len, transfer_size_bytes;
+	u16 *data = NULL;
+	int i, rc, j, k;
+
+	rc = reg_dma_validate_sixzone_config(ctx, cfg, &num_of_mixers, &blk, dspp_list);
+	if (rc) {
+		return;
+	}
+
+	sixzone = hw_cfg->payload;
+
+	dma_ops = sde_reg_dma_get_ops();
+	dma_ops->reset_reg_dma_buf(dspp_buf[SIX_ZONE][ctx->idx]);
+
+	REG_DMA_INIT_OPS(dma_write_cfg, blk, SIX_ZONE,
+		dspp_buf[SIX_ZONE][ctx->idx]);
+
+	REG_DMA_SETUP_OPS(dma_write_cfg, 0, NULL, 0, HW_BLK_SELECT, 0, 0, 0);
+	rc = dma_ops->setup_payload(&dma_write_cfg);
+	if (rc) {
+		DRM_ERROR("write decode select for sixzone failed ret %d\n", rc);
+		return;
+	}
+
+	/* 384 LUT entries * 5 components (hue, sat_low, sat_med, sat_high, value)
+	* 16 bit per LUT entry */
+	len = SIXZONE_LUT_SIZE * 5 * sizeof(u16);
+	/* Data size must be aligned with word size AND LUT transfer size */
+	transfer_size_bytes = LUTBUS_SIXZONE_TRANS_SIZE * sizeof(u32);
+	if (len % transfer_size_bytes)
+		len = len + (transfer_size_bytes - len % transfer_size_bytes);
+
+	data = kvzalloc(len, GFP_KERNEL);
+	if (!data) {
+		DRM_ERROR("Allocating memory for sixzone data failed!");
+		return;
+	}
+
+	for (j = 0, k = 0; j < SIXZONE_LUT_SIZE; j++) {
+		/* p0 --> hue, p1 --> sat_low/value, p2 --> sat_mid/sat_high */
+		/* 16 bit per LUT entry and MSB aligned to allow expansion,
+		* hence, sw need to left shift 4 bits before sending to HW.
+		*/
+		data[k++] = (u16) (sixzone->curve[j].p0 << 4);
+		data[k++] = (u16) ((sixzone->curve[j].p1 >> 16) << 4);
+		data[k++] = (u16) (sixzone->curve_p2[j] << 4);
+		data[k++] = (u16) ((sixzone->curve_p2[j] >> 16) << 4);
+		data[k++] = (u16) (sixzone->curve[j].p1 << 4);
+	}
+
+	REG_DMA_SETUP_OPS(dma_write_cfg, 0, (u32 *)data, len,
+			REG_BLK_LUT_WRITE, 0, 0, 0);
+	/* table select is only relevant to SSPP Gamut */
+	dma_write_cfg.table_sel = 0;
+	dma_write_cfg.block_sel = LUTBUS_BLOCK_SIXZONE;
+	dma_write_cfg.trans_size = LUTBUS_SIXZONE_TRANS_SIZE;
+	dma_write_cfg.lut_size = len / transfer_size_bytes;
+
+	rc = dma_ops->setup_payload(&dma_write_cfg);
+	if (rc) {
+		DRM_ERROR("lut write for sixzone failed ret %d\n", rc);
+		goto exit;
+	}
+
+	REG_DMA_SETUP_OPS(dma_write_cfg,
+		ctx->cap->sblk->sixzone.base + SIXZONE_THRESHOLDS_OFF,
+		&sixzone->threshold, sizeof(u32),
+		REG_SINGLE_WRITE, 0, 0, 0);
+	rc = dma_ops->setup_payload(&dma_write_cfg);
+	if (rc) {
+		DRM_ERROR("write sixzone threshold failed ret %d\n", rc);
+		goto exit;
+	}
+
+	REG_DMA_SETUP_OPS(dma_write_cfg,
+		ctx->cap->sblk->sixzone.base + SIXZONE_ADJ_PWL0_OFF,
+		&sixzone->adjust_p0, sizeof(u32),
+		REG_SINGLE_WRITE, 0, 0, 0);
+	rc = dma_ops->setup_payload(&dma_write_cfg);
+	if (rc) {
+		DRM_ERROR("write sixzone adjust p0 failed ret %d\n", rc);
+		goto exit;
+	}
+
+	REG_DMA_SETUP_OPS(dma_write_cfg,
+		ctx->cap->sblk->sixzone.base + SIXZONE_ADJ_PWL1_OFF,
+		&sixzone->adjust_p1, sizeof(u32),
+		REG_SINGLE_WRITE, 0, 0, 0);
+	rc = dma_ops->setup_payload(&dma_write_cfg);
+	if (rc) {
+		DRM_ERROR("write sixzone adjust p1 failed ret %d\n", rc);
+		goto exit;
+	}
+
+	REG_DMA_SETUP_OPS(dma_write_cfg,
+		ctx->cap->sblk->sixzone.base + SIXZONE_SAT_PWL0_OFF,
+		&sixzone->sat_adjust_p0, sizeof(u32),
+		REG_SINGLE_WRITE, 0, 0, 0);
+	rc = dma_ops->setup_payload(&dma_write_cfg);
+	if (rc) {
+		DRM_ERROR("write sixzone saturation adjust p0 failed ret %d\n", rc);
+		goto exit;
+	}
+
+	REG_DMA_SETUP_OPS(dma_write_cfg,
+		ctx->cap->sblk->sixzone.base + SIXZONE_SAT_PWL1_OFF,
+		&sixzone->sat_adjust_p1, sizeof(u32),
+		REG_SINGLE_WRITE, 0, 0, 0);
+	rc = dma_ops->setup_payload(&dma_write_cfg);
+	if (rc) {
+		DRM_ERROR("write sixzone saturation adjust p1 failed ret %d\n", rc);
+		goto exit;
+	}
+
+	if (sixzone->flags & SIXZONE_SV_ENABLE) {
+		sv_ctl |= PA_SIXZONE_SV_EN;
+	}
+
+	REG_DMA_SETUP_OPS(dma_write_cfg,
+		ctx->cap->sblk->sixzone.base + SIXZONE_SV_CTL_OFF,
+		&sv_ctl, sizeof(sv_ctl), REG_SINGLE_WRITE, 0, 0, 0);
+	rc = dma_ops->setup_payload(&dma_write_cfg);
+	if (rc) {
+		DRM_ERROR("sv enable write failed for sixzone ret %d\n", rc);
+		goto exit;
+	}
+
+	local_hold = ((sixzone->sat_hold & REG_MASK(2)) << 12);
+	local_hold |= ((sixzone->val_hold & REG_MASK(2)) << 14);
+	if (sixzone->flags & SIXZONE_HUE_ENABLE)
+		local_opcode |= PA_SIXZONE_HUE_EN;
+	if (sixzone->flags & SIXZONE_SAT_ENABLE)
+		local_opcode |= PA_SIXZONE_SAT_EN;
+	if (sixzone->flags & SIXZONE_VAL_ENABLE)
+		local_opcode |= PA_SIXZONE_VAL_EN;
+
+	if (local_opcode) {
+		local_opcode |= PA_EN;
+	} else {
+		DRM_ERROR("Invalid six zone config 0x%x\n", local_opcode);
+		goto exit;
+	}
+
+	for (i = 0; i < num_of_mixers; i++) {
+		blk = dspp_mapping[dspp_list[i]->idx];
+		REG_DMA_INIT_OPS(dma_write_cfg, blk, SIX_ZONE,
+			dspp_buf[SIX_ZONE][ctx->idx]);
+
+		REG_DMA_SETUP_OPS(dma_write_cfg, 0, NULL, 0, HW_BLK_SELECT,
+			0, 0, 0);
+		rc = dma_ops->setup_payload(&dma_write_cfg);
+		if (rc) {
+			DRM_ERROR("write decode select failed for sixzone ret %d\n", rc);
+			goto exit;
+		}
+
+		REG_DMA_SETUP_OPS(dma_write_cfg,
+			ctx->cap->sblk->hsic.base + PA_PWL_HOLD_OFF, &local_hold,
+			sizeof(local_hold), REG_SINGLE_MODIFY, 0, 0,
+			REG_DMA_PA_PWL_HOLD_SZONE_MASK);
+		rc = dma_ops->setup_payload(&dma_write_cfg);
+		if (rc) {
+			DRM_ERROR("setting local_hold failed for sixzone ret %d\n", rc);
+			goto exit;
+		}
+
+		REG_DMA_SETUP_OPS(dma_write_cfg,
+			ctx->cap->sblk->hsic.base, &local_opcode,
+			sizeof(local_opcode), REG_SINGLE_MODIFY, 0, 0,
+			REG_DMA_PA_MODE_SZONE_MASK);
+		rc = dma_ops->setup_payload(&dma_write_cfg);
+		if (rc) {
+			DRM_ERROR("setting local_opcode failed for sixzone ret %d\n", rc);
+			goto exit;
+		}
+	}
+
+	LOG_FEATURE_ON;
+	_perform_sbdma_kickoff(ctx, hw_cfg, dma_ops, blk, SIX_ZONE);
+
+exit:
+	kvfree(data);
 }
 
 int reg_dmav1_deinit_dspp_ops(enum sde_dspp idx)
@@ -4097,7 +4293,6 @@ int reg_dmav2_init_dspp_op_v4(int feature, enum sde_dspp idx)
 	return rc;
 }
 
-
 /* Attempt to submit a feature buffer to SB DMA.
  * Note that if SB DMA is not supported, this function
  * will quitely attempt to fallback to DB DMA
@@ -4110,7 +4305,7 @@ static void _perform_sbdma_kickoff(struct sde_hw_dspp *ctx,
 	int rc, i;
 	struct sde_reg_dma_kickoff_cfg kick_off;
 
-	if ((feature != GAMUT && feature != IGC) ||
+	if ((feature != GAMUT && feature != IGC && feature != SIX_ZONE) ||
 			!(blk & (DSPP0 | DSPP1 | DSPP2 | DSPP3))) {
 		DRM_ERROR("SB DMA invalid for feature / block - %d/%d\n",
 				feature, blk);

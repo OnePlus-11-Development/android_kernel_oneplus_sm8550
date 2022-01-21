@@ -102,16 +102,19 @@ enum sde_reg_dma_queue {
 #define LUTBUS_TABLE_SELECT_MAX 2
 #define LUTBUS_IGC_TRANS_SIZE 3
 #define LUTBUS_GAMUT_TRANS_SIZE 6
+#define LUTBUS_SIXZONE_TRANS_SIZE 5
 
 /**
  * enum sde_reg_dma_lutbus_block - block select values for lutbus op
  * @LUTBUS_BLOCK_IGC: select IGC block
  * @LUTBUS_BLOCK_GAMUT: select GAMUT block
+ * @LUTBUS_BLOCK_SIXZONE: select SIXZONE block
  * @LUTBUS_BLOCK_MAX: invalid selection
  */
 enum sde_reg_dma_lutbus_block {
 	LUTBUS_BLOCK_IGC = 0,
 	LUTBUS_BLOCK_GAMUT,
+	LUTBUS_BLOCK_SIXZONE = 3,
 	LUTBUS_BLOCK_MAX,
 };
 
