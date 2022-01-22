@@ -1,6 +1,8 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -1286,6 +1288,7 @@ success:
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_IPA3_MHI_PRIME_MANAGER)
 static int ipa_get_mhip_inst_stats(unsigned long arg)
 {
 	struct ipa_lnx_mhip_inst_stats *mhip_stats;
@@ -1460,6 +1463,7 @@ success:
 	kfree(mhip_stats);
 	return 0;
 }
+#endif
 
 static int ipa_stats_get_alloc_info(unsigned long arg)
 {
@@ -1678,13 +1682,14 @@ static int ipa_stats_get_alloc_info(unsigned long arg)
 			= IPA_CLIENT_MHI_PRIME_TETH_PROD;
 		ipa_lnx_agent_ctx.alloc_info.mhip_inst_info[0].rx_inst_client_type[1]
 			= IPA_CLIENT_MHI_PRIME_RMNET_PROD;
+
+success:
 #else
 		/* MHI Prime is not enabled */
 		ipa_lnx_agent_ctx.alloc_info.num_mhip_instances = 0;
 #endif
 	}
 
-success:
 	if(copy_to_user((u8 *)arg,
 		&ipa_lnx_agent_ctx,
 		sizeof(struct ipa_lnx_stats_spearhead_ctx))) {

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -10175,6 +10177,9 @@ static int ipa_smmu_perph_cb_probe(struct device *dev,
 	const u32 *add_map;
 	int i;
 	u32 iova_ap_mapping[2];
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
+	int mapping_config;
+#endif
 
 	IPADBG("CB %d PROBE dev=%pK\n", cb_type, dev);
 
@@ -10222,7 +10227,6 @@ static int ipa_smmu_perph_cb_probe(struct device *dev,
 	 * further below acts accordingly...
 	 */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
-	int mapping_config;
 
 	mapping_config = qcom_iommu_get_mappings_configuration(cb->iommu_domain);
 
@@ -10286,6 +10290,9 @@ static int ipa_smmu_uc_cb_probe(struct device *dev)
 	int bypass = 0;
 	int fast = 0;
 	u32 iova_ap_mapping[2];
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
+	int mapping_config;
+#endif
 
 	IPADBG("UC CB PROBE dev=%pK\n", dev);
 
@@ -10348,7 +10355,6 @@ static int ipa_smmu_uc_cb_probe(struct device *dev)
 	 * further below acts accordingly...
 	 */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
-        int mapping_config;
 
         mapping_config = qcom_iommu_get_mappings_configuration(cb->iommu_domain);
 
@@ -10390,6 +10396,9 @@ static int ipa_smmu_ap_cb_probe(struct device *dev)
 	phys_addr_t iova;
 	phys_addr_t pa;
 	u32 iova_ap_mapping[2];
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
+	int mapping_config;
+#endif
 
 	IPADBG("AP CB PROBE dev=%pK\n", dev);
 
@@ -10452,7 +10461,6 @@ static int ipa_smmu_ap_cb_probe(struct device *dev)
 	 * further below acts accordingly...
 	 */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
-        int mapping_config;
 
         mapping_config = qcom_iommu_get_mappings_configuration(cb->iommu_domain);
 
@@ -10557,6 +10565,9 @@ static int ipa_smmu_11ad_cb_probe(struct device *dev)
 	int bypass = 0;
 	struct ipa_smmu_cb_ctx *cb = ipa3_get_smmu_ctx(IPA_SMMU_CB_11AD);
 	u32 iova_ap_mapping[2];
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
+	int mapping_config;
+#endif
 
 	IPADBG("11AD CB probe: dev=%pK\n", dev);
 
@@ -10587,7 +10598,6 @@ static int ipa_smmu_11ad_cb_probe(struct device *dev)
 	IPADBG("11AD CB PROBE dev=%pK va_start=0x%x va_size=0x%x\n",
 		   dev, cb->va_start, cb->va_size);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
-        int mapping_config;
 
         mapping_config = qcom_iommu_get_mappings_configuration(cb->iommu_domain);
 
