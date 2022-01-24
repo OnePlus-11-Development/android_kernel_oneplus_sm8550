@@ -850,28 +850,6 @@ static int adreno_of_get_power(struct adreno_device *adreno_dev,
 	return 0;
 }
 
-static void adreno_cx_dbgc_probe(struct kgsl_device *device)
-{
-	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
-	struct resource *res;
-
-	res = platform_get_resource_byname(device->pdev, IORESOURCE_MEM,
-					   "cx_dbgc");
-
-	if (res == NULL)
-		return;
-
-	adreno_dev->cx_dbgc_base = res->start - device->regmap.base->start;
-	adreno_dev->cx_dbgc_len = resource_size(res);
-	adreno_dev->cx_dbgc_virt = devm_ioremap(&device->pdev->dev,
-			device->regmap.base->start +
-						adreno_dev->cx_dbgc_base,
-					adreno_dev->cx_dbgc_len);
-
-	if (adreno_dev->cx_dbgc_virt == NULL)
-		dev_warn(device->dev, "cx_dbgc ioremap failed\n");
-}
-
 static void adreno_cx_misc_probe(struct kgsl_device *device)
 {
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
@@ -1237,8 +1215,8 @@ int adreno_device_probe(struct platform_device *pdev,
 
 	adreno_fence_trace_array_init(device);
 
-	/* Probe for the optional CX_DBGC block */
-	adreno_cx_dbgc_probe(device);
+	/* Add CX_DBGC block to the regmap*/
+	kgsl_regmap_add_region(&device->regmap, pdev, "cx_dbgc", NULL, NULL);
 
 	/* Probe for the optional CX_MISC block */
 	adreno_cx_misc_probe(device);
@@ -1280,9 +1258,6 @@ int adreno_device_probe(struct platform_device *pdev,
 	adreno_sysfs_init(adreno_dev);
 
 	kgsl_pwrscale_init(device, pdev, CONFIG_QCOM_ADRENO_DEFAULT_GOVERNOR);
-
-	/* Initialize coresight for the target */
-	adreno_coresight_init(adreno_dev);
 
 	if (ADRENO_FEATURE(adreno_dev, ADRENO_L3_VOTE))
 		device->l3_vote = true;
@@ -2505,56 +2480,6 @@ int adreno_suspend_context(struct kgsl_device *device)
 
 	/* Wait for the device to go idle */
 	return adreno_idle(device);
-}
-
-bool adreno_is_cx_dbgc_register(struct kgsl_device *device,
-		unsigned int offsetwords)
-{
-	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
-
-	return adreno_dev->cx_dbgc_virt &&
-		(offsetwords >= (adreno_dev->cx_dbgc_base >> 2)) &&
-		(offsetwords < (adreno_dev->cx_dbgc_base +
-				adreno_dev->cx_dbgc_len) >> 2);
-}
-
-void adreno_cx_dbgc_regread(struct kgsl_device *device,
-	unsigned int offsetwords, unsigned int *value)
-{
-	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
-	unsigned int cx_dbgc_offset;
-
-	if (!adreno_is_cx_dbgc_register(device, offsetwords))
-		return;
-
-	cx_dbgc_offset = (offsetwords << 2) - adreno_dev->cx_dbgc_base;
-	*value = __raw_readl(adreno_dev->cx_dbgc_virt + cx_dbgc_offset);
-
-	/*
-	 * ensure this read finishes before the next one.
-	 * i.e. act like normal readl()
-	 */
-	rmb();
-}
-
-void adreno_cx_dbgc_regwrite(struct kgsl_device *device,
-	unsigned int offsetwords, unsigned int value)
-{
-	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
-	unsigned int cx_dbgc_offset;
-
-	if (!adreno_is_cx_dbgc_register(device, offsetwords))
-		return;
-
-	cx_dbgc_offset = (offsetwords << 2) - adreno_dev->cx_dbgc_base;
-	trace_kgsl_regwrite(offsetwords, value);
-
-	/*
-	 * ensure previous writes post before this one,
-	 * i.e. act like normal writel()
-	 */
-	wmb();
-	__raw_writel(value, adreno_dev->cx_dbgc_virt + cx_dbgc_offset);
 }
 
 void adreno_cx_misc_regread(struct adreno_device *adreno_dev,

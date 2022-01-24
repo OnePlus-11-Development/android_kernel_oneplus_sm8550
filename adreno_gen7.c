@@ -1229,6 +1229,7 @@ int gen7_probe_common(struct platform_device *pdev,
 	/* debugfs node for ACD calibration */
 	debugfs_create_file("acd_calibrate", 0644, device->d_debugfs, device, &acd_cal_fops);
 
+	gen7_coresight_init(adreno_dev);
 	return 0;
 }
 

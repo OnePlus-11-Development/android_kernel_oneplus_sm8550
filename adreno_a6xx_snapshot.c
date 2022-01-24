@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/iopoll.h>
@@ -1346,10 +1347,10 @@ static void a6xx_cx_debug_bus_read(struct kgsl_device *device,
 	reg = (block_id << A6XX_CX_DBGC_CFG_DBGBUS_SEL_PING_BLK_SEL_SHIFT) |
 			(index << A6XX_CX_DBGC_CFG_DBGBUS_SEL_PING_INDEX_SHIFT);
 
-	adreno_cx_dbgc_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_SEL_A, reg);
-	adreno_cx_dbgc_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_SEL_B, reg);
-	adreno_cx_dbgc_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_SEL_C, reg);
-	adreno_cx_dbgc_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_SEL_D, reg);
+	kgsl_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_SEL_A, reg);
+	kgsl_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_SEL_B, reg);
+	kgsl_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_SEL_C, reg);
+	kgsl_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_SEL_D, reg);
 
 	/*
 	 * There needs to be a delay of 1 us to ensure enough time for correct
@@ -1357,9 +1358,9 @@ static void a6xx_cx_debug_bus_read(struct kgsl_device *device,
 	 */
 	udelay(1);
 
-	adreno_cx_dbgc_regread(device, A6XX_CX_DBGC_CFG_DBGBUS_TRACE_BUF2, val);
+	kgsl_regread(device, A6XX_CX_DBGC_CFG_DBGBUS_TRACE_BUF2, val);
 	val++;
-	adreno_cx_dbgc_regread(device, A6XX_CX_DBGC_CFG_DBGBUS_TRACE_BUF1, val);
+	kgsl_regread(device, A6XX_CX_DBGC_CFG_DBGBUS_TRACE_BUF1, val);
 }
 
 /*
@@ -1441,20 +1442,20 @@ static void a6xx_snapshot_debugbus(struct adreno_device *adreno_dev,
 	kgsl_regwrite(device, A6XX_DBGC_CFG_DBGBUS_MASKL_2, 0);
 	kgsl_regwrite(device, A6XX_DBGC_CFG_DBGBUS_MASKL_3, 0);
 
-	adreno_cx_dbgc_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_CNTLT,
+	kgsl_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_CNTLT,
 		(0xf << A6XX_DBGC_CFG_DBGBUS_CNTLT_SEGT_SHIFT) |
 		(0x0 << A6XX_DBGC_CFG_DBGBUS_CNTLT_GRANU_SHIFT) |
 		(0x0 << A6XX_DBGC_CFG_DBGBUS_CNTLT_TRACEEN_SHIFT));
 
-	adreno_cx_dbgc_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_CNTLM,
+	kgsl_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_CNTLM,
 		0xf << A6XX_CX_DBGC_CFG_DBGBUS_CNTLM_ENABLE_SHIFT);
 
-	adreno_cx_dbgc_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_IVTL_0, 0);
-	adreno_cx_dbgc_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_IVTL_1, 0);
-	adreno_cx_dbgc_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_IVTL_2, 0);
-	adreno_cx_dbgc_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_IVTL_3, 0);
+	kgsl_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_IVTL_0, 0);
+	kgsl_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_IVTL_1, 0);
+	kgsl_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_IVTL_2, 0);
+	kgsl_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_IVTL_3, 0);
 
-	adreno_cx_dbgc_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_BYTEL_0,
+	kgsl_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_BYTEL_0,
 		(0 << A6XX_CX_DBGC_CFG_DBGBUS_BYTEL0_SHIFT) |
 		(1 << A6XX_CX_DBGC_CFG_DBGBUS_BYTEL1_SHIFT) |
 		(2 << A6XX_CX_DBGC_CFG_DBGBUS_BYTEL2_SHIFT) |
@@ -1463,7 +1464,7 @@ static void a6xx_snapshot_debugbus(struct adreno_device *adreno_dev,
 		(5 << A6XX_CX_DBGC_CFG_DBGBUS_BYTEL5_SHIFT) |
 		(6 << A6XX_CX_DBGC_CFG_DBGBUS_BYTEL6_SHIFT) |
 		(7 << A6XX_CX_DBGC_CFG_DBGBUS_BYTEL7_SHIFT));
-	adreno_cx_dbgc_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_BYTEL_1,
+	kgsl_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_BYTEL_1,
 		(8 << A6XX_CX_DBGC_CFG_DBGBUS_BYTEL8_SHIFT) |
 		(9 << A6XX_CX_DBGC_CFG_DBGBUS_BYTEL9_SHIFT) |
 		(10 << A6XX_CX_DBGC_CFG_DBGBUS_BYTEL10_SHIFT) |
@@ -1473,10 +1474,10 @@ static void a6xx_snapshot_debugbus(struct adreno_device *adreno_dev,
 		(14 << A6XX_CX_DBGC_CFG_DBGBUS_BYTEL14_SHIFT) |
 		(15 << A6XX_CX_DBGC_CFG_DBGBUS_BYTEL15_SHIFT));
 
-	adreno_cx_dbgc_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_MASKL_0, 0);
-	adreno_cx_dbgc_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_MASKL_1, 0);
-	adreno_cx_dbgc_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_MASKL_2, 0);
-	adreno_cx_dbgc_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_MASKL_3, 0);
+	kgsl_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_MASKL_0, 0);
+	kgsl_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_MASKL_1, 0);
+	kgsl_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_MASKL_2, 0);
+	kgsl_regwrite(device, A6XX_CX_DBGC_CFG_DBGBUS_MASKL_3, 0);
 
 	for (i = 0; i < ARRAY_SIZE(a6xx_dbgc_debugbus_blocks); i++) {
 		kgsl_snapshot_add_section(device,
@@ -1511,7 +1512,7 @@ static void a6xx_snapshot_debugbus(struct adreno_device *adreno_dev,
 			(void *) &a6xx_vbif_debugbus_blocks);
 
 	/* Dump the CX debugbus data if the block exists */
-	if (adreno_is_cx_dbgc_register(device, A6XX_CX_DBGC_CFG_DBGBUS_SEL_A)) {
+	if (kgsl_regmap_valid_offset(&device->regmap, A6XX_CX_DBGC_CFG_DBGBUS_SEL_A)) {
 		for (i = 0; i < ARRAY_SIZE(a6xx_cx_dbgc_debugbus_blocks); i++) {
 			kgsl_snapshot_add_section(device,
 				KGSL_SNAPSHOT_SECTION_DEBUGBUS,

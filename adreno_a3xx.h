@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2013-2016, 2019-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef __A3XX_H
 #define __A3XX_H
@@ -65,5 +66,11 @@ int a3xx_ringbuffer_init(struct adreno_device *adreno_dev);
 int a3xx_ringbuffer_submitcmd(struct adreno_device *adreno_dev,
 		struct kgsl_drawobj_cmd *cmdobj, u32 flags,
 		struct adreno_submit_time *time);
+
+#ifdef CONFIG_QCOM_KGSL_CORESIGHT
+void a3xx_coresight_init(struct adreno_device *device);
+#else
+static inline void a3xx_coresight_init(struct adreno_device *device) { }
+#endif
 
 #endif /*__A3XX_H */

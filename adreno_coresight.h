@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _ADRENO_CORESIGHT_H_
@@ -86,18 +87,30 @@ struct adreno_coresight {
 	unsigned int count;
 	/** @groups: Pointer to an attribute list of control files */
 	const struct attribute_group **groups;
+};
+
+/**
+ * struct adreno_coresight_device - Container for a coresight instance
+ */
+struct adreno_coresight_device {
+	/** @dev: Pointer to the corsight device */
+	struct coresight_device *dev;
+	/** @coresight: Point to the GPU specific coresight definition */
+	const struct adreno_coresight *coresight;
+	/** @device: Pointer to a GPU device handle */
+	struct kgsl_device *device;
+	/** @enabled: True if the coresight instance is enabled */
+	bool enabled;
 	/** @atid: The unique ATID value of the coresight device */
 	unsigned int atid;
 };
 
 #ifdef CONFIG_QCOM_KGSL_CORESIGHT
-/**
- * adreno_coresight_init - Initialize coresight for the GPU device
- * @adreno_dev: An Adreno GPU device handle
- *
- * Initialize devices for the GPU target.
- */
-void adreno_coresight_init(struct adreno_device *adreno_dev);
+
+void adreno_coresight_add_device(struct adreno_device *adreno_dev,
+		const char *name,
+		const struct adreno_coresight *coresight,
+		struct adreno_coresight_device *adreno_csdev);
 
 /**
  * adreno_coresight_start - Reprogram coresight registers after power collapse
@@ -124,7 +137,13 @@ void adreno_coresight_stop(struct adreno_device *adreno_dev);
  */
 void adreno_coresight_remove(struct adreno_device *adreno_dev);
 #else
-static inline void adreno_coresight_init(struct adreno_device *adreno_dev) { }
+static inline void adreno_coresight_add_device(struct kgsl_device *device,
+		const char *name,
+		const struct adreno_coresight *coresight,
+		struct adreno_coresight_device *adreno_csdev)
+{
+}
+
 static inline void adreno_coresight_start(struct adreno_device *adreno_dev) { }
 static inline void adreno_coresight_stop(struct adreno_device *adreno_dev) { }
 static inline void adreno_coresight_remove(struct adreno_device *adreno_dev) { }

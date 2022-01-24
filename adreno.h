@@ -535,9 +535,6 @@ struct adreno_device {
 	struct kgsl_device dev;    /* Must be first field in this struct */
 	unsigned long priv;
 	unsigned int chipid;
-	unsigned long cx_dbgc_base;
-	unsigned int cx_dbgc_len;
-	void __iomem *cx_dbgc_virt;
 	unsigned int cx_misc_len;
 	void __iomem *cx_misc_virt;
 	unsigned long isense_base;
@@ -601,7 +598,13 @@ struct adreno_device {
 	unsigned int highest_bank_bit;
 	unsigned int quirks;
 
-	struct coresight_device *csdev[2];
+#ifdef CONFIG_QCOM_KGSL_CORESIGHT
+	/** @gx_coresight:  A coresight instance for GX */
+	struct adreno_coresight_device gx_coresight;
+	/** @gx_coresight:  A coresight instance for CX */
+	struct adreno_coresight_device cx_coresight;
+#endif
+
 	uint32_t gpmu_throttle_counters[ADRENO_GPMU_THROTTLE_COUNTERS];
 	struct work_struct irq_storm_work;
 
@@ -657,8 +660,6 @@ struct adreno_device {
  * @ADRENO_DEVICE_PWRON - Set during init after a power collapse
  * @ADRENO_DEVICE_PWRON_FIXUP - Set if the target requires the shader fixup
  * after power collapse
- * @ADRENO_DEVICE_CORESIGHT - Set if the coresight (trace bus) registers should
- * be restored after power collapse
  * @ADRENO_DEVICE_STARTED - Set if the device start sequence is in progress
  * @ADRENO_DEVICE_FAULT - Set if the device is currently in fault (and shouldn't
  * send any more commands to the ringbuffer)
@@ -676,7 +677,6 @@ enum adreno_device_flags {
 	ADRENO_DEVICE_PWRON = 0,
 	ADRENO_DEVICE_PWRON_FIXUP = 1,
 	ADRENO_DEVICE_INITIALIZED = 2,
-	ADRENO_DEVICE_CORESIGHT = 3,
 	ADRENO_DEVICE_STARTED = 5,
 	ADRENO_DEVICE_FAULT = 6,
 	ADRENO_DEVICE_DRAWOBJ_PROFILE = 7,
@@ -686,7 +686,6 @@ enum adreno_device_flags {
 	ADRENO_DEVICE_GPMU_INITIALIZED = 11,
 	ADRENO_DEVICE_ISDB_ENABLED = 12,
 	ADRENO_DEVICE_CACHE_FLUSH_TS_SUSPENDED = 13,
-	ADRENO_DEVICE_CORESIGHT_CX = 14,
 };
 
 /**
@@ -800,8 +799,6 @@ struct adreno_gpudev {
 	 * so define them in the structure and use them as variables.
 	 */
 	unsigned int *const reg_offsets;
-
-	struct adreno_coresight *coresight[2];
 
 	/* GPU specific function hooks */
 	int (*probe)(struct platform_device *pdev, u32 chipid,
@@ -973,12 +970,6 @@ long adreno_ioctl_perfcounter_get(struct kgsl_device_private *dev_priv,
 long adreno_ioctl_perfcounter_put(struct kgsl_device_private *dev_priv,
 	unsigned int cmd, void *data);
 
-bool adreno_is_cx_dbgc_register(struct kgsl_device *device,
-		unsigned int offset);
-void adreno_cx_dbgc_regread(struct kgsl_device *adreno_device,
-		unsigned int offsetwords, unsigned int *value);
-void adreno_cx_dbgc_regwrite(struct kgsl_device *device,
-		unsigned int offsetwords, unsigned int value);
 void adreno_cx_misc_regread(struct adreno_device *adreno_dev,
 		unsigned int offsetwords, unsigned int *value);
 void adreno_cx_misc_regwrite(struct adreno_device *adreno_dev,

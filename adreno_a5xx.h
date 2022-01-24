@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015-2017,2019-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _ADRENO_A5XX_H_
@@ -303,5 +304,11 @@ static inline bool a5xx_has_gpmu(struct adreno_device *adreno_dev)
 {
 	return (adreno_is_a530(adreno_dev) || adreno_is_a540(adreno_dev));
 }
+
+#ifdef CONFIG_QCOM_KGSL_CORESIGHT
+void a5xx_coresight_init(struct adreno_device *device);
+#else
+static inline void a5xx_coresight_init(struct adreno_device *device) { }
+#endif
 
 #endif

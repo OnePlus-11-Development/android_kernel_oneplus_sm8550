@@ -767,10 +767,10 @@ static void gen7_cx_debug_bus_read(struct kgsl_device *device,
 	reg = FIELD_PREP(GENMASK(7, 0), index) |
 		FIELD_PREP(GENMASK(24, 16), block_id);
 
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_A, reg);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_B, reg);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_C, reg);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_D, reg);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_A, reg);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_B, reg);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_C, reg);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_D, reg);
 
 	/*
 	 * There needs to be a delay of 1 us to ensure enough time for correct
@@ -778,9 +778,9 @@ static void gen7_cx_debug_bus_read(struct kgsl_device *device,
 	 */
 	udelay(1);
 
-	adreno_cx_dbgc_regread(device, GEN7_CX_DBGC_CFG_DBGBUS_TRACE_BUF2, val);
+	kgsl_regread(device, GEN7_CX_DBGC_CFG_DBGBUS_TRACE_BUF2, val);
 	val++;
-	adreno_cx_dbgc_regread(device, GEN7_CX_DBGC_CFG_DBGBUS_TRACE_BUF1, val);
+	kgsl_regread(device, GEN7_CX_DBGC_CFG_DBGBUS_TRACE_BUF1, val);
 }
 
 /*
@@ -817,10 +817,10 @@ static void gen7_cx_side_debug_bus_read(struct kgsl_device *device,
 	unsigned int reg = FIELD_PREP(GENMASK(7, 0), index) |
 			FIELD_PREP(GENMASK(24, 16), block_id);
 
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_A, reg);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_B, reg);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_C, reg);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_D, reg);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_A, reg);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_B, reg);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_C, reg);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_D, reg);
 
 	/*
 	 * There needs to be a delay of 1 us to ensure enough time for correct
@@ -828,7 +828,7 @@ static void gen7_cx_side_debug_bus_read(struct kgsl_device *device,
 	 */
 	udelay(1);
 
-	adreno_cx_dbgc_regread(device, GEN7_CX_DBGC_CFG_DBGBUS_OVER, &reg);
+	kgsl_regread(device, GEN7_CX_DBGC_CFG_DBGBUS_OVER, &reg);
 	*val = FIELD_GET(GENMASK(27, 24), reg);
 }
 
@@ -903,18 +903,18 @@ static void gen7_snapshot_debugbus(struct adreno_device *adreno_dev,
 	kgsl_regwrite(device, GEN7_DBGC_CFG_DBGBUS_MASKL_2, 0);
 	kgsl_regwrite(device, GEN7_DBGC_CFG_DBGBUS_MASKL_3, 0);
 
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_CNTLT,
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_CNTLT,
 			FIELD_PREP(GENMASK(31, 28), 0xf));
 
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_CNTLM,
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_CNTLM,
 			FIELD_PREP(GENMASK(27, 24), 0xf));
 
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_IVTL_0, 0);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_IVTL_1, 0);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_IVTL_2, 0);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_IVTL_3, 0);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_IVTL_0, 0);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_IVTL_1, 0);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_IVTL_2, 0);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_IVTL_3, 0);
 
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_BYTEL_0,
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_BYTEL_0,
 			FIELD_PREP(GENMASK(3, 0), 0x0) |
 			FIELD_PREP(GENMASK(7, 4), 0x1) |
 			FIELD_PREP(GENMASK(11, 8), 0x2) |
@@ -923,7 +923,7 @@ static void gen7_snapshot_debugbus(struct adreno_device *adreno_dev,
 			FIELD_PREP(GENMASK(23, 20), 0x5) |
 			FIELD_PREP(GENMASK(27, 24), 0x6) |
 			FIELD_PREP(GENMASK(31, 28), 0x7));
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_BYTEL_1,
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_BYTEL_1,
 			FIELD_PREP(GENMASK(3, 0), 0x8) |
 			FIELD_PREP(GENMASK(7, 4), 0x9) |
 			FIELD_PREP(GENMASK(11, 8), 0xa) |
@@ -933,10 +933,10 @@ static void gen7_snapshot_debugbus(struct adreno_device *adreno_dev,
 			FIELD_PREP(GENMASK(27, 24), 0xe) |
 			FIELD_PREP(GENMASK(31, 28), 0xf));
 
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_MASKL_0, 0);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_MASKL_1, 0);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_MASKL_2, 0);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_MASKL_3, 0);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_MASKL_0, 0);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_MASKL_1, 0);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_MASKL_2, 0);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_MASKL_3, 0);
 
 	for (i = 0; i < gen7_snapshot_block_list->debugbus_blocks_len; i++) {
 		kgsl_snapshot_add_section(device,
@@ -961,7 +961,7 @@ static void gen7_snapshot_debugbus(struct adreno_device *adreno_dev,
 	}
 
 	/* Dump the CX debugbus data if the block exists */
-	if (adreno_is_cx_dbgc_register(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_A)) {
+	if (kgsl_regmap_valid_offset(&device->regmap, GEN7_CX_DBGC_CFG_DBGBUS_SEL_A)) {
 		for (i = 0; i < gen7_snapshot_block_list->cx_debugbus_blocks_len; i++) {
 			kgsl_snapshot_add_section(device,
 				KGSL_SNAPSHOT_SECTION_DEBUGBUS,

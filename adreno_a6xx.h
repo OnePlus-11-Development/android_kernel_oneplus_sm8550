@@ -471,4 +471,11 @@ void a6xx_reset_preempt_records(struct adreno_device *adreno_dev);
  * Return true if there is any gpu irq pending
  */
 bool a6xx_irq_pending(struct adreno_device *adreno_dev);
+
+#ifdef CONFIG_QCOM_KGSL_CORESIGHT
+void a6xx_coresight_init(struct adreno_device *device);
+#else
+static inline void a6xx_coresight_init(struct adreno_device *device) { }
+#endif
+
 #endif

@@ -457,4 +457,11 @@ void gen7_rdpm_mx_freq_update(struct gen7_gmu_device *gmu, u32 freq);
  * This function communicates GPU cx frequency(in Mhz) changes to rdpm.
  */
 void gen7_rdpm_cx_freq_update(struct gen7_gmu_device *gmu, u32 freq);
+
+#ifdef CONFIG_QCOM_KGSL_CORESIGHT
+void gen7_coresight_init(struct adreno_device *device);
+#else
+static inline void gen7_coresight_init(struct adreno_device *device) { }
+#endif
+
 #endif
