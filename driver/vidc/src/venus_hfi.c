@@ -17,6 +17,7 @@
 
 #include "venus_hfi.h"
 #include "msm_vidc_core.h"
+#include "msm_vidc_control.h"
 #include "msm_vidc_power.h"
 #include "msm_vidc_platform.h"
 #include "msm_vidc_memory.h"
@@ -3656,6 +3657,70 @@ int venus_hfi_scale_buses(struct msm_vidc_inst *inst, u64 bw_ddr, u64 bw_llcc)
 	rc = __vote_buses(core, bw_ddr, bw_llcc);
 	if (rc)
 		goto exit;
+
+exit:
+	core_unlock(core, __func__);
+
+	return rc;
+}
+
+int venus_hfi_set_ir_period(struct msm_vidc_inst *inst, u32 ir_type,
+	enum msm_vidc_inst_capability_type cap_id)
+{
+	int rc = 0;
+	struct msm_vidc_core *core;
+	u32 ir_period, sync_frame_req = 0;
+
+	if (!inst || !inst->core) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	core = inst->core;
+
+	core_lock(core, __func__);
+
+	ir_period = inst->capabilities->cap[cap_id].value;
+
+	rc = hfi_create_header(inst->packet, inst->packet_size,
+			       inst->session_id, core->header_id++);
+	if (rc)
+		goto exit;
+
+	/* Request sync frame if ir period enabled dynamically */
+	if (!inst->ir_enabled) {
+		inst->ir_enabled = ((ir_period > 0) ? true : false);
+		if (inst->ir_enabled && inst->bufq[OUTPUT_PORT].vb2q->streaming) {
+			sync_frame_req = HFI_SYNC_FRAME_REQUEST_WITH_PREFIX_SEQ_HDR;
+			rc = hfi_create_packet(inst->packet, inst->packet_size,
+					       HFI_PROP_REQUEST_SYNC_FRAME,
+					       HFI_HOST_FLAGS_NONE,
+					       HFI_PAYLOAD_U32_ENUM,
+					       msm_vidc_get_port_info(inst, REQUEST_I_FRAME),
+					       core->packet_id++,
+					       &sync_frame_req,
+					       sizeof(u32));
+			if (rc)
+				goto exit;
+		}
+	}
+
+	rc = hfi_create_packet(inst->packet, inst->packet_size,
+			       ir_type,
+			       HFI_HOST_FLAGS_NONE,
+			       HFI_PAYLOAD_U32,
+			       msm_vidc_get_port_info(inst, cap_id),
+			       core->packet_id++,
+			       &ir_period,
+			       sizeof(u32));
+	if (rc)
+		goto exit;
+
+	rc = __iface_cmdq_write(inst->core, inst->packet);
+	if (rc) {
+		i_vpr_e(inst, "%s: failed to set cap[%d] %s to fw\n",
+			__func__, cap_id, cap_name(cap_id));
+		goto exit;
+	}
 
 exit:
 	core_unlock(core, __func__);

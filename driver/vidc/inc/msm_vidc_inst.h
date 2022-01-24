@@ -172,5 +172,6 @@ struct msm_vidc_inst {
 	u32                                auto_framerate;
 	u32                                max_rate;
 	bool                               has_bframe;
+	bool                               ir_enabled;
 };
 #endif // _MSM_VIDC_INST_H_

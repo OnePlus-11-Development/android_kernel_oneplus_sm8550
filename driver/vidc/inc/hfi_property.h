@@ -533,6 +533,8 @@ enum hfi_nal_length_field_type {
 
 #define HFI_PROP_MAINTAIN_MIN_QUALITY                           0x0300017D
 
+#define HFI_PROP_IR_CYCLIC_PERIOD                               0x0300017E
+
 #define HFI_PROP_AV1_FILM_GRAIN_PRESENT                         0x03000180
 
 #define HFI_PROP_AV1_SUPER_BLOCK_ENABLED                        0x03000181

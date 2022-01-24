@@ -71,6 +71,13 @@
 
 /* Encoder Intra refresh period */
 #define V4L2_CID_MPEG_VIDC_INTRA_REFRESH_PERIOD (V4L2_CID_MPEG_VIDC_BASE + 0xB)
+/* Encoder Intra refresh type */
+#define V4L2_CID_MPEG_VIDEO_VIDC_INTRA_REFRESH_TYPE                           \
+	(V4L2_CID_MPEG_VIDC_BASE + 0xC)
+enum v4l2_mpeg_vidc_ir_type {
+	V4L2_MPEG_VIDEO_VIDC_INTRA_REFRESH_RANDOM = 0x0,
+	V4L2_MPEG_VIDEO_VIDC_INTRA_REFRESH_CYCLIC = 0x1,
+};
 #define V4L2_CID_MPEG_VIDC_TIME_DELTA_BASED_RC  (V4L2_CID_MPEG_VIDC_BASE + 0xD)
 /* Encoder quality controls */
 #define V4L2_CID_MPEG_VIDC_CONTENT_ADAPTIVE_CODING                            \
