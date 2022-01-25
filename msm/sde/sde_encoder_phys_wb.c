@@ -1344,7 +1344,8 @@ static void _sde_encoder_phys_wb_setup_dnsc_blur(struct sde_encoder_phys *phys_e
 			hw_dnsc_blur->ops.setup_dither(hw_dnsc_blur, cfg);
 
 		if (hw_dnsc_blur->ops.bind_pingpong_blk)
-			hw_dnsc_blur->ops.bind_pingpong_blk(hw_dnsc_blur, enable, hw_pp->idx);
+			hw_dnsc_blur->ops.bind_pingpong_blk(hw_dnsc_blur, enable, hw_pp->idx,
+					phys_enc->in_clone_mode);
 
 		SDE_EVT32(DRMID(phys_enc->parent), WBID(wb_enc), sde_conn_state->dnsc_blur_count,
 				cfg->flags, cfg->flags_h, cfg->flags_v, cfg->src_width,
