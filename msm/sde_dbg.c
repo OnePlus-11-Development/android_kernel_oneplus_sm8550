@@ -2801,8 +2801,7 @@ void sde_dbg_reg_register_dump_range(const char *base_name,
 		return;
 	}
 
-	if (offset_end - offset_start < REG_DUMP_ALIGN ||
-			offset_start > offset_end) {
+	if (offset_start > offset_end) {
 		pr_err("%pS: bad range, base_name %s, range_name %s, offset_start 0x%X, end 0x%X\n",
 				__builtin_return_address(0), base_name,
 				range_name, offset_start, offset_end);
