@@ -4958,6 +4958,7 @@ void reg_dmav1_setup_spr_init_cfgv1(struct sde_hw_dspp *ctx, void *cfg)
 	uint32_t reg_off, reg_cnt, base_off;
 	uint32_t reg[16];
 	int i, index, rc = 0;
+	bool spr_bypass = false;
 
 	rc = reg_dma_dspp_check(ctx, cfg, SPR_INIT);
 	if (rc)
@@ -4988,6 +4989,8 @@ void reg_dmav1_setup_spr_init_cfgv1(struct sde_hw_dspp *ctx, void *cfg)
 		return;
 	}
 
+	spr_bypass = (payload->flags & SPR_FLAG_BYPASS) ? true : false;
+
 	reg_cnt = 2;
 	reg_off = base_off + 0x04;
 	reg[0] = APPLY_MASK_AND_SHIFT(payload->cfg0, 1, 0) |
@@ -5004,6 +5007,10 @@ void reg_dmav1_setup_spr_init_cfgv1(struct sde_hw_dspp *ctx, void *cfg)
 	reg[0] |= APPLY_MASK_AND_SHIFT(payload->cfg11[2], 2, 12);
 	reg[0] |= APPLY_MASK_AND_SHIFT(payload->cfg11[3], 1, 14);
 
+	if (spr_bypass)
+		reg[0] = APPLY_MASK_AND_SHIFT(payload->cfg1, 1, 1) |
+				APPLY_MASK_AND_SHIFT(payload->cfg2, 1, 2);
+
 	reg[1] = 0;
 	if (hw_cfg->num_of_mixers == 2)
 		reg[1] = 1;
@@ -5017,6 +5024,9 @@ void reg_dmav1_setup_spr_init_cfgv1(struct sde_hw_dspp *ctx, void *cfg)
 		DRM_ERROR("write spr config failed ret %d\n", rc);
 		return;
 	}
+
+	if (spr_bypass)
+		goto bypass;
 
 	reg_cnt = 1;
 	reg_off = base_off + 0x54;
@@ -5079,6 +5089,7 @@ void reg_dmav1_setup_spr_init_cfgv1(struct sde_hw_dspp *ctx, void *cfg)
 	if (rc)
 		return;
 
+bypass:
 	REG_DMA_SETUP_KICKOFF(kick_off, hw_cfg->ctl,
 			dspp_buf[SPR_INIT][ctx->idx],
 			REG_DMA_WRITE, DMA_CTL_QUEUE0, WRITE_IMMEDIATE,
@@ -5603,11 +5614,14 @@ static bool __reg_dmav1_valid_hfc_en_cfg(struct drm_msm_dem_cfg *dcfg,
 	if (dcfg->pentile) {
 		w = dcfg->c0_depth * (temp / 2) + dcfg->c1_depth * temp +
 			dcfg->c2_depth * (temp / 2);
-		if (w % 32)
-			w = 32 - (w % 32) + w;
-		w = 2 * (w / 32);
-		w = w / (hw_cfg->num_of_mixers ? hw_cfg->num_of_mixers : 1);
+	} else {
+		w = dcfg->c0_depth * temp + dcfg->c1_depth * temp + dcfg->c2_depth * temp;
 	}
+	if (w % 32)
+		w = 32 - (w % 32) + w;
+	w = 2 * (w / 32);
+	w = w / (hw_cfg->num_of_mixers ? hw_cfg->num_of_mixers : 1);
+
 	if (h != hw_cfg->skip_blend_plane_h || w != hw_cfg->skip_blend_plane_w) {
 		DRM_ERROR("invalid hfc cfg exp h %d exp w %d act h %d act w %d\n",
 			h, w, hw_cfg->skip_blend_plane_h, hw_cfg->skip_blend_plane_w);

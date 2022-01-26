@@ -581,6 +581,7 @@ struct drm_msm_ltm_buffer {
 #define SPR_INIT_PARAM_SIZE_3 16
 #define SPR_INIT_PARAM_SIZE_4 24
 #define SPR_INIT_PARAM_SIZE_5 32
+#define SPR_FLAG_BYPASS (1 << 0)
 
 /**
  * struct drm_msm_spr_init_cfg - SPR initial configuration structure
