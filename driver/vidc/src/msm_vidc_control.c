@@ -945,14 +945,6 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 		kfree(curr_node);
 	}
 
-	/* dynamic controls with request will be set along with qbuf */
-	if (inst->request) {
-		i_vpr_l(inst,
-			"%s: request api enabled, dynamic ctrls to be set with qbuf\n",
-			__func__);
-		return 0;
-	}
-
 	/* Dynamic set control ASAP */
 	rc = msm_vidc_set_v4l2_properties(inst);
 	if (rc) {

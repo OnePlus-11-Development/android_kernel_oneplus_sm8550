@@ -11,6 +11,8 @@
 struct msm_vidc_core;
 struct msm_vidc_inst;
 
+#define MSM_MEM_POOL_PACKET_SIZE 1024
+
 struct msm_memory_dmabuf {
 	struct list_head       list;
 	struct dma_buf        *dmabuf;
@@ -23,6 +25,7 @@ enum msm_memory_pool_type {
 	MSM_MEM_POOL_ALLOC,
 	MSM_MEM_POOL_TIMESTAMP,
 	MSM_MEM_POOL_DMABUF,
+	MSM_MEM_POOL_PACKET,
 	MSM_MEM_POOL_MAX,
 };
 

@@ -17,6 +17,7 @@
 #include "msm_vidc_dt.h"
 #include "msm_vidc_core.h"
 #include "msm_vidc_events.h"
+#include "venus_hfi.h"
 
 struct msm_vidc_buf_region_name {
 	enum msm_vidc_buffer_region region;
@@ -589,6 +590,8 @@ static struct msm_vidc_type_size_name buftype_size_name_arr[] = {
 	{MSM_MEM_POOL_ALLOC,      sizeof(struct msm_vidc_alloc),      "MSM_MEM_POOL_ALLOC"      },
 	{MSM_MEM_POOL_TIMESTAMP,  sizeof(struct msm_vidc_timestamp),  "MSM_MEM_POOL_TIMESTAMP"  },
 	{MSM_MEM_POOL_DMABUF,     sizeof(struct msm_memory_dmabuf),   "MSM_MEM_POOL_DMABUF"     },
+	{MSM_MEM_POOL_PACKET,     sizeof(struct hfi_pending_packet) + MSM_MEM_POOL_PACKET_SIZE,
+		"MSM_MEM_POOL_PACKET"},
 };
 
 int msm_memory_pools_init(struct msm_vidc_inst *inst)
