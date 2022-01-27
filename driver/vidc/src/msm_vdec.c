@@ -886,6 +886,32 @@ static int msm_vdec_set_av1_operating_point(struct msm_vidc_inst *inst,
 	return rc;
 }
 
+static int msm_vdec_set_av1_drap_config(struct msm_vidc_inst *inst,
+	enum msm_vidc_port_type port)
+{
+	int rc = 0;
+	u32 drap_config;
+
+	if (inst->codec != MSM_VIDC_AV1)
+		return 0;
+
+	drap_config = inst->capabilities->cap[DRAP].value;
+	i_vpr_h(inst, "%s: drap_config: %u\n", __func__, drap_config);
+	rc = venus_hfi_session_property(inst,
+			HFI_PROP_AV1_DRAP_CONFIG,
+			HFI_HOST_FLAGS_NONE,
+			get_hfi_port(inst, port),
+			HFI_PAYLOAD_U32,
+			&drap_config,
+			sizeof(u32));
+	if (rc) {
+		i_vpr_e(inst, "%s: set property failed\n", __func__);
+		return rc;
+	}
+
+	return rc;
+}
+
 static int msm_vdec_set_input_properties(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
@@ -932,6 +958,10 @@ static int msm_vdec_set_input_properties(struct msm_vidc_inst *inst)
 		return rc;
 
 	rc = msm_vdec_set_av1_operating_point(inst, INPUT_PORT);
+	if (rc)
+		return rc;
+
+	rc = msm_vdec_set_av1_drap_config(inst, INPUT_PORT);
 	if (rc)
 		return rc;
 

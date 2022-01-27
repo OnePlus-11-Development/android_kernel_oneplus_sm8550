@@ -187,7 +187,8 @@ u32 msm_vidc_internal_buffer_count(struct msm_vidc_inst *inst,
 			buffer_type == MSM_VIDC_BUF_NON_COMV) {
 			if (inst->codec == MSM_VIDC_H264 ||
 				inst->codec == MSM_VIDC_HEVC ||
-				inst->codec == MSM_VIDC_HEIC)
+				inst->codec == MSM_VIDC_HEIC ||
+				inst->codec == MSM_VIDC_AV1)
 				count = 1;
 			else
 				count = 0;
