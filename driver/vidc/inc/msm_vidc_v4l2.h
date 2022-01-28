@@ -36,6 +36,8 @@ int msm_v4l2_reqbufs(struct file *file, void *fh,
 		struct v4l2_requestbuffers *b);
 int msm_v4l2_querybuf(struct file *file, void *fh,
 		struct v4l2_buffer *b);
+int msm_v4l2_create_bufs(struct file *filp, void *fh,
+		struct v4l2_create_buffers *b);
 int msm_v4l2_qbuf(struct file *file, void *fh,
 		struct v4l2_buffer *b);
 int msm_v4l2_dqbuf(struct file *file, void *fh,
