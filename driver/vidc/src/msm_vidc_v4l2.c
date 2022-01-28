@@ -323,6 +323,30 @@ unlock:
 	return rc;
 }
 
+int msm_v4l2_querybuf(struct file *filp, void *fh,
+				struct v4l2_buffer *b)
+{
+	struct msm_vidc_inst *inst = get_vidc_inst(filp, fh);
+	int rc = 0;
+
+	inst = get_inst_ref(g_core, inst);
+	if (!inst) {
+		d_vpr_e("%s: invalid instance\n", __func__);
+		return -EINVAL;
+	}
+
+	inst_lock(inst, __func__);
+	rc = msm_vidc_querybuf((void *)inst, b);
+	if (rc)
+		goto unlock;
+
+unlock:
+	inst_unlock(inst, __func__);
+	put_inst(inst);
+
+	return rc;
+}
+
 int msm_v4l2_qbuf(struct file *filp, void *fh,
 				struct v4l2_buffer *b)
 {
