@@ -34,6 +34,7 @@ static const u32 gen7_pwrup_reglist[] = {
 	GEN7_UCHE_CACHE_WAYS,
 	GEN7_UCHE_MODE_CNTL,
 	GEN7_RB_NC_MODE_CNTL,
+	GEN7_RB_CMP_DBG_ECO_CNTL,
 	GEN7_TPL1_NC_MODE_CNTL,
 	GEN7_SP_NC_MODE_CNTL,
 	GEN7_GRAS_NC_MODE_CNTL,
@@ -500,6 +501,9 @@ int gen7_start(struct adreno_device *adreno_dev)
 	if (adreno_is_preemption_enabled(adreno_dev))
 		kgsl_regwrite(device, GEN7_RB_CONTEXT_SWITCH_GMEM_SAVE_RESTORE,
 			0x1);
+
+	/* Disable non-ubwc read reqs from passing write reqs */
+	kgsl_regrmw(device, GEN7_RB_CMP_DBG_ECO_CNTL, 0x800, 0x800);
 
 	/* Enable GMU power counter 0 to count GPU busy */
 	kgsl_regwrite(device, GEN7_GPU_GMU_AO_GPU_CX_BUSY_MASK, 0xff000000);
