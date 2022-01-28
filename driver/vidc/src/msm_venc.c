@@ -1707,6 +1707,34 @@ int msm_venc_g_param(struct msm_vidc_inst *inst,
 	return 0;
 }
 
+int msm_venc_subscribe_event(struct msm_vidc_inst *inst,
+		const struct v4l2_event_subscription *sub)
+{
+	int rc = 0;
+
+	if (!inst || !sub) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	switch (sub->type) {
+	case V4L2_EVENT_EOS:
+		rc = v4l2_event_subscribe(&inst->event_handler, sub, MAX_EVENTS, NULL);
+		break;
+	case V4L2_EVENT_CTRL:
+		rc = v4l2_ctrl_subscribe_event(&inst->event_handler, sub);
+		break;
+	default:
+		i_vpr_e(inst, "%s: invalid type %d id %d\n", __func__, sub->type, sub->id);
+		return -EINVAL;
+	}
+
+	if (rc)
+		i_vpr_e(inst, "%s: failed, type %d id %d\n",
+			__func__, sub->type, sub->id);
+	return rc;
+}
+
 int msm_venc_enum_fmt(struct msm_vidc_inst *inst, struct v4l2_fmtdesc *f)
 {
 	int rc = 0;

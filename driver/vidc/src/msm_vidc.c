@@ -26,8 +26,6 @@
 /* kernel/msm-4.19 */
 #define MSM_VIDC_VERSION     ((5 << 16) + (10 << 8) + 0)
 
-#define MAX_EVENTS 30
-
 static inline bool valid_v4l2_buffer(struct v4l2_buffer *b,
 		struct msm_vidc_inst *inst)
 {
@@ -742,12 +740,14 @@ int msm_vidc_subscribe_event(void *instance,
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
+
 	i_vpr_h(inst, "%s: type %d id %d\n", __func__, sub->type, sub->id);
-	rc = v4l2_event_subscribe(&inst->event_handler,
-		sub, MAX_EVENTS, NULL);
-	if (rc)
-		i_vpr_e(inst, "%s: fialed, type %d id %d\n",
-			__func__, sub->type, sub->id);
+
+	if (inst->domain == MSM_VIDC_DECODER)
+		rc = msm_vdec_subscribe_event(inst, sub);
+	if (inst->domain == MSM_VIDC_ENCODER)
+		rc = msm_venc_subscribe_event(inst, sub);
+
 	return rc;
 }
 EXPORT_SYMBOL(msm_vidc_subscribe_event);
@@ -765,7 +765,7 @@ int msm_vidc_unsubscribe_event(void *instance,
 	i_vpr_h(inst, "%s: type %d id %d\n", __func__, sub->type, sub->id);
 	rc = v4l2_event_unsubscribe(&inst->event_handler, sub);
 	if (rc)
-		i_vpr_e(inst, "%s: fialed, type %d id %d\n",
+		i_vpr_e(inst, "%s: failed, type %d id %d\n",
 			 __func__, sub->type, sub->id);
 	return rc;
 }

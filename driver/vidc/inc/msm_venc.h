@@ -25,6 +25,8 @@ int msm_venc_s_param(struct msm_vidc_inst *inst,
         struct v4l2_streamparm *s_parm);
 int msm_venc_g_param(struct msm_vidc_inst *inst,
 		struct v4l2_streamparm *s_parm);
+int msm_venc_subscribe_event(struct msm_vidc_inst *inst,
+		const struct v4l2_event_subscription *sub);
 int msm_venc_enum_fmt(struct msm_vidc_inst *inst, struct v4l2_fmtdesc *f);
 int msm_venc_inst_init(struct msm_vidc_inst *inst);
 int msm_venc_inst_deinit(struct msm_vidc_inst *inst);
