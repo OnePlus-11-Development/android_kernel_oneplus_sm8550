@@ -213,66 +213,66 @@ static int dp_vco_pll_init_db_4nm(struct dp_pll_db *pdb,
 	case DP_VCO_HSCLK_RATE_1620MHZDIV1000:
 		DP_DEBUG("VCO rate: %ld\n", DP_VCO_RATE_9720MHZDIV1000);
 		pdb->hsclk_sel = 0x05;
-		pdb->dec_start_mode0 = 0x69;
-		pdb->div_frac_start2_mode0 = 0x80;
-		pdb->div_frac_start3_mode0 = 0x07;
-		pdb->lock_cmp1_mode0 = 0x6f;
-		pdb->lock_cmp2_mode0 = 0x08;
+		pdb->dec_start_mode0 = 0x34;
+		pdb->div_frac_start2_mode0 = 0xc0;
+		pdb->div_frac_start3_mode0 = 0x0b;
+		pdb->lock_cmp1_mode0 = 0x37;
+		pdb->lock_cmp2_mode0 = 0x04;
 		pdb->phy_vco_div = 0x1;
 		pdb->lock_cmp_en = 0x04;
-		pdb->ssc_step_size1_mode0 = 0x45;
-		pdb->ssc_step_size2_mode0 = 0x06;
-		pdb->ssc_per1 = 0x36;
-		pdb->cmp_code1_mode0 = 0xE2;
-		pdb->cmp_code2_mode0 = 0x18;
+		pdb->ssc_step_size1_mode0 = 0x92;
+		pdb->ssc_step_size2_mode0 = 0x01;
+		pdb->ssc_per1 = 0x6B;
+		pdb->cmp_code1_mode0 = 0x71;
+		pdb->cmp_code2_mode0 = 0x0c;
 		break;
 	case DP_VCO_HSCLK_RATE_2700MHZDIV1000:
 		DP_DEBUG("VCO rate: %ld\n", DP_VCO_RATE_10800MHZDIV1000);
 		pdb->hsclk_sel = 0x03;
-		pdb->dec_start_mode0 = 0x69;
-		pdb->div_frac_start2_mode0 = 0x80;
-		pdb->div_frac_start3_mode0 = 0x07;
-		pdb->lock_cmp1_mode0 = 0x0f;
-		pdb->lock_cmp2_mode0 = 0x0e;
+		pdb->dec_start_mode0 = 0x34;
+		pdb->div_frac_start2_mode0 = 0xc0;
+		pdb->div_frac_start3_mode0 = 0x0b;
+		pdb->lock_cmp1_mode0 = 0x07;
+		pdb->lock_cmp2_mode0 = 0x07;
 		pdb->phy_vco_div = 0x1;
 		pdb->lock_cmp_en = 0x08;
-		pdb->ssc_step_size1_mode0 = 0x45;
-		pdb->ssc_step_size2_mode0 = 0x06;
-		pdb->ssc_per1 = 0x36;
-		pdb->cmp_code1_mode0 = 0xE2;
-		pdb->cmp_code2_mode0 = 0x18;
+		pdb->ssc_step_size1_mode0 = 0x92;
+		pdb->ssc_step_size2_mode0 = 0x01;
+		pdb->ssc_per1 = 0x6B;
+		pdb->cmp_code1_mode0 = 0x71;
+		pdb->cmp_code2_mode0 = 0x0c;
 		break;
 	case DP_VCO_HSCLK_RATE_5400MHZDIV1000:
 		DP_DEBUG("VCO rate: %ld\n", DP_VCO_RATE_10800MHZDIV1000);
 		pdb->hsclk_sel = 0x01;
-		pdb->dec_start_mode0 = 0x8c;
+		pdb->dec_start_mode0 = 0x46;
 		pdb->div_frac_start2_mode0 = 0x00;
-		pdb->div_frac_start3_mode0 = 0x0a;
-		pdb->lock_cmp1_mode0 = 0x1f;
-		pdb->lock_cmp2_mode0 = 0x1c;
+		pdb->div_frac_start3_mode0 = 0x05;
+		pdb->lock_cmp1_mode0 = 0x0f;
+		pdb->lock_cmp2_mode0 = 0x0e;
 		pdb->phy_vco_div = 0x2;
 		pdb->lock_cmp_en = 0x08;
-		pdb->ssc_step_size1_mode0 = 0x5C;
-		pdb->ssc_step_size2_mode0 = 0x08;
-		pdb->ssc_per1 = 0x36;
-		pdb->cmp_code1_mode0 = 0x2E;
-		pdb->cmp_code2_mode0 = 0x21;
+		pdb->ssc_step_size1_mode0 = 0x18;
+		pdb->ssc_step_size2_mode0 = 0x02;
+		pdb->ssc_per1 = 0x6B;
+		pdb->cmp_code1_mode0 = 0x97;
+		pdb->cmp_code2_mode0 = 0x10;
 		break;
 	case DP_VCO_HSCLK_RATE_8100MHZDIV1000:
 		DP_DEBUG("VCO rate: %ld\n", DP_VCO_RATE_8100MHZDIV1000);
 		pdb->hsclk_sel = 0x00;
-		pdb->dec_start_mode0 = 0x69;
-		pdb->div_frac_start2_mode0 = 0x80;
-		pdb->div_frac_start3_mode0 = 0x07;
-		pdb->lock_cmp1_mode0 = 0x2f;
-		pdb->lock_cmp2_mode0 = 0x2a;
+		pdb->dec_start_mode0 = 0x34;
+		pdb->div_frac_start2_mode0 = 0xc0;
+		pdb->div_frac_start3_mode0 = 0x0b;
+		pdb->lock_cmp1_mode0 = 0x17;
+		pdb->lock_cmp2_mode0 = 0x15;
 		pdb->phy_vco_div = 0x0;
 		pdb->lock_cmp_en = 0x08;
-		pdb->ssc_step_size1_mode0 = 0x45;
-		pdb->ssc_step_size2_mode0 = 0x06;
-		pdb->ssc_per1 = 0x36;
-		pdb->cmp_code1_mode0 = 0xE2;
-		pdb->cmp_code2_mode0 = 0x18;
+		pdb->ssc_step_size1_mode0 = 0x92;
+		pdb->ssc_step_size2_mode0 = 0x01;
+		pdb->ssc_per1 = 0x6B;
+		pdb->cmp_code1_mode0 = 0x71;
+		pdb->cmp_code2_mode0 = 0x0c;
 		break;
 	default:
 		DP_ERR("unsupported rate %ld\n", rate);
@@ -317,7 +317,7 @@ static int dp_config_vco_rate_4nm(struct dp_pll *pll,
 	wmb();
 
 	/* PLL Optimization */
-	dp_pll_write(dp_pll, QSERDES_COM_PLL_IVCO, 0x0f);
+	dp_pll_write(dp_pll, QSERDES_COM_PLL_IVCO, 0x07);
 	dp_pll_write(dp_pll, QSERDES_COM_PLL_CCTRL_MODE0, 0x36);
 	dp_pll_write(dp_pll, QSERDES_COM_PLL_RCTRL_MODE0, 0x16);
 	dp_pll_write(dp_pll, QSERDES_COM_CP_CTRL_MODE0, 0x06);
@@ -347,14 +347,11 @@ static int dp_config_vco_rate_4nm(struct dp_pll *pll,
 	/* Make sure the PHY register writes are done */
 	wmb();
 
-	dp_pll_write(dp_pll, QSERDES_COM_BG_TIMER, 0x0e);
+	dp_pll_write(dp_pll, QSERDES_COM_BG_TIMER, 0x0a);
 	dp_pll_write(dp_pll, QSERDES_COM_CORECLK_DIV_MODE0, 0x14);
 	dp_pll_write(dp_pll, QSERDES_COM_VCO_TUNE_CTRL, 0x00);
 
-	if (pll->bonding_en)
-		dp_pll_write(dp_pll, QSERDES_COM_BIAS_EN_CLKBUFLR_EN, 0x1f);
-	else
-		dp_pll_write(dp_pll, QSERDES_COM_BIAS_EN_CLKBUFLR_EN, 0x17);
+	dp_pll_write(dp_pll, QSERDES_COM_BIAS_EN_CLKBUFLR_EN, 0x1f);
 
 	dp_pll_write(dp_pll, QSERDES_COM_CORE_CLK_EN, 0x0f);
 	dp_pll_write(dp_pll, QSERDES_COM_BIN_VCOCAL_CMP_CODE1_MODE0, pdb->cmp_code1_mode0);
@@ -366,7 +363,7 @@ static int dp_config_vco_rate_4nm(struct dp_pll *pll,
 		dp_pll_write(dp_pll, QSERDES_COM_SSC_EN_CENTER, 0x01);
 		dp_pll_write(dp_pll, QSERDES_COM_SSC_ADJ_PER1, 0x00);
 		dp_pll_write(dp_pll, QSERDES_COM_SSC_PER1, pdb->ssc_per1);
-		dp_pll_write(dp_pll, QSERDES_COM_SSC_PER2, 0x01);
+		dp_pll_write(dp_pll, QSERDES_COM_SSC_PER2, 0x02);
 		dp_pll_write(dp_pll, QSERDES_COM_SSC_STEP_SIZE1_MODE0,
 				pdb->ssc_step_size1_mode0);
 		dp_pll_write(dp_pll, QSERDES_COM_SSC_STEP_SIZE2_MODE0,
@@ -393,8 +390,8 @@ static int dp_config_vco_rate_4nm(struct dp_pll *pll,
 	dp_pll_write(dp_ln_tx0, DP_TRAN_DRVR_EMP_EN, 0xf);
 	dp_pll_write(dp_ln_tx0, TXn_PARRATE_REC_DETECT_IDLE_EN, 0x00);
 	dp_pll_write(dp_ln_tx0, DP_TX_INTERFACE_MODE, 0x00);
-	dp_pll_write(dp_ln_tx0, TXn_RES_CODE_LANE_OFFSET_TX, 0x0C);
-	dp_pll_write(dp_ln_tx0, TXn_RES_CODE_LANE_OFFSET_RX, 0x0C);
+	dp_pll_write(dp_ln_tx0, TXn_RES_CODE_LANE_OFFSET_TX, 0x0A);
+	dp_pll_write(dp_ln_tx0, TXn_RES_CODE_LANE_OFFSET_RX, 0x11);
 	dp_pll_write(dp_ln_tx0, TXn_TX_BAND, 0x04);
 	/* Make sure the PLL register writes are done */
 	wmb();
@@ -409,8 +406,8 @@ static int dp_config_vco_rate_4nm(struct dp_pll *pll,
 	dp_pll_write(dp_ln_tx1, DP_TRAN_DRVR_EMP_EN, 0xf);
 	dp_pll_write(dp_ln_tx1, TXn_PARRATE_REC_DETECT_IDLE_EN, 0x00);
 	dp_pll_write(dp_ln_tx1, DP_TX_INTERFACE_MODE, 0x00);
-	dp_pll_write(dp_ln_tx1, TXn_RES_CODE_LANE_OFFSET_TX, 0x0C);
-	dp_pll_write(dp_ln_tx1, TXn_RES_CODE_LANE_OFFSET_RX, 0x0C);
+	dp_pll_write(dp_ln_tx1, TXn_RES_CODE_LANE_OFFSET_TX, 0x11);
+	dp_pll_write(dp_ln_tx1, TXn_RES_CODE_LANE_OFFSET_RX, 0x11);
 	dp_pll_write(dp_ln_tx1, TXn_TX_BAND, 0x04);
 	/* Make sure the PHY register writes are done */
 	wmb();

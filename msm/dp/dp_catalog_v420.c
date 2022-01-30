@@ -79,6 +79,13 @@ static u8 const dp_swing_hbr_rbr[MAX_VOLTAGE_LEVELS][MAX_PRE_EMP_LEVELS] = {
 	{0x1F, 0xFF, 0xFF, 0xFF}  /* sw1, 1.2v */
 };
 
+static const u8 dp_pre_emp_hbr_rbr_v600[MAX_VOLTAGE_LEVELS][MAX_PRE_EMP_LEVELS] = {
+	{0x00, 0x0D, 0x14, 0x1A}, /* pe0, 0 db */
+	{0x00, 0x0D, 0x15, 0xFF}, /* pe1, 3.5 db */
+	{0x00, 0x0E, 0xFF, 0xFF}, /* pe2, 6.0 db */
+	{0x04, 0xFF, 0xFF, 0xFF}  /* pe3, 9.5 db */
+};
+
 struct dp_catalog_private_v420 {
 	struct device *dev;
 	struct dp_catalog_sub sub;
@@ -269,6 +276,7 @@ static void dp_catalog_ctrl_update_vx_px_v420(struct dp_catalog_ctrl *ctrl,
 	struct dp_io_data *io_data;
 	u8 value0, value1;
 	u32 version;
+	u32 phy_version;
 
 	if (!ctrl || !((v_level < MAX_VOLTAGE_LEVELS)
 		&& (p_level < MAX_PRE_EMP_LEVELS))) {
@@ -279,6 +287,7 @@ static void dp_catalog_ctrl_update_vx_px_v420(struct dp_catalog_ctrl *ctrl,
 	DP_DEBUG("hw: v=%d p=%d, high=%d\n", v_level, p_level, high);
 
 	catalog = dp_catalog_get_priv_v420(ctrl);
+	phy_version = dp_catalog_get_dp_phy_version(catalog->dpc);
 
 	io_data = catalog->io->dp_ahb;
 	version = dp_read(DP_HW_VERSION);
@@ -293,7 +302,10 @@ static void dp_catalog_ctrl_update_vx_px_v420(struct dp_catalog_ctrl *ctrl,
 			value1 = dp_pre_emp_hbr2_hbr3[v_level][p_level];
 		} else {
 			value0 = dp_swing_hbr_rbr[v_level][p_level];
-			value1 = dp_pre_emp_hbr_rbr[v_level][p_level];
+			if (phy_version >= 0x60000000)
+				value1 = dp_pre_emp_hbr_rbr_v600[v_level][p_level];
+			else
+				value1 = dp_pre_emp_hbr_rbr[v_level][p_level];
 		}
 	} else {
 		value0 = vm_voltage_swing[v_level][p_level];
