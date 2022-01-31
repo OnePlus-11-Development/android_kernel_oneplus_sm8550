@@ -2442,7 +2442,7 @@ static void _sde_crtc_dest_scaler_setup(struct drm_crtc *crtc)
 			if (cfg->flags & SDE_DRM_DESTSCALER_ENABLE)
 				op_mode |= BIT(hw_ds->idx - DS_0);
 
-			if ((i == count-1) && hw_ds->ops.setup_opmode) {
+			if (hw_ds->ops.setup_opmode) {
 				op_mode |= (cstate->num_ds_enabled ==
 					CRTC_DUAL_MIXERS_ONLY) ?
 					SDE_DS_OP_MODE_DUAL : 0;

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -195,6 +196,7 @@ struct dp_display_private {
 	struct work_struct attention_work;
 	struct mutex session_lock;
 	bool hdcp_delayed_off;
+	bool no_aux_switch;
 
 	u32 active_stream_cnt;
 	struct dp_mst mst;
@@ -1435,7 +1437,7 @@ static int dp_display_usbpd_configure_cb(struct device *dev)
 		return -ENODEV;
 	}
 
-	if (!dp->debug->sim_mode && !dp->parser->no_aux_switch
+	if (!dp->debug->sim_mode && !dp->no_aux_switch
 	    && !dp->parser->gpio_aux_switch && dp->aux_switch_node) {
 		rc = dp_display_init_aux_switch(dp);
 		if (rc)
@@ -1677,7 +1679,7 @@ static int dp_display_usbpd_disconnect_cb(struct device *dev)
 	dp_display_state_remove(DP_STATE_CONFIGURED);
 	mutex_unlock(&dp->session_lock);
 
-	if (!dp->debug->sim_mode && !dp->parser->no_aux_switch
+	if (!dp->debug->sim_mode && !dp->no_aux_switch
 	    && !dp->parser->gpio_aux_switch)
 		dp->aux->aux_switch(dp->aux, false, ORIENTATION_NONE);
 
@@ -2041,8 +2043,10 @@ static int dp_init_sub_modules(struct dp_display_private *dp)
 	dp_core_revision = dp_catalog_get_dp_core_version(dp->catalog);
 
 	dp->aux_switch_node = of_parse_phandle(dp->pdev->dev.of_node, phandle, 0);
-	if (!dp->aux_switch_node)
+	if (!dp->aux_switch_node) {
 		DP_DEBUG("cannot parse %s handle\n", phandle);
+		dp->no_aux_switch = true;
+	}
 
 	dp->aux = dp_aux_get(dev, &dp->catalog->aux, dp->parser,
 			dp->aux_switch_node, dp->aux_bridge);

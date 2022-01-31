@@ -293,6 +293,7 @@ enum {
  * @SDE_SSPP_FP16_CSC        FP16 CSC color processing block support
  * @SDE_SSPP_FP16_UNMULT     FP16 alpha unmult color processing block support
  * @SDE_SSPP_UBWC_STATS:     Support for ubwc stats
+ * @SDE_SSPP_SCALER_DE_LPF_BLEND:     Support for detail enhancer
  * @SDE_SSPP_MAX             maximum value
  */
 enum {
@@ -328,6 +329,7 @@ enum {
 	SDE_SSPP_FP16_CSC,
 	SDE_SSPP_FP16_UNMULT,
 	SDE_SSPP_UBWC_STATS,
+	SDE_SSPP_SCALER_DE_LPF_BLEND,
 	SDE_SSPP_MAX
 };
 
@@ -379,6 +381,18 @@ enum {
 	SDE_MIXER_COMBINED_ALPHA,
 	SDE_MIXER_NOISE_LAYER,
 	SDE_MIXER_MAX
+};
+
+/**
+ * Destination scalar features
+ * @SDE_DS_DE_LPF_BLEND       DE_LPF blend supports for destination scalar block
+ * @SDE_DS_MERGE_CTRL  	      mode operation support for destination scalar block
+ * @SDE_DS_DE_LPF_MAX         maximum value
+ */
+enum {
+	SDE_DS_DE_LPF_BLEND = 0x1,
+	SDE_DS_MERGE_CTRL,
+	SDE_DS_DE_LPF_MAX
 };
 
 /**
@@ -993,12 +1007,14 @@ struct sde_lm_sub_blks {
  * @version: HW Algorithm version.
  * @idx: HW block instance id.
  * @mem_total_size: data memory size.
+ * @min_region_width: minimum region width in pixels.
  */
 struct sde_dspp_rc {
 	SDE_HW_SUBBLK_INFO;
 	u32 version;
 	u32 idx;
 	u32 mem_total_size;
+	u32 min_region_width;
 };
 
 struct sde_dspp_sub_blks {

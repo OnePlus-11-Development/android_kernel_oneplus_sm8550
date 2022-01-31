@@ -3239,7 +3239,7 @@ void sde_encoder_helper_phys_disable(struct sde_encoder_phys *phys_enc,
 	if (phys_enc->hw_dnsc_blur && phys_enc->hw_dnsc_blur->ops.bind_pingpong_blk &&
 			phys_enc->hw_pp) {
 		phys_enc->hw_dnsc_blur->ops.bind_pingpong_blk(phys_enc->hw_dnsc_blur,
-				false, phys_enc->hw_pp->idx);
+				false, phys_enc->hw_pp->idx, phys_enc->in_clone_mode);
 
 		if (ctl->ops.update_dnsc_blur_bitmask)
 			ctl->ops.update_dnsc_blur_bitmask(ctl, phys_enc->hw_dnsc_blur->idx, true);

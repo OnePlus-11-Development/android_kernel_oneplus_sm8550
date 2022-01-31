@@ -760,6 +760,7 @@ static void _sde_hw_sspp_setup_scaler3(struct sde_hw_pipe *ctx,
 		void *scaler_cfg)
 {
 	u32 idx;
+	bool de_lpf_en = false;
 	struct sde_hw_scaler3_cfg *scaler3_cfg = scaler_cfg;
 
 	(void)pe;
@@ -767,8 +768,11 @@ static void _sde_hw_sspp_setup_scaler3(struct sde_hw_pipe *ctx,
 		|| !scaler3_cfg || !ctx || !ctx->cap || !ctx->cap->sblk)
 		return;
 
+	if (test_bit(SDE_SSPP_SCALER_DE_LPF_BLEND, &ctx->cap->features))
+		de_lpf_en = true;
+
 	sde_hw_setup_scaler3(&ctx->hw, scaler3_cfg,
-		ctx->cap->sblk->scaler_blk.version, idx, sspp->layout.format);
+		ctx->cap->sblk->scaler_blk.version, idx, sspp->layout.format, de_lpf_en);
 }
 
 static void sde_hw_sspp_setup_pre_downscale(struct sde_hw_pipe *ctx,

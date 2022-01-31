@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -261,6 +262,9 @@ struct sde_drm_de_v1 {
 /* Disable dynamic expansion */
 #define SDE_DYN_EXP_DISABLE 0x1
 
+#define SDE_DE_LPF_BLEND_FILT
+#define SDE_DE_LPF_BLEND_FLAG_EN (1 << 0)
+
 #define SDE_DRM_QSEED3LITE
 #define SDE_DRM_QSEED4
 #define SDE_DRM_INLINE_PREDOWNSCALE
@@ -301,6 +305,10 @@ struct sde_drm_de_v1 {
  * @pre_downscale_x_1  Pre-downscale ratio, x-direction, plane 1(UV)
  * @pre_downscale_y_0  Pre-downscale ratio, y-direction, plane 0(Y/RGB)
  * @pre_downscale_y_1  Pre-downscale ratio, y-direction, plane 1(UV)
+ * @de_lpf_flags:      Detail enhancer lpf blned configuration flags
+ * @de_lpf_h:          Detail enhancer lpf blend high
+ * @de_lpf_l:          Detail enhancer lpf blend low
+ * @de_lpf_m:          Detail enhancer lpf blend medium
  */
 struct sde_drm_scaler_v2 {
 	/*
@@ -366,6 +374,11 @@ struct sde_drm_scaler_v2 {
 	__u32 pre_downscale_x_1;
 	__u32 pre_downscale_y_0;
 	__u32 pre_downscale_y_1;
+
+	__u32 de_lpf_flags;
+	__u32 de_lpf_h;
+	__u32 de_lpf_l;
+	__u32 de_lpf_m;
 };
 
 /* Number of dest scalers supported */

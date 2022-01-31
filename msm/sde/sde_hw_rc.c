@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -577,6 +578,7 @@ static int sde_hw_rc_check_mask_cfg(
 	int rc = 0;
 	u32 i = 0;
 	u32 half_panel_width;
+	u32 mem_total_size, min_region_width;
 	u64 flags;
 	u32 cfg_param_01, cfg_param_02, cfg_param_03;
 	u32 cfg_param_07, cfg_param_08;
@@ -607,7 +609,10 @@ static int sde_hw_rc_check_mask_cfg(
 	r1_enable = ((flags & SDE_HW_RC_DISABLE_R1) != SDE_HW_RC_DISABLE_R1);
 	r2_enable = ((flags & SDE_HW_RC_DISABLE_R2) != SDE_HW_RC_DISABLE_R2);
 
-	if (cfg_param_07 > hw_dspp->cap->sblk->rc.mem_total_size) {
+	mem_total_size = hw_dspp->cap->sblk->rc.mem_total_size;
+	min_region_width = hw_dspp->cap->sblk->rc.min_region_width;
+
+	if (cfg_param_07 > mem_total_size) {
 		SDE_ERROR("invalid cfg_param_07:%d\n", cfg_param_07);
 		return -EINVAL;
 	}
@@ -617,11 +622,9 @@ static int sde_hw_rc_check_mask_cfg(
 		return -EINVAL;
 	}
 
-	if ((cfg_param_07 + cfg_param_08) >
-			hw_dspp->cap->sblk->rc.mem_total_size) {
+	if ((cfg_param_07 + cfg_param_08) > mem_total_size) {
 		SDE_ERROR("invalid cfg_param_08:%d, cfg_param_07:%d, max:%u\n",
-				cfg_param_08, cfg_param_07,
-				hw_dspp->cap->sblk->rc.mem_total_size);
+				cfg_param_08, cfg_param_07, mem_total_size);
 		return -EINVAL;
 	}
 
@@ -631,7 +634,7 @@ static int sde_hw_rc_check_mask_cfg(
 	}
 
 	for (i = 0; i < cfg_param_03; i++) {
-		if (cfg_param_04[i] < 4) {
+		if (cfg_param_04[i] < min_region_width) {
 			SDE_ERROR("invalid cfg_param_04[%d]:%d\n", i,
 					cfg_param_04[i]);
 			return -EINVAL;

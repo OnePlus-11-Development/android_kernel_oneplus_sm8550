@@ -2937,6 +2937,7 @@ static void _dspp_sixzone_install_property(struct drm_crtc *crtc)
 	version = catalog->dspp[0].sblk->sixzone.version >> 16;
 	switch (version) {
 	case 1:
+	case 2:
 		snprintf(feature_name, ARRAY_SIZE(feature_name), "%s%d",
 			"SDE_DSPP_PA_SIXZONE_V", version);
 		_sde_cp_crtc_install_blob_property(crtc, feature_name,
@@ -4377,6 +4378,8 @@ static void _sde_cp_ltm_hist_interrupt_cb(void *arg, int irq_idx)
 	ltm_data->display_v = hw_cfg.displayv;
 	ltm_data->init_h[0] = phase.init_h[LTM_0];
 	ltm_data->init_h[1] = phase.init_h[LTM_1];
+	ltm_data->init_h[2] = phase.init_h[LTM_2];
+	ltm_data->init_h[3] = phase.init_h[LTM_3];
 	ltm_data->init_v = phase.init_v;
 	ltm_data->inc_v = phase.inc_v;
 	ltm_data->inc_h = phase.inc_h;

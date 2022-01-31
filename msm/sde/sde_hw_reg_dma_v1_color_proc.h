@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
  */
 
@@ -89,6 +90,13 @@ void reg_dmav1_setup_dspp_pa_hsicv17(struct sde_hw_dspp *ctx, void *cfg);
  * @cfg: pointer to struct sde_hw_cp_cfg
  */
 void reg_dmav1_setup_dspp_sixzonev17(struct sde_hw_dspp *ctx, void *cfg);
+
+/**
+ * reg_dmav2_setup_dspp_sixzonev2() - sixzone v2 impl using reg dma v2.
+ * @ctx: dspp ctx info
+ * @cfg: pointer to struct sde_hw_cp_cfg
+ */
+void reg_dmav2_setup_dspp_sixzonev2(struct sde_hw_dspp *ctx, void *cfg);
 
 /**
  * reg_dmav1_setup_dspp_memcol_skinv17() - memcol skin v17 impl using
@@ -250,6 +258,13 @@ void reg_dmav1_setup_ltm_roiv1(struct sde_hw_dspp *ctx, void *cfg);
  * @cfg: pointer to struct sde_hw_cp_cfg
  */
 void reg_dmav1_setup_ltm_vlutv1(struct sde_hw_dspp *ctx, void *cfg);
+
+/**
+ * reg_dmav1_setup_ltm_vlutv1_2() - Same as v1 except ltm merge mode setting.
+ * @ctx: dspp ctx info
+ * @cfg: pointer to struct sde_hw_cp_cfg
+ */
+void reg_dmav1_setup_ltm_vlutv1_2(struct sde_hw_dspp *ctx, void *cfg);
 
 /**
  * reg_dmav1_setup_rc_datav1() - RC DATA v1 implementation using reg dma v1.

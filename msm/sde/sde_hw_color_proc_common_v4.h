@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
  */
 #ifndef _SDE_HW_COLOR_PROC_COMMON_V4_H_
@@ -98,6 +99,7 @@ enum {
 #define PA_SIXZONE_HUE_EN BIT(29)
 #define PA_SIXZONE_SAT_EN BIT(30)
 #define PA_SIXZONE_VAL_EN BIT(31)
+#define PA_SIXZONE_SV_EN BIT(0)
 
 #define PA_HIST_EN BIT(16)
 
@@ -126,6 +128,11 @@ enum {
 
 #define SIXZONE_ADJ_CURVE_P1_OFF 0x4
 #define SIXZONE_THRESHOLDS_OFF 0x8
+#define SIXZONE_ADJ_PWL0_OFF 0xC
+#define SIXZONE_ADJ_PWL1_OFF 0x10
+#define SIXZONE_SAT_PWL0_OFF 0x14
+#define SIXZONE_SAT_PWL1_OFF 0x18
+#define SIXZONE_SV_CTL_OFF 0x20
 
 #define MEMCOL_SIZE0 20
 #define MEMCOL_SIZE1 8
@@ -182,12 +189,17 @@ static inline void sde_ltm_get_phase_info(struct sde_hw_cp_cfg *hw_cfg,
 
 	info->init_h[LTM_0] = (1 << 23);
 	info->init_h[LTM_1] = (1 << 23);
+	info->init_h[LTM_2] = (1 << 23);
+	info->init_h[LTM_3] = (1 << 23);
 	info->init_v = (1 << 23);
 	info->inc_h = ((count_h - 1) << 24) / (hw_cfg->displayh - 1);
 	info->inc_v = ((count_v - 1) << 24) / (hw_cfg->displayv - 1);
-	if (info->merge_en)
+	if (info->merge_en) {
 		info->init_h[LTM_1] = info->init_h[LTM_0] +
 			info->inc_h * (hw_cfg->displayh / 2);
+		info->init_h[LTM_3] = info->init_h[LTM_2] +
+			info->inc_h * (hw_cfg->displayh / 2);
+	}
 }
 
 #endif /* _SDE_HW_COLOR_PROC_COMMON_V4_H_ */

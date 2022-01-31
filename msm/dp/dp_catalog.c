@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -2812,18 +2813,12 @@ static int dp_catalog_init(struct device *dev, struct dp_catalog *dp_catalog,
 	struct dp_catalog_private *catalog = container_of(dp_catalog,
 				struct dp_catalog_private, dp_catalog);
 
-	switch (parser->hw_cfg.phy_version) {
-	case DP_PHY_VERSION_4_2_0:
-		dp_catalog->sub = dp_catalog_get_v420(dev, dp_catalog,
-					&catalog->io);
-		break;
-	case DP_PHY_VERSION_2_0_0:
-		dp_catalog->sub = dp_catalog_get_v200(dev, dp_catalog,
-					&catalog->io);
-		break;
-	default:
+	if (parser->hw_cfg.phy_version >= DP_PHY_VERSION_4_2_0)
+		dp_catalog->sub = dp_catalog_get_v420(dev, dp_catalog, &catalog->io);
+	else if (parser->hw_cfg.phy_version == DP_PHY_VERSION_2_0_0)
+		dp_catalog->sub = dp_catalog_get_v200(dev, dp_catalog, &catalog->io);
+	else
 		goto end;
-	}
 
 	if (IS_ERR(dp_catalog->sub)) {
 		rc = PTR_ERR(dp_catalog->sub);

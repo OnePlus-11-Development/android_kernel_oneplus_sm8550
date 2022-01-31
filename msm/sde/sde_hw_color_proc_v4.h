@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
  */
 #ifndef _SDE_HW_COLOR_PROC_V4_H_
@@ -58,6 +59,17 @@ void sde_setup_dspp_ltm_threshv1(struct sde_hw_dspp *ctx, void *cfg);
  */
 void sde_setup_dspp_ltm_hist_ctrlv1(struct sde_hw_dspp *ctx, void *cfg,
 				    bool enable, u64 addr);
+
+/**
+ * sde_setup_dspp_ltm_hist_ctrlv1_2 - Same as v1 except ltm merge mode setting.
+ * @ctx: dspp ctx pointer
+ * @cfg: pointer to sde_hw_cp_cfg
+ * @enable: feature enable/disable value
+ * @addr: aligned iova address
+ */
+void sde_setup_dspp_ltm_hist_ctrlv1_2(struct sde_hw_dspp *ctx, void *cfg,
+				    bool enable, u64 addr);
+
 /**
  * sde_setup_dspp_ltm_hist_bufferv1 - Function for setting ltm hist buffer v1.
  * @ctx: dspp ctx pointer
@@ -77,6 +89,12 @@ void sde_ltm_read_intr_status(struct sde_hw_dspp *dspp, u32 *status);
  * @dspp: pointer to dspp object
  */
 void sde_ltm_clear_merge_mode(struct sde_hw_dspp *dspp);
+
+/**
+ * sde_ltm_clear_merge_modev1_2 - api to clear ltm merge_mode
+ * @dspp: pointer to dspp object
+ */
+void sde_ltm_clear_merge_modev1_2(struct sde_hw_dspp *dspp);
 
 
 /**
