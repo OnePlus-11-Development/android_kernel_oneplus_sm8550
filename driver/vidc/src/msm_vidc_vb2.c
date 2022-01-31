@@ -172,10 +172,19 @@ int msm_vidc_start_streaming(struct vb2_queue *q, unsigned int count)
 		return -EINVAL;
 	}
 	inst = q->drv_priv;
-	if (!inst || !inst->core) {
+	if (!inst || !inst->core || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
+
+	if (q->type == INPUT_META_PLANE &&
+		inst->capabilities->cap[INPUT_META_VIA_REQUEST].value) {
+		i_vpr_e(inst,
+			"%s: invalid input meta port start when request enabled\n",
+			__func__);
+		return -EINVAL;
+	}
+
 	if (q->type == INPUT_META_PLANE || q->type == OUTPUT_META_PLANE) {
 		i_vpr_h(inst, "%s: nothing to start on %s\n",
 			__func__, v4l2_type_name(q->type));
@@ -364,12 +373,15 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 		inst->request = false;
 		i_vpr_e(inst, "%s: request setup failed, error %d\n",
 			__func__, rc);
-		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
-		v4l2_ctrl_request_complete(vb2->req_obj.req, &inst->ctrl_handler);
-		vb2_buffer_done(vb2, VB2_BUF_STATE_ERROR);
-		return;
+		goto error;
 	}
 	inst->request = false;
+
+	if (inst->capabilities->cap[INPUT_META_VIA_REQUEST].value) {
+		rc = msm_vidc_update_input_meta_buffer_index(inst, vb2);
+		if (rc)
+			goto error;
+	}
 
 	if (is_decode_session(inst))
 		rc = msm_vdec_qbuf(inst, vb2);
@@ -380,10 +392,14 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 
 	if (rc) {
 		print_vb2_buffer("failed vb2-qbuf", inst, vb2);
-		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
-		v4l2_ctrl_request_complete(vb2->req_obj.req, &inst->ctrl_handler);
-		vb2_buffer_done(vb2, VB2_BUF_STATE_ERROR);
+		goto error;
 	}
+	return;
+
+error:
+	msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
+	v4l2_ctrl_request_complete(vb2->req_obj.req, &inst->ctrl_handler);
+	vb2_buffer_done(vb2, VB2_BUF_STATE_ERROR);
 }
 
 void msm_vidc_buf_cleanup(struct vb2_buffer *vb)

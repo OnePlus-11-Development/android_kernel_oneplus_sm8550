@@ -1613,12 +1613,18 @@ int msm_vdec_streamon_input(struct msm_vidc_inst *inst)
 		return -EINVAL;
 	}
 
-	if (is_input_meta_enabled(inst) &&
-		!inst->bufq[INPUT_META_PORT].vb2q->streaming) {
-		i_vpr_e(inst,
-			"%s: Meta port must be streamed on before data port\n",
-			__func__);
-		return -EINVAL;
+	/*
+	 * do not check for input meta port streamon when
+	 * request is enabled
+	 */
+	if (!inst->capabilities->cap[INPUT_META_VIA_REQUEST].value) {
+		if (is_input_meta_enabled(inst) &&
+			!inst->bufq[INPUT_META_PORT].vb2q->streaming) {
+			i_vpr_e(inst,
+				"%s: Meta port must be streamed on before data port\n",
+				__func__);
+			return -EINVAL;
+		}
 	}
 
 	rc = msm_vidc_check_session_supported(inst);
