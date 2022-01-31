@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2022, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/types.h>
@@ -873,6 +873,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 		return NULL;
 	}
 	INIT_LIST_HEAD(&inst->response_works);
+	INIT_LIST_HEAD(&inst->caps_list);
 	INIT_LIST_HEAD(&inst->timestamps.list);
 	INIT_LIST_HEAD(&inst->ts_reorder.list);
 	INIT_LIST_HEAD(&inst->buffers.input.list);

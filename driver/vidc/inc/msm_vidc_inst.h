@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2020-2021,, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2022,, The Linux Foundation. All rights reserved.
  */
 
 #ifndef _MSM_VIDC_INST_H_
@@ -143,6 +143,7 @@ struct msm_vidc_inst {
 	struct list_head                   response_works; /* list of struct response_work */
 	struct list_head                   enc_input_crs;
 	struct list_head                   dmabuf_tracker; /* list of struct msm_memory_dmabuf */
+	struct list_head                   caps_list; /* list of struct msm_vidc_inst_cap_entry */
 	bool                               once_per_session_set;
 	bool                               ipsc_properties_set;
 	bool                               opsc_properties_set;

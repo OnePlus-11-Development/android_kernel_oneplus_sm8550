@@ -5136,6 +5136,7 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 	struct msm_vidc_timestamp *ts, *dummy_ts;
 	struct msm_memory_dmabuf *dbuf, *dummy_dbuf;
 	struct response_work *work, *dummy_work = NULL;
+	struct msm_vidc_inst_cap_entry *entry, *dummy_entry;
 	static const enum msm_vidc_buffer_type ext_buf_types[] = {
 		MSM_VIDC_BUF_INPUT,
 		MSM_VIDC_BUF_OUTPUT,
@@ -5225,6 +5226,11 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 		list_del(&work->list);
 		kfree(work->data);
 		kfree(work);
+	}
+
+	list_for_each_entry_safe(entry, dummy_entry, &inst->caps_list, list) {
+		list_del(&entry->list);
+		kfree(entry);
 	}
 
 	/* destroy buffers from pool */

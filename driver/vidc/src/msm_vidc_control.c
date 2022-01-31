@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2022, The Linux Foundation. All rights reserved.
  */
 
 #include "msm_vidc_control.h"
@@ -1812,11 +1812,14 @@ int msm_vidc_adjust_dynamic_layer_bitrate(void *instance, struct v4l2_ctrl *ctrl
 	u32 old_br = 0, new_br = 0, exceeded_br = 0;
 	s32 max_bitrate;
 
-	if (!inst || !inst->capabilities || !ctrl) {
+	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 	capability = inst->capabilities;
+
+	if (!ctrl)
+		return 0;
 
 	/* ignore layer bitrate when total bitrate is set */
 	if (capability->cap[BIT_RATE].flags & CAP_FLAG_CLIENT_SET)
@@ -2484,8 +2487,219 @@ int msm_vidc_adjust_roi_info(void *instance, struct v4l2_ctrl *ctrl)
 	return 0;
 }
 
+static inline bool has_parents(struct msm_vidc_inst_cap *cap)
+{
+	return !!cap->parents[0];
+}
+
+static inline bool has_childrens(struct msm_vidc_inst_cap *cap)
+{
+	return !!cap->children[0];
+}
+
+static inline bool is_root(struct msm_vidc_inst_cap *cap)
+{
+	return !has_parents(cap);
+}
+
+static inline bool is_valid_cap(struct msm_vidc_inst_cap *cap)
+{
+	return cap->cap != INST_CAP_NONE;
+}
+
+static inline bool is_all_parents_visited(
+	struct msm_vidc_inst_cap *cap, bool lookup[INST_CAP_MAX]) {
+	bool found = true;
+	int i;
+
+	for (i = 0; i < MAX_CAP_PARENTS; i++) {
+		if (cap->parents[i] == INST_CAP_NONE)
+			continue;
+
+		if (!lookup[cap->parents[i]]) {
+			found = false;
+			break;
+		}
+	}
+	return found;
+}
+
+static int add_node(
+	struct list_head *list, struct msm_vidc_inst_cap *rcap, bool lookup[INST_CAP_MAX])
+{
+	struct msm_vidc_inst_cap_entry *entry;
+
+	if (lookup[rcap->cap])
+		return 0;
+
+	entry = kzalloc(sizeof(struct msm_vidc_inst_cap_entry), GFP_KERNEL);
+	if (!entry) {
+		d_vpr_e("%s: msm_vidc_inst_cap_entry alloc failed\n", __func__);
+		return -EINVAL;
+	}
+
+	INIT_LIST_HEAD(&entry->list);
+	entry->cap_id = rcap->cap;
+	lookup[rcap->cap] = true;
+
+	list_add_tail(&entry->list, list);
+	return 0;
+}
+
+int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst)
+{
+	struct list_head root_list, opt_list;
+	struct msm_vidc_inst_capability *capability;
+	struct msm_vidc_inst_cap *cap, *rcap;
+	struct msm_vidc_inst_cap_entry *entry = NULL, *temp = NULL;
+	bool root_visited[INST_CAP_MAX];
+	bool opt_visited[INST_CAP_MAX];
+	int tmp_count_total, tmp_count, num_nodes = 0;
+	int i, rc = 0;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	capability = inst->capabilities;
+
+	if (!list_empty(&inst->caps_list)) {
+		i_vpr_h(inst, "%s: dependency list already prepared\n", __func__);
+		return 0;
+	}
+
+	/* init local list and lookup table entries */
+	INIT_LIST_HEAD(&root_list);
+	INIT_LIST_HEAD(&opt_list);
+	memset(&root_visited, 0, sizeof(root_visited));
+	memset(&opt_visited, 0, sizeof(opt_visited));
+
+	/* populate root nodes first */
+	for (i = 1; i < INST_CAP_MAX; i++) {
+		rcap = &capability->cap[i];
+		if (!is_valid_cap(rcap))
+			continue;
+
+		/* sanitize cap value */
+		if (i != rcap->cap) {
+			i_vpr_e(inst, "%s: cap id mismatch. expected %s, actual %s\n",
+				__func__, cap_name(i), cap_name(rcap->cap));
+			rc = -EINVAL;
+			goto error;
+		}
+
+		/* add all root nodes */
+		if (is_root(rcap)) {
+			rc = add_node(&root_list, rcap, root_visited);
+			if (rc)
+				goto error;
+		}
+	}
+
+	/* add all dependent parents */
+	list_for_each_entry_safe(entry, temp, &root_list, list) {
+		rcap = &capability->cap[entry->cap_id];
+		/* skip leaf node */
+		if (!has_childrens(rcap))
+			continue;
+
+		for (i = 0; i < MAX_CAP_CHILDREN; i++) {
+			if (!rcap->children[i])
+				break;
+			cap = &capability->cap[rcap->children[i]];
+			if (!is_valid_cap(cap))
+				continue;
+
+			/**
+			 * if child node is already part of root or optional list
+			 * then no need to add it again.
+			 */
+			if (root_visited[cap->cap] || opt_visited[cap->cap])
+				continue;
+
+			/**
+			 * if child node's all parents are already present in root list
+			 * then add it to root list else add it to optional list.
+			 */
+			if (is_all_parents_visited(cap, root_visited)) {
+				rc = add_node(&root_list, cap, root_visited);
+				if (rc)
+					goto error;
+			} else {
+				rc = add_node(&opt_list, cap, opt_visited);
+				if (rc)
+					goto error;
+			}
+		}
+	}
+
+	/* find total optional list entries */
+	list_for_each_entry(entry, &opt_list, list)
+		num_nodes++;
+
+	/* used for loop detection */
+	tmp_count_total = num_nodes;
+	tmp_count = num_nodes;
+
+	/* sort final outstanding nodes */
+	list_for_each_entry_safe(entry, temp, &opt_list, list) {
+		/* initially remove entry from opt list */
+		list_del_init(&entry->list);
+		tmp_count--;
+		cap = &capability->cap[entry->cap_id];
+
+		/**
+		 * if all parents are visited then add this entry to
+		 * root list else add it to the end of optional list.
+		 */
+		if (is_all_parents_visited(cap, root_visited)) {
+			list_add_tail(&entry->list, &root_list);
+			root_visited[entry->cap_id] = true;
+			tmp_count_total--;
+		} else {
+			list_add_tail(&entry->list, &opt_list);
+		}
+
+		/* detect loop */
+		if (!tmp_count) {
+			if (num_nodes == tmp_count_total) {
+				i_vpr_e(inst, "%s: loop detected in subgraph %d\n",
+					__func__, num_nodes);
+				rc = -EINVAL;
+				goto error;
+			}
+			num_nodes = tmp_count_total;
+			tmp_count = tmp_count_total;
+		}
+	}
+
+	/* expecting opt_list to be empty */
+	if (!list_empty(&opt_list)) {
+		i_vpr_e(inst, "%s: opt_list is not empty\n", __func__);
+		rc = -EINVAL;
+		goto error;
+	}
+
+	/* move elements to &inst->caps_list from local */
+	list_replace_init(&root_list, &inst->caps_list);
+
+	return 0;
+error:
+	list_for_each_entry_safe(entry, temp, &opt_list, list) {
+		i_vpr_e(inst, "%s: opt_list: %s\n", __func__, cap_name(entry->cap_id));
+		list_del_init(&entry->list);
+		kfree(entry);
+	}
+	list_for_each_entry_safe(entry, temp, &root_list, list) {
+		i_vpr_e(inst, "%s: root_list: %s\n", __func__, cap_name(entry->cap_id));
+		list_del_init(&entry->list);
+		kfree(entry);
+	}
+	return rc;
+}
+
 /*
- * Loop over instance capabilities with CAP_FLAG_ROOT
+ * Loop over instance capabilities from caps_list
  * and call adjust function, where
  * - adjust current capability value
  * - update tail of instance children list with capability children
@@ -2495,7 +2709,6 @@ int msm_vidc_adjust_roi_info(void *instance, struct v4l2_ctrl *ctrl)
 int msm_vidc_adjust_v4l2_properties(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
-	int i;
 	struct msm_vidc_inst_cap_entry *curr_node = NULL, *tmp_node = NULL;
 	struct msm_vidc_inst_capability *capability;
 
@@ -2506,13 +2719,12 @@ int msm_vidc_adjust_v4l2_properties(struct msm_vidc_inst *inst)
 	capability = inst->capabilities;
 
 	i_vpr_h(inst, "%s()\n", __func__);
-	for (i = 0; i < INST_CAP_MAX; i++) {
-		if (capability->cap[i].flags & CAP_FLAG_ROOT) {
-			rc = msm_vidc_adjust_property(inst,
-					capability->cap[i].cap);
-			if (rc)
-				goto exit;
-		}
+	list_for_each_entry_safe(curr_node, tmp_node, &inst->caps_list, list) {
+		i_vpr_l(inst, "%s: cap: id %3u, name %s\n", __func__,
+			curr_node->cap_id, cap_name(curr_node->cap_id));
+		rc = msm_vidc_adjust_property(inst, curr_node->cap_id);
+		if (rc)
+			goto exit;
 	}
 
 	/*
