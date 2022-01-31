@@ -125,13 +125,6 @@ static const char *const mpeg_video_hevc_profile[] = {
 	NULL,
 };
 
-static const char *const roi_map_type[] = {
-	"None",
-	"2-bit",
-	"2-bit",
-	NULL,
-};
-
 static const char * const av1_profile[] = {
 	"Main",
 	"High",
@@ -255,7 +248,7 @@ static int msm_vidc_packetize_control(struct msm_vidc_inst *inst,
 		payload_size);
 	if (rc) {
 		i_vpr_e(inst, "%s: failed to set cap[%d] %s to fw\n",
-			__func__, cap_id, cap_name(cap_id));
+			func, cap_id, cap_name(cap_id));
 		return rc;
 	}
 
@@ -372,12 +365,12 @@ int msm_vidc_update_cap_value(struct msm_vidc_inst *inst, u32 cap,
 	return 0;
 }
 
-static int msm_vidc_get_parent_value(struct msm_vidc_inst* inst,
+int msm_vidc_get_parent_value(struct msm_vidc_inst* inst,
 	u32 cap, u32 parent, s32 *value, const char *func)
 {
 	int rc = 0;
 
-	if (is_parent_available(inst, cap, parent, __func__)) {
+	if (is_parent_available(inst, cap, parent, func)) {
 		switch (parent) {
 		case BITRATE_MODE:
 			*value = inst->hfi_rc_type;
@@ -540,7 +533,8 @@ exit:
 void msm_vidc_add_volatile_flag(struct v4l2_ctrl *ctrl)
 {
 	if (ctrl->id == V4L2_CID_MIN_BUFFERS_FOR_OUTPUT ||
-		ctrl->id == V4L2_CID_MIN_BUFFERS_FOR_CAPTURE)
+		ctrl->id == V4L2_CID_MIN_BUFFERS_FOR_CAPTURE ||
+		ctrl->id == V4L2_CID_MPEG_VIDC_AV1D_FILM_GRAIN_PRESENT)
 		ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
 }
 
@@ -2038,7 +2032,7 @@ int msm_vidc_adjust_blur_type(void *instance, struct v4l2_ctrl *ctrl)
 	struct msm_vidc_inst_capability *capability;
 	s32 adjusted_value;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
-	s32 rc_type = -1, cac = -1;
+	s32 rc_type = -1;
 	s32 pix_fmts = -1, min_quality = -1;
 
 	if (!inst || !inst->capabilities) {
@@ -2055,8 +2049,6 @@ int msm_vidc_adjust_blur_type(void *instance, struct v4l2_ctrl *ctrl)
 
 	if (msm_vidc_get_parent_value(inst, BLUR_TYPES, BITRATE_MODE,
 		&rc_type, __func__) ||
-		msm_vidc_get_parent_value(inst, BLUR_TYPES,
-		CONTENT_ADAPTIVE_CODING, &cac, __func__) ||
 		msm_vidc_get_parent_value(inst, BLUR_TYPES, PIX_FMTS,
 		&pix_fmts, __func__) ||
 		msm_vidc_get_parent_value(inst, BLUR_TYPES, MIN_QUALITY,
@@ -2069,8 +2061,10 @@ int msm_vidc_adjust_blur_type(void *instance, struct v4l2_ctrl *ctrl)
 		}
 	} else if (adjusted_value == VIDC_BLUR_ADAPTIVE) {
 		if (is_scaling_enabled(inst) || min_quality ||
-			(rc_type != HFI_RC_VBR_CFR) ||
-			!cac || is_10bit_colorformat(pix_fmts)) {
+			(rc_type != HFI_RC_VBR_CFR &&
+			rc_type != HFI_RC_CBR_CFR &&
+			rc_type != HFI_RC_CBR_VFR) ||
+			is_10bit_colorformat(pix_fmts)) {
 			adjusted_value = VIDC_BLUR_NONE;
 		}
 	}

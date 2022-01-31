@@ -64,11 +64,6 @@
 #define venus_hfi_for_each_clock_reverse(__device, __cinfo) \
 	venus_hfi_for_each_thing_reverse(__device, __cinfo, clock)
 
-#define venus_hfi_for_each_clock_reverse_continue(__device, __rinfo, \
-		__from) \
-	venus_hfi_for_each_thing_reverse_continue(__device, __rinfo, \
-			clock, __from)
-
 /* Bus set helpers */
 #define venus_hfi_for_each_bus(__device, __binfo) \
 	venus_hfi_for_each_thing(__device, __binfo, bus)
@@ -225,5 +220,13 @@ struct msm_vidc_dt {
 int msm_vidc_init_dt(struct platform_device *pdev);
 int msm_vidc_read_context_bank_resources_from_dt(struct platform_device *pdev);
 void msm_vidc_deinit_dt(struct platform_device *pdev);
+
+/* A comparator to compare loads (needed later on) */
+static inline int cmp(const void *a, const void *b)
+{
+	/* want to sort in reverse so flip the comparison */
+	return ((struct allowed_clock_rates_table *)b)->clock_rate -
+		((struct allowed_clock_rates_table *)a)->clock_rate;
+}
 
 #endif // _MSM_VIDC_DT_H_

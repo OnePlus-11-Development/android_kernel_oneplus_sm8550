@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2022, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/workqueue.h>
@@ -82,7 +82,33 @@ exit:
 	return rc;
 }
 
+static ssize_t sku_version_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct msm_vidc_core *core;
+
+	/*
+	 * Default sku version: 0
+	 * driver possibly not probed yet or not the main device.
+	 */
+	if (!dev || !dev->driver ||
+		!of_device_is_compatible(dev->of_node, "qcom,msm-vidc"))
+		return 0;
+
+	core = dev_get_drvdata(dev);
+	if (!core || !core->platform) {
+		d_vpr_e("%s: invalid core\n", __func__);
+		return 0;
+	}
+
+	return scnprintf(buf, PAGE_SIZE, "%d",
+			core->platform->data.sku_version);
+}
+
+static DEVICE_ATTR_RO(sku_version);
+
 static struct attribute *msm_vidc_core_attrs[] = {
+	&dev_attr_sku_version.attr,
 	NULL
 };
 
@@ -305,6 +331,7 @@ static int msm_vidc_remove(struct platform_device* pdev)
 	d_vpr_h("%s()\n", __func__);
 
 	msm_vidc_core_deinit(core, true);
+	of_platform_depopulate(&pdev->dev);
 
 	msm_vidc_unregister_video_device(core, MSM_VIDC_ENCODER);
 	msm_vidc_unregister_video_device(core, MSM_VIDC_DECODER);
@@ -439,8 +466,16 @@ static int msm_vidc_probe_video_device(struct platform_device *pdev)
 		goto sub_dev_failed;
 	}
 
+	rc = msm_vidc_core_init(core);
+	if (rc) {
+		d_vpr_e("%s: sys init failed\n", __func__);
+		goto core_init_failed;
+	}
+
 	return rc;
 
+core_init_failed:
+	of_platform_depopulate(&pdev->dev);
 sub_dev_failed:
 	msm_vidc_unregister_video_device(core, MSM_VIDC_ENCODER);
 enc_reg_failed:

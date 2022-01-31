@@ -260,7 +260,7 @@ static bool check_for_packet_payload(struct msm_vidc_inst *inst,
 	u32 payload_size = 0;
 
 	if (!inst || !pkt) {
-		d_vpr_e("%s: invalid params %d\n", __func__);
+		d_vpr_e("%s: invalid params\n", __func__);
 		return false;
 	}
 
@@ -308,7 +308,7 @@ static bool check_last_flag(struct msm_vidc_inst *inst,
 	struct hfi_buffer *buffer;
 
 	if (!inst || !pkt) {
-		d_vpr_e("%s: invalid params %d\n", __func__);
+		d_vpr_e("%s: invalid params\n", __func__);
 		return false;
 	}
 
@@ -480,8 +480,19 @@ static int handle_system_init(struct msm_vidc_core *core,
 	struct hfi_packet *pkt)
 {
 	if (pkt->flags & HFI_FW_FLAGS_SUCCESS) {
-		d_vpr_h("%s: successful\n", __func__);
-		complete(&core->init_done);
+		core_lock(core, __func__);
+		if (core->state == MSM_VIDC_CORE_INIT_WAIT &&
+				pkt->packet_id == core->sys_init_id) {
+			msm_vidc_change_core_state(core, MSM_VIDC_CORE_INIT, __func__);
+			d_vpr_h("%s: successful\n", __func__);
+		} else if (core->state != MSM_VIDC_CORE_INIT_WAIT) {
+			d_vpr_e("%s: invalid core state %s\n", __func__,
+				core_state_name(core->state));
+		} else if (pkt->packet_id != core->sys_init_id) {
+			d_vpr_e("%s: invalid pkt id %u, expected %u\n", __func__,
+				pkt->packet_id, core->sys_init_id);
+		}
+		core_unlock(core, __func__);
 	} else {
 		d_vpr_h("%s: unhandled. flags=%d\n", __func__, pkt->flags);
 	}
@@ -755,6 +766,13 @@ static int handle_input_buffer(struct msm_vidc_inst *inst,
 	buf->flags = 0;
 	buf->flags = get_driver_buffer_flags(inst, buffer->flags);
 
+	/* handle ts_reorder for no_output prop attached input buffer */
+	if (is_ts_reorder_allowed(inst) && inst->hfi_frame_info.no_output) {
+		i_vpr_h(inst, "%s: received no_output buffer. remove timestamp %lld\n",
+			__func__, buf->timestamp);
+		msm_vidc_ts_reorder_remove_timestamp(inst, buf->timestamp);
+	}
+
 	print_vidc_buffer(VIDC_HIGH, "high", "dqbuf", inst, buf);
 	msm_vidc_update_stats(inst, buf, MSM_VIDC_DEBUGFS_EVENT_EBD);
 
@@ -885,6 +903,10 @@ static int handle_output_buffer(struct msm_vidc_inst *inst,
 
 	if (!is_image_session(inst) && is_decode_session(inst) && buf->data_size)
 		msm_vidc_update_timestamp(inst, buf->timestamp);
+
+	/* update output buffer timestamp, if ts_reorder is enabled */
+	if (is_ts_reorder_allowed(inst) && buf->data_size)
+		msm_vidc_ts_reorder_get_first_timestamp(inst, &buf->timestamp);
 
 	print_vidc_buffer(VIDC_HIGH, "high", "dqbuf", inst, buf);
 	msm_vidc_update_stats(inst, buf, MSM_VIDC_DEBUGFS_EVENT_FBD);
@@ -1254,6 +1276,14 @@ static int handle_session_resume(struct msm_vidc_inst *inst,
 	return 0;
 }
 
+static int handle_session_stability(struct msm_vidc_inst *inst,
+	struct hfi_packet *pkt)
+{
+	if (pkt->flags & HFI_FW_FLAGS_SUCCESS)
+		i_vpr_h(inst, "%s: successful\n", __func__);
+	return 0;
+}
+
 static int handle_session_command(struct msm_vidc_inst *inst,
 	struct hfi_packet *pkt)
 {
@@ -1269,6 +1299,7 @@ static int handle_session_command(struct msm_vidc_inst *inst,
 		{HFI_CMD_SUBSCRIBE_MODE,    handle_session_subscribe_mode     },
 		{HFI_CMD_DELIVERY_MODE,     handle_session_delivery_mode      },
 		{HFI_CMD_RESUME,            handle_session_resume             },
+		{HFI_CMD_STABILITY,         handle_session_stability          },
 	};
 
 	/* handle session pkt */
@@ -1744,6 +1775,17 @@ int cancel_response_work(struct msm_vidc_inst *inst)
 		kfree(work->data);
 		kfree(work);
 	}
+
+	return 0;
+}
+
+int cancel_response_work_sync(struct msm_vidc_inst *inst)
+{
+	if (!inst) {
+		d_vpr_e("%s: Invalid arguments\n", __func__);
+		return -EINVAL;
+	}
+	cancel_delayed_work_sync(&inst->response_work);
 
 	return 0;
 }

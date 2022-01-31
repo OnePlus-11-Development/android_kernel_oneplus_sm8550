@@ -91,14 +91,6 @@ static int msm_vidc_load_u32_table(struct platform_device *pdev,
 	return rc;
 }
 
-/* A comparator to compare loads (needed later on) */
-static int cmp(const void *a, const void *b)
-{
-	/* want to sort in reverse so flip the comparison */
-	return ((struct allowed_clock_rates_table *)b)->clock_rate -
-		((struct allowed_clock_rates_table *)a)->clock_rate;
-}
-
 static void msm_vidc_free_allowed_clocks_table(struct msm_vidc_dt *dt)
 {
 	dt->allowed_clks_tbl = NULL;
@@ -328,7 +320,7 @@ static int msm_vidc_load_allowed_clocks_table(
 
 	d_vpr_h("Found allowed clock rates\n");
 	for (i = 0; i < dt->allowed_clks_tbl_size; i++)
-		d_vpr_h("    %d\n", dt->allowed_clks_tbl[i]);
+		d_vpr_h("    %d\n", dt->allowed_clks_tbl[i].clock_rate);
 
 	return 0;
 }
@@ -686,7 +678,7 @@ static int msm_vidc_read_resources_from_dt(struct platform_device *pdev)
 	core = dev_get_drvdata(&pdev->dev);
 	if (!core || !core->dt) {
 		d_vpr_e("%s: core not found in device %s",
-				dev_name(&pdev->dev));
+				__func__, dev_name(&pdev->dev));
 		return -EINVAL;
 	}
 	dt = core->dt;
@@ -935,11 +927,11 @@ void msm_vidc_deinit_dt(struct platform_device *pdev)
 	core = dev_get_drvdata(&pdev->dev);
 	if (!core) {
 		d_vpr_e("%s: core not found in device %s",
-				dev_name(&pdev->dev));
+				__func__, dev_name(&pdev->dev));
 		return;
 	} else if (!core->dt) {
 		d_vpr_e("%s: invalid dt in device %s",
-				dev_name(&pdev->dev));
+				__func__, dev_name(&pdev->dev));
 		return;
 	}
 
@@ -966,7 +958,7 @@ int msm_vidc_init_dt(struct platform_device *pdev)
 	core = dev_get_drvdata(&pdev->dev);
 	if (!core) {
 		d_vpr_e("%s: core not found in device %s",
-				dev_name(&pdev->dev));
+				__func__, dev_name(&pdev->dev));
 		return -EINVAL;
 	}
 

@@ -20,7 +20,7 @@ struct vb2_queue *msm_vidc_get_vb2q(struct msm_vidc_inst *inst,
 	struct vb2_queue *q = NULL;
 
 	if (!inst) {
-		d_vpr_e("%s: invalid buffer type %d\n", func);
+		d_vpr_e("%s: invalid params\n", func);
 		return NULL;
 	}
 	if (type == INPUT_MPLANE) {
@@ -38,32 +38,46 @@ struct vb2_queue *msm_vidc_get_vb2q(struct msm_vidc_inst *inst,
 	return q;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
 void *msm_vb2_get_userptr(struct device *dev, unsigned long vaddr,
 			unsigned long size, enum dma_data_direction dma_dir)
 {
 	return (void *)0xdeadbeef;
 }
 
+void *msm_vb2_attach_dmabuf(struct device *dev, struct dma_buf *dbuf,
+	unsigned long size, enum dma_data_direction dma_dir)
+{
+	return (void *)0xdeadbeef;
+}
+#else
+void *msm_vb2_get_userptr(struct vb2_buffer *vb, struct device *dev,
+	unsigned long vaddr, unsigned long size)
+{
+	return (void *)0xdeadbeef;
+}
+
+void *msm_vb2_attach_dmabuf(struct vb2_buffer *vb, struct device *dev,
+	struct dma_buf *dbuf, unsigned long size)
+{
+	return (void *)0xdeadbeef;
+}
+#endif
+
 void msm_vb2_put_userptr(void *buf_priv)
 {
 }
 
-void* msm_vb2_attach_dmabuf(struct device* dev, struct dma_buf* dbuf,
-	unsigned long size, enum dma_data_direction dma_dir)
-{
-	return (void*)0xdeadbeef;
-}
-
-void msm_vb2_detach_dmabuf(void* buf_priv)
+void msm_vb2_detach_dmabuf(void *buf_priv)
 {
 }
 
-int msm_vb2_map_dmabuf(void* buf_priv)
+int msm_vb2_map_dmabuf(void *buf_priv)
 {
 	return 0;
 }
 
-void msm_vb2_unmap_dmabuf(void* buf_priv)
+void msm_vb2_unmap_dmabuf(void *buf_priv)
 {
 }
 
@@ -154,7 +168,7 @@ int msm_vidc_start_streaming(struct vb2_queue *q, unsigned int count)
 	enum msm_vidc_buffer_type buf_type;
 
 	if (!q || !q->drv_priv) {
-		d_vpr_e("%s: invalid input, q = %pK\n", q);
+		d_vpr_e("%s: invalid input, q = %pK\n", __func__, q);
 		return -EINVAL;
 	}
 	inst = q->drv_priv;
@@ -222,7 +236,7 @@ int msm_vidc_start_streaming(struct vb2_queue *q, unsigned int count)
 		else
 			goto error;
 	} else {
-		i_vpr_e(inst, "%s: invalid type %d\n", q->type);
+		i_vpr_e(inst, "%s: invalid type %d\n", __func__, q->type);
 		goto error;
 	}
 	if (rc)
@@ -271,7 +285,7 @@ void msm_vidc_stop_streaming(struct vb2_queue *q)
 	struct msm_vidc_inst *inst;
 
 	if (!q || !q->drv_priv) {
-		d_vpr_e("%s: invalid input, q = %pK\n", q);
+		d_vpr_e("%s: invalid input, q = %pK\n", __func__, q);
 		return;
 	}
 	inst = q->drv_priv;
@@ -302,7 +316,7 @@ void msm_vidc_stop_streaming(struct vb2_queue *q)
 		else if (is_encode_session(inst))
 			rc = msm_venc_streamoff_output(inst);
 	} else {
-		i_vpr_e(inst, "%s: invalid type %d\n", q->type);
+		i_vpr_e(inst, "%s: invalid type %d\n", __func__, q->type);
 		goto error;
 	}
 	if (rc)

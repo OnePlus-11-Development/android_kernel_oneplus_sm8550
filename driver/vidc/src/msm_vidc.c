@@ -28,10 +28,15 @@
 
 #define MAX_EVENTS 30
 
-bool valid_v4l2_buffer(struct v4l2_buffer *b,
+static inline bool valid_v4l2_buffer(struct v4l2_buffer *b,
 		struct msm_vidc_inst *inst)
 {
-	return true;
+	if (b->type == INPUT_MPLANE || b->type == OUTPUT_MPLANE)
+		return b->length > 0;
+	else if (b->type == INPUT_META_PLANE || b->type == OUTPUT_META_PLANE)
+		return true;
+
+	return false;
 }
 
 static int get_poll_flags(struct msm_vidc_inst *inst, u32 port)
@@ -202,7 +207,7 @@ int msm_vidc_query_menu(void *instance, struct v4l2_querymenu *qmenu)
 		rc = -EINVAL;
 
 	i_vpr_h(inst,
-		"%s: ctrl: %s: min %d, max %d, menu_skip_mask %#x, qmenu: id %d, index %d, %s\n",
+		"%s: ctrl: %s: min %lld, max %lld, menu_skip_mask %#x, qmenu: id %u, index %d, %s\n",
 		__func__, ctrl->name, ctrl->minimum, ctrl->maximum,
 		ctrl->menu_skip_mask, qmenu->id, qmenu->index,
 		rc ? "not supported" : "supported");
@@ -629,7 +634,7 @@ int msm_vidc_enum_framesizes(void *instance, struct v4l2_frmsizeenum *fsize)
 		return -EINVAL;
 	}
 	if (!inst->capabilities) {
-		i_vpr_e(inst, "capabilities not available\n", __func__);
+		i_vpr_e(inst, "%s: capabilities not available\n", __func__);
 		return -EINVAL;
 	}
 	capability = inst->capabilities;
@@ -684,7 +689,7 @@ int msm_vidc_enum_frameintervals(void *instance, struct v4l2_frmivalenum *fival)
 	core = inst->core;
 
 	if (!inst->capabilities || !core->capabilities) {
-		i_vpr_e(inst, "capabilities not available\n", __func__);
+		i_vpr_e(inst, "%s: capabilities not available\n", __func__);
 		return -EINVAL;
 	}
 	capability = inst->capabilities;
@@ -807,6 +812,10 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	if (rc)
 		return NULL;
 
+	rc = msm_vidc_core_init_wait(core);
+	if (rc)
+		return NULL;
+
 	inst = kzalloc(sizeof(*inst), GFP_KERNEL);
 	if (!inst) {
 		d_vpr_e("%s: failed to allocate inst memory\n", __func__);
@@ -835,6 +844,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	}
 	INIT_LIST_HEAD(&inst->response_works);
 	INIT_LIST_HEAD(&inst->timestamps.list);
+	INIT_LIST_HEAD(&inst->ts_reorder.list);
 	INIT_LIST_HEAD(&inst->buffers.input.list);
 	INIT_LIST_HEAD(&inst->buffers.input_meta.list);
 	INIT_LIST_HEAD(&inst->buffers.output.list);
@@ -884,6 +894,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 
 	INIT_DELAYED_WORK(&inst->response_work, handle_session_response_work_handler);
 	INIT_DELAYED_WORK(&inst->stats_work, msm_vidc_stats_handler);
+	INIT_WORK(&inst->stability_work, msm_vidc_stability_handler);
 
 	inst->capabilities = kzalloc(sizeof(struct msm_vidc_inst_capability), GFP_KERNEL);
 	if (!inst->capabilities) {
@@ -948,13 +959,14 @@ int msm_vidc_close(void *instance)
 
 	i_vpr_h(inst, "%s()\n", __func__);
 	inst_lock(inst, __func__);
-	cancel_response_work(inst);
 	/* print final stats */
 	msm_vidc_print_stats(inst);
 	msm_vidc_session_close(inst);
 	msm_vidc_remove_session(inst);
 	msm_vidc_destroy_buffers(inst);
 	inst_unlock(inst, __func__);
+	cancel_response_work_sync(inst);
+	cancel_stability_work_sync(inst);
 	cancel_stats_work_sync(inst);
 	msm_vidc_show_stats(inst);
 	put_inst(inst);

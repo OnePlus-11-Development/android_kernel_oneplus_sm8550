@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2022, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/iommu.h>
@@ -42,6 +42,13 @@ extern struct msm_vidc_core *g_core;
 #define SSR_ADDR_ID 0xFFFFFFFF00000000
 #define SSR_ADDR_SHIFT 32
 
+#define STABILITY_TYPE 0x0000000F
+#define STABILITY_TYPE_SHIFT 0
+#define STABILITY_SUB_CLIENT_ID 0x000000F0
+#define STABILITY_SUB_CLIENT_ID_SHIFT 4
+#define STABILITY_PAYLOAD_ID 0xFFFFFFFF00000000
+#define STABILITY_PAYLOAD_SHIFT 32
+
 struct msm_vidc_cap_name {
 	enum msm_vidc_inst_capability_type cap;
 	char *name;
@@ -74,6 +81,7 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{MB_CYCLES_FW,                   "MB_CYCLES_FW"               },
 	{MB_CYCLES_FW_VPP,               "MB_CYCLES_FW_VPP"           },
 	{SECURE_MODE,                    "SECURE_MODE"                },
+	{TS_REORDER,                     "TS_REORDER"                 },
 	{HFLIP,                          "HFLIP"                      },
 	{VFLIP,                          "VFLIP"                      },
 	{ROTATION,                       "ROTATION"                   },
@@ -2019,6 +2027,11 @@ int msm_vidc_get_control(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 			inst->buffers.input.extra_count;
 		i_vpr_h(inst, "g_min: input buffers %d\n", ctrl->val);
 		break;
+	case V4L2_CID_MPEG_VIDC_AV1D_FILM_GRAIN_PRESENT:
+		ctrl->val = inst->capabilities->cap[FILM_GRAIN].value;
+		i_vpr_h(inst, "%s: film grain present: %d\n",
+			 __func__, ctrl->val);
+		break;
 	default:
 		i_vpr_e(inst, "invalid ctrl %s id %d\n",
 			ctrl->name, ctrl->id);
@@ -2341,7 +2354,7 @@ int msm_vidc_flush_ts(struct msm_vidc_inst *inst)
 	}
 
 	list_for_each_entry_safe(ts, temp, &inst->timestamps.list, sort.list) {
-		i_vpr_l(inst, "%s: flushing ts: val %lld, rank %%lld\n",
+		i_vpr_l(inst, "%s: flushing ts: val %llu, rank %llu\n",
 			__func__, ts->sort.val, ts->rank);
 		list_del(&ts->sort.list);
 		msm_memory_free(inst, ts);
@@ -2393,6 +2406,105 @@ int msm_vidc_update_timestamp(struct msm_vidc_inst *inst, u64 timestamp)
 		list_del(&ts->sort.list);
 		msm_memory_free(inst, ts);
 	}
+
+	return 0;
+}
+
+int msm_vidc_ts_reorder_insert_timestamp(struct msm_vidc_inst *inst, u64 timestamp)
+{
+	struct msm_vidc_timestamp *ts;
+	int rc = 0;
+
+	if (!inst) {
+		d_vpr_e("%s: Invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	/* allocate ts from pool */
+	ts = msm_memory_alloc(inst, MSM_MEM_POOL_TIMESTAMP);
+	if (!ts) {
+		i_vpr_e(inst, "%s: ts alloc failed\n", __func__);
+		return -ENOMEM;
+	}
+
+	/* initialize ts node */
+	INIT_LIST_HEAD(&ts->sort.list);
+	ts->sort.val = timestamp;
+	rc = msm_vidc_insert_sort(&inst->ts_reorder.list, &ts->sort);
+	if (rc)
+		return rc;
+	inst->ts_reorder.count++;
+
+	return 0;
+}
+
+int msm_vidc_ts_reorder_remove_timestamp(struct msm_vidc_inst *inst, u64 timestamp)
+{
+	struct msm_vidc_timestamp *ts, *temp;
+
+	if (!inst) {
+		d_vpr_e("%s: Invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	/* remove matching node */
+	list_for_each_entry_safe(ts, temp, &inst->ts_reorder.list, sort.list) {
+		if (ts->sort.val == timestamp) {
+			list_del_init(&ts->sort.list);
+			inst->ts_reorder.count--;
+			msm_memory_free(inst, ts);
+			break;
+		}
+	}
+
+	return 0;
+}
+
+int msm_vidc_ts_reorder_get_first_timestamp(struct msm_vidc_inst *inst, u64 *timestamp)
+{
+	struct msm_vidc_timestamp *ts;
+
+	if (!inst || !timestamp) {
+		d_vpr_e("%s: Invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	/* check if list empty */
+	if (list_empty(&inst->ts_reorder.list)) {
+		i_vpr_e(inst, "%s: list empty. ts %lld\n", __func__, timestamp);
+		return -EINVAL;
+	}
+
+	/* get 1st node from reorder list */
+	ts = list_first_entry(&inst->ts_reorder.list,
+		struct msm_vidc_timestamp, sort.list);
+	list_del_init(&ts->sort.list);
+
+	/* copy timestamp */
+	*timestamp = ts->sort.val;
+
+	inst->ts_reorder.count--;
+	msm_memory_free(inst, ts);
+
+	return 0;
+}
+
+int msm_vidc_ts_reorder_flush(struct msm_vidc_inst *inst)
+{
+	struct msm_vidc_timestamp *temp, *ts = NULL;
+
+	if (!inst) {
+		d_vpr_e("%s: Invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	/* flush all entries */
+	list_for_each_entry_safe(ts, temp, &inst->ts_reorder.list, sort.list) {
+		i_vpr_l(inst, "%s: flushing ts: val %lld\n", __func__, ts->sort.val);
+		list_del(&ts->sort.list);
+		msm_memory_free(inst, ts);
+	}
+	inst->ts_reorder.count = 0;
 
 	return 0;
 }
@@ -3087,6 +3199,13 @@ static int msm_vidc_queue_buffer(struct msm_vidc_inst *inst, struct msm_vidc_buf
 		meta->attr |= MSM_VIDC_ATTR_QUEUED;
 	}
 
+	/* insert timestamp for ts_reorder enable case */
+	if (is_ts_reorder_allowed(inst) && is_input_buffer(buf->type)) {
+		rc = msm_vidc_ts_reorder_insert_timestamp(inst, buf->timestamp);
+		if (rc)
+			i_vpr_e(inst, "%s: insert timestamp failed\n", __func__);
+	}
+
 	if (is_input_buffer(buf->type))
 		inst->power.buffer_counter++;
 
@@ -3718,6 +3837,12 @@ int msm_vidc_add_session(struct msm_vidc_inst *inst)
 	}
 
 	core_lock(core, __func__);
+	if (core->state != MSM_VIDC_CORE_INIT) {
+		i_vpr_e(inst, "%s: invalid state %s\n",
+			__func__, core_state_name(core->state));
+		rc = -EINVAL;
+		goto unlock;
+	}
 	list_for_each_entry(i, &core->instances, list)
 		count++;
 
@@ -3728,6 +3853,7 @@ int msm_vidc_add_session(struct msm_vidc_inst *inst)
 			__func__, core->capabilities[MAX_SESSION_COUNT].value, count);
 		rc = -EINVAL;
 	}
+unlock:
 	core_unlock(core, __func__);
 
 	return rc;
@@ -4323,9 +4449,9 @@ int msm_vidc_core_deinit(struct msm_vidc_core *core, bool force)
 	return rc;
 }
 
-static int msm_vidc_core_init_wait(struct msm_vidc_core *core)
+int msm_vidc_core_init_wait(struct msm_vidc_core *core)
 {
-	const int interval = 40;
+	const int interval = 10;
 	int max_tries, count = 0, rc = 0;
 
 	if (!core || !core->capabilities) {
@@ -4333,21 +4459,18 @@ static int msm_vidc_core_init_wait(struct msm_vidc_core *core)
 		return -EINVAL;
 	}
 
-	rc = __strict_check(core, __func__);
-	if (rc)
-		return rc;
-
-	if (core->state != MSM_VIDC_CORE_INIT_WAIT)
-		return 0;
+	core_lock(core, __func__);
+	if (core->state == MSM_VIDC_CORE_INIT) {
+		rc = 0;
+		goto unlock;
+	} else if (core->state == MSM_VIDC_CORE_DEINIT) {
+		rc = -EINVAL;
+		goto unlock;
+	}
 
 	d_vpr_h("%s(): waiting for state change\n", __func__);
 	max_tries = core->capabilities[HW_RESPONSE_TIMEOUT].value / interval;
-	/**
-	 * attempt one more time to ensure triggering init_done
-	 * timeout sequence for 1st session, incase response not
-	 * received in reverse thread.
-	 */
-	while (count < max_tries + 1) {
+	while (count < max_tries) {
 		if (core->state != MSM_VIDC_CORE_INIT_WAIT)
 			break;
 
@@ -4359,12 +4482,20 @@ static int msm_vidc_core_init_wait(struct msm_vidc_core *core)
 	d_vpr_h("%s: state %s, interval %u, count %u, max_tries %u\n", __func__,
 		core_state_name(core->state), interval, count, max_tries);
 
-	/* treat as fatal and fail session_open */
-	if (core->state == MSM_VIDC_CORE_INIT_WAIT) {
-		d_vpr_e("%s: state change failed\n", __func__);
+	if (core->state == MSM_VIDC_CORE_INIT) {
+		d_vpr_h("%s: sys init successful\n", __func__);
+		rc = 0;
+		goto unlock;
+	} else {
+		d_vpr_h("%s: sys init wait timedout. state %s\n",
+			__func__, core_state_name(core->state));
 		rc = -EINVAL;
+		goto unlock;
 	}
-
+unlock:
+	if (rc)
+		msm_vidc_core_deinit_locked(core, true);
+	core_unlock(core, __func__);
 	return rc;
 }
 
@@ -4378,15 +4509,11 @@ int msm_vidc_core_init(struct msm_vidc_core *core)
 	}
 
 	core_lock(core, __func__);
-	rc = msm_vidc_core_init_wait(core);
-	if (rc)
-		goto unlock;
-
-	if (core->state == MSM_VIDC_CORE_INIT)
+	if (core->state == MSM_VIDC_CORE_INIT ||
+			core->state == MSM_VIDC_CORE_INIT_WAIT)
 		goto unlock;
 
 	msm_vidc_change_core_state(core, MSM_VIDC_CORE_INIT_WAIT, __func__);
-	init_completion(&core->init_done);
 	core->smmu_fault_handled = false;
 	core->ssr.trigger = false;
 	core->pm_suspended = false;
@@ -4395,21 +4522,6 @@ int msm_vidc_core_init(struct msm_vidc_core *core)
 	if (rc) {
 		d_vpr_e("%s: core init failed\n", __func__);
 		goto unlock;
-	}
-
-	d_vpr_h("%s(): waiting for sys_init_done, %d ms\n", __func__,
-		core->capabilities[HW_RESPONSE_TIMEOUT].value);
-	core_unlock(core, __func__);
-	rc = wait_for_completion_timeout(&core->init_done, msecs_to_jiffies(
-			core->capabilities[HW_RESPONSE_TIMEOUT].value));
-	core_lock(core, __func__);
-	if (!rc) {
-		d_vpr_e("%s: core init timed out\n", __func__);
-		rc = -ETIMEDOUT;
-	} else {
-		msm_vidc_change_core_state(core, MSM_VIDC_CORE_INIT, __func__);
-		d_vpr_h("%s: system init wait completed\n", __func__);
-		rc = 0;
 	}
 
 unlock:
@@ -4677,8 +4789,75 @@ void msm_vidc_ssr_handler(struct work_struct *work)
 	core_unlock(core, __func__);
 }
 
-void msm_vidc_pm_work_handler(struct work_struct *work)
+int msm_vidc_trigger_stability(struct msm_vidc_core *core,
+		u64 trigger_stability_val)
 {
+	struct msm_vidc_inst *inst = NULL;
+	struct msm_vidc_stability stability;
+
+	if (!core) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	/*
+	 * <payload><sub_client_id><stability_type>
+	 * stability_type: 0-3 bits
+	 * sub_client_id: 4-7 bits
+	 * reserved: 8-31 bits
+	 * payload: 32-63 bits
+	 */
+	memset(&stability, 0, sizeof(struct msm_vidc_stability));
+	stability.stability_type = (trigger_stability_val &
+			(unsigned long)STABILITY_TYPE) >> STABILITY_TYPE_SHIFT;
+	stability.sub_client_id = (trigger_stability_val &
+			(unsigned long)STABILITY_SUB_CLIENT_ID) >> STABILITY_SUB_CLIENT_ID_SHIFT;
+	stability.value = (trigger_stability_val &
+			(unsigned long)STABILITY_PAYLOAD_ID) >> STABILITY_PAYLOAD_SHIFT;
+
+	core_lock(core, __func__);
+	list_for_each_entry(inst, &core->instances, list) {
+		memcpy(&inst->stability, &stability, sizeof(struct msm_vidc_stability));
+		schedule_work(&inst->stability_work);
+	}
+	core_unlock(core, __func__);
+
+	return 0;
+}
+
+void msm_vidc_stability_handler(struct work_struct *work)
+{
+	int rc;
+	struct msm_vidc_inst *inst;
+	struct msm_vidc_stability *stability;
+
+	inst = container_of(work, struct msm_vidc_inst, stability_work);
+	inst = get_inst_ref(g_core, inst);
+	if (!inst) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return;
+	}
+
+	inst_lock(inst, __func__);
+	stability = &inst->stability;
+	rc = venus_hfi_trigger_stability(inst, stability->stability_type,
+		stability->sub_client_id, stability->value);
+	if (rc)
+		i_vpr_e(inst, "%s: trigger_stability failed\n", __func__);
+	inst_unlock(inst, __func__);
+
+	put_inst(inst);
+}
+
+int cancel_stability_work_sync(struct msm_vidc_inst *inst)
+{
+	if (!inst) {
+		d_vpr_e("%s: Invalid arguments\n", __func__);
+		return -EINVAL;
+	}
+	cancel_work_sync(&inst->stability_work);
+
+	return 0;
 }
 
 void msm_vidc_fw_unload_handler(struct work_struct *work)
@@ -4912,6 +5091,22 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 		}
 	}
 
+	/* read_only and release list does not take dma ref_count using dma_buf_get().
+	   dma_buf ptr will be obselete when its ref_count reaches zero. Hence print
+	   the dma_buf info before releasing the ref count.
+	*/
+	list_for_each_entry_safe(buf, dummy, &inst->buffers.read_only.list, list) {
+		print_vidc_buffer(VIDC_ERR, "err ", "destroying ro buffer", inst, buf);
+		list_del(&buf->list);
+		msm_memory_free(inst, buf);
+	}
+
+	list_for_each_entry_safe(buf, dummy, &inst->buffers.release.list, list) {
+		print_vidc_buffer(VIDC_ERR, "err ", "destroying release buffer", inst, buf);
+		list_del(&buf->list);
+		msm_memory_free(inst, buf);
+	}
+
 	for (i = 0; i < ARRAY_SIZE(ext_buf_types); i++) {
 		buffers = msm_vidc_get_buffers(inst, ext_buf_types[i], __func__);
 		if (!buffers)
@@ -4926,21 +5121,16 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 		msm_vidc_unmap_buffers(inst, ext_buf_types[i]);
 	}
 
-	list_for_each_entry_safe(buf, dummy, &inst->buffers.read_only.list, list) {
-		print_vidc_buffer(VIDC_ERR, "err ", "destroying ro buffer", inst, buf);
-		list_del(&buf->list);
-		msm_memory_free(inst, buf);
-	}
-
-	list_for_each_entry_safe(buf, dummy, &inst->buffers.release.list, list) {
-		print_vidc_buffer(VIDC_ERR, "err ", "destroying release buffer", inst, buf);
-		list_del(&buf->list);
-		msm_memory_free(inst, buf);
-	}
-
 	list_for_each_entry_safe(ts, dummy_ts, &inst->timestamps.list, sort.list) {
 		i_vpr_e(inst, "%s: removing ts: val %lld, rank %lld\n",
 			__func__, ts->sort.val, ts->rank);
+		list_del(&ts->sort.list);
+		msm_memory_free(inst, ts);
+	}
+
+	list_for_each_entry_safe(ts, dummy_ts, &inst->ts_reorder.list, sort.list) {
+		i_vpr_e(inst, "%s: removing reorder ts: val %lld\n",
+			__func__, ts->sort.val);
 		list_del(&ts->sort.list);
 		msm_memory_free(inst, ts);
 	}
