@@ -469,6 +469,7 @@ enum hfi_picture_type {
     HFI_PICTURE_I   = 0x00000008,
     HFI_PICTURE_CRA = 0x00000010,
     HFI_PICTURE_BLA = 0x00000020,
+    HFI_PICTURE_NOSHOW = 0x00000040,
 };
 #define HFI_PROP_PICTURE_TYPE                                   0x03000162
 
@@ -541,6 +542,8 @@ enum hfi_nal_length_field_type {
 #define HFI_PROP_OPB_ENABLE                                     0x03000184
 
 #define HFI_PROP_AV1_DRAP_CONFIG                                0x03000189
+
+#define HFI_PROP_FENCE                                          0x0300018B
 
 #define HFI_PROP_END                                            0x03FFFFFF
 
