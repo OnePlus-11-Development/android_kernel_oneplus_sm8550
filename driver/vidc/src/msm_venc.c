@@ -1060,21 +1060,20 @@ int msm_venc_try_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 	if (f->type == INPUT_MPLANE) {
 		pix_fmt = v4l2_colorformat_to_driver(f->fmt.pix_mp.pixelformat, __func__);
 		if (!pix_fmt) {
-			i_vpr_h(inst, "%s: unsupported format, set default params\n", __func__);
-			f->fmt.pix_mp.pixelformat = V4L2_PIX_FMT_VIDC_NV12C;
-			f->fmt.pix_mp.width = VIDEO_Y_STRIDE_PIX(f->fmt.pix_mp.pixelformat,
-								 DEFAULT_WIDTH);
-			f->fmt.pix_mp.height = VIDEO_Y_SCANLINES(f->fmt.pix_mp.pixelformat,
-								 DEFAULT_HEIGHT);
+			i_vpr_e(inst, "%s: unsupported format, set current params\n", __func__);
+			f->fmt.pix_mp.pixelformat = inst->fmts[INPUT_PORT].fmt.pix_mp.pixelformat;
+			f->fmt.pix_mp.width = inst->fmts[INPUT_PORT].fmt.pix_mp.width;
+			f->fmt.pix_mp.height = inst->fmts[INPUT_PORT].fmt.pix_mp.height;
+			pix_fmt = v4l2_colorformat_to_driver(f->fmt.pix_mp.pixelformat, __func__);
 		}
 	} else if (f->type == OUTPUT_MPLANE) {
 		pix_fmt = v4l2_codec_to_driver(f->fmt.pix_mp.pixelformat, __func__);
 		if (!pix_fmt) {
-			i_vpr_h(inst, "%s: unsupported codec, set default params\n", __func__);
-			f->fmt.pix_mp.width = DEFAULT_WIDTH;
-			f->fmt.pix_mp.height = DEFAULT_HEIGHT;
-			f->fmt.pix_mp.pixelformat = V4L2_PIX_FMT_H264;
-			pix_fmt = v4l2_colorformat_to_driver(f->fmt.pix_mp.pixelformat, __func__);
+			i_vpr_e(inst, "%s: unsupported codec, set current params\n", __func__);
+			f->fmt.pix_mp.width = inst->fmts[OUTPUT_PORT].fmt.pix_mp.width;
+			f->fmt.pix_mp.height = inst->fmts[OUTPUT_PORT].fmt.pix_mp.height;
+			f->fmt.pix_mp.pixelformat = inst->fmts[OUTPUT_PORT].fmt.pix_mp.pixelformat;
+			pix_fmt = v4l2_codec_to_driver(f->fmt.pix_mp.pixelformat, __func__);
 		}
 	} else {
 		i_vpr_e(inst, "%s: invalid type %d\n", __func__, f->type);
@@ -1101,6 +1100,7 @@ int msm_venc_s_fmt_output(struct msm_vidc_inst *inst, struct v4l2_format *f)
 		return -EINVAL;
 	}
 	core = inst->core;
+	msm_venc_try_fmt(inst, f);
 
 	fmt = &inst->fmts[OUTPUT_PORT];
 	if (fmt->fmt.pix_mp.pixelformat != f->fmt.pix_mp.pixelformat) {
@@ -1222,6 +1222,8 @@ static int msm_venc_s_fmt_input(struct msm_vidc_inst *inst, struct v4l2_format *
 		return -EINVAL;
 	}
 	core = inst->core;
+	msm_venc_try_fmt(inst, f);
+
 	pix_fmt = v4l2_colorformat_to_driver(f->fmt.pix_mp.pixelformat, __func__);
 	msm_vidc_update_cap_value(inst, PIX_FMTS, pix_fmt, __func__);
 
