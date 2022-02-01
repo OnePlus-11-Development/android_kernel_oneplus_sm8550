@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -62,6 +62,7 @@ struct rmnet_ch_switch {
 	u8 switch_to_ch;
 	u8 retry_left;
 	u8 status_code;
+	bool auto_switched;
 	enum rmnet_ch_switch_state state;
 	__be32 switch_txid;
 	u32 flags;
