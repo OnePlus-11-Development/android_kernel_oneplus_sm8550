@@ -34,8 +34,6 @@ static int msm_vidc_deinit_irq(struct msm_vidc_core *core)
 	d_vpr_h("%s: reg_base = %pa, reg_size = %#x\n",
 		__func__, &dt->register_base, dt->register_size);
 
-	if (dt->irq)
-		free_irq(dt->irq, core);
 	dt->irq = 0;
 
 	if (core->register_base_addr)
@@ -345,7 +343,7 @@ exit:
 	return rc;
 }
 
-static int msm_vidc_remove(struct platform_device* pdev)
+static int msm_vidc_remove_video_device(struct platform_device *pdev)
 {
 	struct msm_vidc_core* core;
 
@@ -362,6 +360,13 @@ static int msm_vidc_remove(struct platform_device* pdev)
 	d_vpr_h("%s()\n", __func__);
 
 	msm_vidc_core_deinit(core, true);
+
+	d_vpr_h("depopulating sub devices\n");
+	/*
+	 * Trigger remove for each sub-device i.e. qcom,msm-vidc,context-bank.
+	 * When msm_vidc_remove is called for each sub-device, destroy
+	 * context-bank mappings.
+	 */
 	of_platform_depopulate(&pdev->dev);
 
 #ifdef CONFIG_MEDIA_CONTROLLER
@@ -393,6 +398,33 @@ static int msm_vidc_remove(struct platform_device* pdev)
 	g_core = NULL;
 
 	return 0;
+}
+
+static int msm_vidc_remove_context_bank(struct platform_device *pdev)
+{
+	d_vpr_h("%s(): Detached %s and destroyed mapping\n",
+		__func__, dev_name(&pdev->dev));
+
+	return 0;
+}
+
+static int msm_vidc_remove(struct platform_device *pdev)
+{
+	/*
+	 * Sub devices remove will be triggered by of_platform_depopulate()
+	 * after core_deinit(). It return immediately after completing
+	 * sub-device remove.
+	 */
+	if (of_device_is_compatible(pdev->dev.of_node, "qcom,msm-vidc")) {
+		return msm_vidc_remove_video_device(pdev);
+	} else if (of_device_is_compatible(pdev->dev.of_node,
+				"qcom,msm-vidc,context-bank")) {
+		return msm_vidc_remove_context_bank(pdev);
+	}
+
+	/* How did we end up here? */
+	WARN_ON(1);
+	return -EINVAL;
 }
 
 static int msm_vidc_probe_video_device(struct platform_device *pdev)
@@ -522,6 +554,7 @@ static int msm_vidc_probe_video_device(struct platform_device *pdev)
 		d_vpr_e("%s: sys init failed\n", __func__);
 		goto core_init_failed;
 	}
+	d_vpr_h("%s(): succssful\n", __func__);
 
 	return rc;
 
