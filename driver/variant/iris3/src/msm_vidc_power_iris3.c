@@ -137,9 +137,16 @@ u64 msm_vidc_calc_freq_iris3(struct msm_vidc_inst *inst, u32 data_size)
 			inst->capabilities->cap[PIPE].value;
 		/* 21 / 20 is minimum overhead factor */
 		vpp_cycles += max(vpp_cycles / 20, fw_vpp_cycles);
-		/* 1.059 is multi-pipe overhead */
-		if (inst->capabilities->cap[PIPE].value > 1)
-			vpp_cycles += div_u64(vpp_cycles * 59, 1000);
+		/* 1.059 is multi-pipe overhead 
+		 * 1.410 AV1 RECOMMENDED TILE 1080P_V2XH1, UHD_V2X2, 8KUHD_V8X2
+		 *       av1d_commer_tile_enable=0
+		 */
+		if (inst->capabilities->cap[PIPE].value > 1) {
+			if (inst->codec == MSM_VIDC_AV1)
+				vpp_cycles += div_u64(vpp_cycles * 410, 1000);
+			else
+				vpp_cycles += div_u64(vpp_cycles * 59, 1000);
+		}
 
 		/* VSP */
 		base_cycles = inst->has_bframe ?
@@ -289,6 +296,15 @@ static u64 __calculate_decoder(struct vidc_bus_vote_data *d)
 
 	collocated_bytes_per_lcu = lcu_size == 16 ? 16 :
 				lcu_size == 32 ? 64 : 256;
+
+	if (d->codec == MSM_VIDC_AV1) {
+		collocated_bytes_per_lcu = 4 * 512; /* lcu_size = 128 */
+		if (lcu_size == 32) {
+			collocated_bytes_per_lcu = 4 * 512 / (128 * 128 / 32 / 32);
+		} else if (lcu_size == 64) {
+			collocated_bytes_per_lcu = 4 * 512 / (128 * 128 / 64 / 64);
+		}
+	}
 
 	dpb_factor = FP(1, 50, 100);
 	dpb_write_factor = FP(1, 5, 100);
