@@ -441,6 +441,37 @@ exit:
 }
 EXPORT_SYMBOL(msm_vidc_querybuf);
 
+int msm_vidc_create_bufs(void *instance, struct v4l2_create_buffers *b)
+{
+	int rc = 0;
+	struct msm_vidc_inst *inst = instance;
+	int port;
+	struct v4l2_format *f;
+
+	if (!inst || !b) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	f = &b->format;
+	port = v4l2_type_to_driver_port(inst, f->type, __func__);
+	if (port < 0) {
+		rc = -EINVAL;
+		goto exit;
+	}
+
+	rc = vb2_create_bufs(inst->bufq[port].vb2q, b);
+	if (rc) {
+		i_vpr_e(inst, "%s: vb2_create_bufs(%d) failed, %d\n",
+			__func__, f->type, rc);
+		goto exit;
+	}
+
+exit:
+	return rc;
+}
+EXPORT_SYMBOL(msm_vidc_create_bufs);
+
 int msm_vidc_qbuf(void *instance, struct media_device *mdev,
 		struct v4l2_buffer *b)
 {
