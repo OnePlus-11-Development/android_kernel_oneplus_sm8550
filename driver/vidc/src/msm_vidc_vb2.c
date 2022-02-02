@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2022, The Linux Foundation. All rights reserved.
  */
 
 #include "msm_vidc_vb2.h"
@@ -190,6 +190,10 @@ int msm_vidc_start_streaming(struct vb2_queue *q, unsigned int count)
 
 	if (!inst->once_per_session_set) {
 		inst->once_per_session_set = true;
+		rc = msm_vidc_prepare_dependency_list(inst);
+		if (rc)
+			return rc;
+
 		rc = msm_vidc_session_set_codec(inst);
 		if (rc)
 			return rc;
