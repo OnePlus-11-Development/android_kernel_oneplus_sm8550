@@ -458,6 +458,7 @@ enum msm_vidc_inst_capability_type {
 	DPB_LIST,
 	FILM_GRAIN,
 	SUPER_BLOCK,
+	DRAP,
 	ALL_INTRA,
 	INPUT_METADATA_FD,
 	META_BITSTREAM_RESOLUTION,

@@ -69,7 +69,7 @@ static u32 msm_vidc_decoder_comv_size_iris3(struct msm_vidc_inst* inst)
 {
 	u32 size = 0;
 	u32 width, height, out_min_count, vpp_delay;
-	struct v4l2_format* f;
+	struct v4l2_format *f;
 
 	if (!inst || !inst->core) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -86,10 +86,21 @@ static u32 msm_vidc_decoder_comv_size_iris3(struct msm_vidc_inst* inst)
 	out_min_count = inst->buffers.output.min_count;
 	out_min_count = max(vpp_delay + 1, out_min_count);
 
-	if (inst->codec == MSM_VIDC_H264)
+	if (inst->codec == MSM_VIDC_H264) {
 		HFI_BUFFER_COMV_H264D(size, width, height, out_min_count);
-	else if (inst->codec == MSM_VIDC_HEVC || inst->codec == MSM_VIDC_HEIC)
+	} else if (inst->codec == MSM_VIDC_HEVC || inst->codec == MSM_VIDC_HEIC) {
 		HFI_BUFFER_COMV_H265D(size, width, height, out_min_count);
+	} else if (inst->codec == MSM_VIDC_AV1) {
+		/*
+		 * When DRAP is enabled, COMV buffer is part of PERSIST buffer and
+		 * should not be allocated separately.
+		 * When DRAP is disabled, COMV buffer must be allocated.
+		 */
+		if (inst->capabilities->cap[DRAP].value)
+			size = 0;
+		else
+			HFI_BUFFER_COMV_AV1D(size, width, height, out_min_count);
+	}
 
 	i_vpr_l(inst, "%s: size %d\n", __func__, size);
 	return size;
@@ -195,14 +206,28 @@ static u32 msm_vidc_decoder_persist_size_iris3(struct msm_vidc_inst *inst)
 		return size;
 	}
 
-	if (inst->codec == MSM_VIDC_H264)
+	if (inst->codec == MSM_VIDC_H264) {
 		HFI_BUFFER_PERSIST_H264D(size);
-	else if (inst->codec == MSM_VIDC_HEVC || inst->codec == MSM_VIDC_HEIC)
+	} else if (inst->codec == MSM_VIDC_HEVC || inst->codec == MSM_VIDC_HEIC) {
 		HFI_BUFFER_PERSIST_H265D(size);
-	else if (inst->codec == MSM_VIDC_VP9)
+	} else if (inst->codec == MSM_VIDC_VP9) {
 		HFI_BUFFER_PERSIST_VP9D(size);
-	else if (inst->codec == MSM_VIDC_AV1)
-		HFI_BUFFER_PERSIST_AV1D(size);
+	} else if (inst->codec == MSM_VIDC_AV1) {
+		/*
+		 * When DRAP is enabled, COMV buffer is part of PERSIST buffer and
+		 * should not be allocated separately. PERSIST buffer should include
+		 * COMV buffer calculated with width, height, refcount.
+		 * When DRAP is disabled, COMV buffer should not be included in PERSIST
+		 * buffer.
+		 */
+		if (inst->capabilities->cap[DRAP].value)
+			HFI_BUFFER_PERSIST_AV1D(size,
+				inst->capabilities->cap[FRAME_WIDTH].max,
+				inst->capabilities->cap[FRAME_HEIGHT].max, 16);
+		else
+			HFI_BUFFER_PERSIST_AV1D(size, 0, 0, 0);
+	}
+
 	i_vpr_l(inst, "%s: size %d\n", __func__, size);
 	return size;
 }

@@ -175,6 +175,7 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{DPB_LIST,                       "DPB_LIST"                   },
 	{FILM_GRAIN,                     "FILM_GRAIN"                 },
 	{SUPER_BLOCK,                    "SUPER_BLOCK"                },
+	{DRAP,                           "DRAP"                       },
 	{ALL_INTRA,                      "ALL_INTRA"                  },
 	{INPUT_METADATA_FD,              "INPUT_METADATA_FD"          },
 	{META_BITSTREAM_RESOLUTION,      "META_BITSTREAM_RESOLUTION"  },

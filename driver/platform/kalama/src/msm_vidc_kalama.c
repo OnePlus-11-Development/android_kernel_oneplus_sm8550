@@ -1484,6 +1484,11 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		0,
 		HFI_PROP_AV1_SUPER_BLOCK_ENABLED},
 
+	{DRAP, DEC, AV1,
+		0, S32_MAX, 1, 0,
+		0,
+		HFI_PROP_AV1_DRAP_CONFIG},
+
 	{META_BITSTREAM_RESOLUTION, DEC, AV1,
 		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,

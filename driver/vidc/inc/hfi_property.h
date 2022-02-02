@@ -540,6 +540,8 @@ enum hfi_nal_length_field_type {
 
 #define HFI_PROP_OPB_ENABLE                                     0x03000184
 
+#define HFI_PROP_AV1_DRAP_CONFIG                                0x03000189
+
 #define HFI_PROP_END                                            0x03FFFFFF
 
 #define HFI_SESSION_ERROR_BEGIN                                 0x04000000
@@ -555,6 +557,8 @@ enum hfi_nal_length_field_type {
 #define HFI_ERROR_INSUFFICIENT_RESOURCES                        0x04000005
 
 #define HFI_ERROR_BUFFER_NOT_SET                                0x04000006
+
+#define HFI_ERROR_DRAP_CONFIG_EXCEED                            0x04000007
 
 #define HFI_SESSION_ERROR_END                                   0x04FFFFFF
 
