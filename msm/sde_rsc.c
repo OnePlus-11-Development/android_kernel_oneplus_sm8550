@@ -1039,7 +1039,6 @@ int sde_rsc_client_trigger_vote(struct sde_rsc_client *caller_client,
 {
 	int rc = 0, rsc_index, i;
 	struct sde_rsc_priv *rsc;
-	bool bw_increase = false;
 
 	if (caller_client && caller_client->rsc_index >= MAX_RSC_COUNT) {
 		pr_err("invalid rsc index\n");
@@ -1051,6 +1050,9 @@ int sde_rsc_client_trigger_vote(struct sde_rsc_client *caller_client,
 	if (!rsc)
 		return -EINVAL;
 
+	if (rsc->bwi_update == BW_NO_CHANGE && !delta_vote && rsc->version >= SDE_RSC_REV_5)
+		return 0;
+
 	pr_debug("client:%s trigger bw delta vote:%d\n",
 		caller_client ? caller_client->name : "unknown", delta_vote);
 
@@ -1060,10 +1062,11 @@ int sde_rsc_client_trigger_vote(struct sde_rsc_client *caller_client,
 			(rsc->current_state == SDE_RSC_CLK_STATE))
 		goto end;
 
+	rsc->bwi_update = BW_HIGH_TO_LOW;
 	for (i = 0; i < SDE_POWER_HANDLE_DBUS_ID_MAX && delta_vote; i++) {
 		if (rsc->bw_config.new_ab_vote[i] > rsc->bw_config.ab_vote[i] ||
 		    rsc->bw_config.new_ib_vote[i] > rsc->bw_config.ib_vote[i])
-			bw_increase = true;
+			rsc->bwi_update = BW_LOW_TO_HIGH;
 
 		rsc->bw_config.ab_vote[i] = rsc->bw_config.new_ab_vote[i];
 		rsc->bw_config.ib_vote[i] = rsc->bw_config.new_ib_vote[i];
@@ -1092,10 +1095,13 @@ int sde_rsc_client_trigger_vote(struct sde_rsc_client *caller_client,
 		rpmh_write_sleep_and_wake(rsc->rpmh_dev);
 	}
 
+	if (rsc->version >= SDE_RSC_REV_5 && !delta_vote)
+		rsc->bwi_update = BW_NO_CHANGE;
+
 	if (rsc->hw_ops.bwi_status &&
 	    (rsc->current_state == SDE_RSC_CMD_STATE ||
 	     rsc->current_state == SDE_RSC_VID_STATE))
-		rsc->hw_ops.bwi_status(rsc, bw_increase);
+		rsc->hw_ops.bwi_status(rsc);
 	else if (rsc->hw_ops.tcs_use_ok)
 		rsc->hw_ops.tcs_use_ok(rsc);
 

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
  */
 
@@ -12,6 +13,11 @@
 #include "sde_rsc_priv.h"
 #include "sde_rsc_hw.h"
 #include "sde_dbg.h"
+
+#define BWI_HIGH_TO_LOW		 0x00
+#define BWI_LOW_TO_HIGH		 0x01
+#define BWI_NO_CHANGE		 0x10
+
 
 static int _rsc_hw_qtimer_init(struct sde_rsc_priv *rsc)
 {
@@ -539,10 +545,26 @@ end:
 	return rc;
 }
 
-int rsc_hw_bwi_status_v3(struct sde_rsc_priv *rsc, bool bw_indication)
+int rsc_hw_bwi_status_v3(struct sde_rsc_priv *rsc)
 {
 	int count, bw_ack;
 	int rc = 0;
+	u32 bw_indication = 0;
+
+	switch (rsc->bwi_update) {
+	case BW_HIGH_TO_LOW:
+		bw_indication = BWI_HIGH_TO_LOW;
+		break;
+	case BW_LOW_TO_HIGH:
+		bw_indication = BWI_LOW_TO_HIGH;
+		break;
+	case BW_NO_CHANGE:
+		bw_indication = BWI_NO_CHANGE;
+		break;
+	default:
+		pr_err("unsupported bwi data\n");
+		break;
+	}
 
 	dss_reg_w(&rsc->wrapper_io, SDE_RSCC_WRAPPER_BW_INDICATION,
 						bw_indication, rsc->debug_mode);
