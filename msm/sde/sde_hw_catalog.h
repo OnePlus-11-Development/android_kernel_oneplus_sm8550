@@ -148,6 +148,7 @@
 #define SDE_UIDLE_VERSION_1_0_0		0x100
 #define SDE_UIDLE_VERSION_1_0_1		0x101
 #define SDE_UIDLE_VERSION_1_0_2		0x102
+#define SDE_UIDLE_VERSION_1_0_3		0x103
 
 #define IS_SDE_UIDLE_REV_100(rev) \
 	((rev) == SDE_UIDLE_VERSION_1_0_0)
@@ -155,6 +156,8 @@
 	((rev) == SDE_UIDLE_VERSION_1_0_1)
 #define IS_SDE_UIDLE_REV_102(rev) \
 	((rev) == SDE_UIDLE_VERSION_1_0_2)
+#define IS_SDE_UIDLE_REV_103(rev) \
+	((rev) == SDE_UIDLE_VERSION_1_0_3)
 
 #define SDE_UIDLE_MAJOR(rev)		((rev) >> 8)
 
@@ -345,6 +348,7 @@ enum {
  * @SDE_PERF_SSPP_CDP             Supports client driven prefetch
  * @SDE_PERF_SSPP_SYS_CACHE,      SSPP supports system cache
  * @SDE_PERF_SSPP_UIDLE,          sspp supports uidle
+ * @SDE_PERF_SSPP_UIDLE_FILL_LVL_SCALE,          sspp supports uidle fill level scaling
  * @SDE_PERF_SSPP_MAX             Maximum value
  */
 enum {
@@ -355,6 +359,7 @@ enum {
 	SDE_PERF_SSPP_CDP,
 	SDE_PERF_SSPP_SYS_CACHE,
 	SDE_PERF_SSPP_UIDLE,
+	SDE_PERF_SSPP_UIDLE_FILL_LVL_SCALE,
 	SDE_PERF_SSPP_MAX
 };
 
