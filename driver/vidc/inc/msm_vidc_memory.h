@@ -56,8 +56,8 @@ void msm_vidc_memory_put_dmabuf_completely(struct msm_vidc_inst *inst,
 	struct msm_memory_dmabuf *buf);
 int msm_memory_pools_init(struct msm_vidc_inst *inst);
 void msm_memory_pools_deinit(struct msm_vidc_inst *inst);
-void *msm_memory_alloc(struct msm_vidc_inst *inst,
+void *msm_memory_pool_alloc(struct msm_vidc_inst *inst,
 	enum msm_memory_pool_type type);
-void msm_memory_free(struct msm_vidc_inst *inst, void *vidc_buf);
+void msm_memory_pool_free(struct msm_vidc_inst *inst, void *vidc_buf);
 
 #endif // _MSM_VIDC_MEMORY_H_
