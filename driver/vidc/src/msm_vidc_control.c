@@ -868,14 +868,12 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 		}
 
 		if (ctrl->id == V4L2_CID_ROTATE) {
-			if (ctrl->val == 90 || ctrl->val == 270) {
 				struct v4l2_format *output_fmt;
 
 				output_fmt = &inst->fmts[OUTPUT_PORT];
 				rc = msm_venc_s_fmt_output(inst, output_fmt);
 				if (rc)
 					return rc;
-			}
 		}
 
 		if (ctrl->id == V4L2_CID_MPEG_VIDC_MIN_BITSTREAM_SIZE_OVERWRITE) {
