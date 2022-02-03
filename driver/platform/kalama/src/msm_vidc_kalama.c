@@ -248,7 +248,7 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		1, (DEFAULT_FPS << 16)},
 
 	{OPERATING_RATE, DEC, VP9,
-		(MINIMUM_FPS << 16), (MAXIMUM_VP9_FPS << 16),
+		(MINIMUM_FPS << 16), (MAXIMUM_OVERRIDE_VP9_FPS << 16),
 		1, (DEFAULT_FPS << 16)},
 
 	{SCALE_FACTOR, ENC, H264|HEVC, 1, 8, 1, 8},
