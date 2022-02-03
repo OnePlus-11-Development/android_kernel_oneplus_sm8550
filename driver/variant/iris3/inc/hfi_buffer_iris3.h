@@ -973,13 +973,6 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		HFI_U32 y_width_a = 128, y_height_a = 32; \
 		HFI_U32 uv_width_a = 128, uv_height_a = 32; \
 		HFI_U32 yBufSize, uvBufSize, y_width, y_height, uv_width, uv_height; \
-		HFI_NV12_IL_CALC_Y_STRIDE(y_width, frame_width, y_width_a); \
-		HFI_NV12_IL_CALC_Y_BUFHEIGHT(y_height, frame_height, y_height_a); \
-		HFI_NV12_IL_CALC_UV_STRIDE(uv_width, frame_width, uv_width_a); \
-		HFI_NV12_IL_CALC_UV_BUFHEIGHT(uv_height, frame_height, uv_height_a); \
-		HFI_NV12_UBWC_IL_CALC_Y_BUF_SIZE(yBufSize, y_width, y_height); \
-		HFI_NV12_UBWC_IL_CALC_UV_BUF_SIZE(uvBufSize, uv_width, uv_height); \
-		_size = yBufSize + uvBufSize; \
 		HFI_U32 y_meta_width_a = 64, y_meta_height_a = 16; \
 		HFI_U32 uv_meta_width_a = 64, uv_meta_height_a = 16; \
 		HFI_U32 meta_height, meta_stride, meta_size; \
@@ -988,6 +981,13 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		HFI_U32 tile_width_uv = HFI_COLOR_FORMAT_YUV420_NV12_UBWC_UV_TILE_WIDTH; \
 		HFI_U32 tile_height_uv = \
 		    HFI_COLOR_FORMAT_YUV420_NV12_UBWC_UV_TILE_HEIGHT; \
+		HFI_NV12_IL_CALC_Y_STRIDE(y_width, frame_width, y_width_a); \
+		HFI_NV12_IL_CALC_Y_BUFHEIGHT(y_height, frame_height, y_height_a); \
+		HFI_NV12_IL_CALC_UV_STRIDE(uv_width, frame_width, uv_width_a); \
+		HFI_NV12_IL_CALC_UV_BUFHEIGHT(uv_height, frame_height, uv_height_a); \
+		HFI_NV12_UBWC_IL_CALC_Y_BUF_SIZE(yBufSize, y_width, y_height); \
+		HFI_NV12_UBWC_IL_CALC_UV_BUF_SIZE(uvBufSize, uv_width, uv_height); \
+		_size = yBufSize + uvBufSize; \
 		HFI_UBWC_CALC_METADATA_PLANE_STRIDE(meta_stride, frame_width, \
 							y_meta_width_a, tile_width_y); \
 		HFI_UBWC_METADATA_PLANE_BUFHEIGHT(meta_height, frame_height, \
@@ -1010,14 +1010,6 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		HFI_U32 y_width_a = 256, y_height_a = 16, \
 			uv_width_a = 256, uv_height_a = 16; \
 		HFI_U32 yBufSize, uvBufSize, y_width, y_height, uv_width, uv_height; \
-		HFI_YUV420_TP10_CALC_Y_STRIDE(y_width, frame_width, y_width_a); \
-		HFI_YUV420_TP10_CALC_Y_BUFHEIGHT(y_height, frame_height, y_height_a); \
-		HFI_YUV420_TP10_CALC_UV_STRIDE(uv_width, frame_width, uv_width_a); \
-		HFI_YUV420_TP10_CALC_UV_BUFHEIGHT(uv_height, frame_height, \
-						uv_height_a); \
-		HFI_YUV420_TP10_UBWC_CALC_Y_BUF_SIZE(yBufSize, y_width, y_height); \
-		HFI_YUV420_TP10_UBWC_CALC_UV_BUF_SIZE(uvBufSize, uv_width, uv_height); \
-		_size = yBufSize + uvBufSize; \
 		HFI_U32 y_meta_width_a = 64, y_meta_height_a = 16, \
 			uv_meta_width_a = 64, uv_meta_height_a = 16; \
 		HFI_U32 meta_height, meta_stride, meta_size; \
@@ -1026,6 +1018,14 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		HFI_U32 tile_width_uv = HFI_COLOR_FORMAT_YUV420_TP10_UBWC_UV_TILE_WIDTH; \
 		HFI_U32 tile_height_uv = \
 			HFI_COLOR_FORMAT_YUV420_TP10_UBWC_UV_TILE_HEIGHT; \
+		HFI_YUV420_TP10_CALC_Y_STRIDE(y_width, frame_width, y_width_a); \
+		HFI_YUV420_TP10_CALC_Y_BUFHEIGHT(y_height, frame_height, y_height_a); \
+		HFI_YUV420_TP10_CALC_UV_STRIDE(uv_width, frame_width, uv_width_a); \
+		HFI_YUV420_TP10_CALC_UV_BUFHEIGHT(uv_height, frame_height, \
+						uv_height_a); \
+		HFI_YUV420_TP10_UBWC_CALC_Y_BUF_SIZE(yBufSize, y_width, y_height); \
+		HFI_YUV420_TP10_UBWC_CALC_UV_BUF_SIZE(uvBufSize, uv_width, uv_height); \
+		_size = yBufSize + uvBufSize; \
 		HFI_UBWC_CALC_METADATA_PLANE_STRIDE(meta_stride, frame_width, \
 			y_meta_width_a, tile_width_y); \
 		HFI_UBWC_METADATA_PLANE_BUFHEIGHT(meta_height, frame_height, \
