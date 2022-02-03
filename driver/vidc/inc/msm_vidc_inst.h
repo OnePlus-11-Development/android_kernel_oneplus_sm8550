@@ -110,8 +110,6 @@ struct msm_vidc_inst {
 	struct v4l2_m2m_ctx               *m2m_ctx;
 	struct v4l2_ctrl                 **ctrls;
 	u32                                num_ctrls;
-	struct msm_vidc_inst_cap_entry     children;
-	struct msm_vidc_inst_cap_entry     firmware;
 	enum hfi_rate_control              hfi_rc_type;
 	enum hfi_layer_encoding_type       hfi_layer_type;
 	bool                               request;
@@ -143,7 +141,9 @@ struct msm_vidc_inst {
 	struct list_head                   response_works; /* list of struct response_work */
 	struct list_head                   enc_input_crs;
 	struct list_head                   dmabuf_tracker; /* list of struct msm_memory_dmabuf */
-	struct list_head                   caps_list; /* list of struct msm_vidc_inst_cap_entry */
+	struct list_head                   caps_list;
+	struct list_head                   children_list;
+	struct list_head                   firmware_list;
 	bool                               once_per_session_set;
 	bool                               ipsc_properties_set;
 	bool                               opsc_properties_set;

@@ -265,7 +265,7 @@ static enum msm_vidc_inst_capability_type msm_vidc_get_cap_id(
 	capability = inst->capabilities;
 	do {
 		if (capability->cap[i].v4l2_id == id) {
-			cap_id = capability->cap[i].cap;
+			cap_id = capability->cap[i].cap_id;
 			break;
 		}
 		i++;
@@ -282,7 +282,7 @@ static int msm_vidc_add_capid_to_list(struct msm_vidc_inst *inst,
 
 	/* skip adding if cap_id already present in list */
 	if (type & FW_LIST) {
-		list_for_each_entry(curr_node, &inst->firmware.list, list) {
+		list_for_each_entry(curr_node, &inst->firmware_list, list) {
 			if (curr_node->cap_id == cap_id) {
 				i_vpr_l(inst,
 					"%s: cap[%d] %s already present in FW_LIST\n",
@@ -299,9 +299,9 @@ static int msm_vidc_add_capid_to_list(struct msm_vidc_inst *inst,
 	}
 	entry->cap_id = cap_id;
 	if (type & CHILD_LIST)
-		list_add_tail(&entry->list, &inst->children.list);
+		list_add_tail(&entry->list, &inst->children_list);
 	if (type & FW_LIST)
-		list_add_tail(&entry->list, &inst->firmware.list);
+		list_add_tail(&entry->list, &inst->firmware_list);
 
 	return 0;
 }
@@ -325,15 +325,15 @@ static int msm_vidc_add_children(struct msm_vidc_inst *inst,
 	return rc;
 }
 
-static bool is_parent_available(struct msm_vidc_inst* inst,
-	u32 cap, u32 check_parent, const char* func)
+static bool is_parent_available(struct msm_vidc_inst *inst,
+	u32 cap_id, u32 check_parent, const char *func)
 {
 	int i = 0;
 	u32 cap_parent;
 
 	while (i < MAX_CAP_PARENTS &&
-		inst->capabilities->cap[cap].parents[i]) {
-		cap_parent = inst->capabilities->cap[cap].parents[i];
+		inst->capabilities->cap[cap_id].parents[i]) {
+		cap_parent = inst->capabilities->cap[cap_id].parents[i];
 		if (cap_parent == check_parent) {
 			return true;
 		}
@@ -342,11 +342,11 @@ static bool is_parent_available(struct msm_vidc_inst* inst,
 
 	i_vpr_e(inst,
 		"%s: missing parent %s for %s\n",
-		func, cap_name(check_parent), cap_name(cap));
+		func, cap_name(check_parent), cap_name(cap_id));
 	return false;
 }
 
-int msm_vidc_update_cap_value(struct msm_vidc_inst *inst, u32 cap,
+int msm_vidc_update_cap_value(struct msm_vidc_inst *inst, u32 cap_id,
 	s32 adjusted_val, const char *func)
 {
 	if (!inst || !inst->capabilities) {
@@ -354,23 +354,23 @@ int msm_vidc_update_cap_value(struct msm_vidc_inst *inst, u32 cap,
 		return -EINVAL;
 	}
 
-	if (inst->capabilities->cap[cap].value != adjusted_val)
+	if (inst->capabilities->cap[cap_id].value != adjusted_val)
 		i_vpr_h(inst,
 			"%s: updated database: name: %s, value: %#x -> %#x\n",
-			func, cap_name(cap),
-			inst->capabilities->cap[cap].value, adjusted_val);
+			func, cap_name(cap_id),
+			inst->capabilities->cap[cap_id].value, adjusted_val);
 
-	inst->capabilities->cap[cap].value = adjusted_val;
+	inst->capabilities->cap[cap_id].value = adjusted_val;
 
 	return 0;
 }
 
 int msm_vidc_get_parent_value(struct msm_vidc_inst* inst,
-	u32 cap, u32 parent, s32 *value, const char *func)
+	u32 cap_id, u32 parent, s32 *value, const char *func)
 {
 	int rc = 0;
 
-	if (is_parent_available(inst, cap, parent, func)) {
+	if (is_parent_available(inst, cap_id, parent, func)) {
 		switch (parent) {
 		case BITRATE_MODE:
 			*value = inst->hfi_rc_type;
@@ -438,7 +438,7 @@ static int msm_vidc_adjust_property(struct msm_vidc_inst *inst,
 	 * skip for uninitialized cap properties.
 	 * Eg: Skip Tramform 8x8 cap that is uninitialized for HEVC codec
 	 */
-	if (!capability->cap[cap_id].cap)
+	if (!capability->cap[cap_id].cap_id)
 		return 0;
 
 	if (capability->cap[cap_id].adjust) {
@@ -490,8 +490,8 @@ static int msm_vidc_adjust_dynamic_property(struct msm_vidc_inst *inst,
 	if (!ctrl && !capability->cap[cap_id].adjust) {
 		i_vpr_e(inst,
 			"%s: child cap[%d] %s must have ajdust function\n",
-			__func__, capability->cap[cap_id].cap,
-			cap_name(capability->cap[cap_id].cap));
+			__func__, capability->cap[cap_id].cap_id,
+			cap_name(capability->cap[cap_id].cap_id));
 		return -EINVAL;
 	}
 	prev_value = capability->cap[cap_id].value;
@@ -645,7 +645,7 @@ int msm_vidc_ctrl_init(struct msm_vidc_inst *inst)
 				ctrl_cfg.step =
 					capability->cap[idx].step_or_mask;
 			}
-			ctrl_cfg.name = cap_name(capability->cap[idx].cap);
+			ctrl_cfg.name = cap_name(capability->cap[idx].cap_id);
 			if (!ctrl_cfg.name) {
 				i_vpr_e(inst, "%s: %#x ctrl name is null\n",
 					__func__, ctrl_cfg.id);
@@ -936,7 +936,7 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	/* adjust all children if any */
 	list_for_each_entry_safe(curr_node, tmp_node,
-			&inst->children.list, list) {
+			&inst->children_list, list) {
 		rc = msm_vidc_adjust_dynamic_property(
 				inst, curr_node->cap_id, NULL);
 		if (rc)
@@ -2494,7 +2494,7 @@ static inline bool is_root(struct msm_vidc_inst_cap *cap)
 
 static inline bool is_valid_cap(struct msm_vidc_inst_cap *cap)
 {
-	return cap->cap != INST_CAP_NONE;
+	return cap->cap_id != INST_CAP_NONE;
 }
 
 static inline bool is_all_parents_visited(
@@ -2519,7 +2519,7 @@ static int add_node(
 {
 	struct msm_vidc_inst_cap_entry *entry;
 
-	if (lookup[rcap->cap])
+	if (lookup[rcap->cap_id])
 		return 0;
 
 	entry = kzalloc(sizeof(struct msm_vidc_inst_cap_entry), GFP_KERNEL);
@@ -2529,8 +2529,8 @@ static int add_node(
 	}
 
 	INIT_LIST_HEAD(&entry->list);
-	entry->cap_id = rcap->cap;
-	lookup[rcap->cap] = true;
+	entry->cap_id = rcap->cap_id;
+	lookup[rcap->cap_id] = true;
 
 	list_add_tail(&entry->list, list);
 	return 0;
@@ -2571,9 +2571,9 @@ int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst)
 			continue;
 
 		/* sanitize cap value */
-		if (i != rcap->cap) {
+		if (i != rcap->cap_id) {
 			i_vpr_e(inst, "%s: cap id mismatch. expected %s, actual %s\n",
-				__func__, cap_name(i), cap_name(rcap->cap));
+				__func__, cap_name(i), cap_name(rcap->cap_id));
 			rc = -EINVAL;
 			goto error;
 		}
@@ -2604,7 +2604,7 @@ int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst)
 			 * if child node is already part of root or optional list
 			 * then no need to add it again.
 			 */
-			if (root_visited[cap->cap] || opt_visited[cap->cap])
+			if (root_visited[cap->cap_id] || opt_visited[cap->cap_id])
 				continue;
 
 			/**
@@ -2722,7 +2722,7 @@ int msm_vidc_adjust_v4l2_properties(struct msm_vidc_inst *inst)
 	 * added to inst->children list at this point
 	 */
 	list_for_each_entry_safe(curr_node, tmp_node,
-			&inst->children.list, list) {
+			&inst->children_list, list) {
 		/*
 		 * call adjust for each child. Each child adjust
 		 * will also update child list at the tail with
@@ -3858,7 +3858,7 @@ int msm_vidc_set_v4l2_properties(struct msm_vidc_inst *inst)
 	capability = inst->capabilities;
 
 	list_for_each_entry_safe(curr_node, tmp_node,
-			&inst->firmware.list, list) {
+			&inst->firmware_list, list) {
 
 		/*  cap_id's like PIX_FMT etc may not have set functions */
 		if (!capability->cap[curr_node->cap_id].set)

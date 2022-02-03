@@ -2163,7 +2163,7 @@ int msm_vdec_handle_release_buffer(struct msm_vidc_inst *inst,
 		inst->debug_count.ebd, inst->debug_count.ftb, inst->debug_count.fbd);
 	/* delete the buffer from release list */
 	list_del(&buf->list);
-	msm_memory_free(inst, buf);
+	msm_memory_pool_free(inst, buf);
 
 	return rc;
 }
