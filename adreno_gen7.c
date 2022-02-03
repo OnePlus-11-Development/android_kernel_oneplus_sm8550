@@ -12,6 +12,7 @@
 #include <linux/of_device.h>
 #include <linux/regulator/consumer.h>
 #include <linux/soc/qcom/llcc-qcom.h>
+#include <soc/qcom/of_common.h>
 
 #include "adreno.h"
 #include "adreno_gen7.h"
@@ -242,6 +243,10 @@ int gen7_init(struct adreno_device *adreno_dev)
 	adreno_dev->highest_bank_bit = gen7_core->highest_bank_bit;
 	adreno_dev->cooperative_reset = ADRENO_FEATURE(adreno_dev,
 			ADRENO_COOP_RESET);
+
+	/* If the memory type is DDR 4, override the existing configuration */
+	if (of_fdt_get_ddrtype() == 0x7)
+		adreno_dev->highest_bank_bit = 14;
 
 	gen7_crashdump_init(adreno_dev);
 
