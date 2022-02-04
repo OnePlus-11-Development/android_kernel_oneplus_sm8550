@@ -228,19 +228,6 @@ static inline bool gen7_is_smmu_stalled(struct kgsl_device *device)
 	return val & BIT(24);
 }
 
-/**
- * gen7_cx_regulator_disable_wait - Disable a cx regulator and wait for it
- * @reg: A &struct regulator handle
- * @device: kgsl device struct
- * @timeout: Time to wait (in milliseconds)
- *
- * Disable the regulator and wait @timeout milliseconds for it to enter the
- * disabled state.
- *
- */
-void gen7_cx_regulator_disable_wait(struct regulator *reg,
-		struct kgsl_device *device, u32 timeout);
-
 /* Preemption functions */
 void gen7_preemption_trigger(struct adreno_device *adreno_dev, bool atomic);
 void gen7_preemption_schedule(struct adreno_device *adreno_dev);
