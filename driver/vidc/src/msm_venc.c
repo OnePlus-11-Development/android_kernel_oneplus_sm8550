@@ -1002,15 +1002,11 @@ int msm_venc_streamon_output(struct msm_vidc_inst *inst)
 		return -EINVAL;
 	}
 
-	rc = msm_vidc_adjust_v4l2_properties(inst);
-	if (rc)
-		goto error;
-
 	rc = msm_venc_set_output_properties(inst);
 	if (rc)
 		goto error;
 
-	rc = msm_vidc_set_v4l2_properties(inst);
+	rc = msm_vidc_adjust_set_v4l2_properties(inst);
 	if (rc)
 		goto error;
 
