@@ -3715,7 +3715,12 @@ static int _sde_crtc_fences_wait_list(struct drm_crtc *crtc, bool use_hw_fences,
 	u32 num_hw_fences = 0;
 	ktime_t kt_end, kt_wait;
 	uint32_t wait_ms = 1;
+	struct msm_display_mode *msm_mode;
+	bool mode_switch;
 	int i, rc = 0;
+
+	msm_mode = sde_crtc_get_msm_mode(crtc->state);
+	mode_switch = msm_is_mode_seamless_poms(msm_mode);
 
 	/* use monotonic timer to limit total fence wait time */
 	kt_end = ktime_add_ns(ktime_get(),
@@ -3724,7 +3729,7 @@ static int _sde_crtc_fences_wait_list(struct drm_crtc *crtc, bool use_hw_fences,
 	drm_atomic_crtc_for_each_plane(plane, crtc) {
 
 		/* check if input-fences are hw fences and if they are, add them to the list */
-		if (use_hw_fences) {
+		if (use_hw_fences && !mode_switch) {
 
 			dma_hw_fences[num_hw_fences] = _sde_plane_get_input_hw_fence(plane);
 
