@@ -491,6 +491,7 @@ enum {
  * @SDE_DSC_HW_REV_1_1          dsc block supports dsc 1.1 only
  * @SDE_DSC_HW_REV_1_2          dsc block supports dsc 1.1 and 1.2
  * @SDE_DSC_NATIVE_422_EN,      Supports native422 and native420 encoding
+ * @SDE_DSC_REDUCED_OB_MAX,	DSC size is limited to 10k
  * @SDE_DSC_ENC,                DSC encoder sub block
  * @SDE_DSC_CTL,                DSC ctl sub block
  * @SDE_DSC_4HS,                Dedicated DSC 4HS config registers
@@ -501,6 +502,7 @@ enum {
 	SDE_DSC_HW_REV_1_1,
 	SDE_DSC_HW_REV_1_2,
 	SDE_DSC_NATIVE_422_EN,
+	SDE_DSC_REDUCED_OB_MAX,
 	SDE_DSC_ENC,
 	SDE_DSC_CTL,
 	SDE_DSC_4HS,
@@ -1729,6 +1731,8 @@ struct sde_perf_cfg {
  * @qseed_hw_rev        qseed HW block version
  * @smart_dma_rev       smartDMA block version
  * @ctl_rev             control path block version
+ * @has_precise_vsync_ts  indicates if HW has vsyc timestamp logging capability
+ * @has_reduced_ob_max indicate if DSC size is limited to 10k
  * @ts_prefill_rev      prefill traffic shaper feature revision
  * @true_inline_rot_rev inline rotator feature revision
  * @dnsc_blur_rev       downscale blur HW block version
@@ -1830,6 +1834,8 @@ struct sde_mdss_cfg {
 	u32 qseed_hw_rev;
 	u32 smart_dma_rev;
 	u32 ctl_rev;
+	bool has_precise_vsync_ts;
+	bool has_reduced_ob_max;
 	u32 ts_prefill_rev;
 	u32 true_inline_rot_rev;
 	u32 dnsc_blur_rev;

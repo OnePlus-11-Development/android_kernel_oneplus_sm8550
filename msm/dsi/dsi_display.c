@@ -706,13 +706,17 @@ static void dsi_display_set_cmd_tx_ctrl_flags(struct dsi_display *display,
 		/*
 		 * Set flags for command scheduling.
 		 * 1) In video mode command DMA scheduling is default.
-		 * 2) In command mode command DMA scheduling depends on message
+		 * 2) In command mode unicast command DMA scheduling depends on message
 		 * flag and TE needs to be running.
+		 * 3) In command mode broadcast command DMA scheduling is default and
+		 * TE needs to be running.
 		 */
 		if (display->panel->panel_mode == DSI_OP_VIDEO_MODE) {
 			flags |= DSI_CTRL_CMD_CUSTOM_DMA_SCHED;
 		} else {
 			if (msg->flags & MIPI_DSI_MSG_CMD_DMA_SCHED)
+				flags |= DSI_CTRL_CMD_CUSTOM_DMA_SCHED;
+			if (flags & DSI_CTRL_CMD_BROADCAST)
 				flags |= DSI_CTRL_CMD_CUSTOM_DMA_SCHED;
 			if (!display->enabled)
 				flags &= ~DSI_CTRL_CMD_CUSTOM_DMA_SCHED;
@@ -5363,7 +5367,22 @@ int dsi_display_splash_res_cleanup(struct  dsi_display *display)
 
 static int dsi_display_force_update_dsi_clk(struct dsi_display *display)
 {
-	int rc = 0;
+	int rc = 0, i = 0;
+	struct dsi_display_ctrl *ctrl;
+
+	/*
+	 * The force update dsi clock, is the only clock update function that toggles the state of
+	 * DSI clocks without any ref count protection. With the addition of ASYNC command wait,
+	 * there is a need for adding a check for any queued waits before updating these clocks.
+	 */
+	display_for_each_ctrl(i, display) {
+		ctrl = &display->ctrl[i];
+		if (!ctrl->ctrl || !(ctrl->ctrl->post_tx_queued))
+			continue;
+		flush_workqueue(display->post_cmd_tx_workq);
+		cancel_work_sync(&ctrl->ctrl->post_cmd_tx_work);
+		ctrl->ctrl->post_tx_queued = false;
+	}
 
 	rc = dsi_display_link_clk_force_update_ctrl(display->dsi_clk_handle);
 

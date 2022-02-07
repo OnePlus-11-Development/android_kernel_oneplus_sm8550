@@ -3195,6 +3195,8 @@ static int sde_dsc_parse_dt(struct device_node *np,
 						&dsc->features);
 			if (SDE_HW_MAJOR(sde_cfg->hw_rev) >= SDE_HW_MAJOR(SDE_HW_VER_900))
 				set_bit(SDE_DSC_4HS, &dsc->features);
+			if (sde_cfg->has_reduced_ob_max)
+				set_bit(SDE_DSC_REDUCED_OB_MAX, &dsc->features);
 		} else {
 			set_bit(SDE_DSC_HW_REV_1_1, &dsc->features);
 		}
@@ -5094,6 +5096,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		set_bit(SDE_FEATURE_CWB_CROP, sde_cfg->features);
 		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 40;
+		sde_cfg->has_reduced_ob_max = true;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;

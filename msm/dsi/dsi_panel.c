@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -945,6 +946,9 @@ static int dsi_panel_parse_pixel_format(struct dsi_host_common_cfg *host,
 	case 18:
 		fmt = DSI_PIXEL_FORMAT_RGB666;
 		break;
+	case 30:
+		fmt = DSI_PIXEL_FORMAT_RGB101010;
+		break;
 	case 24:
 	default:
 		fmt = DSI_PIXEL_FORMAT_RGB888;
@@ -1326,8 +1330,10 @@ static int dsi_panel_parse_qsync_caps(struct dsi_panel *panel,
 	 */
 	qsync_caps->qsync_min_fps_list_len = utils->count_u32_elems(utils->data,
 				  "qcom,dsi-supported-qsync-min-fps-list");
-	if (qsync_caps->qsync_min_fps_list_len < 1)
+	if (qsync_caps->qsync_min_fps_list_len < 1) {
+		qsync_caps->qsync_min_fps_list_len = 0;
 		goto qsync_support;
+	}
 
 	/**
 	 * qcom,dsi-supported-qsync-min-fps-list cannot be defined

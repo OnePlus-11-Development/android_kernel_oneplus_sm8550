@@ -301,6 +301,7 @@ struct sde_frame_data {
  * @ltm_buffer_lock : muttx to protect ltm_buffers allcation and free
  * @ltm_lock        : Spinlock to protect ltm buffer_cnt, hist_en and ltm lists
  * @needs_hw_reset  : Initiate a hw ctl reset
+ * @reinit_crtc_mixers : Reinitialize mixers in crtc
  * @hist_irq_idx    : hist interrupt irq idx
  * @disable_pending_cp : flag tracks pending color processing features force disable
  * @src_bpp         : source bpp used to calculate compression ratio
@@ -400,6 +401,7 @@ struct sde_crtc {
 	struct mutex ltm_buffer_lock;
 	spinlock_t ltm_lock;
 	bool needs_hw_reset;
+	bool reinit_crtc_mixers;
 	int hist_irq_idx;
 	bool disable_pending_cp;
 
@@ -425,7 +427,6 @@ enum sde_crtc_dirty_flags {
 	SDE_CRTC_DIRTY_DEST_SCALER,
 	SDE_CRTC_DIRTY_DIM_LAYERS,
 	SDE_CRTC_NOISE_LAYER,
-	SDE_CRTC_DIRTY_UIDLE,
 	SDE_CRTC_DIRTY_MAX,
 };
 

@@ -905,6 +905,7 @@ static void _sde_dbg_vbif_disable_block(void __iomem *mem_base, u32 wr_addr)
 			MMSS_VBIF_TEST_BUS2_CTRL0 : MMSS_VBIF_TEST_BUS1_CTRL0;
 	writel_relaxed(0, mem_base + disable_addr);
 	writel_relaxed(BIT(0), mem_base + MMSS_VBIF_TEST_BUS_OUT_CTRL);
+	wmb(); /* update test bus */
 }
 
 static u32 _sde_dbg_vbif_read_test_point(void __iomem *mem_base, u32 wr_addr, u32 rd_addr,
@@ -920,6 +921,7 @@ static void _sde_dbg_vbif_clear_test_point(void __iomem *mem_base, u32 wr_addr)
 {
 	writel_relaxed(0, mem_base + wr_addr);
 	writel_relaxed(0, mem_base + wr_addr + 0x4);
+	wmb(); /* update test point clear */
 }
 
 static u32 _sde_dbg_sde_read_test_point(void __iomem *mem_base, u32 wr_addr, u32 rd_addr,
@@ -1120,7 +1122,7 @@ static void _sde_dbg_dump_sde_dbg_bus(struct sde_dbg_sde_debug_bus *bus, u32 ena
 	SDE_DBG_LOG_MARKER(name, SDE_DBG_LOG_START, in_log);
 
 	if ((in_mem || in_dump) && (!(*dump_mem))) {
-		*dump_mem = kvzalloc(list_size, GFP_KERNEL);
+		*dump_mem = vzalloc(list_size);
 		bus->cmn.content_size = list_size / sizeof(u32);
 	}
 	dump_addr = *dump_mem;
@@ -1165,7 +1167,7 @@ static void _sde_dbg_dump_dsi_dbg_bus(struct sde_dbg_sde_debug_bus *bus, u32 ena
 
 	mutex_lock(&sde_dbg_dsi_mutex);
 	if ((in_mem || in_dump) && (!(*dump_mem))) {
-		*dump_mem = kvzalloc(list_size, GFP_KERNEL);
+		*dump_mem = vzalloc(list_size);
 		bus->cmn.content_size = list_size / sizeof(u32);
 	}
 	dump_addr = *dump_mem;
@@ -1259,7 +1261,7 @@ static void _sde_dump_array(bool do_panic, const char *name, bool dump_secure, u
 
 	reg_dump_size =  _sde_dbg_get_reg_dump_size();
 	if (!dbg_base->reg_dump_base)
-		dbg_base->reg_dump_base = kvzalloc(reg_dump_size, GFP_KERNEL);
+		dbg_base->reg_dump_base = vzalloc(reg_dump_size);
 
 	dbg_base->reg_dump_addr =  dbg_base->reg_dump_base;
 
@@ -1834,7 +1836,7 @@ static ssize_t sde_recovery_regdump_read(struct file *file, char __user *ubuf,
 
 	if (!rbuf->dump_done && !rbuf->cur_blk) {
 		if (!rbuf->buf)
-			rbuf->buf = kvzalloc(DUMP_BUF_SIZE, GFP_KERNEL);
+			rbuf->buf = vzalloc(DUMP_BUF_SIZE);
 		if (!rbuf->buf) {
 			len =  -ENOMEM;
 			goto err;
@@ -2647,7 +2649,7 @@ static void sde_dbg_reg_base_destroy(void)
 		list_del(&blk_base->reg_base_head);
 		kfree(blk_base);
 	}
-	kvfree(dbg_base->reg_dump_base);
+	vfree(dbg_base->reg_dump_base);
 }
 
 static void sde_dbg_dsi_ctrl_destroy(void)
@@ -2666,12 +2668,12 @@ static void sde_dbg_buses_destroy(void)
 {
 	struct sde_dbg_base *dbg_base = &sde_dbg_base;
 
-	kvfree(dbg_base->dbgbus_sde.cmn.dumped_content);
-	kvfree(dbg_base->dbgbus_vbif_rt.cmn.dumped_content);
-	kvfree(dbg_base->dbgbus_dsi.cmn.dumped_content);
-	kvfree(dbg_base->dbgbus_lutdma.cmn.dumped_content);
-	kvfree(dbg_base->dbgbus_rsc.cmn.dumped_content);
-	kvfree(dbg_base->dbgbus_dp.cmn.dumped_content);
+	vfree(dbg_base->dbgbus_sde.cmn.dumped_content);
+	vfree(dbg_base->dbgbus_vbif_rt.cmn.dumped_content);
+	vfree(dbg_base->dbgbus_dsi.cmn.dumped_content);
+	vfree(dbg_base->dbgbus_lutdma.cmn.dumped_content);
+	vfree(dbg_base->dbgbus_rsc.cmn.dumped_content);
+	vfree(dbg_base->dbgbus_dp.cmn.dumped_content);
 }
 
 /**
@@ -2679,7 +2681,7 @@ static void sde_dbg_buses_destroy(void)
  */
 void sde_dbg_destroy(void)
 {
-	kvfree(sde_dbg_base.regbuf.buf);
+	vfree(sde_dbg_base.regbuf.buf);
 	memset(&sde_dbg_base.regbuf, 0, sizeof(sde_dbg_base.regbuf));
 	_sde_dbg_debugfs_destroy();
 	sde_dbg_base_evtlog = NULL;

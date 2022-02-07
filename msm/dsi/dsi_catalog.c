@@ -300,6 +300,7 @@ int dsi_catalog_phy_setup(struct dsi_phy_hw *phy,
 	case DSI_PHY_VERSION_4_1:
 	case DSI_PHY_VERSION_4_2:
 	case DSI_PHY_VERSION_4_3:
+	case DSI_PHY_VERSION_4_3_2:
 		dsi_catalog_phy_4_0_init(phy);
 		break;
 	case DSI_PHY_VERSION_5_2:

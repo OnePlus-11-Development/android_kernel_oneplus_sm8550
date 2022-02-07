@@ -4869,7 +4869,7 @@ void sde_cp_crtc_enable(struct drm_crtc *drm_crtc)
 	if (!num_mixers)
 		return;
 	mutex_lock(&crtc->crtc_cp_lock);
-	info = kzalloc(sizeof(struct sde_kms_info), GFP_KERNEL);
+	info = vzalloc(sizeof(struct sde_kms_info));
 	if (info) {
 		for (i = 0; i < ARRAY_SIZE(dspp_cap_update_func); i++)
 			dspp_cap_update_func[i](crtc, info);
@@ -4878,7 +4878,7 @@ void sde_cp_crtc_enable(struct drm_crtc *drm_crtc)
 			info->data, SDE_KMS_INFO_DATALEN(info),
 			CRTC_PROP_DSPP_INFO);
 	}
-	kfree(info);
+	vfree(info);
 	mutex_unlock(&crtc->crtc_cp_lock);
 }
 
@@ -4893,7 +4893,7 @@ void sde_cp_crtc_disable(struct drm_crtc *drm_crtc)
 	}
 	crtc = to_sde_crtc(drm_crtc);
 	mutex_lock(&crtc->crtc_cp_lock);
-	info = kzalloc(sizeof(struct sde_kms_info), GFP_KERNEL);
+	info = vzalloc(sizeof(struct sde_kms_info));
 	if (info)
 		msm_property_set_blob(&crtc->property_info,
 				&crtc->dspp_blob_info,
@@ -4904,7 +4904,7 @@ void sde_cp_crtc_disable(struct drm_crtc *drm_crtc)
 	crtc->skip_blend_plane_h = 0;
 	crtc->skip_blend_plane_w = 0;
 	mutex_unlock(&crtc->crtc_cp_lock);
-	kfree(info);
+	vfree(info);
 }
 
 void sde_cp_clear_state_info(struct drm_crtc_state *state)

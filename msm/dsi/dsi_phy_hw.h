@@ -35,6 +35,7 @@
  * @DSI_PHY_VERSION_4_1:	7nm
  * @DSI_PHY_VERSION_4_2:        5nm
  * @DSI_PHY_VERSION_4_3:        5nm
+ * @DSI_PHY_VERSION_4_3_2:	4nm (v4.3 specific to SM8475)
  * @DSI_PHY_VERSION_5_2:        4nm
  * @DSI_PHY_VERSION_MAX:
  */
@@ -45,6 +46,7 @@ enum dsi_phy_version {
 	DSI_PHY_VERSION_4_1, /* 7nm */
 	DSI_PHY_VERSION_4_2, /* 5nm */
 	DSI_PHY_VERSION_4_3, /* 5nm */
+	DSI_PHY_VERSION_4_3_2, /* 4nm */
 	DSI_PHY_VERSION_5_2, /* 4nm */
 	DSI_PHY_VERSION_MAX
 };
