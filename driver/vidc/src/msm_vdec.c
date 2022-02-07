@@ -77,6 +77,7 @@ static const u32 msm_vdec_output_subscribe_for_properties[] = {
 	HFI_PROP_PICTURE_TYPE,
 	HFI_PROP_DPB_LIST,
 	HFI_PROP_CABAC_SESSION,
+	HFI_PROP_FENCE,
 };
 
 static const u32 msm_vdec_internal_buffer_type[] = {
@@ -1230,6 +1231,8 @@ static int msm_vdec_subscribe_property(struct msm_vidc_inst *inst,
 			HFI_PAYLOAD_U32_ARRAY,
 			&payload[0],
 			(count + 1) * sizeof(u32));
+	if (rc)
+		return rc;
 
 	return rc;
 }
@@ -1241,7 +1244,15 @@ static int msm_vdec_subscribe_metadata(struct msm_vidc_inst *inst,
 	u32 payload[32] = {0};
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
-	static const u32 metadata_list[] = {
+	const u32 metadata_input_list[] = {
+		INPUT_META_OUTBUF_FENCE,
+		/*
+		 * when fence enabled, client needs output buffer_tag
+		 * in input metadata buffer done.
+		 */
+		META_OUTPUT_BUF_TAG,
+	};
+	const u32 metadata_output_list[] = {
 		META_BITSTREAM_RESOLUTION,
 		META_CROP_OFFSETS,
 		META_DPB_MISR,
@@ -1253,6 +1264,9 @@ static int msm_vdec_subscribe_metadata(struct msm_vidc_inst *inst,
 		META_SEI_MASTERING_DISP,
 		META_SEI_CLL,
 		META_HDR10PLUS,
+		/*
+		 * client needs input buffer tag in output metadata buffer done.
+		 */
 		META_BUF_TAG,
 		META_DPB_TAG_LIST,
 		META_SUBFRAME_OUTPUT,
@@ -1268,14 +1282,28 @@ static int msm_vdec_subscribe_metadata(struct msm_vidc_inst *inst,
 
 	capability = inst->capabilities;
 	payload[0] = HFI_MODE_METADATA;
-	for (i = 0; i < ARRAY_SIZE(metadata_list); i++) {
-		if (capability->cap[metadata_list[i]].value &&
-			msm_vidc_allow_metadata(inst, metadata_list[i])) {
-			payload[count + 1] =
-				capability->cap[metadata_list[i]].hfi_id;
-			count++;
+	if (port == INPUT_PORT) {
+		for (i = 0; i < ARRAY_SIZE(metadata_input_list); i++) {
+			if (capability->cap[metadata_input_list[i]].value &&
+				msm_vidc_allow_metadata(inst, metadata_input_list[i])) {
+				payload[count + 1] =
+					capability->cap[metadata_input_list[i]].hfi_id;
+				count++;
+			}
 		}
-	};
+	} else if (port == OUTPUT_PORT) {
+		for (i = 0; i < ARRAY_SIZE(metadata_output_list); i++) {
+			if (capability->cap[metadata_output_list[i]].value &&
+				msm_vidc_allow_metadata(inst, metadata_output_list[i])) {
+				payload[count + 1] =
+					capability->cap[metadata_output_list[i]].hfi_id;
+				count++;
+			}
+		}
+	} else {
+		i_vpr_e(inst, "%s: invalid port: %d\n", __func__, port);
+		return -EINVAL;
+	}
 
 	rc = venus_hfi_session_command(inst,
 			HFI_CMD_SUBSCRIBE_MODE,
@@ -1283,6 +1311,8 @@ static int msm_vdec_subscribe_metadata(struct msm_vidc_inst *inst,
 			HFI_PAYLOAD_U32_ARRAY,
 			&payload[0],
 			(count + 1) * sizeof(u32));
+	if (rc)
+		return rc;
 
 	return rc;
 }
@@ -1294,10 +1324,10 @@ static int msm_vdec_set_delivery_mode_metadata(struct msm_vidc_inst *inst,
 	u32 payload[32] = {0};
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
-	static const u32 metadata_input_list[] = {
+	const u32 metadata_input_list[] = {
 		META_BUF_TAG,
 	};
-	static const u32 metadata_output_list[] = {
+	const u32 metadata_output_list[] = {
 		META_OUTPUT_BUF_TAG,
 	};
 
@@ -1338,6 +1368,62 @@ static int msm_vdec_set_delivery_mode_metadata(struct msm_vidc_inst *inst,
 			HFI_PAYLOAD_U32_ARRAY,
 			&payload[0],
 			(count + 1) * sizeof(u32));
+	if (rc)
+		return rc;
+
+	return rc;
+}
+
+static int msm_vdec_set_delivery_mode_property(struct msm_vidc_inst *inst,
+	enum msm_vidc_port_type port)
+{
+	int rc = 0;
+	u32 payload[32] = {0};
+	u32 i, count = 0;
+	struct msm_vidc_inst_capability *capability;
+	const u32 property_output_list[] = {
+		INPUT_META_OUTBUF_FENCE,
+	};
+	const u32 property_input_list[] = {};
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	i_vpr_h(inst, "%s()\n", __func__);
+
+	capability = inst->capabilities;
+	payload[0] = HFI_MODE_PROPERTY;
+
+	if (port == INPUT_PORT) {
+		for (i = 0; i < ARRAY_SIZE(property_input_list); i++) {
+			if (capability->cap[property_input_list[i]].value) {
+				payload[count + 1] =
+					capability->cap[property_input_list[i]].hfi_id;
+				count++;
+			}
+		}
+	} else if (port == OUTPUT_PORT) {
+		for (i = 0; i < ARRAY_SIZE(property_output_list); i++) {
+			if (capability->cap[property_output_list[i]].value) {
+				payload[count + 1] =
+					capability->cap[property_output_list[i]].hfi_id;
+				count++;
+			}
+		}
+	} else {
+		i_vpr_e(inst, "%s: invalid port: %d\n", __func__, port);
+		return -EINVAL;
+	}
+
+	rc = venus_hfi_session_command(inst,
+			HFI_CMD_DELIVERY_MODE,
+			port,
+			HFI_PAYLOAD_U32_ARRAY,
+			&payload[0],
+			(count + 1) * sizeof(u32));
+	if (rc)
+		return rc;
 
 	return rc;
 }
@@ -1354,6 +1440,8 @@ static int msm_vdec_session_resume(struct msm_vidc_inst *inst,
 			HFI_PAYLOAD_NONE,
 			NULL,
 			0);
+	if (rc)
+		return rc;
 
 	return rc;
 }
@@ -1983,6 +2071,10 @@ int msm_vdec_streamon_output(struct msm_vidc_inst *inst)
 	rc = msm_vdec_subscribe_metadata(inst, OUTPUT_PORT);
 	if (rc)
 		goto error;
+
+	rc = msm_vdec_set_delivery_mode_property(inst, OUTPUT_PORT);
+	if (rc)
+		return rc;
 
 	rc = msm_vdec_set_delivery_mode_metadata(inst, OUTPUT_PORT);
 	if (rc)
@@ -2887,6 +2979,7 @@ int msm_vdec_subscribe_event(struct msm_vidc_inst *inst,
 
 	switch (sub->type) {
 	case V4L2_EVENT_EOS:
+	case V4L2_EVENT_VIDC_METADATA:
 		rc = v4l2_event_subscribe(&inst->event_handler, sub, MAX_EVENTS, NULL);
 		break;
 	case V4L2_EVENT_SOURCE_CHANGE:

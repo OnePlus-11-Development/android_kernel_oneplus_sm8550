@@ -63,6 +63,7 @@ struct msm_vidc_fence *msm_vidc_fence_create(struct msm_vidc_inst *inst)
 		return NULL;
 	}
 
+	fence->fd = INVALID_FD;
 	spin_lock_init(&fence->lock);
 	dma_fence_init(&fence->dma_fence, &msm_vidc_dma_fence_ops,
 		&fence->lock, inst->fence_context.ctx_num,

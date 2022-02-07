@@ -1115,7 +1115,7 @@ static int handle_dequeue_buffers(struct msm_vidc_inst *inst)
 						"vb2 done already", inst, buf);
 				} else {
 					buf->attr |= MSM_VIDC_ATTR_BUFFER_DONE;
-					msm_vidc_vb2_buffer_done(inst, buf);
+					msm_vidc_buffer_done(inst, buf);
 				}
 				msm_vidc_put_driver_buf(inst, buf);
 			}
@@ -1557,7 +1557,7 @@ static int handle_session_property(struct msm_vidc_inst *inst,
 				__func__,  payload_ptr[0], inst->capabilities->cap[PIPE].value);
 		break;
 	case HFI_PROP_FENCE:
-		if (inst->capabilities->cap[SW_FENCE_ENABLE].value) {
+		if (inst->capabilities->cap[INPUT_META_OUTBUF_FENCE].value) {
 			if (payload_ptr) {
 				fence_id = payload_ptr[0];
 				rc = msm_vidc_fence_signal(inst, fence_id);

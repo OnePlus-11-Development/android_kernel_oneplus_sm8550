@@ -61,6 +61,7 @@
 #define MAX_SUPPORTED_MIN_QUALITY            70
 #define MIN_CHROMA_QP_OFFSET                -12
 #define MAX_CHROMA_QP_OFFSET                  0
+#define INVALID_FD                           -1
 
 #define DCVS_WINDOW 16
 #define ENC_FPS_WINDOW 3
@@ -379,7 +380,7 @@ enum msm_vidc_inst_capability_type {
 	MB_CYCLES_FW,
 	MB_CYCLES_FW_VPP,
 	SECURE_MODE,
-	SW_FENCE_ENABLE,
+	INPUT_META_OUTBUF_FENCE,
 	FENCE_ID,
 	FENCE_FD,
 	TS_REORDER,
