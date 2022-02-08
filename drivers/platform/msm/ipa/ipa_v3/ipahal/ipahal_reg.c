@@ -4878,7 +4878,7 @@ static struct ipahal_reg_obj ipahal_reg_objs[IPA_HW_MAX][IPA_REG_MAX] = {
 		0x00000000, 0, 0, 0, 0, 0},
 	[IPA_HW_v5_5][IPA_FLAVOR_9] = {
 		ipareg_construct_dummy, ipareg_parse_ipa_flavor_9,
-		0x00000000, 0, 0, 0, 0, 0},
+		0x00000024, 0, 0, 0, 0, 0},
 	[IPA_HW_v5_5][IPA_ENABLED_PIPES] = {
 		ipareg_construct_dummy, ipareg_parse_dummy,
 		-1, 0, 0, 0, 0, 0},
