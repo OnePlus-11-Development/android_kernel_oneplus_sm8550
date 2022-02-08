@@ -197,6 +197,9 @@ enum v4l2_mpeg_video_av1_tier {
 /* Control to set input metadata buffer fd */
 #define V4L2_CID_MPEG_VIDC_INPUT_METADATA_FD                                 \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x36)
+/* Control to enable input metadata via request api */
+#define V4L2_CID_MPEG_VIDC_INPUT_METADATA_VIA_REQUEST_ENABLE                 \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x37)
 
 /* add new controls above this line */
 /* Deprecate below controls once availble in gki and gsi bionic header */

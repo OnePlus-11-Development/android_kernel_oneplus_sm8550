@@ -28,6 +28,11 @@ struct vidc_buffer_addr_info {
 	u32 response_required;
 };
 
+struct hfi_pending_packet {
+	struct list_head       list;
+	void                  *data;
+};
+
 int venus_hfi_session_property(struct msm_vidc_inst *inst,
 	u32 pkt_type, u32 flags, u32 port,
 	u32 payload_type, void *payload, u32 payload_size);

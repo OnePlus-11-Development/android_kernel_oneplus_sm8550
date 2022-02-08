@@ -854,6 +854,17 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 		return -EINVAL;
 	}
 
+	if (ctrl->id == V4L2_CID_MPEG_VIDC_INPUT_METADATA_FD) {
+		if (!capability->cap[INPUT_META_VIA_REQUEST].value) {
+			i_vpr_e(inst,
+				"%s: input metadata not enabled via request\n", __func__);
+			return -EINVAL;
+		}
+		rc = msm_vidc_create_input_metadata_buffer(inst, ctrl->val);
+		if (rc)
+			return rc;
+	}
+
 	capability->cap[cap_id].flags |= CAP_FLAG_CLIENT_SET;
 	/* Static setting */
 	if (!inst->bufq[OUTPUT_PORT].vb2q->streaming) {
@@ -943,14 +954,6 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 			goto exit;
 		list_del(&curr_node->list);
 		kfree(curr_node);
-	}
-
-	/* dynamic controls with request will be set along with qbuf */
-	if (inst->request) {
-		i_vpr_l(inst,
-			"%s: request api enabled, dynamic ctrls to be set with qbuf\n",
-			__func__);
-		return 0;
 	}
 
 	/* Dynamic set control ASAP */

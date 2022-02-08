@@ -144,6 +144,7 @@ struct msm_vidc_inst {
 	struct list_head                   caps_list;
 	struct list_head                   children_list;
 	struct list_head                   firmware_list;
+	struct list_head                   pending_pkts; /* list of struct hfi_pending_packet */
 	bool                               once_per_session_set;
 	bool                               ipsc_properties_set;
 	bool                               opsc_properties_set;
