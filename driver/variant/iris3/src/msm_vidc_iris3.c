@@ -297,7 +297,7 @@ static int __disable_regulator_iris3(struct msm_vidc_core *core,
 		rc = __acquire_regulator(core, rinfo);
 		if (rc) {
 			d_vpr_e("%s: failed to acquire %s, rc = %d\n",
-				rinfo->name, rc);
+				__func__, rinfo->name, rc);
 			/* Bring attention to this issue */
 			WARN_ON(true);
 			return rc;
@@ -307,7 +307,7 @@ static int __disable_regulator_iris3(struct msm_vidc_core *core,
 		rc = regulator_disable(rinfo->regulator);
 		if (rc) {
 			d_vpr_e("%s: failed to disable %s, rc = %d\n",
-				rinfo->name, rc);
+				__func__, rinfo->name, rc);
 			return rc;
 		}
 		d_vpr_h("%s: disabled regulator %s\n", __func__, rinfo->name);
@@ -575,10 +575,10 @@ static int __power_off_iris3_controller(struct msm_vidc_core *core)
 	if (rc)
 		d_vpr_h("%s: debug bridge release failed\n", __func__);
 
-	/* power down process */
-	rc = __disable_regulator_iris3(core, "iris-ctl");
+	/* Turn off MVP MVS0C core clock */
+	rc = __disable_unprepare_clock_iris3(core, "core_clk");
 	if (rc) {
-		d_vpr_e("%s: disable regulator iris-ctl failed\n", __func__);
+		d_vpr_e("%s: disable unprepare core_clk failed\n", __func__);
 		rc = 0;
 	}
 
@@ -589,17 +589,16 @@ static int __power_off_iris3_controller(struct msm_vidc_core *core)
 		rc = 0;
 	}
 
-	/* Turn off MVP MVS0C core clock */
-	rc = __disable_unprepare_clock_iris3(core, "core_clk");
+	rc = call_venus_op(core, reset_ahb2axi_bridge, core);
 	if (rc) {
-		d_vpr_e("%s: disable unprepare core_clk failed\n", __func__);
+		d_vpr_e("%s: reset ahb2axi bridge failed\n", __func__);
 		rc = 0;
 	}
 
-	/* Turn off MVP MVS0 SRC clock */
-	rc = __disable_unprepare_clock_iris3(core, "video_cc_mvs0_clk_src");
+	/* power down process */
+	rc = __disable_regulator_iris3(core, "iris-ctl");
 	if (rc) {
-		d_vpr_e("%s: disable unprepare video_cc_mvs0_clk_src failed\n", __func__);
+		d_vpr_e("%s: disable regulator iris-ctl failed\n", __func__);
 		rc = 0;
 	}
 
@@ -617,6 +616,14 @@ static int __power_off_iris3(struct msm_vidc_core *core)
 
 	if (!core->power_enabled)
 		return 0;
+
+	/**
+	 * Reset video_cc_mvs0_clk_src value to resolve MMRM high video
+	 * clock projection issue.
+	 */
+	rc = __set_clocks(core, 0);
+	if (rc)
+		d_vpr_e("%s: resetting clocks failed\n", __func__);
 
 	if (__power_off_iris3_hardware(core))
 		d_vpr_e("%s: failed to power off hardware\n", __func__);
@@ -656,14 +663,8 @@ static int __power_on_iris3_controller(struct msm_vidc_core *core)
 	if (rc)
 		goto fail_clk_controller;
 
-	rc = __prepare_enable_clock_iris3(core, "video_cc_mvs0_clk_src");
-	if (rc)
-		goto fail_clk_src;
-
 	return 0;
 
-fail_clk_src:
-	__disable_unprepare_clock_iris3(core, "core_clk");
 fail_clk_controller:
 	__disable_unprepare_clock_iris3(core, "gcc_video_axi0");
 fail_clk_axi:
@@ -1059,12 +1060,8 @@ int msm_vidc_decide_work_route_iris3(struct msm_vidc_inst* inst)
 				CODED_FRAMES_INTERLACE)
 			work_route = MSM_VIDC_PIPE_1;
 	} else if (is_encode_session(inst)) {
-		u32 slice_mode, width, height;
-		struct v4l2_format* f;
+		u32 slice_mode;
 
-		f = &inst->fmts[INPUT_PORT];
-		height = f->fmt.pix_mp.height;
-		width = f->fmt.pix_mp.width;
 		slice_mode = inst->capabilities->cap[SLICE_MODE].value;
 
 		/*TODO Pipe=1 for legacy CBR*/
