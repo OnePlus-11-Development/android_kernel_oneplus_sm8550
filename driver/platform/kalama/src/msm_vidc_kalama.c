@@ -4,7 +4,7 @@
  * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
-#include <linux/of.h>
+#include <soc/qcom/of_common.h>
 
 #include "msm_vidc_kalama.h"
 #include "msm_vidc_platform.h"
@@ -53,6 +53,10 @@
 #define HEIC    MSM_VIDC_HEIC
 #define CODECS_ALL     (H264 | HEVC | VP9 | HEIC | AV1)
 #define MAXIMUM_OVERRIDE_VP9_FPS 120
+
+/* from of.h */
+#define DDR_TYPE_LPDDR5 0x8
+#define DDR_TYPE_LPDDR5X 0x9
 
 static struct msm_platform_core_capability core_data_kalama[] = {
 	/* {type, value} */
@@ -1810,6 +1814,21 @@ static struct msm_vidc_platform_data kalama_data = {
 	.bus_bw_nrt = bus_bw_nrt,
 };
 
+int msm_vidc_kalama_check_ddr_type(void)
+{
+	u32 ddr_type;
+
+	ddr_type = of_fdt_get_ddrtype();
+	if (ddr_type != DDR_TYPE_LPDDR5 &&
+		ddr_type != DDR_TYPE_LPDDR5X) {
+		d_vpr_e("%s: wrong ddr type %d\n", __func__, ddr_type);
+		return -EINVAL;
+	} else {
+		d_vpr_h("%s: ddr type %d\n", __func__, ddr_type);
+	}
+	return 0;
+}
+
 static int msm_vidc_init_data(struct msm_vidc_core *core)
 {
 	int rc = 0;
@@ -1821,6 +1840,9 @@ static int msm_vidc_init_data(struct msm_vidc_core *core)
 	d_vpr_h("%s: initialize kalama data\n", __func__);
 
 	core->platform->data = kalama_data;
+	rc = msm_vidc_kalama_check_ddr_type();
+	if (rc)
+		return rc;
 
 	return rc;
 }
