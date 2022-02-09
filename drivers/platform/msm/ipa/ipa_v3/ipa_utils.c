@@ -6531,8 +6531,56 @@ const char *ipa_clients_strings[IPA_CLIENT_MAX] = {
 	__stringify(RESERVERD_CONS_123),
 	__stringify(RESERVERD_PROD_124),
 	__stringify(IPA_CLIENT_TPUT_CONS),
+	__stringify(RESERVERD_PROD_126),
+	__stringify(IPA_CLIENT_APPS_LAN_COAL_CONS),
 };
 EXPORT_SYMBOL(ipa_clients_strings);
+
+static void _set_coalescing_disposition(
+	bool force_to_default )
+{
+	if ( ipa3_ctx->ipa_initialization_complete
+		 &&
+		 ipa3_ctx->ipa_hw_type >= IPA_HW_v5_5 ) {
+
+		struct ipahal_reg_coal_master_cfg master_cfg;
+
+		memset(&master_cfg, 0, sizeof(master_cfg));
+
+		ipahal_read_reg_fields(IPA_COAL_MASTER_CFG, &master_cfg);
+
+		master_cfg.coal_force_to_default = force_to_default;
+
+		ipahal_write_reg_fields(IPA_COAL_MASTER_CFG, &master_cfg);
+	}
+}
+
+void start_coalescing()
+{
+	if ( ipa3_ctx->coal_stopped ) {
+		_set_coalescing_disposition(false);
+		ipa3_ctx->coal_stopped = false;
+	}
+}
+
+void stop_coalescing()
+{
+	if ( ! ipa3_ctx->coal_stopped ) {
+		_set_coalescing_disposition(true);
+		ipa3_ctx->coal_stopped = true;
+	}
+}
+
+bool lan_coal_enabled()
+{
+	if ( ipa3_ctx->ipa_initialization_complete ) {
+		int ep_idx;
+		if ( IPA_CLIENT_IS_MAPPED_VALID(IPA_CLIENT_APPS_LAN_COAL_CONS, ep_idx) ) {
+			return true;
+		}
+	}
+	return false;
+}
 
 int ipa3_set_evict_policy(
 	struct ipa_ioc_coal_evict_policy *evict_pol)
@@ -6638,6 +6686,8 @@ const char *ipa_get_version_string(enum ipa_hw_type ver)
 		break;
 	case IPA_HW_v5_1:
 		str = "5.1";
+	case IPA_HW_v5_5:
+		str = "5.5";
 	default:
 		str = "Invalid version";
 		break;
@@ -7486,12 +7536,13 @@ int ipa3_init_hw(void)
 	master_cfg.coal_ipv4_id_ignore = ipa3_ctx->coal_ipv4_id_ignore;
 	ipahal_write_reg_fields(IPA_COAL_MASTER_CFG, &master_cfg);
 
-	IPADBG(": coal-ipv4-id-ignore = %s\n",
-			master_cfg.coal_ipv4_id_ignore
-			? "True" : "False");
-
+	IPADBG(
+		": coal-ipv4-id-ignore = %s\n",
+		master_cfg.coal_ipv4_id_ignore ?
+		"True" : "False");
 
 	ipa_comp_cfg();
+
 	/*
 	 * In IPA 4.2 filter and routing hashing not supported
 	 * disabling hash enable register.
@@ -11801,7 +11852,7 @@ EXPORT_SYMBOL(ipa3_stop_gsi_channel);
 static int _ipa_suspend_resume_pipe(enum ipa_client_type client, bool suspend)
 {
 	struct ipa_ep_cfg_ctrl cfg;
-	int ipa_ep_idx, coal_ep_idx;
+	int ipa_ep_idx, wan_coal_ep_idx, lan_coal_ep_idx;
 	struct ipa3_ep_context *ep;
 	int res;
 
@@ -11832,8 +11883,6 @@ static int _ipa_suspend_resume_pipe(enum ipa_client_type client, bool suspend)
 		return 0;
 	}
 
-	coal_ep_idx = ipa3_get_ep_mapping(IPA_CLIENT_APPS_WAN_COAL_CONS);
-
 	/*
 	 * Configure the callback mode only one time after starting the channel
 	 * otherwise observing IEOB interrupt received before configure callmode
@@ -11858,7 +11907,7 @@ static int _ipa_suspend_resume_pipe(enum ipa_client_type client, bool suspend)
 	/* Apps prod pipes use common event ring so cannot configure mode*/
 
 	/*
-	 * Skipping to configure mode for default wan pipe,
+	 * Skipping to configure mode for default [w|l]an pipe,
 	 * as both pipes using commong event ring. if both pipes
 	 * configure same event ring observing race condition in
 	 * updating current polling state.
@@ -11866,7 +11915,9 @@ static int _ipa_suspend_resume_pipe(enum ipa_client_type client, bool suspend)
 
 	if (IPA_CLIENT_IS_APPS_PROD(client) ||
 		(client == IPA_CLIENT_APPS_WAN_CONS &&
-			coal_ep_idx != IPA_EP_NOT_ALLOCATED))
+		 IPA_CLIENT_IS_MAPPED(IPA_CLIENT_APPS_WAN_COAL_CONS, wan_coal_ep_idx)) ||
+		(client == IPA_CLIENT_APPS_LAN_CONS &&
+		 IPA_CLIENT_IS_MAPPED(IPA_CLIENT_APPS_LAN_COAL_CONS, lan_coal_ep_idx)))
 		return 0;
 
 	if (suspend) {
@@ -11883,24 +11934,57 @@ static int _ipa_suspend_resume_pipe(enum ipa_client_type client, bool suspend)
 	return 0;
 }
 
-void ipa3_force_close_coal(void)
+void ipa3_force_close_coal(
+	bool close_wan,
+	bool close_lan )
 {
-	struct ipa3_desc desc[2];
+	struct ipa3_desc desc[ MAX_CCP_SUB ];
+
 	int ep_idx, num_desc = 0;
 
-	ep_idx = ipa3_get_ep_mapping(IPA_CLIENT_APPS_WAN_COAL_CONS);
-	if (ep_idx == IPA_EP_NOT_ALLOCATED || (!ipa3_ctx->ep[ep_idx].valid))
-		return;
+	if ( close_wan
+		 &&
+		 IPA_CLIENT_IS_MAPPED_VALID(IPA_CLIENT_APPS_WAN_COAL_CONS, ep_idx)
+		 &&
+		 ipa3_ctx->coal_cmd_pyld[WAN_COAL_SUB] ) {
 
-	ipa3_init_imm_cmd_desc(&desc[0], ipa3_ctx->coal_cmd_pyld[0]);
-	num_desc++;
-	if (ipa3_ctx->ulso_wa) {
-		ipa3_init_imm_cmd_desc(&desc[1], ipa3_ctx->coal_cmd_pyld[1]);
+		ipa3_init_imm_cmd_desc(
+			&desc[num_desc],
+			ipa3_ctx->coal_cmd_pyld[WAN_COAL_SUB]);
+
 		num_desc++;
 	}
-	IPADBG("Sending %d descriptor for coal force close\n", num_desc);
-	if (ipa3_send_cmd(num_desc, desc))
-		IPADBG("ipa3_send_cmd timedout\n");
+
+	if ( close_lan
+		 &&
+		 IPA_CLIENT_IS_MAPPED_VALID(IPA_CLIENT_APPS_LAN_COAL_CONS, ep_idx)
+		 &&
+		 ipa3_ctx->coal_cmd_pyld[LAN_COAL_SUB] ) {
+
+		ipa3_init_imm_cmd_desc(
+			&desc[num_desc],
+			ipa3_ctx->coal_cmd_pyld[LAN_COAL_SUB]);
+
+		num_desc++;
+	}
+
+	if (ipa3_ctx->ulso_wa && ipa3_ctx->coal_cmd_pyld[ULSO_COAL_SUB] ) {
+		ipa3_init_imm_cmd_desc(
+			&desc[num_desc],
+			ipa3_ctx->coal_cmd_pyld[ULSO_COAL_SUB]);
+
+		num_desc++;
+	}
+
+	if ( num_desc ) {
+		IPADBG("Sending %d descriptor(s) for coal force close\n", num_desc);
+		if ( ipa3_send_cmd_timeout(
+				 num_desc,
+				 desc,
+				 IPA_COAL_CLOSE_FRAME_CMD_TIMEOUT_MSEC) ) {
+			IPADBG("ipa3_send_cmd_timeout timedout\n");
+		}
+	}
 }
 
 int ipa3_suspend_apps_pipes(bool suspend)
@@ -11909,25 +11993,45 @@ int ipa3_suspend_apps_pipes(bool suspend)
 	struct ipa_ep_cfg_holb holb_cfg;
 	int odl_ep_idx;
 
+	if (suspend) {
+		stop_coalescing();
+		ipa3_force_close_coal(true, true);
+	}
+
 	/* As per HPG first need start/stop coalescing channel
 	 * then default one. Coalescing client number was greater then
 	 * default one so starting the last client.
 	 */
 	res = _ipa_suspend_resume_pipe(IPA_CLIENT_APPS_WAN_COAL_CONS, suspend);
-	if (res == -EAGAIN)
+	if (res == -EAGAIN) {
+		if (suspend) start_coalescing();
 		goto undo_coal_cons;
+	}
 
 	res = _ipa_suspend_resume_pipe(IPA_CLIENT_APPS_WAN_CONS, suspend);
-	if (res == -EAGAIN)
+	if (res == -EAGAIN) {
+		if (suspend) start_coalescing();
 		goto undo_wan_cons;
+	}
+
+	res = _ipa_suspend_resume_pipe(IPA_CLIENT_APPS_LAN_COAL_CONS, suspend);
+	if (res == -EAGAIN) {
+		if (suspend) start_coalescing();
+		goto undo_lan_coal_cons;
+	}
 
 	res = _ipa_suspend_resume_pipe(IPA_CLIENT_APPS_LAN_CONS, suspend);
-	if (res == -EAGAIN)
+	if (res == -EAGAIN) {
+		if (suspend) start_coalescing();
 		goto undo_lan_cons;
+	}
+
+	if (suspend) start_coalescing();
 
 	res = _ipa_suspend_resume_pipe(IPA_CLIENT_ODL_DPL_CONS, suspend);
-	if (res == -EAGAIN)
+	if (res == -EAGAIN) {
 		goto undo_odl_cons;
+	}
 
 	odl_ep_idx = ipa3_get_ep_mapping(IPA_CLIENT_ODL_DPL_CONS);
 	if (odl_ep_idx != IPA_EP_NOT_ALLOCATED && ipa3_ctx->ep[odl_ep_idx].valid) {
@@ -11949,13 +12053,15 @@ int ipa3_suspend_apps_pipes(bool suspend)
 
 	res = _ipa_suspend_resume_pipe(IPA_CLIENT_APPS_WAN_LOW_LAT_CONS,
 		suspend);
-	if (res == -EAGAIN)
+	if (res == -EAGAIN) {
 		goto undo_qmap_cons;
+	}
 
 	res = _ipa_suspend_resume_pipe(IPA_CLIENT_APPS_WAN_LOW_LAT_DATA_CONS,
 		suspend);
-	if (res == -EAGAIN)
+	if (res == -EAGAIN) {
 		goto undo_low_lat_data_cons;
+	}
 
 	if (suspend) {
 		struct ipahal_reg_tx_wrapper tx;
@@ -12033,6 +12139,8 @@ undo_odl_cons:
 	_ipa_suspend_resume_pipe(IPA_CLIENT_ODL_DPL_CONS, !suspend);
 undo_lan_cons:
 	_ipa_suspend_resume_pipe(IPA_CLIENT_APPS_LAN_CONS, !suspend);
+undo_lan_coal_cons:
+	_ipa_suspend_resume_pipe(IPA_CLIENT_APPS_LAN_COAL_CONS, !suspend);
 undo_wan_cons:
 	_ipa_suspend_resume_pipe(IPA_CLIENT_APPS_WAN_COAL_CONS, !suspend);
 	_ipa_suspend_resume_pipe(IPA_CLIENT_APPS_WAN_CONS, !suspend);
@@ -12094,57 +12202,98 @@ int ipa3_allocate_coal_close_frame(void)
 	struct ipahal_imm_cmd_register_write reg_write_cmd = { 0 };
 	struct ipahal_imm_cmd_register_read dummy_reg_read = { 0 };
 	struct ipahal_reg_valmask valmask;
-	int ep_idx;
 	u32 offset = 0;
+	int ep_idx, num_desc = 0;
 
-	ep_idx = ipa3_get_ep_mapping(IPA_CLIENT_APPS_WAN_COAL_CONS);
-	if (ep_idx == IPA_EP_NOT_ALLOCATED)
-		return 0;
-	IPADBG("Allocate coal close frame cmd\n");
-	reg_write_cmd.skip_pipeline_clear = false;
-	if (ipa3_ctx->ulso_wa) {
-		reg_write_cmd.pipeline_clear_options = IPAHAL_SRC_GRP_CLEAR;
-	} else {
-		reg_write_cmd.pipeline_clear_options = IPAHAL_HPS_CLEAR;
-	}
-	if (ipa3_ctx->ipa_hw_type < IPA_HW_v5_0)
-		offset = ipahal_get_reg_ofst(
-			IPA_AGGR_FORCE_CLOSE);
-	else
-		offset = ipahal_get_ep_reg_offset(
-			IPA_AGGR_FORCE_CLOSE_n, ep_idx);
-	reg_write_cmd.offset = offset;
-	ipahal_get_aggr_force_close_valmask(ep_idx, &valmask);
-	reg_write_cmd.value = valmask.val;
-	reg_write_cmd.value_mask = valmask.mask;
-	ipa3_ctx->coal_cmd_pyld[0] =
-		ipahal_construct_imm_cmd(IPA_IMM_CMD_REGISTER_WRITE,
-			&reg_write_cmd, false);
-	if (!ipa3_ctx->coal_cmd_pyld[0]) {
-		IPAERR("fail construct register_write imm cmd\n");
-		ipa_assert();
-		return 0;
+	if ( IPA_CLIENT_IS_MAPPED(IPA_CLIENT_APPS_WAN_COAL_CONS, ep_idx) ) {
+
+		IPADBG("Allocate wan coal close frame cmd\n");
+
+		reg_write_cmd.skip_pipeline_clear = false;
+		if (ipa3_ctx->ulso_wa) {
+			reg_write_cmd.pipeline_clear_options = IPAHAL_SRC_GRP_CLEAR;
+		} else {
+			reg_write_cmd.pipeline_clear_options = IPAHAL_HPS_CLEAR;
+		}
+		if (ipa3_ctx->ipa_hw_type < IPA_HW_v5_0)
+			offset = ipahal_get_reg_ofst(
+				IPA_AGGR_FORCE_CLOSE);
+		else
+			offset = ipahal_get_ep_reg_offset(
+				IPA_AGGR_FORCE_CLOSE_n, ep_idx);
+		reg_write_cmd.offset = offset;
+		ipahal_get_aggr_force_close_valmask(ep_idx, &valmask);
+		reg_write_cmd.value = valmask.val;
+		reg_write_cmd.value_mask = valmask.mask;
+		ipa3_ctx->coal_cmd_pyld[WAN_COAL_SUB] =
+			ipahal_construct_imm_cmd(
+				IPA_IMM_CMD_REGISTER_WRITE,
+				&reg_write_cmd, false);
+		if (!ipa3_ctx->coal_cmd_pyld[WAN_COAL_SUB]) {
+			IPAERR("fail construct register_write imm cmd\n");
+			ipa_assert();
+			return 0;
+		}
+		num_desc++;
 	}
 
-	if (ipa3_ctx->ulso_wa) {
-		/* dummary regsiter read IC with HPS clear*/
+	if ( IPA_CLIENT_IS_MAPPED(IPA_CLIENT_APPS_LAN_COAL_CONS, ep_idx) ) {
+
+		IPADBG("Allocate lan coal close frame cmd\n");
+
+		reg_write_cmd.skip_pipeline_clear = false;
+		if (ipa3_ctx->ulso_wa) {
+			reg_write_cmd.pipeline_clear_options = IPAHAL_SRC_GRP_CLEAR;
+		} else {
+			reg_write_cmd.pipeline_clear_options = IPAHAL_HPS_CLEAR;
+		}
+		if (ipa3_ctx->ipa_hw_type < IPA_HW_v5_0)
+			offset = ipahal_get_reg_ofst(
+				IPA_AGGR_FORCE_CLOSE);
+		else
+			offset = ipahal_get_ep_reg_offset(
+				IPA_AGGR_FORCE_CLOSE_n, ep_idx);
+		reg_write_cmd.offset = offset;
+		ipahal_get_aggr_force_close_valmask(ep_idx, &valmask);
+		reg_write_cmd.value = valmask.val;
+		reg_write_cmd.value_mask = valmask.mask;
+		ipa3_ctx->coal_cmd_pyld[LAN_COAL_SUB] =
+			ipahal_construct_imm_cmd(
+				IPA_IMM_CMD_REGISTER_WRITE,
+				&reg_write_cmd, false);
+		if (!ipa3_ctx->coal_cmd_pyld[LAN_COAL_SUB]) {
+			IPAERR("fail construct register_write imm cmd\n");
+			ipa_assert();
+			return 0;
+		}
+		num_desc++;
+	}
+
+	if ( ipa3_ctx->ulso_wa ) {
+		/*
+		 * Dummy regsiter read IC with HPS clear
+		 */
 		ipa3_ctx->ulso_wa_cmd.size = 4;
-		ipa3_ctx->ulso_wa_cmd.base = dma_alloc_coherent(ipa3_ctx->pdev,
-			ipa3_ctx->ulso_wa_cmd.size,
-			&ipa3_ctx->ulso_wa_cmd.phys_base, GFP_KERNEL);
+		ipa3_ctx->ulso_wa_cmd.base =
+			dma_alloc_coherent(
+				ipa3_ctx->pdev,
+				ipa3_ctx->ulso_wa_cmd.size,
+				&ipa3_ctx->ulso_wa_cmd.phys_base, GFP_KERNEL);
 		if (ipa3_ctx->ulso_wa_cmd.base == NULL) {
 			ipa_assert();
 		}
-		offset = ipahal_get_reg_n_ofst(IPA_STAT_QUOTA_BASE_n,
+		offset = ipahal_get_reg_n_ofst(
+			IPA_STAT_QUOTA_BASE_n,
 			ipa3_ctx->ee);
 		dummy_reg_read.skip_pipeline_clear = false;
 		dummy_reg_read.pipeline_clear_options = IPAHAL_HPS_CLEAR;
 		dummy_reg_read.offset = offset;
 		dummy_reg_read.sys_addr = ipa3_ctx->ulso_wa_cmd.phys_base;
-		ipa3_ctx->coal_cmd_pyld[1] = ipahal_construct_imm_cmd(
-			IPA_IMM_CMD_REGISTER_READ,
-			&dummy_reg_read, false);
-		if (!ipa3_ctx->coal_cmd_pyld[1]) {
+		ipa3_ctx->coal_cmd_pyld[ULSO_COAL_SUB] =
+			ipahal_construct_imm_cmd(
+				IPA_IMM_CMD_REGISTER_READ,
+				&dummy_reg_read, false);
+		if (!ipa3_ctx->coal_cmd_pyld[ULSO_COAL_SUB]) {
 			IPAERR("failed to construct DUMMY READ IC\n");
 			ipa_assert();
 		}
@@ -12155,15 +12304,27 @@ int ipa3_allocate_coal_close_frame(void)
 
 void ipa3_free_coal_close_frame(void)
 {
-	if (ipa3_ctx->coal_cmd_pyld[0])
-		ipahal_destroy_imm_cmd(ipa3_ctx->coal_cmd_pyld[0]);
+	if (ipa3_ctx->coal_cmd_pyld[WAN_COAL_SUB]) {
+		ipahal_destroy_imm_cmd(ipa3_ctx->coal_cmd_pyld[WAN_COAL_SUB]);
+	}
 
-	if (ipa3_ctx->coal_cmd_pyld[1]) {
-		ipahal_destroy_imm_cmd(ipa3_ctx->coal_cmd_pyld[1]);
-		dma_free_coherent(ipa3_ctx->pdev, ipa3_ctx->ulso_wa_cmd.size,
-			ipa3_ctx->ulso_wa_cmd.base, ipa3_ctx->ulso_wa_cmd.phys_base);
+	if (ipa3_ctx->coal_cmd_pyld[LAN_COAL_SUB]) {
+		ipahal_destroy_imm_cmd(ipa3_ctx->coal_cmd_pyld[LAN_COAL_SUB]);
+	}
+
+	if (ipa3_ctx->coal_cmd_pyld[ULSO_COAL_SUB]) {
+		ipahal_destroy_imm_cmd(ipa3_ctx->coal_cmd_pyld[ULSO_COAL_SUB]);
+	}
+
+	if ( ipa3_ctx->ulso_wa_cmd.base ) {
+		dma_free_coherent(
+			ipa3_ctx->pdev,
+			ipa3_ctx->ulso_wa_cmd.size,
+			ipa3_ctx->ulso_wa_cmd.base,
+			ipa3_ctx->ulso_wa_cmd.phys_base);
 	}
 }
+
 /**
  * ipa3_inject_dma_task_for_gsi()- Send DMA_TASK to IPA for GSI stop channel
  *
@@ -12715,6 +12876,7 @@ bool ipa3_is_msm_device(void)
 	case IPA_HW_v4_9:
 	case IPA_HW_v4_11:
 	case IPA_HW_v5_1:
+	case IPA_HW_v5_5:
 		return true;
 	default:
 		IPAERR("unknown HW type %d\n", ipa3_ctx->ipa_hw_type);

@@ -1653,33 +1653,40 @@ static ssize_t ipa3_read_page_recycle_stats(struct file *file,
 	int nbytes;
 	int cnt = 0, i = 0, k = 0;
 
-	nbytes = scnprintf(dbg_buff, IPA_MAX_MSG_LEN,
-			"COAL : Total number of packets replenished =%llu\n"
-			"COAL : Number of page recycled packets  =%llu\n"
-			"COAL : Number of tmp alloc packets  =%llu\n"
-			"COAL  : Number of times tasklet scheduled  =%llu\n"
-			"DEF  : Total number of packets replenished =%llu\n"
-			"DEF  : Number of page recycled packets =%llu\n"
-			"DEF  : Number of tmp alloc packets  =%llu\n"
-			"DEF  : Number of times tasklet scheduled  =%llu\n"
-			"COMMON  : Number of page recycled in tasklet  =%llu\n"
-			"COMMON  : Number of times free pages not found in tasklet =%llu\n",
-			ipa3_ctx->stats.page_recycle_stats[0].total_replenished,
-			ipa3_ctx->stats.page_recycle_stats[0].page_recycled,
-			ipa3_ctx->stats.page_recycle_stats[0].tmp_alloc,
-			ipa3_ctx->stats.num_sort_tasklet_sched[0],
-			ipa3_ctx->stats.page_recycle_stats[1].total_replenished,
-			ipa3_ctx->stats.page_recycle_stats[1].page_recycled,
-			ipa3_ctx->stats.page_recycle_stats[1].tmp_alloc,
-			ipa3_ctx->stats.num_sort_tasklet_sched[1],
-			ipa3_ctx->stats.page_recycle_cnt_in_tasklet,
-			ipa3_ctx->stats.num_of_times_wq_reschd);
+	nbytes = scnprintf(
+		dbg_buff, IPA_MAX_MSG_LEN,
+		"COAL   : Total number of packets replenished =%llu\n"
+		"COAL   : Number of page recycled packets  =%llu\n"
+		"COAL   : Number of tmp alloc packets  =%llu\n"
+		"COAL   : Number of times tasklet scheduled  =%llu\n"
+
+		"DEF    : Total number of packets replenished =%llu\n"
+		"DEF    : Number of page recycled packets =%llu\n"
+		"DEF    : Number of tmp alloc packets  =%llu\n"
+		"DEF    : Number of times tasklet scheduled  =%llu\n"
+
+		"COMMON : Number of page recycled in tasklet  =%llu\n"
+		"COMMON : Number of times free pages not found in tasklet =%llu\n",
+
+		ipa3_ctx->stats.page_recycle_stats[0].total_replenished,
+		ipa3_ctx->stats.page_recycle_stats[0].page_recycled,
+		ipa3_ctx->stats.page_recycle_stats[0].tmp_alloc,
+		ipa3_ctx->stats.num_sort_tasklet_sched[0],
+
+		ipa3_ctx->stats.page_recycle_stats[1].total_replenished,
+		ipa3_ctx->stats.page_recycle_stats[1].page_recycled,
+		ipa3_ctx->stats.page_recycle_stats[1].tmp_alloc,
+		ipa3_ctx->stats.num_sort_tasklet_sched[1],
+
+		ipa3_ctx->stats.page_recycle_cnt_in_tasklet,
+		ipa3_ctx->stats.num_of_times_wq_reschd);
 
 	cnt += nbytes;
 
 	for (k = 0; k < 2; k++) {
 		for (i = 0; i < ipa3_ctx->page_poll_threshold; i++) {
-			nbytes = scnprintf(dbg_buff + cnt, IPA_MAX_MSG_LEN,
+			nbytes = scnprintf(
+				dbg_buff + cnt, IPA_MAX_MSG_LEN,
 				"COMMON  : Page replenish efficiency[%d][%d]  =%llu\n",
 				k, i, ipa3_ctx->stats.page_recycle_cnt[k][i]);
 			cnt += nbytes;
@@ -1688,6 +1695,111 @@ static ssize_t ipa3_read_page_recycle_stats(struct file *file,
 
 	return simple_read_from_buffer(ubuf, count, ppos, dbg_buff, cnt);
 }
+
+static ssize_t ipa3_read_lan_coal_stats(
+	struct file *file,
+	char __user *ubuf,
+	size_t       count,
+	loff_t      *ppos)
+{
+	int nbytes=0, cnt=0;
+	u32 i;
+	char buf[4096];
+
+	*buf = '\0';
+
+	for ( i = 0;
+		  i < sizeof(ipa3_ctx->stats.coal.coal_veid) /
+			  sizeof(ipa3_ctx->stats.coal.coal_veid[0]);
+		  i++ ) {
+
+		nbytes += scnprintf(
+			buf         + nbytes,
+			sizeof(buf) - nbytes,
+			"(%u/%llu) ",
+			i,
+			ipa3_ctx->stats.coal.coal_veid[i]);
+	}
+
+	nbytes = scnprintf(
+		dbg_buff, IPA_MAX_MSG_LEN,
+		"LAN COAL rx            = %llu\n"
+		"LAN COAL pkts          = %llu\n"
+		"LAN COAL left as is    = %llu\n"
+		"LAN COAL reconstructed = %llu\n"
+		"LAN COAL hdr qmap err  = %llu\n"
+		"LAN COAL hdr nlo err   = %llu\n"
+		"LAN COAL hdr pkt err   = %llu\n"
+		"LAN COAL csum err      = %llu\n"
+
+		"LAN COAL ip invalid    = %llu\n"
+		"LAN COAL trans invalid = %llu\n"
+		"LAN COAL tcp           = %llu\n"
+		"LAN COAL tcp bytes     = %llu\n"
+		"LAN COAL udp           = %llu\n"
+		"LAN COAL udp bytes     = %llu\n"
+		"LAN COAL (veid/cnt)...(veid/cnt) = %s\n",
+
+		ipa3_ctx->stats.coal.coal_rx,
+		ipa3_ctx->stats.coal.coal_pkts,
+		ipa3_ctx->stats.coal.coal_left_as_is,
+		ipa3_ctx->stats.coal.coal_reconstructed,
+		ipa3_ctx->stats.coal.coal_hdr_qmap_err,
+		ipa3_ctx->stats.coal.coal_hdr_nlo_err,
+		ipa3_ctx->stats.coal.coal_hdr_pkt_err,
+		ipa3_ctx->stats.coal.coal_csum_err,
+		ipa3_ctx->stats.coal.coal_ip_invalid,
+		ipa3_ctx->stats.coal.coal_trans_invalid,
+		ipa3_ctx->stats.coal.coal_tcp,
+		ipa3_ctx->stats.coal.coal_tcp_bytes,
+		ipa3_ctx->stats.coal.coal_udp,
+		ipa3_ctx->stats.coal.coal_udp_bytes,
+		buf);
+
+	cnt += nbytes;
+
+	return simple_read_from_buffer(ubuf, count, ppos, dbg_buff, cnt);
+}
+
+static ssize_t ipa3_read_cache_recycle_stats(
+	struct file *file,
+	char __user *ubuf,
+	size_t       count,
+	loff_t      *ppos)
+{
+	int nbytes;
+	int cnt = 0;
+
+	nbytes = scnprintf(dbg_buff, IPA_MAX_MSG_LEN,
+			"COAL  (cache) : Total number of pkts replenished =%llu\n"
+			"COAL  (cache) : Number of pkts alloced  =%llu\n"
+			"COAL  (cache) : Number of pkts not alloced  =%llu\n"
+
+			"DEF   (cache) : Total number of pkts replenished =%llu\n"
+			"DEF   (cache) : Number of pkts alloced  =%llu\n"
+			"DEF   (cache) : Number of pkts not alloced  =%llu\n"
+
+			"OTHER (cache) : Total number of packets replenished =%llu\n"
+			"OTHER (cache) : Number of pkts alloced  =%llu\n"
+			"OTHER (cache) : Number of pkts not alloced  =%llu\n",
+
+			ipa3_ctx->stats.cache_recycle_stats[0].tot_pkt_replenished,
+			ipa3_ctx->stats.cache_recycle_stats[0].pkt_allocd,
+			ipa3_ctx->stats.cache_recycle_stats[0].pkt_found,
+
+			ipa3_ctx->stats.cache_recycle_stats[1].tot_pkt_replenished,
+			ipa3_ctx->stats.cache_recycle_stats[1].pkt_allocd,
+			ipa3_ctx->stats.cache_recycle_stats[1].pkt_found,
+
+			ipa3_ctx->stats.cache_recycle_stats[2].tot_pkt_replenished,
+			ipa3_ctx->stats.cache_recycle_stats[2].pkt_allocd,
+			ipa3_ctx->stats.cache_recycle_stats[2].pkt_found);
+
+	cnt += nbytes;
+
+	return simple_read_from_buffer(ubuf, count, ppos, dbg_buff, cnt);
+}
+
 static ssize_t ipa3_read_wstats(struct file *file, char __user *ubuf,
 		size_t count, loff_t *ppos)
 {
@@ -3351,6 +3463,14 @@ static const struct ipa3_debugfs_file debugfs_files[] = {
 	}, {
 		"page_recycle_stats", IPA_READ_ONLY_MODE, NULL, {
 			.read = ipa3_read_page_recycle_stats,
+		}
+	}, {
+		"lan_coal_stats", IPA_READ_ONLY_MODE, NULL, {
+			.read = ipa3_read_lan_coal_stats,
+		}
+	}, {
+		"cache_recycle_stats", IPA_READ_ONLY_MODE, NULL, {
+			.read = ipa3_read_cache_recycle_stats,
 		}
 	}, {
 		"wdi", IPA_READ_ONLY_MODE, NULL, {

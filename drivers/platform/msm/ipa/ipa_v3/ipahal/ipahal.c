@@ -57,8 +57,11 @@ static const char *ipahal_pkt_status_exception_to_str
 	__stringify(IPAHAL_PKT_STATUS_EXCEPTION_CSUM),
 };
 
+/*
+ * Forward declarations.
+ */
 static u16 ipahal_imm_cmd_get_opcode(enum ipahal_imm_cmd_name cmd);
-
+static int ipahal_qmap_init(enum ipa_hw_type ipa_hw_type);
 
 static struct ipahal_imm_cmd_pyld *ipa_imm_cmd_construct_dma_task_32b_addr(
 	enum ipahal_imm_cmd_name cmd, const void *params, bool is_atomic_ctx)
@@ -2576,6 +2579,12 @@ int ipahal_init(enum ipa_hw_type ipa_hw_type, void __iomem *base,
 		goto bail_free_ctx;
 	}
 
+	if (ipahal_qmap_init(ipa_hw_type)) {
+		IPAHAL_ERR("failed to init ipahal qmap\n");
+		result = -EFAULT;
+		goto bail_free_ctx;
+	}
+
 	ipahal_hdr_init(ipa_hw_type);
 
 	if (ipahal_fltrt_init(ipa_hw_type)) {
@@ -2635,4 +2644,185 @@ void ipahal_free_dma_mem(struct ipa_mem_buffer *mem)
 		mem->base = NULL;
 		mem->phys_base = 0;
 	}
+}
+
+/*
+ * ***************************************************************
+ *
+ * To follow, a generalized qmap header manipulation API.
+ *
+ * The functions immediately following this comment are version
+ * specific qmap parsing functions.  The referred to in the
+ * ipahal_qmap_parse_tbl below.
+ *
+ * ***************************************************************
+ */
+void ipa_qmap_hdr_parse_v4_5(
+	union qmap_hdr_u*     qmap_hdr,
+	struct qmap_hdr_data* qmap_data_rslt )
+{
+	qmap_data_rslt->cd = qmap_hdr->qmap5_0.cd;
+	qmap_data_rslt->qmap_next_hdr = qmap_hdr->qmap5_0.qmap_next_hdr;
+	qmap_data_rslt->pad = qmap_hdr->qmap5_0.pad;
+	qmap_data_rslt->mux_id = qmap_hdr->qmap5_0.mux_id;
+	qmap_data_rslt->packet_len_with_pad = qmap_hdr->qmap5_0.packet_len_with_pad;
+
+	qmap_data_rslt->hdr_type = qmap_hdr->qmap5_0.hdr_type;
+	qmap_data_rslt->coal_next_hdr = qmap_hdr->qmap5_0.coal_next_hdr;
+	qmap_data_rslt->zero_checksum = qmap_hdr->qmap5_0.zero_checksum;
+}
+
+void ipa_qmap_hdr_parse_v5_0(
+	union qmap_hdr_u*     qmap_hdr,
+	struct qmap_hdr_data* qmap_data_rslt )
+{
+	qmap_data_rslt->cd = qmap_hdr->qmap5_0.cd;
+	qmap_data_rslt->qmap_next_hdr = qmap_hdr->qmap5_0.qmap_next_hdr;
+	qmap_data_rslt->pad = qmap_hdr->qmap5_0.pad;
+	qmap_data_rslt->mux_id = qmap_hdr->qmap5_0.mux_id;
+	qmap_data_rslt->packet_len_with_pad = qmap_hdr->qmap5_0.packet_len_with_pad;
+
+	qmap_data_rslt->hdr_type = qmap_hdr->qmap5_0.hdr_type;
+	qmap_data_rslt->coal_next_hdr = qmap_hdr->qmap5_0.coal_next_hdr;
+	qmap_data_rslt->ip_id_cfg = qmap_hdr->qmap5_0.ip_id_cfg;
+	qmap_data_rslt->zero_checksum = qmap_hdr->qmap5_0.zero_checksum;
+	qmap_data_rslt->additional_hdr_size = qmap_hdr->qmap5_0.additional_hdr_size;
+	qmap_data_rslt->segment_size = qmap_hdr->qmap5_0.segment_size;
+}
+
+void ipa_qmap_hdr_parse_v5_5(
+	union qmap_hdr_u*     qmap_hdr,
+	struct qmap_hdr_data* qmap_data_rslt )
+{
+	qmap_data_rslt->cd = qmap_hdr->qmap5_5.cd;
+	qmap_data_rslt->qmap_next_hdr = qmap_hdr->qmap5_5.qmap_next_hdr;
+	qmap_data_rslt->pad = qmap_hdr->qmap5_5.pad;
+	qmap_data_rslt->mux_id = qmap_hdr->qmap5_5.mux_id;
+	qmap_data_rslt->packet_len_with_pad = ntohs(qmap_hdr->qmap5_5.packet_len_with_pad);
+
+	qmap_data_rslt->hdr_type = qmap_hdr->qmap5_5.hdr_type;
+	qmap_data_rslt->coal_next_hdr = qmap_hdr->qmap5_5.coal_next_hdr;
+	qmap_data_rslt->chksum_valid = qmap_hdr->qmap5_5.chksum_valid;
+	qmap_data_rslt->num_nlos = qmap_hdr->qmap5_5.num_nlos;
+	qmap_data_rslt->inc_ip_id = qmap_hdr->qmap5_5.inc_ip_id;
+	qmap_data_rslt->rnd_ip_id = qmap_hdr->qmap5_5.rnd_ip_id;
+	qmap_data_rslt->close_value = qmap_hdr->qmap5_5.close_value;
+	qmap_data_rslt->close_type = qmap_hdr->qmap5_5.close_type;
+	qmap_data_rslt->vcid = qmap_hdr->qmap5_5.vcid;
+}
+
+/*
+ * Structure used to describe a version specific qmap parsing table.
+ */
+struct ipahal_qmap_parse_s {
+	/*
+	 * Function prototype for a version specific qmap parsing
+	 * function.
+	 */
+	void (*parse)(
+		union qmap_hdr_u*     qmap_hdr,
+		struct qmap_hdr_data* qmap_data_rslt );
+};
+
+/*
+ * Table used to contain and drive version specific qmap parsing
+ * functions.
+ */
+static struct ipahal_qmap_parse_s ipahal_qmap_parse_tbl[IPA_HW_MAX] = {
+	/* IPAv4.5 */
+	[IPA_HW_v4_5] = {
+		ipa_qmap_hdr_parse_v4_5
+	},
+	/* IPAv5.0 */
+	[IPA_HW_v5_0] = {
+		ipa_qmap_hdr_parse_v5_0
+	},
+	/* IPAv5.5 */
+	[IPA_HW_v5_5] = {
+		ipa_qmap_hdr_parse_v5_5
+	},
+};
+
+static int ipahal_qmap_init(
+	enum ipa_hw_type ipa_hw_type)
+{
+	struct ipahal_qmap_parse_s zero_obj;
+	int i;
+
+	IPAHAL_DBG_LOW("Entry - HW_TYPE=%d\n", ipa_hw_type);
+
+	if (ipa_hw_type < 0 || ipa_hw_type >= IPA_HW_MAX) {
+		IPAHAL_ERR("invalid IPA HW type (%d)\n", ipa_hw_type);
+		return -EINVAL;
+	}
+
+	memset(&zero_obj, 0, sizeof(zero_obj));
+
+	for (i = IPA_HW_v4_5; i < ipa_hw_type; i++) {
+
+		if (memcmp(&ipahal_qmap_parse_tbl[i+1],
+				   &zero_obj,
+				   sizeof(struct ipahal_qmap_parse_s)) == 0 ) {
+			memcpy(
+				&ipahal_qmap_parse_tbl[i+1],
+				&ipahal_qmap_parse_tbl[i],
+				sizeof(struct ipahal_qmap_parse_s));
+		} else {
+			if (ipahal_qmap_parse_tbl[i+1].parse == 0) {
+				IPAHAL_ERR(
+					"QMAP parse table missing parse function ipa_ver=%d\n",
+					i+1);
+				WARN_ON(1);
+			}
+		}
+	}
+
+	return 0;
+}
+
+/*
+ * FUNCTION: ipahal_qmap_parse()
+ *
+ * The following Function to be called when version specific qmap parsing is
+ * required.
+ *
+ * ARGUMENTS:
+ *
+ *   unparsed_qmap
+ *
+ *     The QMAP header off of a freshly recieved data packet.  As per
+ *     the architecture documentation, the data contained herein will
+ *     be in network order.
+ *
+ *   qmap_data_rslt
+ *
+ *     A location to store the parsed data from unparsed_qmap above.
+ */
+int ipahal_qmap_parse(
+	const void*           unparsed_qmap,
+	struct qmap_hdr_data* qmap_data_rslt )
+{
+	union qmap_hdr_u qmap_hdr;
+
+	IPAHAL_DBG_LOW("Parse qmap/coal header\n");
+
+	if (!unparsed_qmap || !qmap_data_rslt) {
+		IPAHAL_ERR(
+			"Input Error: unparsed_qmap=%pK qmap_data_rslt=%pK\n",
+			unparsed_qmap, qmap_data_rslt);
+		return -EINVAL;
+	}
+
+	if (ipahal_ctx->hw_type < IPA_HW_v4_5) {
+		IPAHAL_ERR(
+			"Unsupported qmap parse for IPA HW type (%d)\n",
+			ipahal_ctx->hw_type);
+		return -EINVAL;
+	}
+
+	ipahal_qmap_ntoh(unparsed_qmap, &qmap_hdr);
+
+	ipahal_qmap_parse_tbl[ipahal_ctx->hw_type].parse(&qmap_hdr, qmap_data_rslt);
+
+	return 0;
 }
