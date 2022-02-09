@@ -200,6 +200,18 @@ enum v4l2_mpeg_video_av1_tier {
 /* Control to enable input metadata via request api */
 #define V4L2_CID_MPEG_VIDC_INPUT_METADATA_VIA_REQUEST_ENABLE                 \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x37)
+/* Control to enable software fence feature */
+#define V4L2_CID_MPEG_VIDC_SW_FENCE_ENABLE                                   \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x38)
+/* Control to set fence id to driver in order get corresponding fence fd */
+#define V4L2_CID_MPEG_VIDC_SW_FENCE_ID                                       \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x39)
+/*
+ * Control to get fence fd from driver for the fence id
+ * set via V4L2_CID_MPEG_VIDC_SW_FENCE_ID
+ */
+#define V4L2_CID_MPEG_VIDC_SW_FENCE_FD                                       \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x3A)
 
 /* add new controls above this line */
 /* Deprecate below controls once availble in gki and gsi bionic header */

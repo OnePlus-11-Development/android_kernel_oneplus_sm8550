@@ -824,9 +824,6 @@ static int handle_output_buffer(struct msm_vidc_inst *inst,
 		return 0;
 	}
 
-	/* signal the fence asap */
-	msm_vidc_fence_signal(inst, buf);
-
 	buf->data_offset = buffer->data_offset;
 	buf->data_size = buffer->data_size;
 	buf->timestamp = buffer->timestamp;
@@ -1424,6 +1421,7 @@ static int handle_session_property(struct msm_vidc_inst *inst,
 	int rc = 0;
 	u32 port;
 	u32 *payload_ptr = NULL;
+	u32 fence_id = 0;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: Invalid params\n", __func__);
@@ -1557,6 +1555,20 @@ static int handle_session_property(struct msm_vidc_inst *inst,
 			i_vpr_e(inst,
 				"%s: fw pipe mode(%d) not matching the capability value(%d)\n",
 				__func__,  payload_ptr[0], inst->capabilities->cap[PIPE].value);
+		break;
+	case HFI_PROP_FENCE:
+		if (inst->capabilities->cap[SW_FENCE_ENABLE].value) {
+			if (payload_ptr) {
+				fence_id = payload_ptr[0];
+				rc = msm_vidc_fence_signal(inst, fence_id);
+			} else {
+				i_vpr_e(inst, "%s: fence payload is null\n", __func__);
+				rc = -EINVAL;
+			}
+		} else {
+			i_vpr_e(inst, "%s: fence is not enabled for this session\n",
+				__func__);
+		}
 		break;
 	default:
 		i_vpr_e(inst, "%s: invalid property %#x\n",

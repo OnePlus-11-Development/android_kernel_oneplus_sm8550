@@ -9,12 +9,14 @@
 #include "msm_vidc_inst.h"
 #include "msm_vidc_buffer.h"
 
-int msm_vidc_fence_create(struct msm_vidc_inst *inst,
-		struct msm_vidc_buffer *buf);
+struct msm_vidc_fence *msm_vidc_fence_create(
+		struct msm_vidc_inst *inst);
+int msm_vidc_create_fence_fd(struct msm_vidc_inst *inst,
+		struct msm_vidc_fence *fence);
 int msm_vidc_fence_signal(struct msm_vidc_inst *inst,
-		struct msm_vidc_buffer *buf);
+		u32 fence_id);
 void msm_vidc_fence_destroy(struct msm_vidc_inst *inst,
-		struct msm_vidc_buffer *buf);
+		struct msm_vidc_fence *fence);
 int msm_vidc_fence_init(struct msm_vidc_inst *inst);
 void msm_vidc_fence_deinit(struct msm_vidc_inst *inst);
 

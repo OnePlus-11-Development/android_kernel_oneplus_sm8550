@@ -3473,7 +3473,7 @@ int venus_hfi_queue_buffer(struct msm_vidc_inst *inst,
 	struct msm_vidc_core *core;
 	struct hfi_buffer hfi_buffer;
 
-	if (!inst || !inst->core || !inst->packet) {
+	if (!inst || !inst->core || !inst->packet || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
@@ -3521,6 +3521,11 @@ int venus_hfi_queue_buffer(struct msm_vidc_inst *inst,
 			sizeof(hfi_buffer));
 		if (rc)
 			goto unlock;
+	}
+
+	if (inst->capabilities->cap[SW_FENCE_ENABLE].value &&
+		is_output_buffer(buffer->type)) {
+		/* TODO(AS): create fence property packet to send to fw */
 	}
 
 	rc = venus_hfi_add_pending_packets(inst);
