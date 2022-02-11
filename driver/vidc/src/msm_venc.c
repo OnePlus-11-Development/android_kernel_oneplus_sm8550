@@ -1218,7 +1218,7 @@ static int msm_venc_s_fmt_output_meta(struct msm_vidc_inst *inst, struct v4l2_fo
 static int msm_venc_s_fmt_input(struct msm_vidc_inst *inst, struct v4l2_format *f)
 {
 	int rc = 0;
-	struct v4l2_format *fmt;
+	struct v4l2_format *fmt, *output_fmt;
 	struct msm_vidc_core *core;
 	u32 pix_fmt, width, height, size, bytesperline,
 		crop_width, crop_height;
@@ -1266,10 +1266,22 @@ static int msm_venc_s_fmt_input(struct msm_vidc_inst *inst, struct v4l2_format *
 	else
 		size = call_session_op(core, buffer_size, inst, MSM_VIDC_BUF_INPUT);
 	fmt->fmt.pix_mp.plane_fmt[0].sizeimage = size;
+	/* update input port colorspace info */
 	fmt->fmt.pix_mp.colorspace = f->fmt.pix_mp.colorspace;
 	fmt->fmt.pix_mp.xfer_func = f->fmt.pix_mp.xfer_func;
 	fmt->fmt.pix_mp.ycbcr_enc = f->fmt.pix_mp.ycbcr_enc;
 	fmt->fmt.pix_mp.quantization = f->fmt.pix_mp.quantization;
+	/*
+	 * Update output port colorspace info.
+	 * NOTE: If client needs CSC, then client needs to ensure setting
+	 * output port color after setting input color info.
+	 */
+	output_fmt = &inst->fmts[OUTPUT_PORT];
+	output_fmt->fmt.pix_mp.colorspace = fmt->fmt.pix_mp.colorspace;
+	output_fmt->fmt.pix_mp.xfer_func = fmt->fmt.pix_mp.xfer_func;
+	output_fmt->fmt.pix_mp.ycbcr_enc = fmt->fmt.pix_mp.ycbcr_enc;
+	output_fmt->fmt.pix_mp.quantization = fmt->fmt.pix_mp.quantization;
+
 	inst->buffers.input.min_count = call_session_op(core,
 		min_count, inst, MSM_VIDC_BUF_INPUT);
 	inst->buffers.input.extra_count = call_session_op(core,

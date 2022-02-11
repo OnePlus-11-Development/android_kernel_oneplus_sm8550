@@ -1493,6 +1493,16 @@ static int msm_vdec_read_input_subcr_params(struct msm_vidc_inst *inst)
 			__func__);
 	}
 
+	/* align input port color info with output port */
+	inst->fmts[INPUT_PORT].fmt.pix_mp.colorspace =
+		inst->fmts[OUTPUT_PORT].fmt.pix_mp.colorspace;
+	inst->fmts[INPUT_PORT].fmt.pix_mp.xfer_func =
+		inst->fmts[OUTPUT_PORT].fmt.pix_mp.xfer_func;
+	inst->fmts[INPUT_PORT].fmt.pix_mp.ycbcr_enc =
+		inst->fmts[OUTPUT_PORT].fmt.pix_mp.ycbcr_enc;
+	inst->fmts[INPUT_PORT].fmt.pix_mp.quantization =
+		inst->fmts[OUTPUT_PORT].fmt.pix_mp.quantization;
+
 	inst->buffers.output.min_count = subsc_params.fw_min_count;
 	inst->buffers.output.extra_count = call_session_op(core,
 		extra_count, inst, MSM_VIDC_BUF_OUTPUT);
@@ -2492,7 +2502,7 @@ int msm_vdec_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 {
 	int rc = 0;
 	struct msm_vidc_core *core;
-	struct v4l2_format *fmt;
+	struct v4l2_format *fmt, *output_fmt;
 	u32 codec_align, pix_fmt;
 
 	if (!inst || !inst->core) {
@@ -2544,6 +2554,17 @@ int msm_vdec_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 		}
 		inst->buffers.input.size =
 			fmt->fmt.pix_mp.plane_fmt[0].sizeimage;
+		/* update input port color info */
+		fmt->fmt.pix_mp.colorspace = f->fmt.pix_mp.colorspace;
+		fmt->fmt.pix_mp.xfer_func = f->fmt.pix_mp.xfer_func;
+		fmt->fmt.pix_mp.ycbcr_enc = f->fmt.pix_mp.ycbcr_enc;
+		fmt->fmt.pix_mp.quantization = f->fmt.pix_mp.quantization;
+		/* update output port color info */
+		output_fmt = &inst->fmts[OUTPUT_PORT];
+		output_fmt->fmt.pix_mp.colorspace = f->fmt.pix_mp.colorspace;
+		output_fmt->fmt.pix_mp.xfer_func = f->fmt.pix_mp.xfer_func;
+		output_fmt->fmt.pix_mp.ycbcr_enc = f->fmt.pix_mp.ycbcr_enc;
+		output_fmt->fmt.pix_mp.quantization = f->fmt.pix_mp.quantization;
 
 		/* update crop dimensions */
 		inst->crop.left = inst->crop.top = 0;
