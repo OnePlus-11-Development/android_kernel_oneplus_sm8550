@@ -610,7 +610,7 @@ static int _sde_rm_hw_blk_create(
 	struct sde_hw_mdp *hw_mdp;
 	struct sde_hw_blk_reg_map *hw;
 	struct sde_kms *sde_kms = to_sde_kms(ddev_to_msm_kms(rm->dev));
-	struct sde_vbif_clk_client clk_client;
+	struct sde_vbif_clk_client clk_client = {0};
 
 	hw_mdp = rm->hw_mdp;
 
@@ -680,7 +680,8 @@ static int _sde_rm_hw_blk_create(
 
 	_sde_rm_inc_resource_info(rm, &rm->avail_res, blk);
 
-	if (test_bit(SDE_FEATURE_VBIF_CLK_SPLIT, sde_kms->catalog->features) &&
+	if (sde_kms && sde_kms->catalog &&
+			test_bit(SDE_FEATURE_VBIF_CLK_SPLIT, sde_kms->catalog->features) &&
 			SDE_CLK_CTRL_VALID(clk_client.clk_ctrl)) {
 		rc = sde_vbif_clk_register(sde_kms, &clk_client);
 		if (rc) {

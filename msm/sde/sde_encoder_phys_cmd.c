@@ -180,6 +180,9 @@ static void _sde_encoder_phys_signal_frame_done(struct sde_encoder_phys *phys_en
 	cmd_enc = to_sde_encoder_phys_cmd(phys_enc);
 	ctl = phys_enc->hw_ctl;
 
+	if (!ctl)
+		return;
+
 	/* notify all synchronous clients first, then asynchronous clients */
 	if (phys_enc->parent_ops.handle_frame_done &&
 		atomic_add_unless(&phys_enc->pending_kickoff_cnt, -1, 0)) {
@@ -1860,10 +1863,12 @@ static void sde_encoder_phys_cmd_prepare_commit(
 		struct sde_encoder_phys *phys_enc)
 {
 	struct sde_encoder_phys_cmd *cmd_enc = to_sde_encoder_phys_cmd(phys_enc);
-	struct sde_kms *sde_kms = phys_enc->sde_kms;
+	struct sde_kms *sde_kms;
 
 	if (!phys_enc || !sde_encoder_phys_cmd_is_master(phys_enc))
 		return;
+
+	sde_kms = phys_enc->sde_kms;
 
 	SDE_EVT32(DRMID(phys_enc->parent), phys_enc->intf_idx - INTF_0,
 			cmd_enc->autorefresh.cfg.enable);

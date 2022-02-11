@@ -1929,7 +1929,8 @@ static int sde_encoder_phys_wb_prepare_for_kickoff(struct sde_encoder_phys *phys
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
 	int ret = 0;
 
-	phys_enc->frame_trigger_mode = params->frame_trigger_mode;
+	phys_enc->frame_trigger_mode = params ?
+		params->frame_trigger_mode : FRAME_DONE_WAIT_DEFAULT;
 	if (!phys_enc->in_clone_mode && (phys_enc->frame_trigger_mode == FRAME_DONE_WAIT_DEFAULT)
 			&& (atomic_read(&phys_enc->pending_kickoff_cnt))) {
 		ret = _sde_encoder_phys_wb_wait_for_idle(phys_enc, true);

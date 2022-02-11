@@ -3683,13 +3683,9 @@ static void _sde_crtc_clear_all_blend_stages(struct sde_crtc *sde_crtc)
 	}
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-static void sde_crtc_atomic_begin(struct drm_crtc *crtc,
-		struct drm_atomic_state *state)
-#else
-static void sde_crtc_atomic_begin(struct drm_crtc *crtc,
+static void _sde_crtc_atomic_begin(struct drm_crtc *crtc,
 		struct drm_crtc_state *old_state)
-#endif
+
 {
 	struct sde_crtc *sde_crtc;
 	struct drm_encoder *encoder;
@@ -3698,14 +3694,6 @@ static void sde_crtc_atomic_begin(struct drm_crtc *crtc,
 	struct sde_splash_display *splash_display;
 	bool cont_splash_enabled = false;
 	size_t i;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-	struct drm_crtc_state *old_state = drm_atomic_get_new_crtc_state(state, crtc);
-#endif
-
-	if (!crtc) {
-		SDE_ERROR("invalid crtc\n");
-		return;
-	}
 
 	if (!crtc->state->enable) {
 		SDE_DEBUG("crtc%d -> enable %d, skip atomic_begin\n",
@@ -3799,6 +3787,33 @@ static void sde_crtc_atomic_begin(struct drm_crtc *crtc,
 end:
 	SDE_ATRACE_END("crtc_atomic_begin");
 }
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+static void sde_crtc_atomic_begin(struct drm_crtc *crtc,
+		struct drm_atomic_state *state)
+{
+	struct drm_crtc_state *old_state = NULL;
+
+	if (!crtc) {
+		SDE_ERROR("invalid crtc\n");
+		return;
+	}
+
+	old_state = drm_atomic_get_old_crtc_state(state, crtc);
+	_sde_crtc_atomic_begin(crtc, old_state);
+}
+#else
+static void sde_crtc_atomic_begin(struct drm_crtc *crtc,
+		struct drm_crtc_state *old_state)
+{
+	if (!crtc) {
+		SDE_ERROR("invalid crtc\n");
+		return;
+	}
+	_sde_crtc_atomic_begin(crtc, old_state);
+}
+#endif
+
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 static void sde_crtc_atomic_flush(struct drm_crtc *crtc,
@@ -5499,13 +5514,8 @@ static int _sde_crtc_check_plane_layout(struct drm_crtc *crtc,
 	return 0;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-static int sde_crtc_atomic_check(struct drm_crtc *crtc,
-		struct drm_atomic_state *atomic_state)
-#else
-static int sde_crtc_atomic_check(struct drm_crtc *crtc,
+static int _sde_crtc_atomic_check(struct drm_crtc *crtc,
 		struct drm_crtc_state *state)
-#endif
 {
 	struct drm_device *dev;
 	struct sde_crtc *sde_crtc;
@@ -5516,9 +5526,6 @@ static int sde_crtc_atomic_check(struct drm_crtc *crtc,
 	struct sde_multirect_plane_states *multirect_plane = NULL;
 	struct drm_connector *conn;
 	struct drm_connector_list_iter conn_iter;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-	struct drm_crtc_state *state = drm_atomic_get_new_crtc_state(atomic_state, crtc);
-#endif
 
 	if (!crtc) {
 		SDE_ERROR("invalid crtc\n");
@@ -5613,6 +5620,32 @@ end:
 	kfree(multirect_plane);
 	return rc;
 }
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+static int sde_crtc_atomic_check(struct drm_crtc *crtc,
+		struct drm_atomic_state *atomic_state)
+{
+	struct drm_crtc_state *state = NULL;
+
+	if (!crtc) {
+		SDE_ERROR("invalid crtc\n");
+		return -EINVAL;
+	}
+
+	state = drm_atomic_get_new_crtc_state(atomic_state, crtc);
+	return _sde_crtc_atomic_check(crtc, state);
+}
+#else
+static int sde_crtc_atomic_check(struct drm_crtc *crtc,
+		struct drm_crtc_state *state)
+{
+	if (!crtc) {
+		SDE_ERROR("invalid crtc\n");
+		return -EINVAL;
+	}
+	return _sde_crtc_atomic_check(crtc, state);
+}
+#endif
 
 /**
  * sde_crtc_get_num_datapath - get the number of layermixers active
