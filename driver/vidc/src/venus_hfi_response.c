@@ -1024,6 +1024,64 @@ static int handle_output_metadata_buffer(struct msm_vidc_inst *inst,
 	return rc;
 }
 
+static bool is_metabuffer_dequeued(struct msm_vidc_inst *inst,
+	struct msm_vidc_buffer *buf)
+{
+	bool found = false;
+	struct msm_vidc_buffers *buffers;
+	struct msm_vidc_buffer *buffer;
+	enum msm_vidc_buffer_type buffer_type;
+
+	if (is_input_buffer(buf->type) && is_input_meta_enabled(inst))
+		buffer_type = MSM_VIDC_BUF_INPUT_META;
+	else if (is_output_buffer(buf->type) && is_output_meta_enabled(inst))
+		buffer_type = MSM_VIDC_BUF_OUTPUT_META;
+	else
+		return true;
+
+	buffers = msm_vidc_get_buffers(inst, buffer_type, __func__);
+	if (!buffers)
+		return false;
+
+	list_for_each_entry(buffer, &buffers->list, list) {
+		if (buffer->index == buf->index &&
+			buffer->attr & MSM_VIDC_ATTR_DEQUEUED) {
+			found = true;
+			break;
+		}
+	}
+	return found;
+}
+
+static int msm_vidc_check_meta_buffers(struct msm_vidc_inst *inst)
+{
+	int rc = 0;
+	int i;
+	struct msm_vidc_buffers *buffers;
+	struct msm_vidc_buffer *buf;
+	const enum msm_vidc_buffer_type buffer_type[] = {
+		MSM_VIDC_BUF_INPUT,
+		MSM_VIDC_BUF_OUTPUT,
+	};
+
+	for (i = 0; i < ARRAY_SIZE(buffer_type); i++) {
+		buffers = msm_vidc_get_buffers(inst, buffer_type[i], __func__);
+		if (!buffers)
+			return -EINVAL;
+
+		list_for_each_entry(buf, &buffers->list, list) {
+			if (buf->attr & MSM_VIDC_ATTR_DEQUEUED) {
+				if (!is_metabuffer_dequeued(inst, buf)) {
+					print_vidc_buffer(VIDC_ERR, "err ",
+						"meta not dequeued", inst, buf);
+					return -EINVAL;
+				}
+			}
+		}
+	}
+	return rc;
+}
+
 static int handle_dequeue_buffers(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
@@ -1031,12 +1089,17 @@ static int handle_dequeue_buffers(struct msm_vidc_inst *inst)
 	struct msm_vidc_buffers *buffers;
 	struct msm_vidc_buffer *buf;
 	struct msm_vidc_buffer *dummy;
-	static const enum msm_vidc_buffer_type buffer_type[] = {
+	const enum msm_vidc_buffer_type buffer_type[] = {
 		MSM_VIDC_BUF_INPUT_META,
 		MSM_VIDC_BUF_INPUT,
 		MSM_VIDC_BUF_OUTPUT_META,
 		MSM_VIDC_BUF_OUTPUT,
 	};
+
+	/* check metabuffers dequeued before sending vb2_buffer_done() */
+	rc = msm_vidc_check_meta_buffers(inst);
+	if (rc)
+		return rc;
 
 	for (i = 0; i < ARRAY_SIZE(buffer_type); i++) {
 		buffers = msm_vidc_get_buffers(inst, buffer_type[i], __func__);
@@ -1134,12 +1197,12 @@ static int handle_session_buffer(struct msm_vidc_inst *inst,
 	struct hfi_buffer *buffer;
 	u32 hfi_handle_size = 0;
 	const struct msm_vidc_hfi_buffer_handle *hfi_handle_arr = NULL;
-	static const struct msm_vidc_hfi_buffer_handle enc_input_hfi_handle[] = {
+	const struct msm_vidc_hfi_buffer_handle enc_input_hfi_handle[] = {
 		{HFI_BUFFER_METADATA,       handle_input_metadata_buffer      },
 		{HFI_BUFFER_RAW,            handle_input_buffer               },
 		{HFI_BUFFER_VPSS,           handle_release_internal_buffer    },
 	};
-	static const struct msm_vidc_hfi_buffer_handle enc_output_hfi_handle[] = {
+	const struct msm_vidc_hfi_buffer_handle enc_output_hfi_handle[] = {
 		{HFI_BUFFER_METADATA,       handle_output_metadata_buffer     },
 		{HFI_BUFFER_BITSTREAM,      handle_output_buffer              },
 		{HFI_BUFFER_BIN,            handle_release_internal_buffer    },
@@ -1149,7 +1212,7 @@ static int handle_session_buffer(struct msm_vidc_inst *inst,
 		{HFI_BUFFER_ARP,            handle_release_internal_buffer    },
 		{HFI_BUFFER_DPB,            handle_release_internal_buffer    },
 	};
-	static const struct msm_vidc_hfi_buffer_handle dec_input_hfi_handle[] = {
+	const struct msm_vidc_hfi_buffer_handle dec_input_hfi_handle[] = {
 		{HFI_BUFFER_METADATA,       handle_input_metadata_buffer      },
 		{HFI_BUFFER_BITSTREAM,      handle_input_buffer               },
 		{HFI_BUFFER_BIN,            handle_release_internal_buffer    },
@@ -1158,7 +1221,7 @@ static int handle_session_buffer(struct msm_vidc_inst *inst,
 		{HFI_BUFFER_LINE,           handle_release_internal_buffer    },
 		{HFI_BUFFER_PERSIST,        handle_release_internal_buffer    },
 	};
-	static const struct msm_vidc_hfi_buffer_handle dec_output_hfi_handle[] = {
+	const struct msm_vidc_hfi_buffer_handle dec_output_hfi_handle[] = {
 		{HFI_BUFFER_METADATA,       handle_output_metadata_buffer     },
 		{HFI_BUFFER_RAW,            handle_output_buffer              },
 		{HFI_BUFFER_DPB,            handle_release_internal_buffer    },
@@ -1292,7 +1355,7 @@ static int handle_session_command(struct msm_vidc_inst *inst,
 	struct hfi_packet *pkt)
 {
 	int i, rc;
-	static const struct msm_vidc_hfi_packet_handle hfi_pkt_handle[] = {
+	const struct msm_vidc_hfi_packet_handle hfi_pkt_handle[] = {
 		{HFI_CMD_OPEN,              handle_session_open               },
 		{HFI_CMD_CLOSE,             handle_session_close              },
 		{HFI_CMD_START,             handle_session_start              },
@@ -1558,7 +1621,7 @@ static int handle_system_response(struct msm_vidc_core *core,
 	struct hfi_packet *packet;
 	u8 *pkt, *start_pkt;
 	int i, j;
-	static const struct msm_vidc_core_hfi_range be[] = {
+	const struct msm_vidc_core_hfi_range be[] = {
 		{HFI_SYSTEM_ERROR_BEGIN,   HFI_SYSTEM_ERROR_END,   handle_system_error     },
 		{HFI_PROP_BEGIN,           HFI_PROP_END,           handle_system_property  },
 		{HFI_CMD_BEGIN,            HFI_CMD_END,            handle_system_init      },
@@ -1605,7 +1668,7 @@ static int __handle_session_response(struct msm_vidc_inst *inst,
 	u8 *pkt, *start_pkt;
 	bool dequeue = false;
 	int i, j;
-	static const struct msm_vidc_inst_hfi_range be[] = {
+	const struct msm_vidc_inst_hfi_range be[] = {
 		{HFI_SESSION_ERROR_BEGIN,  HFI_SESSION_ERROR_END,  handle_session_error    },
 		{HFI_INFORMATION_BEGIN,    HFI_INFORMATION_END,    handle_session_info     },
 		{HFI_PROP_BEGIN,           HFI_PROP_END,           handle_session_property },
