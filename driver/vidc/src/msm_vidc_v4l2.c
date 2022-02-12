@@ -443,7 +443,7 @@ int msm_v4l2_streamon(struct file *filp, void *fh,
 		rc = -EBUSY;
 		goto unlock;
 	}
-	rc = msm_vidc_streamon((void *)inst, i);
+	rc = msm_vidc_streamon((void *)inst, filp, fh, i);
 	if (rc)
 		goto unlock;
 

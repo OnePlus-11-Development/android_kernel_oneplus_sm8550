@@ -34,7 +34,7 @@ void msm_vb2_unmap_dmabuf(void *buf_priv);
 int msm_vidc_queue_setup(struct vb2_queue *q,
 		unsigned int *num_buffers, unsigned int *num_planes,
 		unsigned int sizes[], struct device *alloc_devs[]);
-int msm_vidc_start_streaming(struct vb2_queue *q, unsigned int count);
+int msm_vidc_start_streaming(struct vb2_queue *q, unsigned int i);
 void msm_vidc_stop_streaming(struct vb2_queue *q);
 void msm_vidc_buf_queue(struct vb2_buffer *vb2);
 void msm_vidc_buf_cleanup(struct vb2_buffer *vb);

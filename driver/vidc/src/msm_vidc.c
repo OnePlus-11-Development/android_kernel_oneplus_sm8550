@@ -5,6 +5,7 @@
 
 #include <linux/types.h>
 #include <linux/hash.h>
+#include <media/v4l2-mem2mem.h>
 #include "msm_vidc_core.h"
 #include "msm_vidc_inst.h"
 #include "msm_vdec.h"
@@ -545,7 +546,8 @@ exit:
 }
 EXPORT_SYMBOL(msm_vidc_dqbuf);
 
-int msm_vidc_streamon(void *instance, enum v4l2_buf_type type)
+int msm_vidc_streamon(void *instance, struct file *filp, void *fh,
+		enum v4l2_buf_type type)
 {
 	int rc = 0;
 	struct msm_vidc_inst *inst = instance;
@@ -569,10 +571,12 @@ int msm_vidc_streamon(void *instance, enum v4l2_buf_type type)
 		rc = -EINVAL;
 		goto exit;
 	}
-
-	rc = vb2_streamon(inst->bufq[port].vb2q, type);
+	if (port == INPUT_PORT || port == OUTPUT_PORT)
+		rc = v4l2_m2m_ioctl_streamon(filp, fh, type);
+	else
+		rc = vb2_streamon(inst->bufq[port].vb2q, type);
 	if (rc) {
-		i_vpr_e(inst, "%s: vb2_streamon(%d) failed, %d\n",
+		i_vpr_e(inst, "%s: streamon(%d) failed, %d\n",
 			__func__, type, rc);
 		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
 		goto exit;
