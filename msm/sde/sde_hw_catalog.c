@@ -3952,8 +3952,8 @@ static void _sde_top_parse_dt_helper(struct sde_mdss_cfg *cfg,
 			DEFAULT_SDE_MIXER_BLENDSTAGES;
 
 	cfg->ubwc_rev = props->exists[UBWC_VERSION] ?
-			SDE_HW_UBWC_VER(PROP_VALUE_ACCESS(props->values,
-			UBWC_VERSION, 0)) : DEFAULT_SDE_UBWC_NONE;
+			PROP_VALUE_ACCESS(props->values,
+			UBWC_VERSION, 0) : DEFAULT_SDE_UBWC_NONE;
 
 	cfg->mdp[0].highest_bank_bit = DEFAULT_SDE_HIGHEST_BANK_BIT;
 
