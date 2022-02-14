@@ -340,6 +340,18 @@ enum msm_vidc_core_capability_type {
 	CORE_CAP_MAX,
 };
 
+/**
+ * msm_vidc_prepare_dependency_list() api will prepare caps_list by looping over
+ * enums(msm_vidc_inst_capability_type) from 0 to INST_CAP_MAX and arranges the
+ * node in such a way that parents willbe at the front and dependent children
+ * in the back.
+ *
+ * caps_list preparation may become CPU intensive task, so to save CPU cycles,
+ * organize enum in proper order(root caps at the beginning and dependent caps
+ * at back), so that during caps_list preparation num CPU cycles spent will reduce.
+ *
+ * Note: It will work, if enum kept at different places, but not efficient.
+ */
 enum msm_vidc_inst_capability_type {
 	INST_CAP_NONE = 0,
 	FRAME_WIDTH,
@@ -462,34 +474,40 @@ enum msm_vidc_inst_capability_type {
 	META_DEC_QP_METADATA,
 	COMPLEXITY,
 	META_MAX_NUM_REORDER_FRAMES,
+	/* place all root(no parent) enums before this line */
+
 	PROFILE,
+	META_ROI_INFO,
+	ENH_LAYER_COUNT,
+	BIT_RATE,
+	LOWLATENCY_MODE,
+	GOP_SIZE,
+	B_FRAME,
+	ALL_INTRA,
+	MIN_QUALITY,
+	CONTENT_ADAPTIVE_CODING,
+	BLUR_TYPES,
+	/* place all intermittent(having both parent and child) enums before this line */
+
 	MIN_FRAME_QP,
 	MAX_FRAME_QP,
 	I_FRAME_QP,
 	P_FRAME_QP,
 	B_FRAME_QP,
-	META_ROI_INFO,
 	TIME_DELTA_BASED_RC,
 	CONSTANT_QUALITY,
-	ENH_LAYER_COUNT,
-	BIT_RATE,
 	VBV_DELAY,
 	PEAK_BITRATE,
-	LOWLATENCY_MODE,
 	ENTROPY_MODE,
 	TRANSFORM_8X8,
-	GOP_SIZE,
-	B_FRAME,
-	BLUR_RESOLUTION,
 	STAGE,
-	ALL_INTRA,
-	MIN_QUALITY,
 	LTR_COUNT,
 	IR_RANDOM,
 	BITRATE_BOOST,
 	SLICE_MODE,
-	CONTENT_ADAPTIVE_CODING,
-	BLUR_TYPES,
+	BLUR_RESOLUTION,
+	/* place all leaf(no child) enums before this line */
+
 	INST_CAP_MAX,
 };
 
