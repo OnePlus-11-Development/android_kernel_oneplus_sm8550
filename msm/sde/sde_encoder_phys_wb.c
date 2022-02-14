@@ -1130,6 +1130,92 @@ static void _sde_encoder_phys_wb_setup_cache(struct sde_encoder_phys_wb *wb_enc,
 	SDE_EVT32(WBID(wb_enc), cfg->wr_scid, cfg->flags, cfg->type, cache_enable);
 }
 
+static void _sde_encoder_phys_wb_update_cwb_flush_helper(
+		struct sde_encoder_phys *phys_enc, bool enable)
+{
+	struct sde_connector *c_conn = NULL;
+	struct sde_connector_state *c_state = NULL;
+	struct sde_hw_wb *hw_wb;
+	struct sde_hw_ctl *hw_ctl;
+	struct sde_hw_pingpong *hw_pp;
+	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
+	struct sde_crtc_state *crtc_state;
+	struct sde_crtc *crtc;
+	int i = 0;
+	int cwb_capture_mode = 0;
+	bool need_merge = false;
+	bool dspp_out = false;
+	enum sde_cwb cwb_idx = 0;
+	enum sde_cwb src_pp_idx = 0;
+	enum sde_dcwb dcwb_idx = 0;
+	size_t dither_sz = 0;
+	void *dither_cfg = NULL;
+
+	/* In CWB mode, program actual source master sde_hw_ctl from crtc */
+	crtc = to_sde_crtc(wb_enc->crtc);
+	hw_ctl = crtc->mixers[0].hw_ctl;
+	hw_pp = phys_enc->hw_pp;
+	hw_wb = wb_enc->hw_wb;
+	if (!hw_ctl || !hw_wb || !hw_pp) {
+		SDE_ERROR("[enc:%d wb:%d] HW resource not available for CWB\n",
+				DRMID(phys_enc->parent), WBID(wb_enc));
+		return;
+	}
+
+	crtc_state = to_sde_crtc_state(wb_enc->crtc->state);
+	cwb_capture_mode = sde_crtc_get_property(crtc_state, CRTC_PROP_CAPTURE_OUTPUT);
+	need_merge = (crtc->num_mixers > 1) ? true : false;
+	dspp_out = (cwb_capture_mode == CAPTURE_DSPP_OUT);
+	cwb_idx = (enum sde_cwb)hw_pp->idx;
+	src_pp_idx = (enum sde_cwb)crtc->mixers[0].hw_lm->idx;
+
+	if (test_bit(SDE_WB_CWB_DITHER_CTRL, &hw_wb->caps->features)) {
+		if (cwb_capture_mode) {
+			c_conn = to_sde_connector(phys_enc->connector);
+			c_state = to_sde_connector_state(phys_enc->connector->state);
+			dither_cfg = msm_property_get_blob(&c_conn->property_info,
+					&c_state->property_state, &dither_sz,
+					CONNECTOR_PROP_PP_CWB_DITHER);
+			SDE_DEBUG("Read cwb dither setting from blob %pK\n", dither_cfg);
+		} else {
+			/* disable case: tap is lm */
+			dither_cfg = NULL;
+		}
+	}
+
+	for (i = 0; i < crtc->num_mixers; i++) {
+		src_pp_idx = (enum sde_cwb) (src_pp_idx + i);
+
+		if (test_bit(SDE_WB_DCWB_CTRL, &hw_wb->caps->features)) {
+			dcwb_idx = (enum sde_dcwb) ((hw_pp->idx % 2) + i);
+			if ((test_bit(SDE_WB_CWB_DITHER_CTRL, &hw_wb->caps->features)) &&
+				hw_wb->ops.program_cwb_dither_ctrl){
+				hw_wb->ops.program_cwb_dither_ctrl(hw_wb,
+					dcwb_idx, dither_cfg, dither_sz, enable);
+			}
+			if (hw_wb->ops.program_dcwb_ctrl)
+				hw_wb->ops.program_dcwb_ctrl(hw_wb, dcwb_idx,
+					src_pp_idx, cwb_capture_mode, enable);
+			if (hw_ctl->ops.update_bitmask)
+				hw_ctl->ops.update_bitmask(hw_ctl,
+					SDE_HW_FLUSH_CWB, dcwb_idx, 1);
+
+		} else if (test_bit(SDE_WB_CWB_CTRL, &hw_wb->caps->features)) {
+			cwb_idx = (enum sde_cwb) (hw_pp->idx + i);
+			if (hw_wb->ops.program_cwb_ctrl)
+				hw_wb->ops.program_cwb_ctrl(hw_wb, cwb_idx,
+					src_pp_idx, dspp_out, enable);
+			if (hw_ctl->ops.update_bitmask)
+				hw_ctl->ops.update_bitmask(hw_ctl,
+					SDE_HW_FLUSH_CWB, cwb_idx, 1);
+		}
+	}
+
+	if (need_merge && hw_ctl->ops.update_bitmask && hw_pp && hw_pp->merge_3d)
+		hw_ctl->ops.update_bitmask(hw_ctl, SDE_HW_FLUSH_MERGE_3D,
+				hw_pp->merge_3d->idx, 1);
+}
+
 static void _sde_encoder_phys_wb_update_cwb_flush(struct sde_encoder_phys *phys_enc, bool enable)
 {
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
@@ -1145,10 +1231,6 @@ static void _sde_encoder_phys_wb_update_cwb_flush(struct sde_encoder_phys *phys_
 	enum sde_dcwb dcwb_idx = 0;
 	enum sde_cwb src_pp_idx = 0;
 	bool dspp_out = false, need_merge = false;
-	struct sde_connector *c_conn = NULL;
-	struct sde_connector_state *c_state = NULL;
-	void *dither_cfg = NULL;
-	size_t dither_sz = 0;
 
 	if (!phys_enc->in_clone_mode) {
 		SDE_DEBUG("enc:%d, wb:%d - not in CWB mode. early return\n",
@@ -1207,51 +1289,7 @@ static void _sde_encoder_phys_wb_update_cwb_flush(struct sde_encoder_phys *phys_
 
 	if (test_bit(SDE_WB_CWB_CTRL, &hw_wb->caps->features) ||
 			test_bit(SDE_WB_DCWB_CTRL, &hw_wb->caps->features)) {
-		if (test_bit(SDE_WB_CWB_DITHER_CTRL, &hw_wb->caps->features)) {
-			if (cwb_capture_mode) {
-				c_conn = to_sde_connector(phys_enc->connector);
-				c_state = to_sde_connector_state(phys_enc->connector->state);
-				dither_cfg = msm_property_get_blob(&c_conn->property_info,
-						&c_state->property_state, &dither_sz,
-						CONNECTOR_PROP_PP_CWB_DITHER);
-				SDE_DEBUG("Read cwb dither setting from blob %pK\n", dither_cfg);
-			} else {
-				/* disable case: tap is lm */
-				dither_cfg = NULL;
-			}
-		}
-
-		for (i = 0; i < crtc->num_mixers; i++) {
-			src_pp_idx = (enum sde_cwb) (src_pp_idx + i);
-
-			if (test_bit(SDE_WB_DCWB_CTRL, &hw_wb->caps->features)) {
-				dcwb_idx = (enum sde_dcwb) ((hw_pp->idx % 2) + i);
-				if (test_bit(SDE_WB_CWB_DITHER_CTRL, &hw_wb->caps->features)) {
-					if (hw_wb->ops.program_cwb_dither_ctrl)
-						hw_wb->ops.program_cwb_dither_ctrl(hw_wb,
-							dcwb_idx, dither_cfg, dither_sz, enable);
-				}
-				if (hw_wb->ops.program_dcwb_ctrl)
-					hw_wb->ops.program_dcwb_ctrl(hw_wb, dcwb_idx,
-						src_pp_idx, cwb_capture_mode, enable);
-				if (hw_ctl->ops.update_bitmask)
-					hw_ctl->ops.update_bitmask(hw_ctl,
-						SDE_HW_FLUSH_CWB, dcwb_idx, 1);
-
-			} else if (test_bit(SDE_WB_CWB_CTRL, &hw_wb->caps->features)) {
-				cwb_idx = (enum sde_cwb) (hw_pp->idx + i);
-				if (hw_wb->ops.program_cwb_ctrl)
-					hw_wb->ops.program_cwb_ctrl(hw_wb, cwb_idx,
-						src_pp_idx, dspp_out, enable);
-				if (hw_ctl->ops.update_bitmask)
-					hw_ctl->ops.update_bitmask(hw_ctl,
-						SDE_HW_FLUSH_CWB, cwb_idx, 1);
-			}
-		}
-
-		if (need_merge && hw_ctl->ops.update_bitmask && hw_pp && hw_pp->merge_3d)
-			hw_ctl->ops.update_bitmask(hw_ctl, SDE_HW_FLUSH_MERGE_3D,
-					hw_pp->merge_3d->idx, 1);
+		_sde_encoder_phys_wb_update_cwb_flush_helper(phys_enc, enable);
 	} else {
 		phys_enc->hw_mdptop->ops.set_cwb_ppb_cntl(phys_enc->hw_mdptop,
 				need_merge, dspp_out);
