@@ -515,6 +515,7 @@ struct sde_hw_blk_reg_map *sde_hw_pingpong_init(enum sde_pingpong idx,
 
 	c->idx = idx;
 	c->caps = cfg;
+	c->dcwb_idx = cfg->dcwb_id;
 	if (test_bit(SDE_PINGPONG_MERGE_3D, &cfg->features)) {
 		c->merge_3d = _sde_pp_merge_3d_init(cfg->merge_3d_id, addr, m);
 			if (IS_ERR(c->merge_3d)) {
