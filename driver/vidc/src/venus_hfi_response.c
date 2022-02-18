@@ -1056,7 +1056,7 @@ static int msm_vidc_check_meta_buffers(struct msm_vidc_inst *inst)
 	int i;
 	struct msm_vidc_buffers *buffers;
 	struct msm_vidc_buffer *buf;
-	const enum msm_vidc_buffer_type buffer_type[] = {
+	static const enum msm_vidc_buffer_type buffer_type[] = {
 		MSM_VIDC_BUF_INPUT,
 		MSM_VIDC_BUF_OUTPUT,
 	};
@@ -1086,7 +1086,7 @@ static int handle_dequeue_buffers(struct msm_vidc_inst *inst)
 	struct msm_vidc_buffers *buffers;
 	struct msm_vidc_buffer *buf;
 	struct msm_vidc_buffer *dummy;
-	const enum msm_vidc_buffer_type buffer_type[] = {
+	static const enum msm_vidc_buffer_type buffer_type[] = {
 		MSM_VIDC_BUF_INPUT_META,
 		MSM_VIDC_BUF_INPUT,
 		MSM_VIDC_BUF_OUTPUT_META,
@@ -1194,12 +1194,12 @@ static int handle_session_buffer(struct msm_vidc_inst *inst,
 	struct hfi_buffer *buffer;
 	u32 hfi_handle_size = 0;
 	const struct msm_vidc_hfi_buffer_handle *hfi_handle_arr = NULL;
-	const struct msm_vidc_hfi_buffer_handle enc_input_hfi_handle[] = {
+	static const struct msm_vidc_hfi_buffer_handle enc_input_hfi_handle[] = {
 		{HFI_BUFFER_METADATA,       handle_input_metadata_buffer      },
 		{HFI_BUFFER_RAW,            handle_input_buffer               },
 		{HFI_BUFFER_VPSS,           handle_release_internal_buffer    },
 	};
-	const struct msm_vidc_hfi_buffer_handle enc_output_hfi_handle[] = {
+	static const struct msm_vidc_hfi_buffer_handle enc_output_hfi_handle[] = {
 		{HFI_BUFFER_METADATA,       handle_output_metadata_buffer     },
 		{HFI_BUFFER_BITSTREAM,      handle_output_buffer              },
 		{HFI_BUFFER_BIN,            handle_release_internal_buffer    },
@@ -1209,7 +1209,7 @@ static int handle_session_buffer(struct msm_vidc_inst *inst,
 		{HFI_BUFFER_ARP,            handle_release_internal_buffer    },
 		{HFI_BUFFER_DPB,            handle_release_internal_buffer    },
 	};
-	const struct msm_vidc_hfi_buffer_handle dec_input_hfi_handle[] = {
+	static const struct msm_vidc_hfi_buffer_handle dec_input_hfi_handle[] = {
 		{HFI_BUFFER_METADATA,       handle_input_metadata_buffer      },
 		{HFI_BUFFER_BITSTREAM,      handle_input_buffer               },
 		{HFI_BUFFER_BIN,            handle_release_internal_buffer    },
@@ -1218,7 +1218,7 @@ static int handle_session_buffer(struct msm_vidc_inst *inst,
 		{HFI_BUFFER_LINE,           handle_release_internal_buffer    },
 		{HFI_BUFFER_PERSIST,        handle_release_internal_buffer    },
 	};
-	const struct msm_vidc_hfi_buffer_handle dec_output_hfi_handle[] = {
+	static const struct msm_vidc_hfi_buffer_handle dec_output_hfi_handle[] = {
 		{HFI_BUFFER_METADATA,       handle_output_metadata_buffer     },
 		{HFI_BUFFER_RAW,            handle_output_buffer              },
 		{HFI_BUFFER_DPB,            handle_release_internal_buffer    },
@@ -1352,7 +1352,7 @@ static int handle_session_command(struct msm_vidc_inst *inst,
 	struct hfi_packet *pkt)
 {
 	int i, rc;
-	const struct msm_vidc_hfi_packet_handle hfi_pkt_handle[] = {
+	static const struct msm_vidc_hfi_packet_handle hfi_pkt_handle[] = {
 		{HFI_CMD_OPEN,              handle_session_open               },
 		{HFI_CMD_CLOSE,             handle_session_close              },
 		{HFI_CMD_START,             handle_session_start              },
@@ -1633,7 +1633,7 @@ static int handle_system_response(struct msm_vidc_core *core,
 	struct hfi_packet *packet;
 	u8 *pkt, *start_pkt;
 	int i, j;
-	const struct msm_vidc_core_hfi_range be[] = {
+	static const struct msm_vidc_core_hfi_range be[] = {
 		{HFI_SYSTEM_ERROR_BEGIN,   HFI_SYSTEM_ERROR_END,   handle_system_error     },
 		{HFI_PROP_BEGIN,           HFI_PROP_END,           handle_system_property  },
 		{HFI_CMD_BEGIN,            HFI_CMD_END,            handle_system_init      },
@@ -1680,7 +1680,7 @@ static int __handle_session_response(struct msm_vidc_inst *inst,
 	u8 *pkt, *start_pkt;
 	bool dequeue = false;
 	int i, j;
-	const struct msm_vidc_inst_hfi_range be[] = {
+	static const struct msm_vidc_inst_hfi_range be[] = {
 		{HFI_SESSION_ERROR_BEGIN,  HFI_SESSION_ERROR_END,  handle_session_error    },
 		{HFI_INFORMATION_BEGIN,    HFI_INFORMATION_END,    handle_session_info     },
 		{HFI_PROP_BEGIN,           HFI_PROP_END,           handle_session_property },

@@ -1244,7 +1244,7 @@ static int msm_vdec_subscribe_metadata(struct msm_vidc_inst *inst,
 	u32 payload[32] = {0};
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
-	const u32 metadata_input_list[] = {
+	static const u32 metadata_input_list[] = {
 		INPUT_META_OUTBUF_FENCE,
 		/*
 		 * when fence enabled, client needs output buffer_tag
@@ -1252,7 +1252,7 @@ static int msm_vdec_subscribe_metadata(struct msm_vidc_inst *inst,
 		 */
 		META_OUTPUT_BUF_TAG,
 	};
-	const u32 metadata_output_list[] = {
+	static const u32 metadata_output_list[] = {
 		META_BITSTREAM_RESOLUTION,
 		META_CROP_OFFSETS,
 		META_DPB_MISR,
@@ -1324,10 +1324,10 @@ static int msm_vdec_set_delivery_mode_metadata(struct msm_vidc_inst *inst,
 	u32 payload[32] = {0};
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
-	const u32 metadata_input_list[] = {
+	static const u32 metadata_input_list[] = {
 		META_BUF_TAG,
 	};
-	const u32 metadata_output_list[] = {
+	static const u32 metadata_output_list[] = {
 		META_OUTPUT_BUF_TAG,
 	};
 
@@ -1381,10 +1381,10 @@ static int msm_vdec_set_delivery_mode_property(struct msm_vidc_inst *inst,
 	u32 payload[32] = {0};
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
-	const u32 property_output_list[] = {
+	static const u32 property_output_list[] = {
 		INPUT_META_OUTBUF_FENCE,
 	};
-	const u32 property_input_list[] = {};
+	static const u32 property_input_list[] = {};
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);

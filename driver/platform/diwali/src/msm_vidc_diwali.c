@@ -4883,7 +4883,7 @@ static struct msm_vidc_efuse_data efuse_data_diwali[] = {
 	EFUSE_ENTRY(0x221C8118, 4, 0x80, 0x6, SKU_VERSION),
 };
 
-static struct msm_vidc_platform_data diwali_data = {
+static const struct msm_vidc_platform_data diwali_data = {
 	.core_data = core_data_diwali_v0,
 	.core_data_size = ARRAY_SIZE(core_data_diwali_v0),
 	.instance_data = instance_data_diwali_v0,

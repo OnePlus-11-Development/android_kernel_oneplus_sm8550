@@ -1694,7 +1694,7 @@ static u32 bus_bw_nrt[] = {
 	11000000,
 };
 
-static struct msm_vidc_platform_data waipio_data = {
+static const struct msm_vidc_platform_data waipio_data = {
 	.core_data = core_data_waipio,
 	.core_data_size = ARRAY_SIZE(core_data_waipio),
 	.instance_data = instance_data_waipio,

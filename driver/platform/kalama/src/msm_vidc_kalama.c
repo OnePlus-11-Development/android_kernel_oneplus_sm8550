@@ -1828,7 +1828,7 @@ static u32 bus_bw_nrt[] = {
 	11000000,
 };
 
-static struct msm_vidc_platform_data kalama_data = {
+static const struct msm_vidc_platform_data kalama_data = {
 	.core_data = core_data_kalama,
 	.core_data_size = ARRAY_SIZE(core_data_kalama),
 	.instance_data = instance_data_kalama,
