@@ -200,8 +200,8 @@ enum v4l2_mpeg_video_av1_tier {
 /* Control to enable input metadata via request api */
 #define V4L2_CID_MPEG_VIDC_INPUT_METADATA_VIA_REQUEST_ENABLE                 \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x37)
-/* Control to enable software fence feature */
-#define V4L2_CID_MPEG_VIDC_SW_FENCE_ENABLE                                   \
+/* Enables Output buffer fence id via input metadata */
+#define V4L2_CID_MPEG_VIDC_INPUT_METADATA_OUTBUF_FENCE                       \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x38)
 /* Control to set fence id to driver in order get corresponding fence fd */
 #define V4L2_CID_MPEG_VIDC_SW_FENCE_ID                                       \
@@ -345,6 +345,7 @@ enum v4l2_mpeg_vidc_metadata {
 	METADATA_ROI_INFO                     = 0x03000173,
 	METADATA_DPB_TAG_LIST                 = 0x03000179,
 	METADATA_MAX_NUM_REORDER_FRAMES       = 0x03000127,
+	METADATA_FENCE                        = 0x0300018B,
 };
 enum meta_interlace_info {
 	META_INTERLACE_INFO_NONE                            = 0x00000000,
@@ -357,5 +358,31 @@ enum meta_interlace_info {
 };
 
 /* vendor controls end */
+
+/* vendor events start */
+
+/*
+ * Vendor event structure looks like below (reference videodev2.h)
+ * struct v4l2_event {
+ *      __u32                             type;
+ *      union {
+ *              struct v4l2_event_src_change    src_change;
+ *              ...
+ *              / ********** vendor event structure ******** /
+ *              __u8                            data[64];
+ *      } u;
+ *      __u32                             pending;
+ *      ...
+ *  }
+ */
+#define V4L2_EVENT_VIDC_METADATA                                             \
+	(V4L2_EVENT_PRIVATE_START + 0x1)
+
+struct v4l2_event_vidc_metadata {
+	__u32                                type;
+	__s32                                fd;
+	__u8                                 reserved[56];
+};
+/* vendor events end */
 
 #endif

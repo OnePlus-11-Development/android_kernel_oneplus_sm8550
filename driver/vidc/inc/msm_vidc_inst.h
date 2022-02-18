@@ -142,8 +142,8 @@ struct msm_vidc_inst {
 	struct list_head                   enc_input_crs;
 	struct list_head                   dmabuf_tracker; /* list of struct msm_memory_dmabuf */
 	struct list_head                   caps_list;
-	struct list_head                   children_list;
-	struct list_head                   firmware_list;
+	struct list_head                   children_list; /* struct msm_vidc_inst_cap_entry */
+	struct list_head                   firmware_list; /* struct msm_vidc_inst_cap_entry */
 	struct list_head                   pending_pkts; /* list of struct hfi_pending_packet */
 	struct list_head                   fence_list; /* list of struct msm_vidc_fence */
 	bool                               once_per_session_set;

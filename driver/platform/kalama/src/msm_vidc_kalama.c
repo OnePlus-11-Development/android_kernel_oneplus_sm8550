@@ -277,18 +277,29 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		{0},
 		NULL, msm_vidc_set_u32},
 
-	{SW_FENCE_ENABLE, DEC, CODECS_ALL,
+	/*
+	 * Client will enable V4L2_CID_MPEG_VIDC_INPUT_METADATA_OUTBUF_FENCE
+	 * to get fence_id in input metadata buffer done.
+	 */
+	{INPUT_META_OUTBUF_FENCE, DEC, CODECS_ALL,
 		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
-		V4L2_CID_MPEG_VIDC_SW_FENCE_ENABLE,
+		V4L2_CID_MPEG_VIDC_INPUT_METADATA_OUTBUF_FENCE,
 		HFI_PROP_FENCE},
 
+	/*
+	 * Client to do set_ctrl with FENCE_ID to set fence_id
+	 * and then client will do get_ctrl with FENCE_FD to get
+	 * fence_fd corresponding to client set fence_id.
+	 */
 	{FENCE_ID, DEC, CODECS_ALL,
 		0, INT_MAX, 1, 0,
-		V4L2_CID_MPEG_VIDC_SW_FENCE_ID},
+		V4L2_CID_MPEG_VIDC_SW_FENCE_ID,
+		0,
+		CAP_FLAG_DYNAMIC_ALLOWED | CAP_FLAG_OUTPUT_PORT},
 
 	{FENCE_FD, DEC, CODECS_ALL,
-		0, INT_MAX, 1, 0,
+		INVALID_FD, INT_MAX, 1, INVALID_FD,
 		V4L2_CID_MPEG_VIDC_SW_FENCE_FD},
 
 	{TS_REORDER, DEC, H264|HEVC,

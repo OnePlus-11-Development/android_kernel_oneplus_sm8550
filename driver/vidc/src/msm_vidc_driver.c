@@ -82,7 +82,7 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{MB_CYCLES_FW,                   "MB_CYCLES_FW"               },
 	{MB_CYCLES_FW_VPP,               "MB_CYCLES_FW_VPP"           },
 	{SECURE_MODE,                    "SECURE_MODE"                },
-	{SW_FENCE_ENABLE,                "SW_FENCE_ENABLE"            },
+	{INPUT_META_OUTBUF_FENCE,        "INPUT_META_OUTBUF_FENCE"    },
 	{FENCE_ID,                       "FENCE_ID"                   },
 	{FENCE_FD,                       "FENCE_FD"                   },
 	{TS_REORDER,                     "TS_REORDER"                 },
@@ -178,33 +178,33 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{COMPLEXITY,                     "COMPLEXITY"                 },
 	{META_MAX_NUM_REORDER_FRAMES,    "META_MAX_NUM_REORDER_FRAMES"},
 	{PROFILE,                        "PROFILE"                    },
+	{META_ROI_INFO,                  "META_ROI_INFO"              },
+	{ENH_LAYER_COUNT,                "ENH_LAYER_COUNT"            },
+	{BIT_RATE,                       "BIT_RATE"                   },
+	{LOWLATENCY_MODE,                "LOWLATENCY_MODE"            },
+	{GOP_SIZE,                       "GOP_SIZE"                   },
+	{B_FRAME,                        "B_FRAME"                    },
+	{ALL_INTRA,                      "ALL_INTRA"                  },
+	{MIN_QUALITY,                    "MIN_QUALITY"                },
+	{CONTENT_ADAPTIVE_CODING,        "CONTENT_ADAPTIVE_CODING"    },
+	{BLUR_TYPES,                     "BLUR_TYPES"                 },
 	{MIN_FRAME_QP,                   "MIN_FRAME_QP"               },
 	{MAX_FRAME_QP,                   "MAX_FRAME_QP"               },
 	{I_FRAME_QP,                     "I_FRAME_QP"                 },
 	{P_FRAME_QP,                     "P_FRAME_QP"                 },
 	{B_FRAME_QP,                     "B_FRAME_QP"                 },
-	{META_ROI_INFO,                  "META_ROI_INFO"              },
 	{TIME_DELTA_BASED_RC,            "TIME_DELTA_BASED_RC"        },
 	{CONSTANT_QUALITY,               "CONSTANT_QUALITY"           },
-	{ENH_LAYER_COUNT,                "ENH_LAYER_COUNT"            },
-	{BIT_RATE,                       "BIT_RATE"                   },
 	{VBV_DELAY,                      "VBV_DELAY"                  },
 	{PEAK_BITRATE,                   "PEAK_BITRATE"               },
-	{LOWLATENCY_MODE,                "LOWLATENCY_MODE"            },
 	{ENTROPY_MODE,                   "ENTROPY_MODE"               },
 	{TRANSFORM_8X8,                  "TRANSFORM_8X8"              },
-	{GOP_SIZE,                       "GOP_SIZE"                   },
-	{B_FRAME,                        "B_FRAME"                    },
-	{BLUR_RESOLUTION,                "BLUR_RESOLUTION"            },
 	{STAGE,                          "STAGE"                      },
-	{ALL_INTRA,                      "ALL_INTRA"                  },
-	{MIN_QUALITY,                    "MIN_QUALITY"                },
 	{LTR_COUNT,                      "LTR_COUNT"                  },
 	{IR_RANDOM,                      "IR_RANDOM"                  },
 	{BITRATE_BOOST,                  "BITRATE_BOOST"              },
 	{SLICE_MODE,                     "SLICE_MODE"                 },
-	{CONTENT_ADAPTIVE_CODING,        "CONTENT_ADAPTIVE_CODING"    },
-	{BLUR_TYPES,                     "BLUR_TYPES"                 },
+	{BLUR_RESOLUTION,                "BLUR_RESOLUTION"            },
 	{INST_CAP_MAX,                   "INST_CAP_MAX"               },
 };
 
@@ -1412,6 +1412,14 @@ bool msm_vidc_allow_property(struct msm_vidc_inst *inst, u32 hfi_id)
 			is_allowed = false;
 		}
 		break;
+	case HFI_PROP_FENCE:
+		if (!inst->capabilities->cap[INPUT_META_OUTBUF_FENCE].value) {
+			i_vpr_h(inst,
+				"%s: cap: %24s not enabled, hence not allowed to subscribe\n",
+				__func__, cap_name(INPUT_META_OUTBUF_FENCE));
+			is_allowed = false;
+		}
+		break;
 	default:
 		is_allowed = true;
 		break;
@@ -2016,6 +2024,46 @@ int msm_vidc_state_change_last_flag(struct msm_vidc_inst *inst)
 	return rc;
 }
 
+int msm_vidc_get_fence_fd(struct msm_vidc_inst *inst, int *fence_fd)
+{
+	int rc = 0;
+	struct msm_vidc_fence *fence, *dummy_fence;
+	bool found = false;
+
+	*fence_fd = INVALID_FD;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	list_for_each_entry_safe(fence, dummy_fence, &inst->fence_list, list) {
+		if (fence->dma_fence.seqno ==
+			(u64)inst->capabilities->cap[FENCE_ID].value) {
+			found = true;
+			break;
+		}
+	}
+
+	if (!found) {
+		i_vpr_e(inst, "%s: could not find matching fence for fence id: %d\n",
+			__func__, inst->capabilities->cap[FENCE_ID].value);
+		rc = -EINVAL;
+		goto exit;
+	}
+
+	if (fence->fd == INVALID_FD) {
+		rc = msm_vidc_create_fence_fd(inst, fence);
+		if (rc)
+			goto exit;
+	}
+
+	*fence_fd = fence->fd;
+
+exit:
+	return rc;
+}
+
 int msm_vidc_get_control(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 {
 	int rc = 0;
@@ -2040,6 +2088,12 @@ int msm_vidc_get_control(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 		ctrl->val = inst->capabilities->cap[FILM_GRAIN].value;
 		i_vpr_h(inst, "%s: film grain present: %d\n",
 			 __func__, ctrl->val);
+		break;
+	case V4L2_CID_MPEG_VIDC_SW_FENCE_FD:
+		rc = msm_vidc_get_fence_fd(inst, &ctrl->val);
+		if (!rc)
+			i_vpr_l(inst, "%s: fence fd: %d\n",
+				__func__, ctrl->val);
 		break;
 	default:
 		i_vpr_e(inst, "invalid ctrl %s id %d\n",
@@ -3272,7 +3326,7 @@ int msm_vidc_queue_buffer_single(struct msm_vidc_inst *inst, struct vb2_buffer *
 	if (!buf)
 		return -EINVAL;
 
-	if (inst->capabilities->cap[SW_FENCE_ENABLE].value &&
+	if (inst->capabilities->cap[INPUT_META_OUTBUF_FENCE].value &&
 		is_output_buffer(buf->type)) {
 		fence = msm_vidc_fence_create(inst);
 		if (!fence)
@@ -3646,7 +3700,7 @@ int msm_vidc_release_internal_buffers(struct msm_vidc_inst *inst,
 	return 0;
 }
 
-int msm_vidc_vb2_buffer_done(struct msm_vidc_inst *inst,
+static int msm_vidc_vb2_buffer_done(struct msm_vidc_inst *inst,
 	struct msm_vidc_buffer *buf)
 {
 	int type, port, state;
@@ -3710,6 +3764,53 @@ int msm_vidc_vb2_buffer_done(struct msm_vidc_inst *inst,
 	vb2->planes[0].bytesused = buf->data_size + vb2->planes[0].data_offset;
 	v4l2_ctrl_request_complete(vb2->req_obj.req, &inst->ctrl_handler);
 	vb2_buffer_done(vb2, state);
+
+	return 0;
+}
+
+static int msm_vidc_v4l2_buffer_event(struct msm_vidc_inst *inst,
+		struct msm_vidc_buffer *buf)
+{
+	int rc = 0;
+	struct v4l2_event event = {0};
+	struct v4l2_event_vidc_metadata *event_data = NULL;
+
+	if (!inst || !buf) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	if (buf->type != MSM_VIDC_BUF_INPUT_META) {
+		i_vpr_e(inst, "%s: unsupported buffer type %s\n",
+			__func__, buf_name(buf->type));
+		return -EINVAL;
+	}
+
+	event.type = V4L2_EVENT_VIDC_METADATA;
+	event_data = (struct v4l2_event_vidc_metadata *)event.u.data;
+	event_data->type = INPUT_META_PLANE;
+	event_data->fd = buf->fd;
+
+	v4l2_event_queue_fh(&inst->event_handler, &event);
+
+	return rc;
+}
+
+int msm_vidc_buffer_done(struct msm_vidc_inst *inst,
+	struct msm_vidc_buffer *buf)
+{
+	if (!inst || !inst->capabilities || !buf) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	if (buf->type == MSM_VIDC_BUF_INPUT_META &&
+		inst->capabilities->cap[INPUT_META_VIA_REQUEST].value) {
+		if (inst->capabilities->cap[INPUT_META_OUTBUF_FENCE].value)
+			return msm_vidc_v4l2_buffer_event(inst, buf);
+	} else {
+		return msm_vidc_vb2_buffer_done(inst, buf);
+	}
 
 	return 0;
 }
@@ -5086,7 +5187,7 @@ int msm_vidc_flush_buffers(struct msm_vidc_inst *inst,
 				buf->attr & MSM_VIDC_ATTR_DEFERRED) {
 				print_vidc_buffer(VIDC_HIGH, "high", "flushing buffer", inst, buf);
 				if (!(buf->attr & MSM_VIDC_ATTR_BUFFER_DONE))
-					msm_vidc_vb2_buffer_done(inst, buf);
+					msm_vidc_buffer_done(inst, buf);
 				msm_vidc_put_driver_buf(inst, buf);
 			}
 		}
@@ -5229,7 +5330,7 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 		list_for_each_entry_safe(buf, dummy, &buffers->list, list) {
 			print_vidc_buffer(VIDC_ERR, "err ", "destroying ", inst, buf);
 			if (!(buf->attr & MSM_VIDC_ATTR_BUFFER_DONE))
-				msm_vidc_vb2_buffer_done(inst, buf);
+				msm_vidc_buffer_done(inst, buf);
 			msm_vidc_put_driver_buf(inst, buf);
 		}
 		msm_vidc_unmap_buffers(inst, ext_buf_types[i]);
@@ -5267,7 +5368,7 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 	}
 
 	list_for_each_entry_safe(fence, dummy_fence, &inst->fence_list, list) {
-		i_vpr_e(inst, "%s: destroying fence id: %llu",
+		i_vpr_e(inst, "%s: destroying fence id: %llu\n",
 			__func__, fence->dma_fence.seqno);
 		msm_vidc_fence_destroy(inst, fence);
 	}
