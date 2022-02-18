@@ -77,7 +77,6 @@ enum rsc_vsync_req {
  * @hw_vsync:			Enables the vsync on RSC block.
  * @tcs_use_ok:			set TCS set to high to allow RSC to use it.
  * @bwi_status:			It updates the BW increase/decrease status.
- * @is_amc_mode:		Check current amc mode status
  * @debug_dump:			dump debug bus registers or enable debug bus
  * @state_update:		Enable/override the solver based on rsc state
  *                              status (command/video)
@@ -95,7 +94,6 @@ struct sde_rsc_hw_ops {
 		char *buffer, int buffer_size, u32 mode);
 	int (*tcs_use_ok)(struct sde_rsc_priv *rsc);
 	int (*bwi_status)(struct sde_rsc_priv *rsc);
-	bool (*is_amc_mode)(struct sde_rsc_priv *rsc);
 	void (*debug_dump)(struct sde_rsc_priv *rsc, u32 mux_sel);
 	int (*state_update)(struct sde_rsc_priv *rsc, enum sde_rsc_state state);
 	int (*debug_show)(struct seq_file *s, struct sde_rsc_priv *rsc);

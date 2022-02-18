@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
  */
 
@@ -844,12 +845,6 @@ void rsc_hw_debug_dump(struct sde_rsc_priv *rsc, u32 mux_sel)
 		((mux_sel & 0xf) << 1) | BIT(0), rsc->debug_mode);
 }
 
-bool rsc_hw_is_amc_mode(struct sde_rsc_priv *rsc)
-{
-	return dss_reg_r(&rsc->drv_io, SDE_RSCC_TCS_DRV0_CONTROL,
-			rsc->debug_mode) & BIT(16);
-}
-
 int rsc_hw_tcs_wait(struct sde_rsc_priv *rsc)
 {
 	int rc = -EBUSY;
@@ -903,7 +898,6 @@ int sde_rsc_hw_register(struct sde_rsc_priv *rsc)
 
 	rsc->hw_ops.tcs_wait = rsc_hw_tcs_wait;
 	rsc->hw_ops.tcs_use_ok = rsc_hw_tcs_use_ok;
-	rsc->hw_ops.is_amc_mode = rsc_hw_is_amc_mode;
 
 	rsc->hw_ops.hw_vsync = rsc_hw_vsync;
 	rsc->hw_ops.state_update = sde_rsc_state_update;
