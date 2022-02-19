@@ -384,18 +384,19 @@ int msm_v4l2_qbuf(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
-	inst_lock(inst, __func__);
-	if (is_session_error(inst)) {
-		i_vpr_e(inst, "%s: inst in error state\n", __func__);
-		rc = -EBUSY;
-		goto unlock;
-	}
+	/*
+	 * do not acquire inst lock here. acquire it in msm_vidc_buf_queue.
+	 * for requests, msm_vidc_buf_queue() is not called from here.
+	 * instead it's called as part of msm_v4l2_request_queue().
+	 * hence acquire the inst lock in common function i.e
+	 * msm_vidc_buf_queue, to handle both requests and non-request
+	 * scenarios.
+	 */
 	rc = msm_vidc_qbuf(inst, vdev->v4l2_dev->mdev, b);
 	if (rc)
-		goto unlock;
+		goto exit;
 
-unlock:
-	inst_unlock(inst, __func__);
+exit:
 	put_inst(inst);
 
 	return rc;

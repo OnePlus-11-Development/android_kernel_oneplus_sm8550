@@ -14,6 +14,8 @@
 #include "msm_vidc_debug.h"
 #include "msm_vidc_control.h"
 
+extern struct msm_vidc_core *g_core;
+
 struct vb2_queue *msm_vidc_get_vb2q(struct msm_vidc_inst *inst,
 	u32 type, const char *func)
 {
@@ -351,6 +353,7 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 {
 	int rc = 0;
 	struct msm_vidc_inst *inst;
+	u64 timestamp_us = 0;
 
 	inst = vb2_get_drv_priv(vb2->vb2_queue);
 	if (!inst) {
@@ -358,6 +361,32 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 		return;
 	}
 
+	inst = get_inst_ref(g_core, inst);
+	if (!inst) {
+		d_vpr_e("%s: invalid instance\n", __func__);
+		return;
+	}
+
+	inst_lock(inst, __func__);
+	if (is_session_error(inst)) {
+		i_vpr_e(inst, "%s: inst in error state\n", __func__);
+		rc = -EINVAL;
+		goto unlock;
+	}
+
+	/* Expecting non-zero filledlen on INPUT port */
+	if (vb2->type == INPUT_MPLANE && !vb2->planes[0].bytesused) {
+		i_vpr_e(inst,
+			"%s: zero bytesused input buffer not supported\n", __func__);
+		rc = -EINVAL;
+		goto unlock;
+	}
+
+	if (is_encode_session(inst) && vb2->type == INPUT_MPLANE) {
+		timestamp_us = vb2->timestamp;
+		msm_vidc_set_auto_framerate(inst, timestamp_us);
+	}
+	inst->last_qbuf_time_ns = ktime_get_ns();
 	/*
 	 * As part of every qbuf initalise request to true.
 	 * If there are any dynamic controls associated with qbuf,
@@ -373,14 +402,14 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 		inst->request = false;
 		i_vpr_e(inst, "%s: request setup failed, error %d\n",
 			__func__, rc);
-		goto error;
+		goto unlock;
 	}
 	inst->request = false;
 
 	if (inst->capabilities->cap[INPUT_META_VIA_REQUEST].value) {
 		rc = msm_vidc_update_input_meta_buffer_index(inst, vb2);
 		if (rc)
-			goto error;
+			goto unlock;
 	}
 
 	if (is_decode_session(inst))
@@ -389,17 +418,19 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 		rc = msm_venc_qbuf(inst, vb2);
 	else
 		rc = -EINVAL;
-
 	if (rc) {
 		print_vb2_buffer("failed vb2-qbuf", inst, vb2);
-		goto error;
+		goto unlock;
 	}
-	return;
 
-error:
-	msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
-	v4l2_ctrl_request_complete(vb2->req_obj.req, &inst->ctrl_handler);
-	vb2_buffer_done(vb2, VB2_BUF_STATE_ERROR);
+unlock:
+	if (rc) {
+		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
+		v4l2_ctrl_request_complete(vb2->req_obj.req, &inst->ctrl_handler);
+		vb2_buffer_done(vb2, VB2_BUF_STATE_ERROR);
+	}
+	inst_unlock(inst, __func__);
+	put_inst(inst);
 }
 
 void msm_vidc_buf_cleanup(struct vb2_buffer *vb)

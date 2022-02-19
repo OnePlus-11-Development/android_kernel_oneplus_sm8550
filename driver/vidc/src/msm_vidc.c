@@ -479,17 +479,9 @@ int msm_vidc_qbuf(void *instance, struct media_device *mdev,
 	int rc = 0;
 	struct msm_vidc_inst *inst = instance;
 	struct vb2_queue *q;
-	u64 timestamp_us = 0;
 
 	if (!inst || !inst->core || !b || !valid_v4l2_buffer(b, inst)) {
 		d_vpr_e("%s: invalid params %pK %pK\n", __func__, inst, b);
-		return -EINVAL;
-	}
-
-	/* Expecting non-zero filledlen on INPUT port */
-	if (b->type == INPUT_MPLANE && !b->m.planes[0].bytesused) {
-		i_vpr_e(inst,
-			"%s: zero bytesused input buffer not supported\n", __func__);
 		return -EINVAL;
 	}
 
@@ -498,13 +490,6 @@ int msm_vidc_qbuf(void *instance, struct media_device *mdev,
 		rc = -EINVAL;
 		goto exit;
 	}
-
-	if (is_encode_session(inst) && b->type == INPUT_MPLANE) {
-		timestamp_us = (u64)((b->timestamp.tv_sec * USEC_PER_SEC) +
-			b->timestamp.tv_usec);
-		msm_vidc_set_auto_framerate(inst, timestamp_us);
-	}
-	inst->last_qbuf_time_ns = ktime_get_ns();
 
 	rc = vb2_qbuf(q, mdev, b);
 	if (rc)
