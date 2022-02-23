@@ -94,7 +94,7 @@ struct sde_rsc_hw_ops {
 	int (*hw_vsync)(struct sde_rsc_priv *rsc, enum rsc_vsync_req request,
 		char *buffer, int buffer_size, u32 mode);
 	int (*tcs_use_ok)(struct sde_rsc_priv *rsc);
-	int (*bwi_status)(struct sde_rsc_priv *rsc, bool bw_indication);
+	int (*bwi_status)(struct sde_rsc_priv *rsc);
 	bool (*is_amc_mode)(struct sde_rsc_priv *rsc);
 	void (*debug_dump)(struct sde_rsc_priv *rsc, u32 mux_sel);
 	int (*state_update)(struct sde_rsc_priv *rsc, enum sde_rsc_state state);
@@ -149,6 +149,22 @@ struct sde_rsc_bw_config {
 	u64	new_ab_vote[SDE_POWER_HANDLE_DBUS_ID_MAX];
 	u64	new_ib_vote[SDE_POWER_HANDLE_DBUS_ID_MAX];
 };
+
+/**
+ * enum sde_rsc_bw_delta bandwidth change
+ *
+ * @BW_HIGH_TO_LOW:	Bandwidth vote from high to low
+ * @BW_LOW_TO_HIGH:	Bandwidth vote from low  to high
+ * @BW_NO_CHANGE:	No change in Bandwidth vote
+ * @BW_DELTA_MAX:	Maximum value
+ */
+enum sde_rsc_bw_delta {
+	BW_HIGH_TO_LOW,
+	BW_LOW_TO_HIGH,
+	BW_NO_CHANGE,
+	BW_DELTA_MAX,
+};
+
 /**
  * struct sde_rsc_priv: sde resource state coordinator(rsc) private handle
  * @version:		rsc sequence version
@@ -196,6 +212,7 @@ struct sde_rsc_bw_config {
  * profiling_supp:	Indicates if HW has support for profiling counters
  * profiling_en:	Flag for rsc lpm profiling counters, true=enabled
  * post_poms:		bool if a panel mode change occurred
+ * bwi_update:		enum to indidate a bandwitdh vote change
  */
 struct sde_rsc_priv {
 	u32 version;
@@ -241,6 +258,7 @@ struct sde_rsc_priv {
 	bool profiling_en;
 
 	bool post_poms;
+	enum sde_rsc_bw_delta bwi_update;
 };
 
 /**
