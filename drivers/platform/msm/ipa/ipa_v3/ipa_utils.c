@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <net/ip.h>
@@ -7374,6 +7375,7 @@ int ipa3_init_hw(void)
 {
 	u32 ipa_version = 0;
 	struct ipahal_reg_counter_cfg cnt_cfg;
+	struct ipahal_reg_coal_master_cfg master_cfg;
 
 	/* Read IPA version and make sure we have access to the registers */
 	ipa_version = ipahal_read_reg(IPA_VERSION);
@@ -7441,8 +7443,18 @@ int ipa3_init_hw(void)
 		ipa3_ctx->ulso_ip_id_max);
 	}
 
-	ipa_comp_cfg();
+	/* Configure COAL_MASTER_CFG */
+	memset(&master_cfg, 0, sizeof(master_cfg));
+	ipahal_read_reg_fields(IPA_COAL_MASTER_CFG, &master_cfg);
+	master_cfg.coal_ipv4_id_ignore = ipa3_ctx->coal_ipv4_id_ignore;
+	ipahal_write_reg_fields(IPA_COAL_MASTER_CFG, &master_cfg);
 
+	IPADBG(": coal-ipv4-id-ignore = %s\n",
+			master_cfg.coal_ipv4_id_ignore
+			? "True" : "False");
+
+
+	ipa_comp_cfg();
 	/*
 	 * In IPA 4.2 filter and routing hashing not supported
 	 * disabling hash enable register.

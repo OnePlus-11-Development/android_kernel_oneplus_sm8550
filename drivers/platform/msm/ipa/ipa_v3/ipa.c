@@ -8780,6 +8780,7 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	ipa3_ctx->ipa_endp_delay_wa = resource_p->ipa_endp_delay_wa;
 	ipa3_ctx->ipa_endp_delay_wa_v2 = resource_p->ipa_endp_delay_wa_v2;
 	ipa3_ctx->ulso_wa = resource_p->ulso_wa;
+	ipa3_ctx->coal_ipv4_id_ignore = resource_p->coal_ipv4_id_ignore;
 
 	WARN(!IPA_IS_REGULAR_CLK_MODE(ipa3_ctx->ipa3_hw_mode),
 		"Non NORMAL IPA HW mode, is this emulation platform ?");
@@ -9607,6 +9608,7 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 	ipa_drv_res->rmnet_ctl_enable = 0;
 	ipa_drv_res->rmnet_ll_enable = 0;
 	ipa_drv_res->ulso_wa = false;
+	ipa_drv_res->coal_ipv4_id_ignore = true;
 
 	/* Get IPA HW Version */
 	result = of_property_read_u32(pdev->dev.of_node, "qcom,ipa-hw-ver",
@@ -10251,6 +10253,17 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 	else
 		IPADBG(": found ipa_drv_res->max_num_smmu_cb = %d\n",
 			ipa_drv_res->max_num_smmu_cb);
+
+	result = of_property_read_u8(pdev->dev.of_node,
+					"qcom,coal-ipv4-id-ignore",
+					&ipa_drv_res->coal_ipv4_id_ignore);
+	if (result || ipa_drv_res->coal_ipv4_id_ignore > 1) {
+		IPADBG(":Resource not present for coal-ipv4-id-ignore, use def\n");
+		ipa_drv_res->coal_ipv4_id_ignore = true;
+	}
+	IPADBG(": coal-ipv4-id-ignore = %s\n",
+			ipa_drv_res->coal_ipv4_id_ignore
+			? "True" : "False");
 
 	return 0;
 }

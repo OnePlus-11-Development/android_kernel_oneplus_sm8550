@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _IPA3_I_H_
@@ -2401,6 +2402,7 @@ struct ipa3_context {
 	int ipa_pil_load;
 	u32 ipa_max_napi_sort_page_thrshld;
 	u32 page_wq_reschd_time;
+	bool coal_ipv4_id_ignore;
 };
 
 struct ipa3_plat_drv_res {
@@ -2481,6 +2483,7 @@ struct ipa3_plat_drv_res {
 	bool use_pm_wrapper;
 	bool use_tput_est_ep;
 	bool ulso_wa;
+	u8 coal_ipv4_id_ignore;
 };
 
 /**

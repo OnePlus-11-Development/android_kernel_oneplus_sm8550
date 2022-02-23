@@ -178,6 +178,7 @@ enum ipahal_reg_name {
 	IPA_RAM_INGRESS_POLICER_DB_BASE_ADDR,
 	IPA_RAM_EGRESS_SHAPING_PROD_DB_BASE_ADDR,
 	IPA_RAM_EGRESS_SHAPING_TC_DB_BASE_ADDR,
+	IPA_COAL_MASTER_CFG,
 	IPA_REG_MAX,
 };
 
@@ -802,6 +803,24 @@ struct ipahal_reg_coal_evict_lru {
  */
 struct ipahal_reg_coal_qmap_cfg {
 	u32 mux_id_byte_sel;
+};
+
+/*
+ * struct ipahal_reg_coal_master_cfg - IPA_COAL_MASTER_CFG register
+ * @coal_ipv4_id_ignore: 1 - global ignore IPV4 ID checks regardles DF,
+ * val 0 -keep checks according to DF/MF  conditions.
+ * @coal_enhanced_ipv4_id_en: 1 - if (DF == 1 && MF == 0 && frag_offset == 0)
+ * Coalescingwill ignore IPv4 identification field, else legacy behaviour
+ * is used.
+ * 0 - Coalescing will use original legacy IPv4 identification field check.
+ * @coal_force_to_default: 1 - force any new packet that arrives to coal master
+ * to default pipe, and close any open frames with the same tuple
+ * 0 - regular coalescing activity.
+ */
+struct ipahal_reg_coal_master_cfg {
+	bool coal_ipv4_id_ignore;
+	bool coal_enhanced_ipv4_id_en;
+	bool coal_force_to_default;
 };
 
 /*
