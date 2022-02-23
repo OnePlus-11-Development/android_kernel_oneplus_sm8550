@@ -45,3 +45,19 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 # Include kp_module.ko in the /vendor/lib/modules (vendor.img)
 # BOARD_VENDOR_KERNEL_MODULES += $(LOCAL_MODULE_PATH)/$(LOCAL_MODULE)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
+
+ifeq ($(CONFIG_MSM_MMRM_VM),y)
+	include $(CLEAR_VARS)
+	# For incremental compilation
+	LOCAL_SRC_FILES           := $(wildcard $(LOCAL_PATH)/**/*) $(wildcard $(LOCAL_PATH)/*)
+	LOCAL_MODULE              := mmrm_vm_be.ko
+	LOCAL_MODULE_KBUILD_NAME  := vm/be/mmrm_vm_be.ko
+	LOCAL_MODULE_TAGS         := optional
+	LOCAL_MODULE_DEBUG_ENABLE := true
+	LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+	LOCAL_INIT_RC             := vm/be/src/mmrm_vm_be.rc
+	LOCAL_C_INCLUDES          := vm/common/inc/
+	# Include kp_module.ko in the /vendor/lib/modules (vendor.img)
+	# BOARD_VENDOR_KERNEL_MODULES += $(LOCAL_MODULE_PATH)/$(LOCAL_MODULE)
+	include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
