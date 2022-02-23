@@ -81,6 +81,23 @@ static void dp_power_regulator_deinit(struct dp_power_private *power)
 	}
 }
 
+static void dp_power_phy_gdsc(struct dp_power *dp_power, bool on)
+{
+	int rc = 0;
+
+	if (IS_ERR_OR_NULL(dp_power->dp_phy_gdsc))
+		return;
+
+	if (on)
+		rc = regulator_enable(dp_power->dp_phy_gdsc);
+	else
+		rc = regulator_disable(dp_power->dp_phy_gdsc);
+
+	if (rc)
+		DP_ERR("Fail to %s dp_phy_gdsc regulator ret =%d\n",
+				on ? "enable" : "disable", rc);
+}
+
 static int dp_power_regulator_ctrl(struct dp_power_private *power, bool enable)
 {
 	int rc = 0, i = 0, j = 0;
@@ -94,6 +111,8 @@ static int dp_power_regulator_ctrl(struct dp_power_private *power, bool enable)
 		 * on the link configuration.
 		 */
 		if (i == DP_PLL_PM) {
+			/* DP GDSC vote is needed for new chipsets, define gdsc phandle if needed */
+			dp_power_phy_gdsc(&power->dp_power, enable);
 			DP_DEBUG("skipping: '%s' vregs for %s\n",
 					enable ? "enable" : "disable",
 					dp_parser_pm_name(i));
@@ -822,6 +841,7 @@ struct dp_power *dp_power_get(struct dp_parser *parser, struct dp_pll *pll)
 	int rc = 0;
 	struct dp_power_private *power;
 	struct dp_power *dp_power;
+	struct device *dev;
 
 	if (!parser || !pll) {
 		DP_ERR("invalid input\n");
@@ -840,6 +860,7 @@ struct dp_power *dp_power_get(struct dp_parser *parser, struct dp_pll *pll)
 	power->pdev = parser->pdev;
 
 	dp_power = &power->dp_power;
+	dev = &power->pdev->dev;
 
 	dp_power->init = dp_power_init;
 	dp_power->deinit = dp_power_deinit;
@@ -851,6 +872,12 @@ struct dp_power *dp_power_get(struct dp_parser *parser, struct dp_pll *pll)
 	dp_power->power_client_init = dp_power_client_init;
 	dp_power->power_client_deinit = dp_power_client_deinit;
 	dp_power->power_mmrm_init = dp_power_mmrm_init;
+
+	dp_power->dp_phy_gdsc = devm_regulator_get(dev, "dp_phy_gdsc");
+	if (IS_ERR(dp_power->dp_phy_gdsc)) {
+		dp_power->dp_phy_gdsc = NULL;
+		DP_DEBUG("Optional GDSC regulator is missing\n");
+	}
 
 	return dp_power;
 error:

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -13,6 +14,7 @@
 /**
  * sruct dp_power - DisplayPort's power related data
  *
+ * @dp_phy_gdsc: GDSC regulator
  * @init: initializes the regulators/core clocks/GPIOs/pinctrl
  * @deinit: turns off the regulators/core clocks/GPIOs/pinctrl
  * @clk_enable: enable/disable the DP clocks
@@ -27,6 +29,7 @@
 struct dp_power {
 	struct drm_device *drm_dev;
 	struct sde_power_handle *phandle;
+	struct regulator *dp_phy_gdsc;
 	int (*init)(struct dp_power *power, bool flip);
 	int (*deinit)(struct dp_power *power);
 	int (*clk_enable)(struct dp_power *power, enum dp_pm_type pm_type,
