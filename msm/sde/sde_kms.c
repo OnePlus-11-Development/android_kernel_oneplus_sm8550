@@ -768,6 +768,11 @@ static int _sde_kms_release_shared_buffer(unsigned int mem_addr,
 	pfn_start = mem_addr >> PAGE_SHIFT;
 	pfn_end = (mem_addr + splash_buffer_size) >> PAGE_SHIFT;
 
+	ret = memblock_free(mem_addr, splash_buffer_size);
+	if (ret) {
+		SDE_ERROR("continuous splash memory free failed:%d\n", ret);
+		return ret;
+	}
 	for (pfn_idx = pfn_start; pfn_idx < pfn_end; pfn_idx++)
 		free_reserved_page(pfn_to_page(pfn_idx));
 
