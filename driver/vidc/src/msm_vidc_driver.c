@@ -3080,31 +3080,6 @@ static void msm_vidc_free_input_cr_list(struct msm_vidc_inst *inst)
 	INIT_LIST_HEAD(&inst->enc_input_crs);
 }
 
-void msm_vidc_free_capabililty_list(struct msm_vidc_inst *inst,
-	enum msm_vidc_ctrl_list_type list_type)
-{
-	struct msm_vidc_inst_cap_entry *temp = NULL, *next = NULL;
-
-	if (list_type & CHILD_LIST) {
-		list_for_each_entry_safe(temp, next, &inst->children_list, list) {
-			list_del(&temp->list);
-			kfree(temp);
-		}
-		INIT_LIST_HEAD(&inst->children_list);
-	}
-
-	temp = NULL;
-	next = NULL;
-
-	if (list_type & FW_LIST) {
-		list_for_each_entry_safe(temp, next, &inst->firmware_list, list) {
-			list_del(&temp->list);
-			kfree(temp);
-		}
-		INIT_LIST_HEAD(&inst->firmware_list);
-	}
-}
-
 void msm_vidc_update_stats(struct msm_vidc_inst *inst,
 	struct msm_vidc_buffer *buf, enum msm_vidc_debugfs_event etype)
 {
@@ -5362,6 +5337,18 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 		kfree(work);
 	}
 
+	list_for_each_entry_safe(entry, dummy_entry, &inst->firmware_list, list) {
+		i_vpr_e(inst, "%s: fw list: %s\n", __func__, cap_name(entry->cap_id));
+		list_del(&entry->list);
+		kfree(entry);
+	}
+
+	list_for_each_entry_safe(entry, dummy_entry, &inst->children_list, list) {
+		i_vpr_e(inst, "%s: child list: %s\n", __func__, cap_name(entry->cap_id));
+		list_del(&entry->list);
+		kfree(entry);
+	}
+
 	list_for_each_entry_safe(entry, dummy_entry, &inst->caps_list, list) {
 		list_del(&entry->list);
 		kfree(entry);
@@ -5392,7 +5379,6 @@ static void msm_vidc_close_helper(struct kref *kref)
 	else if (is_encode_session(inst))
 		msm_venc_inst_deinit(inst);
 	msm_vidc_free_input_cr_list(inst);
-	msm_vidc_free_capabililty_list(inst, CHILD_LIST | FW_LIST);
 	if (inst->response_workq)
 		destroy_workqueue(inst->response_workq);
 	msm_vidc_remove_dangling_session(inst);

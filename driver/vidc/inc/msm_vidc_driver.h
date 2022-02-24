@@ -441,8 +441,6 @@ int msm_vidc_ts_reorder_remove_timestamp(struct msm_vidc_inst *inst, u64 timesta
 int msm_vidc_ts_reorder_get_first_timestamp(struct msm_vidc_inst *inst, u64 *timestamp);
 int msm_vidc_ts_reorder_flush(struct msm_vidc_inst *inst);
 const char *buf_name(enum msm_vidc_buffer_type type);
-void msm_vidc_free_capabililty_list(struct msm_vidc_inst *inst,
-	enum msm_vidc_ctrl_list_type list_type);
 bool res_is_greater_than(u32 width, u32 height,
 	u32 ref_width, u32 ref_height);
 bool res_is_greater_than_or_equal_to(u32 width, u32 height,

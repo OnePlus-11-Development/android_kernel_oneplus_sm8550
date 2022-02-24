@@ -215,6 +215,81 @@ static const char * const * msm_vidc_get_qmenu_type(
 	}
 }
 
+static inline bool has_parents(struct msm_vidc_inst_cap *cap)
+{
+	return !!cap->parents[0];
+}
+
+static inline bool has_childrens(struct msm_vidc_inst_cap *cap)
+{
+	return !!cap->children[0];
+}
+
+static inline bool is_root(struct msm_vidc_inst_cap *cap)
+{
+	return !has_parents(cap);
+}
+
+static inline bool is_valid_cap_id(enum msm_vidc_inst_capability_type cap_id)
+{
+	return cap_id > INST_CAP_NONE && cap_id < INST_CAP_MAX;
+}
+
+static inline bool is_valid_cap(struct msm_vidc_inst_cap *cap)
+{
+	return is_valid_cap_id(cap->cap_id);
+}
+
+static inline bool is_all_parents_visited(
+	struct msm_vidc_inst_cap *cap, bool lookup[INST_CAP_MAX]) {
+	bool found = true;
+	int i;
+
+	for (i = 0; i < MAX_CAP_PARENTS; i++) {
+		if (cap->parents[i] == INST_CAP_NONE)
+			continue;
+
+		if (!lookup[cap->parents[i]]) {
+			found = false;
+			break;
+		}
+	}
+	return found;
+}
+
+static int add_node_list(struct list_head *list, enum msm_vidc_inst_capability_type cap_id)
+{
+	struct msm_vidc_inst_cap_entry *entry;
+
+	entry = kzalloc(sizeof(struct msm_vidc_inst_cap_entry), GFP_KERNEL);
+	if (!entry) {
+		d_vpr_e("%s: msm_vidc_inst_cap_entry alloc failed\n", __func__);
+		return -EINVAL;
+	}
+
+	INIT_LIST_HEAD(&entry->list);
+	entry->cap_id = cap_id;
+	list_add_tail(&entry->list, list);
+
+	return 0;
+}
+
+static int add_node(
+	struct list_head *list, struct msm_vidc_inst_cap *rcap, bool lookup[INST_CAP_MAX])
+{
+	int rc = 0;
+
+	if (lookup[rcap->cap_id])
+		return 0;
+
+	rc = add_node_list(list, rcap->cap_id);
+	if (rc)
+		return rc;
+
+	lookup[rcap->cap_id] = true;
+	return 0;
+}
+
 static int msm_vidc_packetize_control(struct msm_vidc_inst *inst,
 	enum msm_vidc_inst_capability_type cap_id, u32 payload_type,
 	void *hfi_val, u32 payload_size, const char *func)
@@ -275,34 +350,25 @@ static enum msm_vidc_inst_capability_type msm_vidc_get_cap_id(
 	return cap_id;
 }
 
-static int msm_vidc_add_capid_to_list(struct msm_vidc_inst *inst,
-	enum msm_vidc_inst_capability_type cap_id,
-	enum msm_vidc_ctrl_list_type type)
+static int msm_vidc_add_capid_to_fw_list(struct msm_vidc_inst *inst,
+	enum msm_vidc_inst_capability_type cap_id)
 {
-	struct msm_vidc_inst_cap_entry *entry = NULL, *curr_node = NULL;
+	struct msm_vidc_inst_cap_entry *entry = NULL;
+	int rc = 0;
 
-	/* skip adding if cap_id already present in list */
-	if (type & FW_LIST) {
-		list_for_each_entry(curr_node, &inst->firmware_list, list) {
-			if (curr_node->cap_id == cap_id) {
-				i_vpr_l(inst,
-					"%s: cap[%d] %s already present in FW_LIST\n",
-					__func__, cap_id, cap_name(cap_id));
-				return 0;
-			}
+	/* skip adding if cap_id already present in firmware list */
+	list_for_each_entry(entry, &inst->firmware_list, list) {
+		if (entry->cap_id == cap_id) {
+			i_vpr_l(inst,
+				"%s: cap[%d] %s already present in fw list\n",
+				__func__, cap_id, cap_name(cap_id));
+			return 0;
 		}
 	}
 
-	entry = kzalloc(sizeof(*entry), GFP_ATOMIC);
-	if (!entry) {
-		i_vpr_e(inst, "%s: alloc failed\n", __func__);
-		return -ENOMEM;
-	}
-	entry->cap_id = cap_id;
-	if (type & CHILD_LIST)
-		list_add_tail(&entry->list, &inst->children_list);
-	if (type & FW_LIST)
-		list_add_tail(&entry->list, &inst->firmware_list);
+	rc = add_node_list(&inst->firmware_list, cap_id);
+	if (rc)
+		return rc;
 
 	return 0;
 }
@@ -310,19 +376,23 @@ static int msm_vidc_add_capid_to_list(struct msm_vidc_inst *inst,
 static int msm_vidc_add_children(struct msm_vidc_inst *inst,
 	enum msm_vidc_inst_capability_type cap_id)
 {
-	int rc = 0;
-	int i = 0;
-	struct msm_vidc_inst_capability *capability = inst->capabilities;
+	struct msm_vidc_inst_cap *cap;
+	int i, rc = 0;
 
-	while (i < MAX_CAP_CHILDREN &&
-		capability->cap[cap_id].children[i]) {
-		rc = msm_vidc_add_capid_to_list(inst,
-			capability->cap[cap_id].children[i],
-			CHILD_LIST);
+	cap = &inst->capabilities->cap[cap_id];
+
+	for (i = 0; i < MAX_CAP_CHILDREN; i++) {
+		if (!cap->children[i])
+			break;
+
+		if (!is_valid_cap_id(cap->children[i]))
+			continue;
+
+		rc = add_node_list(&inst->children_list, cap->children[i]);
 		if (rc)
 			return rc;
-		i++;
 	}
+
 	return rc;
 }
 
@@ -427,107 +497,208 @@ exit:
 	return 0;
 }
 
-static int msm_vidc_adjust_property(struct msm_vidc_inst *inst,
-	enum msm_vidc_inst_capability_type cap_id)
+static int msm_vidc_adjust_cap(struct msm_vidc_inst *inst,
+	enum msm_vidc_inst_capability_type cap_id,
+	struct v4l2_ctrl *ctrl, const char *func)
 {
+	struct msm_vidc_inst_cap *cap;
 	int rc = 0;
-	struct msm_vidc_inst_capability *capability;
 
-	capability = inst->capabilities;
-
-	/*
-	 * skip for uninitialized cap properties.
-	 * Eg: Skip Tramform 8x8 cap that is uninitialized for HEVC codec
-	 */
-	if (!capability->cap[cap_id].cap_id)
+	/* validate cap_id */
+	if (!is_valid_cap_id(cap_id))
 		return 0;
 
-	if (capability->cap[cap_id].adjust) {
-		rc = capability->cap[cap_id].adjust(inst, NULL);
-		if (rc)
-			goto exit;
+	/* validate cap */
+	cap = &inst->capabilities->cap[cap_id];
+	if (!is_valid_cap(cap))
+		return 0;
+
+	/* check if adjust supported */
+	if (!cap->adjust) {
+		if (ctrl)
+			msm_vidc_update_cap_value(inst, cap_id, ctrl->val, func);
+		return 0;
 	}
 
-	/* add children cap_id's to chidren list */
-	rc = msm_vidc_add_children(inst, cap_id);
-	if (rc)
-		goto exit;
+	/* call adjust */
+	rc = cap->adjust(inst, ctrl);
+	if (rc) {
+		i_vpr_e(inst, "%s: adjust cap failed for %s\n", func, cap_name(cap_id));
+		return rc;
+	}
 
-	/* add cap_id to firmware list  */
-	rc = msm_vidc_add_capid_to_list(inst, cap_id, FW_LIST);
-	if (rc)
-		goto exit;
+	return rc;
+}
 
-	return 0;
+static int msm_vidc_set_cap(struct msm_vidc_inst *inst,
+	enum msm_vidc_inst_capability_type cap_id,
+	const char *func)
+{
+	struct msm_vidc_inst_cap *cap;
+	int rc = 0;
 
-exit:
+	/* validate cap_id */
+	if (!is_valid_cap_id(cap_id))
+		return 0;
+
+	/* validate cap */
+	cap = &inst->capabilities->cap[cap_id];
+	if (!is_valid_cap(cap))
+		return 0;
+
+	/* check if set supported */
+	if (!cap->set)
+		return 0;
+
+	/* call set */
+	rc = cap->set(inst, cap_id);
+	if (rc) {
+		i_vpr_e(inst, "%s: set cap failed for %s\n", func, cap_name(cap_id));
+		return rc;
+	}
+
 	return rc;
 }
 
 static int msm_vidc_adjust_dynamic_property(struct msm_vidc_inst *inst,
 	enum msm_vidc_inst_capability_type cap_id, struct v4l2_ctrl *ctrl)
 {
-	int rc = 0;
+	struct msm_vidc_inst_cap_entry *entry = NULL, *temp = NULL;
 	struct msm_vidc_inst_capability *capability;
 	s32 prev_value;
+	int rc = 0;
 
+	if (!inst || !inst->capabilities || !ctrl) {
+		d_vpr_e("%s: invalid param\n", __func__);
+		return -EINVAL;
+	}
 	capability = inst->capabilities;
-	/*
-	 * ctrl is NULL for children adjustment calls
-	 * When a dynamic control having children is adjusted, check if dynamic
-	 * adjustment is allowed for its children.
-	 */
+
+	/* sanitize cap_id */
+	if (!is_valid_cap_id(cap_id)) {
+		i_vpr_e(inst, "%s: invalid cap_id %u\n", __func__, cap_id);
+		return -EINVAL;
+	}
+
 	if (!(capability->cap[cap_id].flags & CAP_FLAG_DYNAMIC_ALLOWED)) {
 		i_vpr_h(inst,
 			"%s: dynamic setting of cap[%d] %s is not allowed\n",
 			__func__, cap_id, cap_name(cap_id));
-		return 0;
+		return -EBUSY;
 	}
+	i_vpr_h(inst, "%s: cap[%d] %s\n", __func__, cap_id, cap_name(cap_id));
 
-	/*
-	 * if ctrl is NULL, it is children of some parent, and hence,
-	 * must have an adjust function defined
-	 */
-	if (!ctrl && !capability->cap[cap_id].adjust) {
-		i_vpr_e(inst,
-			"%s: child cap[%d] %s must have ajdust function\n",
-			__func__, capability->cap[cap_id].cap_id,
-			cap_name(capability->cap[cap_id].cap_id));
-		return -EINVAL;
-	}
 	prev_value = capability->cap[cap_id].value;
-
-	if (capability->cap[cap_id].adjust) {
-		rc = capability->cap[cap_id].adjust(inst, ctrl);
-		if (rc)
-			goto exit;
-	} else if (ctrl) {
-		msm_vidc_update_cap_value(inst, cap_id, ctrl->val, __func__);
-	}
-
-	/* add children if cap value modified */
-	if (capability->cap[cap_id].value != prev_value) {
-		rc = msm_vidc_add_children(inst, cap_id);
-		if (rc)
-			goto exit;
-	}
+	rc = msm_vidc_adjust_cap(inst, cap_id, ctrl, __func__);
+	if (rc)
+		return rc;
 
 	if (capability->cap[cap_id].value == prev_value && cap_id == GOP_SIZE) {
 		/*
 		 * Ignore setting same GOP size value to firmware to avoid
 		 * unnecessary generation of IDR frame.
 		 */
-		goto exit;
+		return 0;
 	}
 
 	/* add cap_id to firmware list always */
-	rc = msm_vidc_add_capid_to_list(inst, cap_id, FW_LIST);
+	rc = msm_vidc_add_capid_to_fw_list(inst, cap_id);
 	if (rc)
-		goto exit;
+		goto error;
+
+	/* add children only if cap value modified */
+	if (capability->cap[cap_id].value == prev_value)
+		return 0;
+
+	rc = msm_vidc_add_children(inst, cap_id);
+	if (rc)
+		goto error;
+
+	list_for_each_entry_safe(entry, temp, &inst->children_list, list) {
+		if (!is_valid_cap_id(entry->cap_id)) {
+			rc = -EINVAL;
+			goto error;
+		}
+
+		if (!capability->cap[entry->cap_id].adjust) {
+			i_vpr_e(inst, "%s: child cap must have ajdust function %s\n",
+				__func__, cap_name(entry->cap_id));
+			rc = -EINVAL;
+			goto error;
+		}
+
+		prev_value = capability->cap[entry->cap_id].value;
+		rc = msm_vidc_adjust_cap(inst, entry->cap_id, NULL, __func__);
+		if (rc)
+			goto error;
+
+		/* add children if cap value modified */
+		if (capability->cap[entry->cap_id].value != prev_value) {
+			/* add cap_id to firmware list always */
+			rc = msm_vidc_add_capid_to_fw_list(inst, entry->cap_id);
+			if (rc)
+				goto error;
+
+			rc = msm_vidc_add_children(inst, entry->cap_id);
+			if (rc)
+				goto error;
+		}
+
+		list_del_init(&entry->list);
+		kfree(entry);
+	}
+
+	/* expecting children_list to be empty */
+	if (!list_empty(&inst->children_list)) {
+		i_vpr_e(inst, "%s: child_list is not empty\n", __func__);
+		rc = -EINVAL;
+		goto error;
+	}
 
 	return 0;
+error:
+	list_for_each_entry_safe(entry, temp, &inst->children_list, list) {
+		i_vpr_e(inst, "%s: child list: %s\n", __func__, cap_name(entry->cap_id));
+		list_del_init(&entry->list);
+		kfree(entry);
+	}
+	list_for_each_entry_safe(entry, temp, &inst->firmware_list, list) {
+		i_vpr_e(inst, "%s: fw list: %s\n", __func__, cap_name(entry->cap_id));
+		list_del_init(&entry->list);
+		kfree(entry);
+	}
 
-exit:
+	return rc;
+}
+
+static int msm_vidc_set_dynamic_property(struct msm_vidc_inst *inst)
+{
+	struct msm_vidc_inst_cap_entry *entry = NULL, *temp = NULL;
+	int rc = 0;
+
+	if (!inst) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	i_vpr_h(inst, "%s()\n", __func__);
+
+	list_for_each_entry_safe(entry, temp, &inst->firmware_list, list) {
+		rc = msm_vidc_set_cap(inst, entry->cap_id, __func__);
+		if (rc)
+			goto error;
+
+		list_del_init(&entry->list);
+		kfree(entry);
+	}
+
+	return 0;
+error:
+	list_for_each_entry_safe(entry, temp, &inst->firmware_list, list) {
+		i_vpr_e(inst, "%s: fw list: %s\n", __func__, cap_name(entry->cap_id));
+		list_del_init(&entry->list);
+		kfree(entry);
+	}
+
 	return rc;
 }
 
@@ -819,12 +990,86 @@ int msm_v4l2_op_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 	return rc;
 }
 
+static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
+	enum msm_vidc_inst_capability_type cap_id, struct v4l2_ctrl *ctrl)
+{
+	int rc = 0;
+
+	if (!inst || !ctrl) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	/* update value to db */
+	msm_vidc_update_cap_value(inst, cap_id, ctrl->val, __func__);
+
+	if (ctrl->id == V4L2_CID_MPEG_VIDC_SECURE) {
+		if (ctrl->val) {
+			rc = msm_vidc_allow_secure_session(inst);
+			if (rc)
+				return rc;
+		}
+	}
+
+	if (ctrl->id == V4L2_CID_ROTATE) {
+		struct v4l2_format *output_fmt;
+
+		output_fmt = &inst->fmts[OUTPUT_PORT];
+		rc = msm_venc_s_fmt_output(inst, output_fmt);
+		if (rc)
+			return rc;
+	}
+
+	if (ctrl->id == V4L2_CID_MPEG_VIDC_MIN_BITSTREAM_SIZE_OVERWRITE) {
+		rc = msm_vidc_update_bitstream_buffer_size(inst);
+		if (rc)
+			return rc;
+	}
+	if (ctrl->id == V4L2_CID_MPEG_VIDC_PRIORITY) {
+		rc = msm_vidc_adjust_session_priority(inst, ctrl);
+		if (rc)
+			return rc;
+
+		/**
+		 * This is the last static s_ctrl from client(commit point). So update
+		 * input & output counts to reflect final buffer counts based on dcvs
+		 * & decoder_batching enable/disable. So client is expected to query
+		 * for final counts after setting priority control.
+		 */
+		if (is_decode_session(inst))
+			inst->decode_batch.enable = msm_vidc_allow_decode_batch(inst);
+
+		msm_vidc_allow_dcvs(inst);
+	}
+	if (is_meta_ctrl(ctrl->id)) {
+		if (cap_id == META_DPB_TAG_LIST) {
+			/*
+			 * To subscribe HFI_PROP_DPB_TAG_LIST
+			 * data in FBD, HFI_PROP_BUFFER_TAG data
+			 * must be delivered via FTB. Hence, update
+			 * META_OUTPUT_BUF_TAG when META_DPB_TAG_LIST
+			 * is updated.
+			 */
+			msm_vidc_update_cap_value(inst, META_OUTPUT_BUF_TAG,
+				ctrl->val, __func__);
+		}
+
+		rc = msm_vidc_update_meta_port_settings(inst);
+		if (rc)
+			return rc;
+	}
+	rc = msm_vidc_update_buffer_count_if_needed(inst, ctrl);
+	if (rc)
+		return rc;
+
+	return rc;
+}
+
 int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 {
 	int rc = 0;
 	struct msm_vidc_inst *inst;
 	enum msm_vidc_inst_capability_type cap_id;
-	struct msm_vidc_inst_cap_entry *curr_node = NULL, *tmp_node = NULL;
 	struct msm_vidc_inst_capability *capability;
 
 	if (!ctrl) {
@@ -842,14 +1087,14 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	capability = inst->capabilities;
 
-	i_vpr_h(inst, "%s: state %d, name %s, id 0x%x value %d\n",
-		__func__, inst->state, ctrl->name, ctrl->id, ctrl->val);
+	i_vpr_h(inst, "%s: state %s, name %s, id 0x%x value %d\n",
+		__func__, state_name(inst->state), ctrl->name, ctrl->id, ctrl->val);
 
 	if (!msm_vidc_allow_s_ctrl(inst, ctrl->id))
 		return -EINVAL;
 
 	cap_id = msm_vidc_get_cap_id(inst, ctrl->id);
-	if (cap_id == INST_CAP_NONE) {
+	if (!is_valid_cap_id(cap_id)) {
 		i_vpr_e(inst, "%s: could not find cap_id for ctrl %s\n",
 			__func__, ctrl->name);
 		return -EINVAL;
@@ -866,108 +1111,23 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 			return rc;
 	}
 
+	/* mark client set flag */
 	capability->cap[cap_id].flags |= CAP_FLAG_CLIENT_SET;
-	/* Static setting */
 	if (!inst->bufq[OUTPUT_PORT].vb2q->streaming) {
-		msm_vidc_update_cap_value(inst, cap_id, ctrl->val, __func__);
-
-		if (ctrl->id == V4L2_CID_MPEG_VIDC_SECURE) {
-			if (ctrl->val) {
-				rc = msm_vidc_allow_secure_session(inst);
-				if (rc)
-					return rc;
-			}
-		}
-
-		if (ctrl->id == V4L2_CID_ROTATE) {
-				struct v4l2_format *output_fmt;
-
-				output_fmt = &inst->fmts[OUTPUT_PORT];
-				rc = msm_venc_s_fmt_output(inst, output_fmt);
-				if (rc)
-					return rc;
-		}
-
-		if (ctrl->id == V4L2_CID_MPEG_VIDC_MIN_BITSTREAM_SIZE_OVERWRITE) {
-			rc = msm_vidc_update_bitstream_buffer_size(inst);
-			if (rc)
-				return rc;
-		}
-		if (ctrl->id == V4L2_CID_MPEG_VIDC_PRIORITY) {
-			rc = msm_vidc_adjust_session_priority(inst, ctrl);
-			if (rc)
-				return rc;
-
-			/**
-			 * This is the last static s_ctrl from client(commit point). So update
-			 * input & output counts to reflect final buffer counts based on dcvs
-			 * & decoder_batching enable/disable. So client is expected to query
-			 * for final counts after setting priority control.
-			 */
-			if (is_decode_session(inst))
-				inst->decode_batch.enable = msm_vidc_allow_decode_batch(inst);
-
-			msm_vidc_allow_dcvs(inst);
-		}
-		if (is_meta_ctrl(ctrl->id)) {
-			if (cap_id == META_DPB_TAG_LIST) {
-				/*
-				* To subscribe HFI_PROP_DPB_TAG_LIST
-				* data in FBD, HFI_PROP_BUFFER_TAG data
-				* must be delivered via FTB. Hence, update
-				* META_OUTPUT_BUF_TAG when META_DPB_TAG_LIST
-				* is updated.
-				*/
-				msm_vidc_update_cap_value(inst, META_OUTPUT_BUF_TAG,
-					ctrl->val, __func__);
-			}
-
-			rc = msm_vidc_update_meta_port_settings(inst);
-			if (rc)
-				return rc;
-		}
-		rc = msm_vidc_update_buffer_count_if_needed(inst, ctrl);
+		/* static case */
+		rc = msm_vidc_update_static_property(inst, cap_id, ctrl);
+		if (rc)
+			return rc;
+	} else {
+		/* dynamic case */
+		rc = msm_vidc_adjust_dynamic_property(inst, cap_id, ctrl);
 		if (rc)
 			return rc;
 
-		return 0;
-	}
-
-	/* check if dynamic adjustment is allowed */
-	if (inst->bufq[OUTPUT_PORT].vb2q->streaming &&
-		!(capability->cap[cap_id].flags & CAP_FLAG_DYNAMIC_ALLOWED)) {
-		i_vpr_e(inst,
-			"%s: dynamic setting of cap[%d] %s is not allowed\n",
-			__func__, cap_id, cap_name(cap_id));
-		return -EBUSY;
-	}
-
-	rc = msm_vidc_adjust_dynamic_property(inst, cap_id, ctrl);
-	if (rc)
-		goto exit;
-
-	/* adjust all children if any */
-	list_for_each_entry_safe(curr_node, tmp_node,
-			&inst->children_list, list) {
-		rc = msm_vidc_adjust_dynamic_property(
-				inst, curr_node->cap_id, NULL);
+		rc = msm_vidc_set_dynamic_property(inst);
 		if (rc)
-			goto exit;
-		list_del(&curr_node->list);
-		kfree(curr_node);
+			return rc;
 	}
-
-	/* Dynamic set control ASAP */
-	rc = msm_vidc_set_v4l2_properties(inst);
-	if (rc) {
-		i_vpr_e(inst, "%s: setting %s failed\n",
-			__func__, ctrl->name);
-		goto exit;
-	}
-
-exit:
-	if (rc)
-		msm_vidc_free_capabililty_list(inst, CHILD_LIST | FW_LIST);
 
 	return rc;
 }
@@ -2481,65 +2641,6 @@ int msm_vidc_adjust_roi_info(void *instance, struct v4l2_ctrl *ctrl)
 	return 0;
 }
 
-static inline bool has_parents(struct msm_vidc_inst_cap *cap)
-{
-	return !!cap->parents[0];
-}
-
-static inline bool has_childrens(struct msm_vidc_inst_cap *cap)
-{
-	return !!cap->children[0];
-}
-
-static inline bool is_root(struct msm_vidc_inst_cap *cap)
-{
-	return !has_parents(cap);
-}
-
-static inline bool is_valid_cap(struct msm_vidc_inst_cap *cap)
-{
-	return cap->cap_id != INST_CAP_NONE;
-}
-
-static inline bool is_all_parents_visited(
-	struct msm_vidc_inst_cap *cap, bool lookup[INST_CAP_MAX]) {
-	bool found = true;
-	int i;
-
-	for (i = 0; i < MAX_CAP_PARENTS; i++) {
-		if (cap->parents[i] == INST_CAP_NONE)
-			continue;
-
-		if (!lookup[cap->parents[i]]) {
-			found = false;
-			break;
-		}
-	}
-	return found;
-}
-
-static int add_node(
-	struct list_head *list, struct msm_vidc_inst_cap *rcap, bool lookup[INST_CAP_MAX])
-{
-	struct msm_vidc_inst_cap_entry *entry;
-
-	if (lookup[rcap->cap_id])
-		return 0;
-
-	entry = kzalloc(sizeof(struct msm_vidc_inst_cap_entry), GFP_KERNEL);
-	if (!entry) {
-		d_vpr_e("%s: msm_vidc_inst_cap_entry alloc failed\n", __func__);
-		return -EINVAL;
-	}
-
-	INIT_LIST_HEAD(&entry->list);
-	entry->cap_id = rcap->cap_id;
-	lookup[rcap->cap_id] = true;
-
-	list_add_tail(&entry->list, list);
-	return 0;
-}
-
 int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst)
 {
 	struct list_head root_list, opt_list;
@@ -2600,6 +2701,10 @@ int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst)
 		for (i = 0; i < MAX_CAP_CHILDREN; i++) {
 			if (!rcap->children[i])
 				break;
+
+			if (!is_valid_cap_id(rcap->children[i]))
+				continue;
+
 			cap = &capability->cap[rcap->children[i]];
 			if (!is_valid_cap(cap))
 				continue;
@@ -2694,56 +2799,35 @@ error:
 
 /*
  * Loop over instance capabilities from caps_list
- * and call adjust function, where
- * - adjust current capability value
- * - update tail of instance children list with capability children
- * - update instance firmware list with current capability id
- * Now, loop over child list and call its adjust function
+ * and call adjust and set function
  */
-int msm_vidc_adjust_v4l2_properties(struct msm_vidc_inst *inst)
+int msm_vidc_adjust_set_v4l2_properties(struct msm_vidc_inst *inst)
 {
+	struct msm_vidc_inst_cap_entry *entry = NULL, *temp = NULL;
 	int rc = 0;
-	struct msm_vidc_inst_cap_entry *curr_node = NULL, *tmp_node = NULL;
-	struct msm_vidc_inst_capability *capability;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
-	capability = inst->capabilities;
-
 	i_vpr_h(inst, "%s()\n", __func__);
-	list_for_each_entry_safe(curr_node, tmp_node, &inst->caps_list, list) {
+
+	/* adjust all possible caps from caps_list */
+	list_for_each_entry_safe(entry, temp, &inst->caps_list, list) {
 		i_vpr_l(inst, "%s: cap: id %3u, name %s\n", __func__,
-			curr_node->cap_id, cap_name(curr_node->cap_id));
-		rc = msm_vidc_adjust_property(inst, curr_node->cap_id);
+			entry->cap_id, cap_name(entry->cap_id));
+
+		rc = msm_vidc_adjust_cap(inst, entry->cap_id, NULL, __func__);
 		if (rc)
-			goto exit;
+			return rc;
 	}
 
-	/*
-	 * children of all root controls are already
-	 * added to inst->children list at this point
-	 */
-	list_for_each_entry_safe(curr_node, tmp_node,
-			&inst->children_list, list) {
-		/*
-		 * call adjust for each child. Each child adjust
-		 * will also update child list at the tail with
-		 * its own children list.
-		 * Also, if current control id value is updated,
-		 * its entry should be added to fw list.
-		 */
-		rc = msm_vidc_adjust_property(inst, curr_node->cap_id);
+	/* set all caps from caps_list */
+	list_for_each_entry_safe(entry, temp, &inst->caps_list, list) {
+		rc = msm_vidc_set_cap(inst, entry->cap_id, __func__);
 		if (rc)
-			goto exit;
-		list_del(&curr_node->list);
-		kfree(curr_node);
+			return rc;
 	}
-
-exit:
-	if (rc)
-		msm_vidc_free_capabililty_list(inst, CHILD_LIST | FW_LIST);
 
 	return rc;
 }
@@ -3844,41 +3928,6 @@ int msm_vidc_set_s32(void *instance,
 		&hfi_value, sizeof(s32), __func__);
 	if (rc)
 		return rc;
-
-	return rc;
-}
-
-int msm_vidc_set_v4l2_properties(struct msm_vidc_inst *inst)
-{
-	int rc = 0;
-	struct msm_vidc_inst_capability *capability;
-	struct msm_vidc_inst_cap_entry *curr_node = NULL, *tmp_node = NULL;
-
-	if (!inst || !inst->capabilities) {
-		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
-	i_vpr_h(inst, "%s()\n", __func__);
-	capability = inst->capabilities;
-
-	list_for_each_entry_safe(curr_node, tmp_node,
-			&inst->firmware_list, list) {
-
-		/*  cap_id's like PIX_FMT etc may not have set functions */
-		if (!capability->cap[curr_node->cap_id].set)
-			continue;
-
-		rc = capability->cap[curr_node->cap_id].set(inst,
-			curr_node->cap_id);
-		if (rc)
-			goto exit;
-
-		list_del(&curr_node->list);
-		kfree(curr_node);
-	}
-
-exit:
-	msm_vidc_free_capabililty_list(inst, FW_LIST);
 
 	return rc;
 }
