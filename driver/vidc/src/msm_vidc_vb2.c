@@ -378,6 +378,7 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 	int rc = 0;
 	struct msm_vidc_inst *inst;
 	u64 timestamp_us = 0;
+	u64 ktime_ns = ktime_get_ns();
 
 	inst = vb2_get_drv_priv(vb2->vb2_queue);
 	if (!inst) {
@@ -410,7 +411,14 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 		timestamp_us = div_u64(vb2->timestamp, 1000);
 		msm_vidc_set_auto_framerate(inst, timestamp_us);
 	}
-	inst->last_qbuf_time_ns = ktime_get_ns();
+	inst->last_qbuf_time_ns = ktime_ns;
+
+	if (!is_realtime_session(inst) && vb2->type == INPUT_MPLANE) {
+		rc = msm_vidc_update_input_rate(inst, div_u64(ktime_ns, 1000));
+		if (rc)
+			goto unlock;
+	}
+
 	/*
 	 * As part of every qbuf initalise request to true.
 	 * If there are any dynamic controls associated with qbuf,

@@ -75,6 +75,7 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{POWER_SAVE_MBPS,                "POWER_SAVE_MBPS"            },
 	{FRAME_RATE,                     "FRAME_RATE"                 },
 	{OPERATING_RATE,                 "OPERATING_RATE"             },
+	{INPUT_RATE,                     "INPUT_RATE"                 },
 	{SCALE_FACTOR,                   "SCALE_FACTOR"               },
 	{MB_CYCLES_VSP,                  "MB_CYCLES_VSP"              },
 	{MB_CYCLES_VPP,                  "MB_CYCLES_VPP"              },
@@ -2350,6 +2351,59 @@ int msm_vidc_calc_window_avg_framerate(struct msm_vidc_inst *inst)
 	}
 
 	return ts_ms ? (1000 * counter) / ts_ms : 0;
+}
+
+int msm_vidc_update_input_rate(struct msm_vidc_inst *inst, u64 time_us)
+{
+	struct msm_vidc_input_timer *input_timer;
+	struct msm_vidc_input_timer *prev_timer = NULL;
+	u64 counter = 0;
+	u64 input_timer_sum_us = 0;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	input_timer = msm_memory_pool_alloc(inst, MSM_MEM_POOL_BUF_TIMER);
+	if (!input_timer)
+		return -ENOMEM;
+
+	input_timer->time_us = time_us;
+	INIT_LIST_HEAD(&input_timer->list);
+	list_add_tail(&input_timer->list, &inst->input_timer_list);
+	list_for_each_entry(input_timer, &inst->input_timer_list, list) {
+		if (prev_timer) {
+			input_timer_sum_us += input_timer->time_us - prev_timer->time_us;
+			counter++;
+		}
+		prev_timer = input_timer;
+	}
+
+	if (input_timer_sum_us)
+		inst->capabilities->cap[INPUT_RATE].value =
+			(s32)(DIV64_U64_ROUND_CLOSEST(counter * 1000000,
+				input_timer_sum_us) << 16);
+
+	/* delete the first entry once counter >= INPUT_TIMER_LIST_SIZE */
+	if (counter >= INPUT_TIMER_LIST_SIZE) {
+		input_timer = list_first_entry(&inst->input_timer_list,
+				struct msm_vidc_input_timer, list);
+		list_del_init(&input_timer->list);
+		msm_memory_pool_free(inst, input_timer);
+	}
+
+	return 0;
+}
+
+int msm_vidc_get_input_rate(struct msm_vidc_inst *inst)
+{
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: Invalid params\n", __func__);
+		return 0;
+	}
+
+	return inst->capabilities->cap[INPUT_RATE].value >> 16;
 }
 
 static int msm_vidc_insert_sort(struct list_head *head,

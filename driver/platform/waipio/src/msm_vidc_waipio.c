@@ -241,6 +241,10 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		(MINIMUM_FPS << 16), (MAXIMUM_OVERRIDE_VP9_FPS << 16),
 		1, (DEFAULT_FPS << 16)},
 
+	{INPUT_RATE, ENC|DEC, CODECS_ALL,
+		(MINIMUM_FPS << 16), INT_MAX,
+		1, (DEFAULT_FPS << 16)},
+
 	{SCALE_FACTOR, ENC, H264|HEVC, 1, 8, 1, 8},
 
 	{MB_CYCLES_VSP, ENC, CODECS_ALL, 25, 25, 1, 25},

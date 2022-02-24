@@ -142,6 +142,7 @@ struct msm_vidc_inst {
 	struct list_head                   response_works; /* list of struct response_work */
 	struct list_head                   enc_input_crs;
 	struct list_head                   dmabuf_tracker; /* list of struct msm_memory_dmabuf */
+	struct list_head                   input_timer_list; /* list of struct msm_vidc_input_timer */
 	struct list_head                   caps_list;
 	struct list_head                   children_list; /* struct msm_vidc_inst_cap_entry */
 	struct list_head                   firmware_list; /* struct msm_vidc_inst_cap_entry */

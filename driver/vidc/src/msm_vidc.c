@@ -932,6 +932,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	INIT_LIST_HEAD(&inst->firmware_list);
 	INIT_LIST_HEAD(&inst->enc_input_crs);
 	INIT_LIST_HEAD(&inst->dmabuf_tracker);
+	INIT_LIST_HEAD(&inst->input_timer_list);
 	INIT_LIST_HEAD(&inst->pending_pkts);
 	INIT_LIST_HEAD(&inst->fence_list);
 	for (i = 0; i < MAX_SIGNAL; i++)
