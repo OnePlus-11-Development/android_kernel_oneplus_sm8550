@@ -584,7 +584,7 @@ struct msm_vidc_type_size_name {
 	char                     *name;
 };
 
-static struct msm_vidc_type_size_name buftype_size_name_arr[] = {
+static const struct msm_vidc_type_size_name buftype_size_name_arr[] = {
 	{MSM_MEM_POOL_BUFFER,     sizeof(struct msm_vidc_buffer),     "MSM_MEM_POOL_BUFFER"     },
 	{MSM_MEM_POOL_MAP,        sizeof(struct msm_vidc_map),        "MSM_MEM_POOL_MAP"        },
 	{MSM_MEM_POOL_ALLOC,      sizeof(struct msm_vidc_alloc),      "MSM_MEM_POOL_ALLOC"      },
