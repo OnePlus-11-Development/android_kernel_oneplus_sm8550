@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
  */
 
@@ -19,6 +20,11 @@
 #define SDE_RSCC_SEQ_PROGRAM_COUNTER			0x408
 #define SDE_RSCC_SEQ_CFG_BR_ADDR_0_DRV0			0x410
 #define SDE_RSCC_SEQ_CFG_BR_ADDR_1_DRV0			0x414
+#define SDE_RSCC_SEQ_CFG_BR_ADDR_0_DRV0_V3		0x4bc
+#define SDE_RSCC_SEQ_CFG_BR_ADDR_1_DRV0_V3		0x4c0
+#define SDE_RSCC_SEQ_CFG_BR_ADDR_0_DRV0_V2		0x500
+#define SDE_RSCC_SEQ_CFG_BR_ADDR_1_DRV0_V2		0x504
+#define SDE_RSCC_SEQ_MEM_0_DRV0_V3			0x550
 #define SDE_RSCC_SEQ_MEM_0_DRV0				0x600
 #define SDE_RSCC_SOLVER_OVERRIDE_CTRL_DRV0		0xc14
 #define SDE_RSCC_ERROR_IRQ_STATUS_DRV0			0x0d0
@@ -104,8 +110,6 @@
 
 int rsc_hw_vsync(struct sde_rsc_priv *rsc, enum rsc_vsync_req request,
 		char *buffer, int buffer_size, u32 mode);
-
-bool rsc_hw_is_amc_mode(struct sde_rsc_priv *rsc);
 
 void rsc_hw_debug_dump(struct sde_rsc_priv *rsc, u32 mux_sel);
 
