@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -85,7 +86,7 @@ static int msm_smmu_attach(struct msm_mmu *mmu, const char * const *names,
 
 	rc = qcom_iommu_sid_switch(client->dev, SID_ACQUIRE);
 	if (rc) {
-		dev_err(client->dev, "iommu sid switch failed (%d)\n", rc);
+		DISP_DEV_ERR(client->dev, "iommu sid switch failed (%d)\n", rc);
 		return rc;
 	}
 
@@ -517,13 +518,13 @@ static int msm_smmu_probe(struct platform_device *pdev)
 
 	match = of_match_device(msm_smmu_dt_match, &pdev->dev);
 	if (!match || !match->data) {
-		dev_err(&pdev->dev, "probe failed as match data is invalid\n");
+		DISP_DEV_ERR(&pdev->dev, "probe failed as match data is invalid\n");
 		return -EINVAL;
 	}
 
 	domain = match->data;
 	if (!domain) {
-		dev_err(&pdev->dev, "no matching device found\n");
+		DISP_DEV_ERR(&pdev->dev, "no matching device found\n");
 		return -EINVAL;
 	}
 
@@ -536,7 +537,7 @@ static int msm_smmu_probe(struct platform_device *pdev)
 	client->dev = &pdev->dev;
 	client->domain = iommu_get_domain_for_dev(client->dev);
 	if (!client->domain) {
-		dev_err(&pdev->dev, "iommu get domain for dev failed\n");
+		DISP_DEV_ERR(&pdev->dev, "iommu get domain for dev failed\n");
 		return -EINVAL;
 	}
 	client->compat = match->compatible;

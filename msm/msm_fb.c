@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -194,7 +195,7 @@ struct drm_framebuffer *msm_framebuffer_init(struct drm_device *dev,
 	format = kms->funcs->get_format(kms, mode_cmd->pixel_format,
 			mode_cmd->modifier[0]);
 	if (!format) {
-		dev_err(dev->dev, "unsupported pixel format: %4.4s\n",
+		DISP_DEV_ERR(dev->dev, "unsupported pixel format: %4.4s\n",
 				(char *)&mode_cmd->pixel_format);
 		ret = -EINVAL;
 		goto fail;
@@ -226,7 +227,7 @@ struct drm_framebuffer *msm_framebuffer_init(struct drm_device *dev,
 
 	if (is_modified) {
 		if (!kms->funcs->check_modified_format) {
-			dev_err(dev->dev, "can't check modified fb format\n");
+			DISP_DEV_ERR(dev->dev, "can't check modified fb format\n");
 			ret = -EINVAL;
 			goto fail;
 		} else {
@@ -269,7 +270,7 @@ struct drm_framebuffer *msm_framebuffer_init(struct drm_device *dev,
 
 	ret = drm_framebuffer_init(dev, fb, &msm_framebuffer_funcs);
 	if (ret) {
-		dev_err(dev->dev, "framebuffer init failed: %d\n", ret);
+		DISP_DEV_ERR(dev->dev, "framebuffer init failed: %d\n", ret);
 		goto fail;
 	}
 
