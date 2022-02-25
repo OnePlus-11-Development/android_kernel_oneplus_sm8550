@@ -37,7 +37,6 @@
 #define DP_PHY_AUX_CFG1				0x0024
 #define DP_PHY_AUX_CFG2				0x0028
 
-#define DP_PHY_VCO_DIV				0x0070
 #define DP_PHY_TX0_TX1_LANE_CTL			0x0078
 #define DP_PHY_TX2_TX3_LANE_CTL			0x009C
 

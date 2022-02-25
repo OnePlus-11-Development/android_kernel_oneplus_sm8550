@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -16,6 +17,7 @@
 #define DP_VCO_HSCLK_RATE_2700MHZDIV1000	2700000UL
 #define DP_VCO_HSCLK_RATE_5400MHZDIV1000	5400000UL
 #define DP_VCO_HSCLK_RATE_8100MHZDIV1000	8100000UL
+#define DP_PHY_VCO_DIV				0x0070
 
 #define dp_pll_get_base(x) pll->io.x->io.base
 
