@@ -797,6 +797,35 @@ static void rmnet_frag_partial_csum(struct sk_buff *skb,
 	skb->csum_start = (u8 *)iph + frag_desc->ip_len - skb->head;
 }
 
+#define PFN_ENTRY_MAX (256)
+#define PFNI (count++ % PFN_ENTRY_MAX)
+static void rmnet_descriptor_trace_pfn(struct sk_buff *skb)
+{
+	struct skb_shared_info *shinfo;
+	struct sk_buff *frag_iter;
+	unsigned long rpfn[PFN_ENTRY_MAX];
+	int i, count;
+
+	if (!trace_print_pfn_enabled())
+		return;
+
+	shinfo = skb_shinfo(skb);
+	memset(rpfn, 0, sizeof(rpfn));
+	count = 0;
+
+	for (i = 0; i < shinfo->nr_frags; i++)
+		rpfn[PFNI] = page_to_pfn(skb_frag_page(&shinfo->frags[i]));
+
+	skb_walk_frags(skb, frag_iter) {
+		shinfo = skb_shinfo(frag_iter);
+
+		for (i = 0; i < shinfo->nr_frags; i++)
+			rpfn[PFNI] = page_to_pfn(skb_frag_page(&shinfo->frags[i]));
+	}
+
+	trace_print_pfn(skb, rpfn, count);
+}
+
 /* Allocate and populate an skb to contain the packet represented by the
  * frag descriptor.
  */
@@ -1018,6 +1047,8 @@ skip_frags:
 		}
 
 		trace_print_tcp_rx(head_skb, saddr, daddr, tcp_hdr(head_skb));
+
+		rmnet_descriptor_trace_pfn(head_skb);
 	}
 skip_trace_print_tcp_rx:
 
@@ -1047,6 +1078,8 @@ skip_trace_print_tcp_rx:
 		}
 
 		trace_print_udp_rx(head_skb, saddr, daddr, udp_hdr(head_skb));
+
+		rmnet_descriptor_trace_pfn(head_skb);
 	}
 skip_trace_print_udp_rx:
 

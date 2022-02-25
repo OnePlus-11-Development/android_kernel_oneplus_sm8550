@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/version.h>
 #undef TRACE_SYSTEM
@@ -308,6 +309,34 @@ DEFINE_EVENT
 		 struct udphdr *uh),
 
 	TP_ARGS(skb, saddr, daddr, uh)
+);
+
+TRACE_EVENT(print_pfn,
+
+	TP_PROTO(struct sk_buff *skb, unsigned long *pfn_list, int num_elements),
+
+	TP_ARGS(skb, pfn_list, num_elements),
+
+	TP_STRUCT__entry(
+		__field(void *, skbaddr)
+		__field(int, num_elements)
+		__dynamic_array(unsigned long, pfn_list, num_elements)
+	),
+
+	TP_fast_assign(
+		__entry->skbaddr = skb;
+		__entry->num_elements = num_elements;
+		memcpy(__get_dynamic_array(pfn_list), pfn_list,
+		       num_elements * sizeof(*pfn_list));
+	),
+
+	TP_printk("skbaddr=%pK count=%d pfn=%s",
+		  __entry->skbaddr,
+		  __entry->num_elements,
+		  __print_array(__get_dynamic_array(pfn_list),
+				__entry->num_elements,
+				sizeof(unsigned long))
+	)
 );
 
 /*****************************************************************************/
