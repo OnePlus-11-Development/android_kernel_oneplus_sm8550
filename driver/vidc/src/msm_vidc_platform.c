@@ -129,8 +129,9 @@ static struct vb2_ops msm_vb2_ops = {
 };
 
 static struct vb2_mem_ops msm_vb2_mem_ops = {
-	.get_userptr                    = msm_vb2_get_userptr,
-	.put_userptr                    = msm_vb2_put_userptr,
+	.alloc                          = msm_vb2_alloc,
+	.put                            = msm_vb2_put,
+	.mmap                           = msm_vb2_mmap,
 	.attach_dmabuf                  = msm_vb2_attach_dmabuf,
 	.detach_dmabuf                  = msm_vb2_detach_dmabuf,
 	.map_dmabuf                     = msm_vb2_map_dmabuf,
