@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -459,7 +459,7 @@ static void sde_hw_intf_setup_vsync_source(struct sde_hw_intf *intf,
 		u32 frame_rate)
 {
 	struct sde_hw_blk_reg_map *c;
-	u32 reg;
+	u32 reg = 0;
 
 	if (!intf)
 		return;
@@ -469,9 +469,9 @@ static void sde_hw_intf_setup_vsync_source(struct sde_hw_intf *intf,
 	SDE_REG_WRITE(c, INTF_WD_TIMER_0_LOAD_VALUE, CALCULATE_WD_LOAD_VALUE(frame_rate));
 
 	SDE_REG_WRITE(c, INTF_WD_TIMER_0_CTL, BIT(0)); /* clear timer */
-	reg = SDE_REG_READ(c, INTF_WD_TIMER_0_CTL2);
 	reg |= BIT(8); /* enable heartbeat timer */
 	reg |= BIT(0); /* enable WD timer */
+	reg |= BIT(1); /* select default 16 clock ticks */
 	SDE_REG_WRITE(c, INTF_WD_TIMER_0_CTL2, reg);
 
 	/* make sure that timers are enabled/disabled for vsync state */
