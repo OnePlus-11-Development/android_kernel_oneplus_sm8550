@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of.h>
@@ -1639,7 +1640,7 @@ int gsi_register_device(struct gsi_per_props *props, unsigned long *dev_hdl)
 		goto err_iounmap;
 	}
 
-	gsi_ctx->evt_bmap = ~((1 << gsi_ctx->max_ev) - 1);
+	gsi_ctx->evt_bmap = ~((((unsigned long)1) << gsi_ctx->max_ev) - 1);
 
 	/* exclude reserved mhi events */
 	if (props->mhi_er_id_limits_valid)
