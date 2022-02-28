@@ -85,6 +85,8 @@ struct msm_gem_vma;
 
 #define TEARDOWN_DEADLOCK_RETRY_MAX 5
 
+#define DISP_DEV_ERR(dev, fmt, ...) dev_err(dev, "[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
+
 struct msm_file_private {
 	rwlock_t queuelock;
 	struct list_head submitqueues;

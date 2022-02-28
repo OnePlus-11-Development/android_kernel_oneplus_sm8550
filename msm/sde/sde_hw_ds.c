@@ -4,6 +4,7 @@
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
+#define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
 #include "sde_hw_ds.h"
 #include "sde_formats.h"
 #include "sde_dbg.h"
@@ -20,8 +21,18 @@
 static void sde_hw_ds_setup_opmode(struct sde_hw_ds *hw_ds, u32 op_mode)
 {
 	struct sde_hw_blk_reg_map *hw = &hw_ds->hw;
+	u32 op_mode_val;
 
-	SDE_REG_WRITE(hw, DEST_SCALER_OP_MODE, op_mode);
+	op_mode_val = SDE_REG_READ(hw, DEST_SCALER_OP_MODE);
+
+	if (op_mode)
+		op_mode_val |= op_mode;
+	else if (!op_mode && (op_mode_val & SDE_DS_OP_MODE_DUAL))
+		op_mode_val = 0;
+	else
+		op_mode_val &= ~BIT(hw_ds->idx - DS_0);
+
+	SDE_REG_WRITE(hw, DEST_SCALER_OP_MODE, op_mode_val);
 }
 
 static void sde_hw_ds_setup_opmode_v1(struct sde_hw_ds *hw_ds, u32 op_mode)

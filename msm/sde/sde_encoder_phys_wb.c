@@ -447,7 +447,8 @@ static void _sde_encoder_phys_wb_setup_out_cfg(struct sde_encoder_phys *phys_enc
 			wb_cfg->dest.plane_addr[0], wb_cfg->dest.plane_size[0],
 			wb_cfg->dest.plane_addr[1], wb_cfg->dest.plane_size[1],
 			wb_cfg->dest.plane_addr[2], wb_cfg->dest.plane_size[2],
-			wb_cfg->dest.plane_addr[3], wb_cfg->dest.plane_size[3]);
+			wb_cfg->dest.plane_addr[3], wb_cfg->dest.plane_size[3],
+			wb_cfg->roi.x, wb_cfg->roi.y, wb_cfg->roi.w, wb_cfg->roi.h);
 		hw_wb->ops.setup_outaddress(hw_wb, wb_cfg);
 	}
 }
@@ -837,7 +838,7 @@ static int _sde_enc_phys_wb_validate_cwb(struct sde_encoder_phys *phys_enc,
 	struct sde_rect wb_roi = {0,}, pu_roi = {0,};
 	u32  out_width = 0, out_height = 0;
 	const struct sde_format *fmt;
-	int prog_line, ret = 0;
+	int prog_line, ret = 0, i;
 
 	fb = sde_wb_connector_state_get_output_fb(conn_state);
 	if (!fb) {
@@ -901,11 +902,14 @@ static int _sde_enc_phys_wb_validate_cwb(struct sde_encoder_phys *phys_enc,
 		return -EINVAL;
 	}
 
-	if (((wb_roi.w < out_width) || (wb_roi.h < out_height)) &&
-			(wb_roi.w * wb_roi.h * fmt->bpp) % 256) {
-		SDE_ERROR("invalid stride w = %d h = %d bpp =%d out_width = %d, out_height = %d\n",
-				wb_roi.w, wb_roi.h, fmt->bpp, out_width, out_height);
-		return -EINVAL;
+	/* pitch has to be multiple of 256 bits */
+	for (i = 0; i < fb->format->num_planes; i++) {
+		if (fb->pitches[i] % 32) {
+			SDE_ERROR("invalid stride plane:%d pitch:%u fmt: %4.4s bpp:%d wxh:%dx%d\n",
+				i, fb->pitches[i], (char *)&fmt->base.pixel_format,
+				fmt->bpp, wb_roi.w, wb_roi.h);
+			return -EINVAL;
+		}
 	}
 
 	/*
@@ -1646,8 +1650,10 @@ static void sde_encoder_phys_wb_irq_ctrl(struct sde_encoder_phys *phys, bool ena
  * @mode:	Pointer to requested display mode
  * @adj_mode:	Pointer to adjusted display mode
  */
-static void sde_encoder_phys_wb_mode_set(struct sde_encoder_phys *phys_enc,
-		struct drm_display_mode *mode, struct drm_display_mode *adj_mode)
+static void sde_encoder_phys_wb_mode_set(
+		struct sde_encoder_phys *phys_enc,
+		struct drm_display_mode *mode,
+		struct drm_display_mode *adj_mode, bool *reinit_mixers)
 {
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
 	struct sde_rm *rm = &phys_enc->sde_kms->rm;
@@ -1669,8 +1675,13 @@ static void sde_encoder_phys_wb_mode_set(struct sde_encoder_phys *phys_enc,
 	sde_rm_init_hw_iter(&iter, phys_enc->parent->base.id, SDE_HW_BLK_CTL);
 	for (i = 0; i <= instance; i++) {
 		sde_rm_get_hw(rm, &iter);
-		if (i == instance)
+		if (i == instance) {
+			if (phys_enc->hw_ctl && phys_enc->hw_ctl != to_sde_hw_ctl(iter.hw)) {
+				*reinit_mixers =  true;
+				SDE_EVT32(phys_enc->hw_ctl->idx, to_sde_hw_ctl(iter.hw)->idx);
+			}
 			phys_enc->hw_ctl = to_sde_hw_ctl(iter.hw);
+		}
 	}
 
 	if (IS_ERR_OR_NULL(phys_enc->hw_ctl)) {

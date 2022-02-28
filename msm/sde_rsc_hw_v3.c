@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
  */
 
@@ -12,6 +13,11 @@
 #include "sde_rsc_priv.h"
 #include "sde_rsc_hw.h"
 #include "sde_dbg.h"
+
+#define BWI_HIGH_TO_LOW		 0x00
+#define BWI_LOW_TO_HIGH		 0x01
+#define BWI_NO_CHANGE		 0x10
+
 
 static int _rsc_hw_qtimer_init(struct sde_rsc_priv *rsc)
 {
@@ -84,61 +90,51 @@ static int _rsc_hw_seq_memory_init_v3(struct sde_rsc_priv *rsc)
 	const u32 mode_0_start_addr = 0x0;
 	const u32 mode_1_start_addr = 0xc;
 	const u32 mode_2_start_addr = 0x18;
-	u32 br_offset = 0;
+	u32 br_offset_0, br_offset_1, seq_mem_offset;
 
 	pr_debug("rsc sequencer memory init v2\n");
 
+	/* branch address and seq_mem offset override */
+	br_offset_0 = SDE_RSCC_SEQ_CFG_BR_ADDR_0_DRV0;
+	br_offset_1 = SDE_RSCC_SEQ_CFG_BR_ADDR_1_DRV0;
+	seq_mem_offset = SDE_RSCC_SEQ_MEM_0_DRV0;
+	if (rsc->hw_drv_ver >= SDE_RSC_HW_MAJOR_MINOR_STEP(3, 0, 0)) {
+		br_offset_0 = SDE_RSCC_SEQ_CFG_BR_ADDR_0_DRV0_V3;
+		br_offset_1 = SDE_RSCC_SEQ_CFG_BR_ADDR_1_DRV0_V3;
+		seq_mem_offset = SDE_RSCC_SEQ_MEM_0_DRV0_V3;
+	} else if (rsc->hw_drv_ver >= SDE_RSC_HW_MAJOR_MINOR_STEP(2, 0, 5) ||
+			rsc->hw_drv_ver == SDE_RSC_HW_MAJOR_MINOR_STEP(1, 9, 0)) {
+		br_offset_0 = SDE_RSCC_SEQ_CFG_BR_ADDR_0_DRV0_V2;
+		br_offset_1 = SDE_RSCC_SEQ_CFG_BR_ADDR_1_DRV0_V2;
+	}
+
 	/* Mode - 0 sequence */
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0x0,
-						0xff399ebe, rsc->debug_mode);
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0x4,
-						0x20209ebe, rsc->debug_mode);
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0x8,
-						0x20202020, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0x0, 0xff399ebe, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0x4, 0x20209ebe, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0x8, 0x20202020, rsc->debug_mode);
 
 	/* Mode - 1 sequence */
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0xc,
-						0xe0389ebe, rsc->debug_mode);
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0x10,
-						0x9ebeff39, rsc->debug_mode);
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0x14,
-						0x20202020, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0xc, 0xe0389ebe, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0x10, 0x9ebeff39, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0x14, 0x20202020, rsc->debug_mode);
 
 	/* Mode - 2 sequence */
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0x18,
-						0xf9b9baa0, rsc->debug_mode);
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0x1c,
-						0x999afebd, rsc->debug_mode);
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0x20,
-						0x81e1a138, rsc->debug_mode);
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0x24,
-						0xe2a2e0ac, rsc->debug_mode);
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0x28,
-						0xfd9d3982, rsc->debug_mode);
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0x2c,
-						0x2020208c, rsc->debug_mode);
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0x30,
-						0x20202020, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0x18, 0xf9b9baa0, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0x1c, 0x999afebd, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0x20, 0x81e1a138, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0x24, 0xe2a2e0ac, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0x28, 0xfd9d3982, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0x2c, 0x2020208c, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0x30, 0x20202020, rsc->debug_mode);
 
 	/* tcs sleep & wake sequence */
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0x34,
-						0x01a6fcbc, rsc->debug_mode);
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0x38,
-						0x20209ce6, rsc->debug_mode);
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0x3c,
-						0x01a7fcbc, rsc->debug_mode);
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_MEM_0_DRV0 + 0x40,
-						0x00209ce7, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0x34, 0x01a6fcbc, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0x38, 0x20209ce6, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0x3c, 0x01a7fcbc, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, seq_mem_offset + 0x40, 0x00209ce7, rsc->debug_mode);
 
-	/* branch address */
-	if (rsc->hw_drv_ver >= SDE_RSC_HW_MAJOR_MINOR_STEP(2, 0, 5) ||
-		rsc->hw_drv_ver == SDE_RSC_HW_MAJOR_MINOR_STEP(1, 9, 0))
-		br_offset = 0xf0;
-
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_CFG_BR_ADDR_0_DRV0 + br_offset,
-						0x34, rsc->debug_mode);
-	dss_reg_w(&rsc->drv_io, SDE_RSCC_SEQ_CFG_BR_ADDR_1_DRV0 + br_offset,
-						0x3c, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, br_offset_0, 0x34, rsc->debug_mode);
+	dss_reg_w(&rsc->drv_io, br_offset_1, 0x3c, rsc->debug_mode);
 
 	/* start address */
 	dss_reg_w(&rsc->drv_io, SDE_RSC_SOLVER_OVERRIDE_CTRL_DRV0,
@@ -160,8 +156,15 @@ static int _rsc_hw_seq_memory_init_v3(struct sde_rsc_priv *rsc)
 
 static int _rsc_hw_solver_init(struct sde_rsc_priv *rsc)
 {
+	u32 param_1 = 0;
 
 	pr_debug("rsc solver init\n");
+
+	/* update SOLVER_MODE_PARM1 based on RSC version */
+	if (rsc->hw_drv_ver >= SDE_RSC_HW_MAJOR_MINOR_STEP(3, 0, 0))
+		param_1 = 0xc0000001;
+	else
+		param_1 = 0x80000000;
 
 	dss_reg_w(&rsc->drv_io, SDE_RSCC_SOFT_WAKEUP_TIME_LO_DRV0,
 					0xFFFFFFFF, rsc->debug_mode);
@@ -201,14 +204,14 @@ static int _rsc_hw_solver_init(struct sde_rsc_priv *rsc)
 						0x01000010, rsc->debug_mode);
 
 	dss_reg_w(&rsc->drv_io, SDE_RSC_SOLVER_MODE_PARM1_DRV0_MODE0,
-					0x80000000, rsc->debug_mode);
+					param_1, rsc->debug_mode);
 	dss_reg_w(&rsc->drv_io, SDE_RSC_SOLVER_MODE_PARM2_DRV0_MODE0,
 			rsc->timer_config.rsc_backoff_time_ns, rsc->debug_mode);
 	dss_reg_w(&rsc->drv_io, SDE_RSC_SOLVER_MODE_PARM3_DRV0_MODE0,
 			rsc->timer_config.pdc_backoff_time_ns, rsc->debug_mode);
 
 	dss_reg_w(&rsc->drv_io, SDE_RSC_SOLVER_MODE_PARM1_DRV0_MODE1,
-					0x80000000, rsc->debug_mode);
+					param_1, rsc->debug_mode);
 	dss_reg_w(&rsc->drv_io, SDE_RSC_SOLVER_MODE_PARM2_DRV0_MODE1,
 			rsc->timer_config.rsc_backoff_time_ns * 2,
 			rsc->debug_mode);
@@ -216,7 +219,7 @@ static int _rsc_hw_solver_init(struct sde_rsc_priv *rsc)
 			rsc->timer_config.pdc_backoff_time_ns, rsc->debug_mode);
 
 	dss_reg_w(&rsc->drv_io, SDE_RSC_SOLVER_MODE_PARM1_DRV0_MODE2,
-					0x80000000, rsc->debug_mode);
+					param_1, rsc->debug_mode);
 	dss_reg_w(&rsc->drv_io, SDE_RSC_SOLVER_MODE_PARM2_DRV0_MODE2,
 					0x0, rsc->debug_mode);
 	dss_reg_w(&rsc->drv_io, SDE_RSC_SOLVER_MODE_PARM3_DRV0_MODE2,
@@ -539,10 +542,26 @@ end:
 	return rc;
 }
 
-int rsc_hw_bwi_status_v3(struct sde_rsc_priv *rsc, bool bw_indication)
+int rsc_hw_bwi_status_v3(struct sde_rsc_priv *rsc)
 {
 	int count, bw_ack;
 	int rc = 0;
+	u32 bw_indication = 0;
+
+	switch (rsc->bwi_update) {
+	case BW_HIGH_TO_LOW:
+		bw_indication = BWI_HIGH_TO_LOW;
+		break;
+	case BW_LOW_TO_HIGH:
+		bw_indication = BWI_LOW_TO_HIGH;
+		break;
+	case BW_NO_CHANGE:
+		bw_indication = BWI_NO_CHANGE;
+		break;
+	default:
+		pr_err("unsupported bwi data\n");
+		break;
+	}
 
 	dss_reg_w(&rsc->wrapper_io, SDE_RSCC_WRAPPER_BW_INDICATION,
 						bw_indication, rsc->debug_mode);
@@ -666,7 +685,6 @@ int sde_rsc_hw_register_v3(struct sde_rsc_priv *rsc)
 
 	rsc->hw_ops.tcs_wait = rsc_hw_tcs_wait;
 	rsc->hw_ops.tcs_use_ok = rsc_hw_tcs_use_ok;
-	rsc->hw_ops.is_amc_mode = rsc_hw_is_amc_mode;
 	rsc->hw_ops.hw_vsync = rsc_hw_vsync;
 	rsc->hw_ops.debug_show = sde_rsc_debug_show;
 	rsc->hw_ops.mode_ctrl = rsc_hw_mode_ctrl;

@@ -229,6 +229,8 @@ enum sde_ds {
 	DS_TOP,
 	DS_0,
 	DS_1,
+	DS_2,
+	DS_3,
 	DS_MAX
 };
 

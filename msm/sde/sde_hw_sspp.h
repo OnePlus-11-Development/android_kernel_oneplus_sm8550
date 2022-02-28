@@ -265,6 +265,7 @@ struct sde_hw_pipe_sc_cfg {
  * @fal10_exit_threshold: number of lines to indicate fal_10_exit is okay
  * @fal10_threshold: number of lines where fal_10_is okay
  * @fal1_threshold: number of lines where fal_1 is okay
+ * @fill_level_scale: scale factor on the fal10 threshold
  */
 struct sde_hw_pipe_uidle_cfg {
 	u32 enable;
@@ -272,6 +273,7 @@ struct sde_hw_pipe_uidle_cfg {
 	u32 fal10_exit_threshold;
 	u32 fal10_threshold;
 	u32 fal1_threshold;
+	u32 fill_level_scale;
 };
 
 /**
@@ -533,6 +535,14 @@ struct sde_hw_sspp_ops {
 	 void (*setup_uidle)(struct sde_hw_pipe *ctx,
 			 struct sde_hw_pipe_uidle_cfg *cfg,
 			 enum sde_sspp_multirect_index index);
+
+	/**
+	 * setup_uidle_fill_scale - set uidle fill scale factor
+	 * @ctx: Pointer to pipe context
+	 * @cfg: Pointer to uidle configuration
+	 */
+	void (*setup_uidle_fill_scale)(struct sde_hw_pipe *ctx,
+			 struct sde_hw_pipe_uidle_cfg *cfg);
 
 	/**
 	 * setup_ts_prefill - setup prefill traffic shaper

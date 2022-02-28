@@ -107,6 +107,7 @@ struct sde_plane {
 	struct sde_csc_cfg *csc_usr_ptr;
 	struct sde_csc_cfg *csc_ptr;
 
+	uint32_t cached_lut_flag;
 	struct sde_hw_scaler3_cfg scaler3_cfg;
 	struct sde_hw_pixel_ext pixel_ext;
 
@@ -1992,7 +1993,9 @@ static int sde_plane_prepare_fb(struct drm_plane *plane,
 		ret = msm_framebuffer_prepare(fb,
 				pstate->aspace);
 		if (ret) {
-			SDE_ERROR("failed to prepare framebuffer\n");
+			SDE_ERROR("failed to prepare framebuffer fb:%d plane:%d pipe:%d ret:%d\n",
+				 fb->base.id, plane->base.id, psde->pipe, ret);
+			SDE_EVT32(fb->base.id, plane->base.id, psde->pipe, ret, SDE_EVTLOG_ERROR);
 			return ret;
 		}
 	}
@@ -2942,6 +2945,28 @@ static void _sde_plane_setup_uidle(struct drm_crtc *crtc,
 			psde->catalog->uidle_cfg.fal1_max_threshold);
 		cfg.fal_allowed_threshold = fal10_threshold +
 			(fal10_target_idle_time_ns*1000/line_time*2)/1000;
+		cfg.fill_level_scale = 0;
+
+		/*
+		 * if uidle fill scale is supported, determing the scale value
+		 * and adjust fal10 thresholds to their scaled values.
+		 * fal1 thresholds and fal_allowed are not scaled.
+		 */
+		if (psde->pipe_hw->ops.setup_uidle_fill_scale) {
+			u32 fl_require0 = psde->catalog->qos_target_time_ns / line_time * 2;
+			u32 fl_require = max(fal10_threshold * 1000, fl_require0);
+			u32 fl_scale = fl_require / fal10_threshold;
+			u32 fal10_threshold_noscale;
+
+			cfg.fill_level_scale = (fl_scale <= 1) ? 0 : (32 / fl_scale);
+
+			if (cfg.fill_level_scale) {
+				fal10_threshold_noscale = fal10_threshold *
+					32/cfg.fill_level_scale;
+				cfg.fal_allowed_threshold = fal10_threshold_noscale +
+					(fal10_target_idle_time_ns * 1000 / line_time * 2) / 1000;
+			}
+		}
 	} else {
 		SDE_ERROR("invalid settings, will disable UIDLE %d %d %d %d\n",
 			line_time, fal10_threshold, fal10_target_idle_time_ns,
@@ -2950,9 +2975,10 @@ static void _sde_plane_setup_uidle(struct drm_crtc *crtc,
 	}
 
 	SDE_DEBUG_PLANE(psde,
-		"tholds: fal10=%d fal10_exit=%d fal1=%d fal_allowed=%d\n",
+		"tholds: fal10=%d fal10_exit=%d fal1=%d fal_allowed=%d fill_scale=%d\n",
 			cfg.fal10_threshold, cfg.fal10_exit_threshold,
-			cfg.fal1_threshold, cfg.fal_allowed_threshold);
+			cfg.fal1_threshold, cfg.fal_allowed_threshold,
+			cfg.fill_level_scale);
 	SDE_DEBUG_PLANE(psde,
 		"times: line:%d fal1_idle:%d fal10_idle:%d dwnscale:%d\n",
 			line_time, fal1_target_idle_time_ns,
@@ -2961,7 +2987,10 @@ static void _sde_plane_setup_uidle(struct drm_crtc *crtc,
 	SDE_EVT32_VERBOSE(cfg.enable,
 		cfg.fal10_threshold, cfg.fal10_exit_threshold,
 		cfg.fal1_threshold, cfg.fal_allowed_threshold,
-		psde->catalog->uidle_cfg.max_dwnscale);
+		cfg.fill_level_scale, psde->catalog->uidle_cfg.max_dwnscale);
+
+	if (psde->pipe_hw->ops.setup_uidle_fill_scale)
+		psde->pipe_hw->ops.setup_uidle_fill_scale(psde->pipe_hw, &cfg);
 
 	psde->pipe_hw->ops.setup_uidle(
 		psde->pipe_hw, &cfg,
@@ -3240,6 +3269,20 @@ static void _sde_plane_update_properties(struct drm_plane *plane,
 	pstate->dirty = 0x0;
 }
 
+static void _sde_plane_check_lut_dirty(struct sde_plane *psde,
+	struct sde_plane_state *pstate)
+{
+	/**
+	 * Valid configuration if scaler is not enabled or
+	 * lut flag is set
+	 */
+	if (pstate->scaler3_cfg.lut_flag || !pstate->scaler3_cfg.enable)
+		return;
+
+	pstate->scaler3_cfg.lut_flag = psde->cached_lut_flag;
+	SDE_EVT32(DRMID(&psde->base), pstate->scaler3_cfg.lut_flag, SDE_EVTLOG_ERROR);
+}
+
 static int sde_plane_sspp_atomic_update(struct drm_plane *plane,
 				struct drm_plane_state *old_state)
 {
@@ -3291,10 +3334,15 @@ static int sde_plane_sspp_atomic_update(struct drm_plane *plane,
 			state->crtc_w, state->crtc_h,
 			state->crtc_x, state->crtc_y);
 
+	/* Caching the valid lut flag in sde plane */
+	if (pstate->scaler3_cfg.enable && pstate->scaler3_cfg.lut_flag)
+		psde->cached_lut_flag = pstate->scaler3_cfg.lut_flag;
+
 	/* force reprogramming of all the parameters, if the flag is set */
 	if (psde->revalidate) {
 		SDE_DEBUG("plane:%d - reconfigure all the parameters\n",
 				plane->base.id);
+		_sde_plane_check_lut_dirty(psde, pstate);
 		pstate->dirty = SDE_PLANE_DIRTY_ALL | SDE_PLANE_DIRTY_CP;
 		psde->revalidate = false;
 	}
@@ -3819,7 +3867,7 @@ static void _sde_plane_install_properties(struct drm_plane *plane,
 	psde->catalog = catalog;
 	is_master = !psde->is_virtual;
 
-	info = kzalloc(sizeof(struct sde_kms_info), GFP_KERNEL);
+	info = vzalloc(sizeof(struct sde_kms_info));
 	if (!info) {
 		SDE_ERROR("failed to allocate info memory\n");
 		return;
@@ -3901,7 +3949,7 @@ static void _sde_plane_install_properties(struct drm_plane *plane,
 	if (psde->pipe_hw->ops.set_ubwc_stats_roi)
 		msm_property_install_range(&psde->property_info, "ubwc_stats_roi",
 				0, 0, 0xFFFFFFFF, 0, PLANE_PROP_UBWC_STATS_ROI);
-	kfree(info);
+	vfree(info);
 }
 
 static inline void _sde_plane_set_csc_v1(struct sde_plane *psde,
@@ -4117,27 +4165,34 @@ static void _sde_plane_set_excl_rect_v1(struct sde_plane *psde,
 }
 
 static void _sde_plane_set_ubwc_stats_roi(struct sde_plane *psde,
-		struct sde_plane_state *pstate, uint64_t roi)
+		struct sde_plane_state *pstate, void __user *usr_ptr)
 {
-	uint16_t y0, y1;
+	struct sde_drm_ubwc_stats_roi roi = {0};
 
 	if (!psde || !pstate) {
 		SDE_ERROR("invalid argument(s)\n");
 		return;
 	}
 
-	y0 = roi & 0xFFFF;
-	y1 = (roi >> 0x10) & 0xFFFF;
-
-	if (y0 > psde->pipe_cfg.src_rect.h || y1 > psde->pipe_cfg.src_rect.h) {
-		SDE_ERROR_PLANE(psde, "invalid ubwc roi y0 0x%x, y1 0x%x, src height 0x%x",
-				y0, y1, psde->pipe_cfg.src_rect.h);
-		y0 = 0;
-		y1 = 0;
+	if (!usr_ptr) {
+		SDE_DEBUG_PLANE(psde, "ubwc roi disabled");
+		goto end;
 	}
 
-	pstate->ubwc_stats_roi.y_coord0 = y0;
-	pstate->ubwc_stats_roi.y_coord1 = y1;
+	if (copy_from_user(&roi, usr_ptr, sizeof(roi))) {
+		SDE_ERROR_PLANE(psde, "failed to copy ubwc stats roi");
+		return;
+	}
+
+	if (roi.y_coord0 > psde->pipe_cfg.src_rect.h || roi.y_coord1 > psde->pipe_cfg.src_rect.h) {
+		SDE_ERROR_PLANE(psde, "invalid ubwc roi y0 0x%x, y1 0x%x, src height 0x%x",
+				roi.y_coord0, roi.y_coord1, psde->pipe_cfg.src_rect.h);
+		memset(&roi, 0, sizeof(roi));
+	}
+
+end:
+	SDE_EVT32(psde, roi.y_coord0, roi.y_coord1);
+	memcpy(&pstate->ubwc_stats_roi, &roi, sizeof(struct sde_drm_ubwc_stats_roi));
 }
 
 static int sde_plane_atomic_set_property(struct drm_plane *plane,
@@ -4182,7 +4237,8 @@ static int sde_plane_atomic_set_property(struct drm_plane *plane,
 						(void *)(uintptr_t)val);
 				break;
 			case PLANE_PROP_UBWC_STATS_ROI:
-				_sde_plane_set_ubwc_stats_roi(psde, pstate, val);
+				_sde_plane_set_ubwc_stats_roi(psde, pstate,
+						(void __user *)(uintptr_t)val);
 				break;
 			default:
 				/* nothing to do */

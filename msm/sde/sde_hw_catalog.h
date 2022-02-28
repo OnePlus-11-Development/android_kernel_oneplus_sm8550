@@ -148,6 +148,7 @@
 #define SDE_UIDLE_VERSION_1_0_0		0x100
 #define SDE_UIDLE_VERSION_1_0_1		0x101
 #define SDE_UIDLE_VERSION_1_0_2		0x102
+#define SDE_UIDLE_VERSION_1_0_3		0x103
 
 #define IS_SDE_UIDLE_REV_100(rev) \
 	((rev) == SDE_UIDLE_VERSION_1_0_0)
@@ -155,6 +156,8 @@
 	((rev) == SDE_UIDLE_VERSION_1_0_1)
 #define IS_SDE_UIDLE_REV_102(rev) \
 	((rev) == SDE_UIDLE_VERSION_1_0_2)
+#define IS_SDE_UIDLE_REV_103(rev) \
+	((rev) == SDE_UIDLE_VERSION_1_0_3)
 
 #define SDE_UIDLE_MAJOR(rev)		((rev) >> 8)
 
@@ -169,6 +172,7 @@ enum {
 	SDE_HW_UBWC_VER_20 = SDE_HW_UBWC_VER(0x200),
 	SDE_HW_UBWC_VER_30 = SDE_HW_UBWC_VER(0x300),
 	SDE_HW_UBWC_VER_40 = SDE_HW_UBWC_VER(0x400),
+	SDE_HW_UBWC_VER_43 = SDE_HW_UBWC_VER(0x431),
 };
 #define IS_UBWC_10_SUPPORTED(rev) \
 		IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_UBWC_VER_10)
@@ -178,6 +182,8 @@ enum {
 		IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_UBWC_VER_30)
 #define IS_UBWC_40_SUPPORTED(rev) \
 		IS_SDE_MAJOR_SAME((rev), SDE_HW_UBWC_VER_40)
+#define IS_UBWC_43_SUPPORTED(rev) \
+		IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_UBWC_VER_43)
 
 /**
  * Supported system cache settings
@@ -342,6 +348,7 @@ enum {
  * @SDE_PERF_SSPP_CDP             Supports client driven prefetch
  * @SDE_PERF_SSPP_SYS_CACHE,      SSPP supports system cache
  * @SDE_PERF_SSPP_UIDLE,          sspp supports uidle
+ * @SDE_PERF_SSPP_UIDLE_FILL_LVL_SCALE,          sspp supports uidle fill level scaling
  * @SDE_PERF_SSPP_MAX             Maximum value
  */
 enum {
@@ -352,6 +359,7 @@ enum {
 	SDE_PERF_SSPP_CDP,
 	SDE_PERF_SSPP_SYS_CACHE,
 	SDE_PERF_SSPP_UIDLE,
+	SDE_PERF_SSPP_UIDLE_FILL_LVL_SCALE,
 	SDE_PERF_SSPP_MAX
 };
 
@@ -483,6 +491,7 @@ enum {
  * @SDE_DSC_HW_REV_1_1          dsc block supports dsc 1.1 only
  * @SDE_DSC_HW_REV_1_2          dsc block supports dsc 1.1 and 1.2
  * @SDE_DSC_NATIVE_422_EN,      Supports native422 and native420 encoding
+ * @SDE_DSC_REDUCED_OB_MAX,	DSC size is limited to 10k
  * @SDE_DSC_ENC,                DSC encoder sub block
  * @SDE_DSC_CTL,                DSC ctl sub block
  * @SDE_DSC_4HS,                Dedicated DSC 4HS config registers
@@ -493,6 +502,7 @@ enum {
 	SDE_DSC_HW_REV_1_1,
 	SDE_DSC_HW_REV_1_2,
 	SDE_DSC_NATIVE_422_EN,
+	SDE_DSC_REDUCED_OB_MAX,
 	SDE_DSC_ENC,
 	SDE_DSC_CTL,
 	SDE_DSC_4HS,
@@ -1721,6 +1731,8 @@ struct sde_perf_cfg {
  * @qseed_hw_rev        qseed HW block version
  * @smart_dma_rev       smartDMA block version
  * @ctl_rev             control path block version
+ * @has_precise_vsync_ts  indicates if HW has vsyc timestamp logging capability
+ * @has_reduced_ob_max indicate if DSC size is limited to 10k
  * @ts_prefill_rev      prefill traffic shaper feature revision
  * @true_inline_rot_rev inline rotator feature revision
  * @dnsc_blur_rev       downscale blur HW block version
@@ -1822,6 +1834,8 @@ struct sde_mdss_cfg {
 	u32 qseed_hw_rev;
 	u32 smart_dma_rev;
 	u32 ctl_rev;
+	bool has_precise_vsync_ts;
+	bool has_reduced_ob_max;
 	u32 ts_prefill_rev;
 	u32 true_inline_rot_rev;
 	u32 dnsc_blur_rev;

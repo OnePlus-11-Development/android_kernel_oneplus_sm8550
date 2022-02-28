@@ -4,6 +4,7 @@
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
+#define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
 #include "sde_hwio.h"
 #include "sde_hw_catalog.h"
 #include "sde_hw_lm.h"
@@ -46,6 +47,7 @@
 
 #define SSPP_UIDLE_CTRL_VALUE              0x1f0
 #define SSPP_UIDLE_CTRL_VALUE_REC1         0x1f4
+#define SSPP_FILL_LEVEL_SCALE              0x1f8
 
 /* SSPP_DGM */
 #define SSPP_DGM_0                         0x9F0
@@ -1167,6 +1169,22 @@ static void sde_hw_sspp_setup_sys_cache(struct sde_hw_pipe *ctx,
 	SDE_REG_WRITE(&ctx->hw, SSPP_SYS_CACHE_MODE + idx, val);
 }
 
+static void sde_hw_sspp_setup_uidle_fill_scale(struct sde_hw_pipe *ctx,
+		struct sde_hw_pipe_uidle_cfg *cfg)
+{
+	u32 idx, fill_lvl;
+
+	if (_sspp_subblk_offset(ctx, SDE_SSPP_SRC, &idx))
+		return;
+
+	/* duplicate the v1 scale values for V2 and fal10 exit */
+	fill_lvl = cfg->fill_level_scale & 0xF;
+	fill_lvl |= (cfg->fill_level_scale & 0xF) << 8;
+	fill_lvl |= (cfg->fill_level_scale & 0xF) << 16;
+
+	SDE_REG_WRITE(&ctx->hw, SSPP_FILL_LEVEL_SCALE + idx, fill_lvl);
+}
+
 static void sde_hw_sspp_setup_uidle(struct sde_hw_pipe *ctx,
 		struct sde_hw_pipe_uidle_cfg *cfg,
 		enum sde_sspp_multirect_index index)
@@ -1501,8 +1519,11 @@ static void _setup_layer_ops(struct sde_hw_pipe *c,
 	if (test_bit(SDE_PERF_SSPP_CDP, &perf_features))
 		c->ops.setup_cdp = sde_hw_sspp_setup_cdp;
 
-	if (test_bit(SDE_PERF_SSPP_UIDLE, &perf_features))
+	if (test_bit(SDE_PERF_SSPP_UIDLE, &perf_features)) {
 		c->ops.setup_uidle = sde_hw_sspp_setup_uidle;
+		if (test_bit(SDE_PERF_SSPP_UIDLE_FILL_LVL_SCALE, &perf_features))
+			c->ops.setup_uidle_fill_scale = sde_hw_sspp_setup_uidle_fill_scale;
+	}
 
 	_setup_layer_ops_colorproc(c, features, is_virtual_pipe);
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -227,7 +227,7 @@ struct sde_dbg_evtlog *sde_evtlog_init(void)
 {
 	struct sde_dbg_evtlog *evtlog;
 
-	evtlog = kvzalloc(sizeof(*evtlog), GFP_KERNEL);
+	evtlog = vzalloc(sizeof(*evtlog));
 	if (!evtlog)
 		return ERR_PTR(-ENOMEM);
 
@@ -245,7 +245,7 @@ struct sde_dbg_reglog *sde_reglog_init(void)
 {
 	struct sde_dbg_reglog *reglog;
 
-	reglog = kvzalloc(sizeof(*reglog), GFP_KERNEL);
+	reglog = vzalloc(sizeof(*reglog));
 	if (!reglog)
 		return ERR_PTR(-ENOMEM);
 
@@ -353,7 +353,7 @@ void sde_evtlog_destroy(struct sde_dbg_evtlog *evtlog)
 		list_del(&filter_node->list);
 		kfree(filter_node);
 	}
-	kvfree(evtlog);
+	vfree(evtlog);
 }
 
 void sde_reglog_destroy(struct sde_dbg_reglog *reglog)
@@ -361,5 +361,5 @@ void sde_reglog_destroy(struct sde_dbg_reglog *reglog)
 	if (!reglog)
 		return;
 
-	kvfree(reglog);
+	vfree(reglog);
 }

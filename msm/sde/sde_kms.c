@@ -768,6 +768,11 @@ static int _sde_kms_release_shared_buffer(unsigned int mem_addr,
 	pfn_start = mem_addr >> PAGE_SHIFT;
 	pfn_end = (mem_addr + splash_buffer_size) >> PAGE_SHIFT;
 
+	ret = memblock_free(mem_addr, splash_buffer_size);
+	if (ret) {
+		SDE_ERROR("continuous splash memory free failed:%d\n", ret);
+		return ret;
+	}
 	for (pfn_idx = pfn_start; pfn_idx < pfn_end; pfn_idx++)
 		free_reserved_page(pfn_to_page(pfn_idx));
 
@@ -1337,9 +1342,11 @@ int sde_kms_vm_pre_release(struct sde_kms *sde_kms,
 	/* if vm_req is enabled, once CRTC on the commit is guaranteed */
 	sde_kms_wait_for_frame_transfer_complete(&sde_kms->base, crtc);
 
+	sde_dbg_set_hw_ownership_status(false);
+
 	sde_kms_cancel_delayed_work(crtc);
 
-	/* disable SDE irq's */
+	/* disable SDE encoder irq's */
 	drm_for_each_encoder_mask(encoder, crtc->dev,
 					crtc->state->encoder_mask) {
 		if (sde_encoder_in_clone_mode(encoder))
@@ -1349,8 +1356,6 @@ int sde_kms_vm_pre_release(struct sde_kms *sde_kms,
 	}
 
 	if (is_primary) {
-		/* disable IRQ line */
-		sde_irq_update(&sde_kms->base, false);
 
 		/* disable vblank events */
 		drm_crtc_vblank_off(crtc);
@@ -1358,8 +1363,6 @@ int sde_kms_vm_pre_release(struct sde_kms *sde_kms,
 		/* reset sw state */
 		sde_crtc_reset_sw_state(crtc);
 	}
-
-	sde_dbg_set_hw_ownership_status(false);
 
 	return rc;
 }
@@ -1444,17 +1447,22 @@ int sde_kms_vm_primary_post_commit(struct sde_kms *sde_kms,
 	/* properly handoff color processing features */
 	sde_cp_crtc_vm_primary_handoff(crtc);
 
+	sde_vm_lock(sde_kms);
+
 	/* handle non-SDE clients pre-release */
 	if (vm_ops->vm_client_pre_release) {
 		rc = vm_ops->vm_client_pre_release(sde_kms);
 		if (rc) {
 			SDE_ERROR("sde vm client pre_release failed, rc=%d\n",
 					rc);
+			sde_vm_unlock(sde_kms);
 			goto exit;
 		}
 	}
 
-	sde_vm_lock(sde_kms);
+	/* disable IRQ line */
+	sde_irq_update(&sde_kms->base, false);
+
 	/* release HW */
 	if (vm_ops->vm_release) {
 		rc = vm_ops->vm_release(sde_kms);
@@ -2858,7 +2866,7 @@ static int sde_kms_check_vm_request(struct msm_kms *kms,
 	struct sde_vm_ops *vm_ops;
 	enum sde_crtc_vm_req old_vm_req = VM_REQ_NONE, new_vm_req = VM_REQ_NONE;
 	int i, rc = 0;
-	bool vm_req_active = false;
+	bool vm_req_active = false, prev_vm_req = false;
 	bool vm_owns_hw;
 
 	if (!kms || !state)
@@ -2871,6 +2879,14 @@ static int sde_kms_check_vm_request(struct msm_kms *kms,
 
 	if (!vm_ops->vm_request_valid || !vm_ops->vm_owns_hw || !vm_ops->vm_acquire)
 		return -EINVAL;
+
+	drm_for_each_crtc(crtc, state->dev) {
+		if (crtc->state && (sde_crtc_get_property(to_sde_crtc_state(crtc->state),
+				CRTC_PROP_VM_REQ_STATE) == VM_REQ_RELEASE)) {
+			prev_vm_req = true;
+			break;
+		}
+	}
 
 	/* check for an active vm request */
 	for_each_oldnew_crtc_in_state(state, crtc, old_cstate, new_cstate, i) {
@@ -2885,8 +2901,12 @@ static int sde_kms_check_vm_request(struct msm_kms *kms,
 		old_state = to_sde_crtc_state(old_cstate);
 		old_vm_req = sde_crtc_get_property(old_state, CRTC_PROP_VM_REQ_STATE);
 
-		/* No active request if the transition is from VM_REQ_NONE to VM_REQ_NONE */
-		if (old_vm_req || new_vm_req) {
+		/*
+		 * VM request should be validated in the following usecases
+		 * - There is a vm request(other than VM_REQ_NONE) on current/prev crtc state.
+		 * - Previously, vm transition has taken place on one of the crtc's.
+		 */
+		if (old_vm_req || new_vm_req || prev_vm_req) {
 			if (!vm_req_active) {
 				sde_vm_lock(sde_kms);
 				vm_owns_hw = sde_vm_owns_hw(sde_kms);

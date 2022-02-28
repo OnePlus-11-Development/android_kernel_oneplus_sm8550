@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  *
  */
 
+#define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
 #include "sde_hwio.h"
 #include "sde_hw_catalog.h"
 #include "sde_hw_top.h"
@@ -162,7 +164,7 @@ void sde_hw_uidle_setup_ctl(struct sde_hw_uidle *uidle,
 {
 	struct sde_hw_blk_reg_map *c = &uidle->hw;
 	bool enable = false;
-	u32 reg_val;
+	u32 reg_val, fal10_veto_regval = 0;
 
 	reg_val = SDE_REG_READ(c, UIDLE_CTL);
 
@@ -183,6 +185,10 @@ void sde_hw_uidle_setup_ctl(struct sde_hw_uidle *uidle,
 		FAL10_EXIT_CNT_MSK);
 
 	SDE_REG_WRITE(c, UIDLE_CTL, reg_val);
+	if (!enable)
+		fal10_veto_regval |= (BIT(31) | BIT(0));
+
+	SDE_REG_WRITE(c, UIDLE_FAL10_VETO_OVERRIDE, fal10_veto_regval);
 }
 
 static void sde_hw_uilde_active_override(struct sde_hw_uidle *uidle,
@@ -197,6 +203,19 @@ static void sde_hw_uilde_active_override(struct sde_hw_uidle *uidle,
 	SDE_REG_WRITE(c, UIDLE_QACTIVE_HF_OVERRIDE, reg_val);
 }
 
+static void sde_hw_uidle_fal10_override(struct sde_hw_uidle *uidle,
+		bool enable)
+{
+	struct sde_hw_blk_reg_map *c = &uidle->hw;
+	u32 reg_val = 0;
+
+	if (enable)
+		reg_val = BIT(0) | BIT(31);
+
+	SDE_REG_WRITE(c, UIDLE_FAL10_VETO_OVERRIDE, reg_val);
+	wmb();
+}
+
 static inline void _setup_uidle_ops(struct sde_hw_uidle_ops *ops,
 		unsigned long cap)
 {
@@ -207,6 +226,7 @@ static inline void _setup_uidle_ops(struct sde_hw_uidle_ops *ops,
 	ops->uidle_get_status = sde_hw_uidle_get_status;
 	if (cap & BIT(SDE_UIDLE_QACTIVE_OVERRIDE))
 		ops->active_override_enable = sde_hw_uilde_active_override;
+	ops->uidle_fal10_override = sde_hw_uidle_fal10_override;
 }
 
 struct sde_hw_uidle *sde_hw_uidle_init(enum sde_uidle idx,
