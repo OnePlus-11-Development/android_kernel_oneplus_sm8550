@@ -222,7 +222,7 @@ struct sde_encoder_virt {
 	struct sde_rsc_client *rsc_client;
 	bool rsc_state_init;
 	struct msm_display_info disp_info;
-	bool misr_enable;
+	atomic_t misr_enable;
 	bool misr_reconfigure;
 	u32 misr_frame_count;
 
@@ -692,4 +692,38 @@ static inline bool sde_encoder_is_widebus_enabled(struct drm_encoder *drm_enc)
 bool sde_encoder_is_line_insertion_supported(struct drm_encoder *drm_enc);
 
 void sde_encoder_add_data_to_minidump_va(struct drm_encoder *drm_enc);
+
+/**
+ * sde_encoder_misr_sign_event_notify - collect MISR, check with previous value
+ * if change then notify to client with custom event
+ * @drm_enc: pointer to drm encoder
+ */
+void sde_encoder_misr_sign_event_notify(struct drm_encoder *drm_enc);
+
+/**
+ * sde_encoder_register_misr_event - register or deregister MISR event
+ * @drm_enc: pointer to drm encoder
+ * @val: indicates register or deregister
+ */
+static inline int sde_encoder_register_misr_event(struct drm_encoder *drm_enc, bool val)
+{
+	struct sde_encoder_virt *sde_enc = NULL;
+
+	if (!drm_enc)
+		return -EINVAL;
+
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	atomic_set(&sde_enc->misr_enable, val);
+
+	/*
+	 * To setup MISR ctl reg, set misr_reconfigure as true.
+	 * MISR is calculated for the specific number of frames.
+	 */
+	if (atomic_read(&sde_enc->misr_enable)) {
+		sde_enc->misr_reconfigure = true;
+		sde_enc->misr_frame_count = 1;
+	}
+
+	return 0;
+}
 #endif /* __SDE_ENCODER_H__ */

@@ -837,6 +837,20 @@ static int _set_spr_pu_feature(struct sde_hw_dspp *hw_dspp,
 	return 0;
 }
 
+int sde_dspp_spr_read_opr_value(struct sde_hw_dspp *hw_dspp, u32 *opr_value)
+{
+	int rc;
+
+	if (!opr_value || !hw_dspp || !hw_dspp->ops.read_spr_opr_value)
+		return -EINVAL;
+
+	rc = hw_dspp->ops.read_spr_opr_value(hw_dspp, opr_value);
+	if (rc)
+		SDE_ERROR("invalid opr read %d", rc);
+
+	return rc;
+}
+
 static int _set_demura_pu_feature(struct sde_hw_dspp *hw_dspp,
 	struct sde_hw_cp_cfg *hw_cfg, struct sde_crtc *sde_crtc)
 {

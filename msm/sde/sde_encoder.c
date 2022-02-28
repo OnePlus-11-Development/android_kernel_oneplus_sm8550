@@ -77,6 +77,9 @@
 /* Maximum number of VSYNC wait attempts for RSC state transition */
 #define MAX_RSC_WAIT	5
 
+#define IS_ROI_UPDATED(a, b) (a.x1 != b.x1 || a.x2 != b.x2 || \
+			a.y1 != b.y1 || a.y2 != b.y2)
+
 /**
  * enum sde_enc_rc_events - events for resource control state machine
  * @SDE_ENC_RC_EVENT_KICKOFF:
@@ -2193,6 +2196,7 @@ static int _sde_encoder_rc_idle(struct drm_encoder *drm_enc,
 	struct drm_crtc *crtc = drm_enc->crtc;
 	struct sde_crtc *sde_crtc = to_sde_crtc(crtc);
 	struct sde_connector *sde_conn;
+	int crtc_id = 0;
 
 	priv = drm_enc->dev->dev_private;
 	sde_kms = to_sde_kms(priv->kms);
@@ -2218,10 +2222,14 @@ static int _sde_encoder_rc_idle(struct drm_encoder *drm_enc,
 		goto end;
 	}
 
+	crtc_id = drm_crtc_index(crtc);
 	if (is_vid_mode) {
 		sde_encoder_irq_control(drm_enc, false);
 		_sde_encoder_pm_qos_remove_request(drm_enc);
 	} else {
+		if (priv->event_thread[crtc_id].thread)
+			kthread_flush_worker(&priv->event_thread[crtc_id].worker);
+
 		/* disable all the clks and resources */
 		_sde_encoder_update_rsc_client(drm_enc, false);
 		_sde_encoder_resource_control_helper(drm_enc, false);
@@ -2985,6 +2993,13 @@ void sde_encoder_virt_restore(struct drm_encoder *drm_enc)
 
 	_sde_encoder_virt_enable_helper(drm_enc);
 	sde_encoder_control_te(drm_enc, true);
+
+	/*
+	 * During IPC misr ctl register is reset.
+	 * Need to reconfigure misr after every IPC.
+	 */
+	if (atomic_read(&sde_enc->misr_enable))
+		sde_enc->misr_reconfigure = true;
 }
 
 static void sde_encoder_populate_encoder_phys(struct drm_encoder *drm_enc,
@@ -3032,7 +3047,7 @@ static void sde_encoder_populate_encoder_phys(struct drm_encoder *drm_enc,
 				phys->ops.enable(phys);
 		}
 
-		if (sde_enc->misr_enable  && phys->ops.setup_misr &&
+		if (atomic_read(&sde_enc->misr_enable)  && phys->ops.setup_misr &&
 		(sde_encoder_check_curr_mode(drm_enc, MSM_DISPLAY_VIDEO_MODE)))
 			phys->ops.setup_misr(phys, true,
 						sde_enc->misr_frame_count);
@@ -3977,7 +3992,7 @@ static void _sde_encoder_kickoff_phys(struct sde_encoder_virt *sde_enc,
 		}
 	}
 
-	if (sde_enc->misr_enable)
+	if (atomic_read(&sde_enc->misr_enable))
 		sde_encoder_misr_configure(&sde_enc->base, true,
 				sde_enc->misr_frame_count);
 
@@ -4888,7 +4903,7 @@ static ssize_t _sde_encoder_misr_setup(struct file *file,
 	if (sscanf(buf, "%u %u", &enable, &frame_count) != 2)
 		return -EINVAL;
 
-	sde_enc->misr_enable = enable;
+	atomic_set(&sde_enc->misr_enable, enable);
 	sde_enc->misr_reconfigure = true;
 	sde_enc->misr_frame_count = frame_count;
 	return count;
@@ -4935,7 +4950,7 @@ static ssize_t _sde_encoder_misr_read(struct file *file,
 		goto end;
 	}
 
-	if (!sde_enc->misr_enable) {
+	if (!atomic_read(&sde_enc->misr_enable)) {
 		len += scnprintf(buf + len, MISR_BUFF_SIZE - len,
 				"disabled\n");
 		goto buff_check;
@@ -5912,5 +5927,82 @@ void sde_encoder_add_data_to_minidump_va(struct drm_encoder *drm_enc)
 		phys_enc = sde_enc->phys_vid_encs[i];
 		if(phys_enc && phys_enc->ops.add_to_minidump)
 			phys_enc->ops.add_to_minidump(phys_enc);
+	}
+}
+
+void sde_encoder_misr_sign_event_notify(struct drm_encoder *drm_enc)
+{
+	struct drm_event event;
+	struct drm_connector *connector;
+	struct sde_connector *c_conn = NULL;
+	struct sde_connector_state *c_state = NULL;
+	struct sde_encoder_virt *sde_enc = NULL;
+	struct sde_encoder_phys *phys = NULL;
+	u32 current_misr_value[MAX_DSI_DISPLAYS] = {0};
+	int rc = 0, i = 0;
+	bool misr_updated = false, roi_updated = false;
+	struct msm_roi_list *prev_roi, *c_state_roi;
+
+	if (!drm_enc)
+		return;
+
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	if (!atomic_read(&sde_enc->misr_enable)) {
+		SDE_DEBUG("MISR is disabled\n");
+		return;
+	}
+
+	connector = sde_enc->cur_master->connector;
+	if (!connector)
+		return;
+
+	c_conn = to_sde_connector(connector);
+	c_state = to_sde_connector_state(connector->state);
+
+	atomic64_set(&c_conn->previous_misr_sign.num_valid_misr, 0);
+	for (i = 0; i < sde_enc->num_phys_encs; i++) {
+		phys = sde_enc->phys_encs[i];
+
+		if (!phys || !phys->ops.collect_misr) {
+			SDE_DEBUG("invalid misr ops\n", i);
+			continue;
+		}
+
+		rc = phys->ops.collect_misr(phys, true, &current_misr_value[i]);
+		if (rc) {
+			SDE_ERROR("failed to collect misr %d\n", rc);
+			return;
+		}
+
+		atomic64_inc(&c_conn->previous_misr_sign.num_valid_misr);
+	}
+
+	for (i = 0; i < sde_enc->num_phys_encs; i++) {
+		if (current_misr_value[i] != c_conn->previous_misr_sign.misr_sign_value[i]) {
+			c_conn->previous_misr_sign.misr_sign_value[i] = current_misr_value[i];
+			misr_updated = true;
+		}
+	}
+
+	prev_roi = &c_conn->previous_misr_sign.roi_list;
+	c_state_roi = &c_state->rois;
+
+	if (prev_roi->num_rects != c_state_roi->num_rects) {
+		roi_updated = true;
+	} else {
+		for (i = 0; i < prev_roi->num_rects; i++) {
+			if (IS_ROI_UPDATED(prev_roi->roi[i], c_state_roi->roi[i]))
+				roi_updated = true;
+		}
+	}
+
+	if (roi_updated)
+		memcpy(&c_conn->previous_misr_sign.roi_list, &c_state->rois, sizeof(c_state->rois));
+
+	if (misr_updated || roi_updated) {
+		event.type = DRM_EVENT_MISR_SIGN;
+		event.length = sizeof(c_conn->previous_misr_sign);
+		msm_mode_object_event_notify(&connector->base, connector->dev, &event,
+						(u8 *)&c_conn->previous_misr_sign);
 	}
 }
