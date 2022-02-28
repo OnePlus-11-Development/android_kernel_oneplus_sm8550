@@ -323,6 +323,54 @@ unlock:
 	return rc;
 }
 
+int msm_v4l2_querybuf(struct file *filp, void *fh,
+				struct v4l2_buffer *b)
+{
+	struct msm_vidc_inst *inst = get_vidc_inst(filp, fh);
+	int rc = 0;
+
+	inst = get_inst_ref(g_core, inst);
+	if (!inst) {
+		d_vpr_e("%s: invalid instance\n", __func__);
+		return -EINVAL;
+	}
+
+	inst_lock(inst, __func__);
+	rc = msm_vidc_querybuf((void *)inst, b);
+	if (rc)
+		goto unlock;
+
+unlock:
+	inst_unlock(inst, __func__);
+	put_inst(inst);
+
+	return rc;
+}
+
+int msm_v4l2_create_bufs(struct file *filp, void *fh,
+				struct v4l2_create_buffers *b)
+{
+	struct msm_vidc_inst *inst = get_vidc_inst(filp, fh);
+	int rc = 0;
+
+	inst = get_inst_ref(g_core, inst);
+	if (!inst) {
+		d_vpr_e("%s: invalid instance\n", __func__);
+		return -EINVAL;
+	}
+
+	inst_lock(inst, __func__);
+	rc = msm_vidc_create_bufs((void *)inst, b);
+	if (rc)
+		goto unlock;
+
+unlock:
+	inst_unlock(inst, __func__);
+	put_inst(inst);
+
+	return rc;
+}
+
 int msm_v4l2_qbuf(struct file *filp, void *fh,
 				struct v4l2_buffer *b)
 {
@@ -336,18 +384,19 @@ int msm_v4l2_qbuf(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
-	inst_lock(inst, __func__);
-	if (is_session_error(inst)) {
-		i_vpr_e(inst, "%s: inst in error state\n", __func__);
-		rc = -EBUSY;
-		goto unlock;
-	}
+	/*
+	 * do not acquire inst lock here. acquire it in msm_vidc_buf_queue.
+	 * for requests, msm_vidc_buf_queue() is not called from here.
+	 * instead it's called as part of msm_v4l2_request_queue().
+	 * hence acquire the inst lock in common function i.e
+	 * msm_vidc_buf_queue, to handle both requests and non-request
+	 * scenarios.
+	 */
 	rc = msm_vidc_qbuf(inst, vdev->v4l2_dev->mdev, b);
 	if (rc)
-		goto unlock;
+		goto exit;
 
-unlock:
-	inst_unlock(inst, __func__);
+exit:
 	put_inst(inst);
 
 	return rc;
@@ -695,4 +744,31 @@ unlock:
 	put_inst(inst);
 
 	return rc;
+}
+
+int msm_v4l2_request_validate(struct media_request *req)
+{
+	return vb2_request_validate(req);
+}
+
+void msm_v4l2_request_queue(struct media_request *req)
+{
+	v4l2_m2m_request_queue(req);
+}
+
+void msm_v4l2_m2m_device_run(void *priv)
+{
+	d_vpr_l("%s: \n", __func__);
+}
+
+void msm_v4l2_m2m_job_abort(void *priv)
+{
+	struct msm_vidc_inst *inst = priv;
+
+	if (!inst) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return;
+	}
+	i_vpr_h(inst, "%s: m2m job aborted\n", __func__);
+	v4l2_m2m_job_finish(inst->m2m_dev, inst->m2m_ctx);
 }

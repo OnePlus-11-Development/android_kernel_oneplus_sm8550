@@ -13,6 +13,7 @@
 #include "msm_vdec.h"
 #include "msm_vidc_control.h"
 #include "msm_vidc_memory.h"
+#include "msm_vidc_fence.h"
 
 #define in_range(range, val) (((range.begin) < (val)) && ((range.end) > (val)))
 
@@ -648,7 +649,7 @@ static int handle_read_only_buffer(struct msm_vidc_inst *inst,
 	 *          if present, do nothing
 	 */
 	if (!found) {
-		ro_buf = msm_memory_alloc(inst, MSM_MEM_POOL_BUFFER);
+		ro_buf = msm_memory_pool_alloc(inst, MSM_MEM_POOL_BUFFER);
 		if (!ro_buf) {
 			i_vpr_e(inst, "%s: buffer alloc failed\n", __func__);
 			return -ENOMEM;
@@ -699,7 +700,7 @@ static int handle_non_read_only_buffer(struct msm_vidc_inst *inst,
 	if (found) {
 		print_vidc_buffer(VIDC_LOW, "low ", "ro buf deleted", inst, ro_buf);
 		list_del(&ro_buf->list);
-		msm_memory_free(inst, ro_buf);
+		msm_memory_pool_free(inst, ro_buf);
 	}
 
 	return 0;
@@ -1020,6 +1021,64 @@ static int handle_output_metadata_buffer(struct msm_vidc_inst *inst,
 	return rc;
 }
 
+static bool is_metabuffer_dequeued(struct msm_vidc_inst *inst,
+	struct msm_vidc_buffer *buf)
+{
+	bool found = false;
+	struct msm_vidc_buffers *buffers;
+	struct msm_vidc_buffer *buffer;
+	enum msm_vidc_buffer_type buffer_type;
+
+	if (is_input_buffer(buf->type) && is_input_meta_enabled(inst))
+		buffer_type = MSM_VIDC_BUF_INPUT_META;
+	else if (is_output_buffer(buf->type) && is_output_meta_enabled(inst))
+		buffer_type = MSM_VIDC_BUF_OUTPUT_META;
+	else
+		return true;
+
+	buffers = msm_vidc_get_buffers(inst, buffer_type, __func__);
+	if (!buffers)
+		return false;
+
+	list_for_each_entry(buffer, &buffers->list, list) {
+		if (buffer->index == buf->index &&
+			buffer->attr & MSM_VIDC_ATTR_DEQUEUED) {
+			found = true;
+			break;
+		}
+	}
+	return found;
+}
+
+static int msm_vidc_check_meta_buffers(struct msm_vidc_inst *inst)
+{
+	int rc = 0;
+	int i;
+	struct msm_vidc_buffers *buffers;
+	struct msm_vidc_buffer *buf;
+	static const enum msm_vidc_buffer_type buffer_type[] = {
+		MSM_VIDC_BUF_INPUT,
+		MSM_VIDC_BUF_OUTPUT,
+	};
+
+	for (i = 0; i < ARRAY_SIZE(buffer_type); i++) {
+		buffers = msm_vidc_get_buffers(inst, buffer_type[i], __func__);
+		if (!buffers)
+			return -EINVAL;
+
+		list_for_each_entry(buf, &buffers->list, list) {
+			if (buf->attr & MSM_VIDC_ATTR_DEQUEUED) {
+				if (!is_metabuffer_dequeued(inst, buf)) {
+					print_vidc_buffer(VIDC_ERR, "err ",
+						"meta not dequeued", inst, buf);
+					return -EINVAL;
+				}
+			}
+		}
+	}
+	return rc;
+}
+
 static int handle_dequeue_buffers(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
@@ -1033,6 +1092,11 @@ static int handle_dequeue_buffers(struct msm_vidc_inst *inst)
 		MSM_VIDC_BUF_OUTPUT_META,
 		MSM_VIDC_BUF_OUTPUT,
 	};
+
+	/* check metabuffers dequeued before sending vb2_buffer_done() */
+	rc = msm_vidc_check_meta_buffers(inst);
+	if (rc)
+		return rc;
 
 	for (i = 0; i < ARRAY_SIZE(buffer_type); i++) {
 		buffers = msm_vidc_get_buffers(inst, buffer_type[i], __func__);
@@ -1051,7 +1115,7 @@ static int handle_dequeue_buffers(struct msm_vidc_inst *inst)
 						"vb2 done already", inst, buf);
 				} else {
 					buf->attr |= MSM_VIDC_ATTR_BUFFER_DONE;
-					msm_vidc_vb2_buffer_done(inst, buf);
+					msm_vidc_buffer_done(inst, buf);
 				}
 				msm_vidc_put_driver_buf(inst, buf);
 			}
@@ -1357,6 +1421,7 @@ static int handle_session_property(struct msm_vidc_inst *inst,
 	int rc = 0;
 	u32 port;
 	u32 *payload_ptr = NULL;
+	u32 fence_id = 0;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: Invalid params\n", __func__);
@@ -1490,6 +1555,20 @@ static int handle_session_property(struct msm_vidc_inst *inst,
 			i_vpr_e(inst,
 				"%s: fw pipe mode(%d) not matching the capability value(%d)\n",
 				__func__,  payload_ptr[0], inst->capabilities->cap[PIPE].value);
+		break;
+	case HFI_PROP_FENCE:
+		if (inst->capabilities->cap[INPUT_META_OUTBUF_FENCE].value) {
+			if (payload_ptr) {
+				fence_id = payload_ptr[0];
+				rc = msm_vidc_fence_signal(inst, fence_id);
+			} else {
+				i_vpr_e(inst, "%s: fence payload is null\n", __func__);
+				rc = -EINVAL;
+			}
+		} else {
+			i_vpr_e(inst, "%s: fence is not enabled for this session\n",
+				__func__);
+		}
 		break;
 	default:
 		i_vpr_e(inst, "%s: invalid property %#x\n",

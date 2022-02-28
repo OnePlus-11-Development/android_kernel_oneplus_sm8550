@@ -11,6 +11,8 @@
 struct msm_vidc_core;
 struct msm_vidc_inst;
 
+#define MSM_MEM_POOL_PACKET_SIZE 1024
+
 struct msm_memory_dmabuf {
 	struct list_head       list;
 	struct dma_buf        *dmabuf;
@@ -23,6 +25,7 @@ enum msm_memory_pool_type {
 	MSM_MEM_POOL_ALLOC,
 	MSM_MEM_POOL_TIMESTAMP,
 	MSM_MEM_POOL_DMABUF,
+	MSM_MEM_POOL_PACKET,
 	MSM_MEM_POOL_MAX,
 };
 
@@ -56,8 +59,8 @@ void msm_vidc_memory_put_dmabuf_completely(struct msm_vidc_inst *inst,
 	struct msm_memory_dmabuf *buf);
 int msm_memory_pools_init(struct msm_vidc_inst *inst);
 void msm_memory_pools_deinit(struct msm_vidc_inst *inst);
-void *msm_memory_alloc(struct msm_vidc_inst *inst,
+void *msm_memory_pool_alloc(struct msm_vidc_inst *inst,
 	enum msm_memory_pool_type type);
-void msm_memory_free(struct msm_vidc_inst *inst, void *vidc_buf);
+void msm_memory_pool_free(struct msm_vidc_inst *inst, void *vidc_buf);
 
 #endif // _MSM_VIDC_MEMORY_H_

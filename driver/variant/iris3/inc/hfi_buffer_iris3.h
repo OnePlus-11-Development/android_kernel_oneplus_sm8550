@@ -880,6 +880,17 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 #define AV1D_LCU_MIN_SIZE_PELS 64
 #define AV1D_MAX_TILE_COLS     64
 
+#define HFI_BUFFER_COMV_AV1D(_size, frame_width, frame_height, \
+				_yuv_bufcount_min) \
+	do { \
+		_size = 2 * HFI_ALIGN(MAX(((frame_width + 63) / 64) * \
+				((frame_height + 63) / 64) * 512, \
+				((frame_width + 127) / 128) * \
+				((frame_height + 127) / 128) * 2816), \
+				VENUS_DMA_ALIGNMENT); \
+		_size *= _yuv_bufcount_min; \
+	} while (0)
+
 #define SIZE_AV1D_LB_FE_TOP_DATA(frame_width, frame_height) \
 	(HFI_ALIGN(frame_width, AV1D_LCU_MAX_SIZE_PELS) * ((16 * 10) >> 3) + \
 	HFI_ALIGN(frame_width, AV1D_LCU_MAX_SIZE_PELS) / 2 * ((16 * 6) >> 3) * 2)
@@ -962,13 +973,6 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		HFI_U32 y_width_a = 128, y_height_a = 32; \
 		HFI_U32 uv_width_a = 128, uv_height_a = 32; \
 		HFI_U32 yBufSize, uvBufSize, y_width, y_height, uv_width, uv_height; \
-		HFI_NV12_IL_CALC_Y_STRIDE(y_width, frame_width, y_width_a); \
-		HFI_NV12_IL_CALC_Y_BUFHEIGHT(y_height, frame_height, y_height_a); \
-		HFI_NV12_IL_CALC_UV_STRIDE(uv_width, frame_width, uv_width_a); \
-		HFI_NV12_IL_CALC_UV_BUFHEIGHT(uv_height, frame_height, uv_height_a); \
-		HFI_NV12_UBWC_IL_CALC_Y_BUF_SIZE(yBufSize, y_width, y_height); \
-		HFI_NV12_UBWC_IL_CALC_UV_BUF_SIZE(uvBufSize, uv_width, uv_height); \
-		_size = yBufSize + uvBufSize; \
 		HFI_U32 y_meta_width_a = 64, y_meta_height_a = 16; \
 		HFI_U32 uv_meta_width_a = 64, uv_meta_height_a = 16; \
 		HFI_U32 meta_height, meta_stride, meta_size; \
@@ -977,6 +981,13 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		HFI_U32 tile_width_uv = HFI_COLOR_FORMAT_YUV420_NV12_UBWC_UV_TILE_WIDTH; \
 		HFI_U32 tile_height_uv = \
 		    HFI_COLOR_FORMAT_YUV420_NV12_UBWC_UV_TILE_HEIGHT; \
+		HFI_NV12_IL_CALC_Y_STRIDE(y_width, frame_width, y_width_a); \
+		HFI_NV12_IL_CALC_Y_BUFHEIGHT(y_height, frame_height, y_height_a); \
+		HFI_NV12_IL_CALC_UV_STRIDE(uv_width, frame_width, uv_width_a); \
+		HFI_NV12_IL_CALC_UV_BUFHEIGHT(uv_height, frame_height, uv_height_a); \
+		HFI_NV12_UBWC_IL_CALC_Y_BUF_SIZE(yBufSize, y_width, y_height); \
+		HFI_NV12_UBWC_IL_CALC_UV_BUF_SIZE(uvBufSize, uv_width, uv_height); \
+		_size = yBufSize + uvBufSize; \
 		HFI_UBWC_CALC_METADATA_PLANE_STRIDE(meta_stride, frame_width, \
 							y_meta_width_a, tile_width_y); \
 		HFI_UBWC_METADATA_PLANE_BUFHEIGHT(meta_height, frame_height, \
@@ -999,14 +1010,6 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		HFI_U32 y_width_a = 256, y_height_a = 16, \
 			uv_width_a = 256, uv_height_a = 16; \
 		HFI_U32 yBufSize, uvBufSize, y_width, y_height, uv_width, uv_height; \
-		HFI_YUV420_TP10_CALC_Y_STRIDE(y_width, frame_width, y_width_a); \
-		HFI_YUV420_TP10_CALC_Y_BUFHEIGHT(y_height, frame_height, y_height_a); \
-		HFI_YUV420_TP10_CALC_UV_STRIDE(uv_width, frame_width, uv_width_a); \
-		HFI_YUV420_TP10_CALC_UV_BUFHEIGHT(uv_height, frame_height, \
-						uv_height_a); \
-		HFI_YUV420_TP10_UBWC_CALC_Y_BUF_SIZE(yBufSize, y_width, y_height); \
-		HFI_YUV420_TP10_UBWC_CALC_UV_BUF_SIZE(uvBufSize, uv_width, uv_height); \
-		_size = yBufSize + uvBufSize; \
 		HFI_U32 y_meta_width_a = 64, y_meta_height_a = 16, \
 			uv_meta_width_a = 64, uv_meta_height_a = 16; \
 		HFI_U32 meta_height, meta_stride, meta_size; \
@@ -1015,6 +1018,14 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		HFI_U32 tile_width_uv = HFI_COLOR_FORMAT_YUV420_TP10_UBWC_UV_TILE_WIDTH; \
 		HFI_U32 tile_height_uv = \
 			HFI_COLOR_FORMAT_YUV420_TP10_UBWC_UV_TILE_HEIGHT; \
+		HFI_YUV420_TP10_CALC_Y_STRIDE(y_width, frame_width, y_width_a); \
+		HFI_YUV420_TP10_CALC_Y_BUFHEIGHT(y_height, frame_height, y_height_a); \
+		HFI_YUV420_TP10_CALC_UV_STRIDE(uv_width, frame_width, uv_width_a); \
+		HFI_YUV420_TP10_CALC_UV_BUFHEIGHT(uv_height, frame_height, \
+						uv_height_a); \
+		HFI_YUV420_TP10_UBWC_CALC_Y_BUF_SIZE(yBufSize, y_width, y_height); \
+		HFI_YUV420_TP10_UBWC_CALC_UV_BUF_SIZE(uvBufSize, uv_width, uv_height); \
+		_size = yBufSize + uvBufSize; \
 		HFI_UBWC_CALC_METADATA_PLANE_STRIDE(meta_stride, frame_width, \
 			y_meta_width_a, tile_width_y); \
 		HFI_UBWC_METADATA_PLANE_BUFHEIGHT(meta_height, frame_height, \
@@ -1135,15 +1146,18 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 				(((8192 + 127) / 128) * ((4352 + 127) / 128) * \
 				AV1D_SIZE_BSE_COL_MV_128x128))
 
-#define HFI_BUFFER_PERSIST_AV1D(_size) \
+#define HFI_BUFFER_PERSIST_AV1D(_size, max_width, max_height, total_ref_count) \
 	do \
 	{ \
-		_size = HFI_ALIGN(SIZE_AV1D_SEQUENCE_HEADER * 2 + \
-		       SIZE_AV1D_METADATA + \
+		HFI_U32 comv_size; \
+		HFI_BUFFER_COMV_AV1D(comv_size, max_width, max_height, total_ref_count); \
+		_size = \
+		HFI_ALIGN((SIZE_AV1D_SEQUENCE_HEADER * 2 + \
+		SIZE_AV1D_METADATA + \
 		AV1D_NUM_HW_PIC_BUF * (SIZE_AV1D_TILE_OFFSET + SIZE_AV1D_QM) + \
 		AV1D_NUM_FRAME_HEADERS * (SIZE_AV1D_FRAME_HEADER + \
-			2 * SIZE_AV1D_PROB_TABLE) + \
-		AV1D_NUM_HW_PIC_BUF * 2 * SIZE_AV1D_COL_MV, VENUS_DMA_ALIGNMENT); \
+		2 * SIZE_AV1D_PROB_TABLE) + \
+		comv_size), VENUS_DMA_ALIGNMENT); \
 	} while (0)
 
 #define HFI_BUFFER_BITSTREAM_ENC(size, frame_width, frame_height, \

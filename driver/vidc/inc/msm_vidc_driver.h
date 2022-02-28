@@ -252,7 +252,7 @@ static inline bool is_secure_region(enum msm_vidc_buffer_region region)
 			region == MSM_VIDC_NON_SECURE_PIXEL);
 }
 
-const char *cap_name(enum msm_vidc_inst_capability_type cap);
+const char *cap_name(enum msm_vidc_inst_capability_type cap_id);
 const char *v4l2_pixelfmt_name(u32 pixelfmt);
 const char *v4l2_type_name(u32 port);
 void print_vidc_buffer(u32 tag, const char *tag_str, const char *str, struct msm_vidc_inst *inst,
@@ -298,8 +298,8 @@ int msm_vidc_alloc_and_queue_session_internal_buffers(struct msm_vidc_inst *inst
 		enum msm_vidc_buffer_type buffer_type);
 int msm_vidc_release_internal_buffers(struct msm_vidc_inst *inst,
 		enum msm_vidc_buffer_type buffer_type);
-int msm_vidc_vb2_buffer_done(struct msm_vidc_inst *inst,
-	struct msm_vidc_buffer *buf);
+int msm_vidc_buffer_done(struct msm_vidc_inst *inst,
+		struct msm_vidc_buffer *buf);
 int msm_vidc_remove_session(struct msm_vidc_inst *inst);
 int msm_vidc_add_session(struct msm_vidc_inst *inst);
 int msm_vidc_session_open(struct msm_vidc_inst *inst);
@@ -441,8 +441,6 @@ int msm_vidc_ts_reorder_remove_timestamp(struct msm_vidc_inst *inst, u64 timesta
 int msm_vidc_ts_reorder_get_first_timestamp(struct msm_vidc_inst *inst, u64 *timestamp);
 int msm_vidc_ts_reorder_flush(struct msm_vidc_inst *inst);
 const char *buf_name(enum msm_vidc_buffer_type type);
-void msm_vidc_free_capabililty_list(struct msm_vidc_inst *inst,
-	enum msm_vidc_ctrl_list_type list_type);
 bool res_is_greater_than(u32 width, u32 height,
 	u32 ref_width, u32 ref_height);
 bool res_is_greater_than_or_equal_to(u32 width, u32 height,
@@ -452,5 +450,7 @@ bool res_is_less_than(u32 width, u32 height,
 bool res_is_less_than_or_equal_to(u32 width, u32 height,
 	u32 ref_width, u32 ref_height);
 int msm_vidc_get_properties(struct msm_vidc_inst *inst);
+int msm_vidc_create_input_metadata_buffer(struct msm_vidc_inst *inst, u32 buf_fd);
+int msm_vidc_update_input_meta_buffer_index(struct msm_vidc_inst *inst, struct vb2_buffer *vb2);
 #endif // _MSM_VIDC_DRIVER_H_
 

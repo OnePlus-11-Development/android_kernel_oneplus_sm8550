@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2020-2021,, The Linux Foundation. All rights reserved.
  */
+/* Copyright (c) 2022. Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #ifndef _MSM_VIDC_INST_H_
 #define _MSM_VIDC_INST_H_
@@ -86,9 +87,14 @@ enum msm_vidc_inst_state {
 	MSM_VIDC_ERROR                     = 12,
 };
 
+struct buf_queue {
+	struct vb2_queue *vb2q;
+};
+
 struct msm_vidc_inst {
 	struct list_head                   list;
 	struct mutex                       lock;
+	struct mutex                       request_lock;
 	enum msm_vidc_inst_state           state;
 	enum msm_vidc_domain_type          domain;
 	enum msm_vidc_codec_type           codec;
@@ -101,14 +107,14 @@ struct msm_vidc_inst {
 	struct v4l2_format                 fmts[MAX_PORT];
 	struct v4l2_ctrl_handler           ctrl_handler;
 	struct v4l2_fh                     event_handler;
+	struct v4l2_m2m_dev               *m2m_dev;
+	struct v4l2_m2m_ctx               *m2m_ctx;
 	struct v4l2_ctrl                 **ctrls;
 	u32                                num_ctrls;
-	struct msm_vidc_inst_cap_entry     children;
-	struct msm_vidc_inst_cap_entry     firmware;
 	enum hfi_rate_control              hfi_rc_type;
 	enum hfi_layer_encoding_type       hfi_layer_type;
 	bool                               request;
-	struct vb2_queue                   vb2q[MAX_PORT];
+	struct buf_queue                   bufq[MAX_PORT];
 	struct msm_vidc_rectangle          crop;
 	struct msm_vidc_rectangle          compose;
 	struct msm_vidc_power              power;
@@ -136,6 +142,11 @@ struct msm_vidc_inst {
 	struct list_head                   response_works; /* list of struct response_work */
 	struct list_head                   enc_input_crs;
 	struct list_head                   dmabuf_tracker; /* list of struct msm_memory_dmabuf */
+	struct list_head                   caps_list;
+	struct list_head                   children_list; /* struct msm_vidc_inst_cap_entry */
+	struct list_head                   firmware_list; /* struct msm_vidc_inst_cap_entry */
+	struct list_head                   pending_pkts; /* list of struct hfi_pending_packet */
+	struct list_head                   fence_list; /* list of struct msm_vidc_fence */
 	bool                               once_per_session_set;
 	bool                               ipsc_properties_set;
 	bool                               opsc_properties_set;
@@ -145,6 +156,7 @@ struct msm_vidc_inst {
 	struct msm_vidc_statistics         stats;
 	struct msm_vidc_inst_capability   *capabilities;
 	struct completion                  completions[MAX_SIGNAL];
+	struct msm_vidc_fence_context      fence_context;
 	enum priority_level                priority_level;
 	u32                                firmware_priority;
 	bool                               active;

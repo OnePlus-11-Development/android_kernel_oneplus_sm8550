@@ -108,6 +108,8 @@
 
 #define WRAPPER_DEBUG_BRIDGE_LPI_CONTROL_IRIS3	(WRAPPER_BASE_OFFS_IRIS3 + 0x54)
 #define WRAPPER_DEBUG_BRIDGE_LPI_STATUS_IRIS3	(WRAPPER_BASE_OFFS_IRIS3 + 0x58)
+#define WRAPPER_IRIS_CPU_NOC_LPI_CONTROL	(WRAPPER_BASE_OFFS_IRIS3 + 0x5C)
+#define WRAPPER_IRIS_CPU_NOC_LPI_STATUS		(WRAPPER_BASE_OFFS_IRIS3 + 0x60)
 #define WRAPPER_CORE_CLOCK_CONFIG_IRIS3		(WRAPPER_BASE_OFFS_IRIS3 + 0x88)
 
 /*
@@ -118,6 +120,8 @@
 #define WRAPPER_TZ_BASE_OFFS	0x000C0000
 #define WRAPPER_TZ_CPU_CLOCK_CONFIG	(WRAPPER_TZ_BASE_OFFS)
 #define WRAPPER_TZ_CPU_STATUS	(WRAPPER_TZ_BASE_OFFS + 0x10)
+#define WRAPPER_TZ_CTL_AXI_CLOCK_CONFIG	(WRAPPER_TZ_BASE_OFFS + 0x14)
+#define WRAPPER_TZ_QNS4PDXFIFO_RESET	(WRAPPER_TZ_BASE_OFFS + 0x18)
 
 #define CTRL_INIT_IRIS3		CPU_CS_SCIACMD_IRIS3
 
@@ -297,7 +301,7 @@ static int __disable_regulator_iris3(struct msm_vidc_core *core,
 		rc = __acquire_regulator(core, rinfo);
 		if (rc) {
 			d_vpr_e("%s: failed to acquire %s, rc = %d\n",
-				rinfo->name, rc);
+				__func__, rinfo->name, rc);
 			/* Bring attention to this issue */
 			WARN_ON(true);
 			return rc;
@@ -307,7 +311,7 @@ static int __disable_regulator_iris3(struct msm_vidc_core *core,
 		rc = regulator_disable(rinfo->regulator);
 		if (rc) {
 			d_vpr_e("%s: failed to disable %s, rc = %d\n",
-				rinfo->name, rc);
+				__func__, rinfo->name, rc);
 			return rc;
 		}
 		d_vpr_h("%s: disabled regulator %s\n", __func__, rinfo->name);
@@ -555,15 +559,16 @@ static int __power_off_iris3_controller(struct msm_vidc_core *core)
 	if (rc)
 		d_vpr_h("%s: AON_WRAPPER_MVP_NOC_LPI_CONTROL failed\n", __func__);
 
-	/* Set Debug bridge Low power */
-	rc = __write_register(core, WRAPPER_DEBUG_BRIDGE_LPI_CONTROL_IRIS3, 0x7);
+	/* Set Iris CPU NoC to Low power */
+	rc = __write_register_masked(core, WRAPPER_IRIS_CPU_NOC_LPI_CONTROL,
+			0x1, BIT(0));
 	if (rc)
 		return rc;
 
-	rc = __read_register_with_poll_timeout(core, WRAPPER_DEBUG_BRIDGE_LPI_STATUS_IRIS3,
-			0x7, 0x7, 200, 2000);
+	rc = __read_register_with_poll_timeout(core, WRAPPER_IRIS_CPU_NOC_LPI_STATUS,
+			0x1, 0x1, 200, 2000);
 	if (rc)
-		d_vpr_h("%s: debug bridge low power failed\n", __func__);
+		d_vpr_h("%s: WRAPPER_IRIS_CPU_NOC_LPI_CONTROL failed\n", __func__);
 
 	/* Debug bridge LPI release */
 	rc = __write_register(core, WRAPPER_DEBUG_BRIDGE_LPI_CONTROL_IRIS3, 0x0);
@@ -575,19 +580,22 @@ static int __power_off_iris3_controller(struct msm_vidc_core *core)
 	if (rc)
 		d_vpr_h("%s: debug bridge release failed\n", __func__);
 
-	/* power down process */
-	rc = __disable_regulator_iris3(core, "iris-ctl");
-	if (rc) {
-		d_vpr_e("%s: disable regulator iris-ctl failed\n", __func__);
-		rc = 0;
-	}
+	/* Reset MVP QNS4PDXFIFO */
+	rc = __write_register(core, WRAPPER_TZ_CTL_AXI_CLOCK_CONFIG, 0x3);
+	if (rc)
+		return rc;
 
-	/* Disable GCC_VIDEO_AXI0_CLK clock */
-	rc = __disable_unprepare_clock_iris3(core, "gcc_video_axi0");
-	if (rc) {
-		d_vpr_e("%s: disable unprepare gcc_video_axi0 failed\n", __func__);
-		rc = 0;
-	}
+	rc = __write_register(core, WRAPPER_TZ_QNS4PDXFIFO_RESET, 0x1);
+	if (rc)
+		return rc;
+
+	rc = __write_register(core, WRAPPER_TZ_QNS4PDXFIFO_RESET, 0x0);
+	if (rc)
+		return rc;
+
+	rc = __write_register(core, WRAPPER_TZ_CTL_AXI_CLOCK_CONFIG, 0x0);
+	if (rc)
+		return rc;
 
 	/* Turn off MVP MVS0C core clock */
 	rc = __disable_unprepare_clock_iris3(core, "core_clk");
@@ -596,10 +604,10 @@ static int __power_off_iris3_controller(struct msm_vidc_core *core)
 		rc = 0;
 	}
 
-	/* Turn off MVP MVS0 SRC clock */
-	rc = __disable_unprepare_clock_iris3(core, "video_cc_mvs0_clk_src");
+	/* power down process */
+	rc = __disable_regulator_iris3(core, "iris-ctl");
 	if (rc) {
-		d_vpr_e("%s: disable unprepare video_cc_mvs0_clk_src failed\n", __func__);
+		d_vpr_e("%s: disable regulator iris-ctl failed\n", __func__);
 		rc = 0;
 	}
 
@@ -617,6 +625,14 @@ static int __power_off_iris3(struct msm_vidc_core *core)
 
 	if (!core->power_enabled)
 		return 0;
+
+	/**
+	 * Reset video_cc_mvs0_clk_src value to resolve MMRM high video
+	 * clock projection issue.
+	 */
+	rc = __set_clocks(core, 0);
+	if (rc)
+		d_vpr_e("%s: resetting clocks failed\n", __func__);
 
 	if (__power_off_iris3_hardware(core))
 		d_vpr_e("%s: failed to power off hardware\n", __func__);
@@ -656,14 +672,8 @@ static int __power_on_iris3_controller(struct msm_vidc_core *core)
 	if (rc)
 		goto fail_clk_controller;
 
-	rc = __prepare_enable_clock_iris3(core, "video_cc_mvs0_clk_src");
-	if (rc)
-		goto fail_clk_src;
-
 	return 0;
 
-fail_clk_src:
-	__disable_unprepare_clock_iris3(core, "core_clk");
 fail_clk_controller:
 	__disable_unprepare_clock_iris3(core, "gcc_video_axi0");
 fail_clk_axi:
@@ -1059,12 +1069,8 @@ int msm_vidc_decide_work_route_iris3(struct msm_vidc_inst* inst)
 				CODED_FRAMES_INTERLACE)
 			work_route = MSM_VIDC_PIPE_1;
 	} else if (is_encode_session(inst)) {
-		u32 slice_mode, width, height;
-		struct v4l2_format* f;
+		u32 slice_mode;
 
-		f = &inst->fmts[INPUT_PORT];
-		height = f->fmt.pix_mp.height;
-		width = f->fmt.pix_mp.width;
 		slice_mode = inst->capabilities->cap[SLICE_MODE].value;
 
 		/*TODO Pipe=1 for legacy CBR*/

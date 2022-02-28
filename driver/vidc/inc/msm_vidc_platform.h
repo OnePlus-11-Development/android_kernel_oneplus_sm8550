@@ -17,7 +17,7 @@ struct msm_platform_core_capability {
 };
 
 struct msm_platform_inst_capability {
-	enum msm_vidc_inst_capability_type cap;
+	enum msm_vidc_inst_capability_type cap_id;
 	enum msm_vidc_domain_type domain;
 	enum msm_vidc_codec_type codec;
 	s32 min;

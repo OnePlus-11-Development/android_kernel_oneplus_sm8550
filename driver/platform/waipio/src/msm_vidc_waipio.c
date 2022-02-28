@@ -19,7 +19,7 @@
 #define MAX_BITRATE             220000000
 #define DEFAULT_BITRATE         20000000
 #define MINIMUM_FPS             1
-#define MAXIMUM_FPS             960
+#define MAXIMUM_FPS             480
 #define MIN_QP_10BIT            -12
 #define MIN_QP_8BIT             0
 #define MAX_QP                  51
@@ -49,6 +49,7 @@
 #define VP9     MSM_VIDC_VP9
 #define HEIC    MSM_VIDC_HEIC
 #define CODECS_ALL     (H264 | HEVC | VP9 | HEIC)
+#define MAXIMUM_OVERRIDE_VP9_FPS 120
 
 static struct msm_platform_core_capability core_data_waipio[] = {
 	/* {type, value} */
@@ -137,7 +138,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		 */
 		MSM_VIDC_FMT_NV12C,
 		0, 0,
-		CAP_FLAG_ROOT,
+		0,
 		{0},
 		{META_ROI_INFO}},
 	{PIX_FMTS, ENC, HEVC,
@@ -151,7 +152,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		 */
 		MSM_VIDC_FMT_NV12C,
 		0, 0,
-		CAP_FLAG_ROOT,
+		0,
 		{0},
 		{/* Do not change order of META_ROI_INFO, MIN_QUALITY, BLUR_TYPES
 		 * Since parent -> children relationship for these cap_ids is
@@ -168,7 +169,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		MSM_VIDC_FMT_P010 | MSM_VIDC_FMT_TP10C,
 		MSM_VIDC_FMT_NV12C,
 		0, 0,
-		CAP_FLAG_ROOT,
+		0,
 		{0},
 		{PROFILE}},
 
@@ -191,7 +192,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		0, 64, 1, 4,
 		V4L2_CID_MIN_BUFFERS_FOR_CAPTURE,
 		HFI_PROP_BUFFER_FW_MIN_OUTPUT_COUNT,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT},
+		CAP_FLAG_OUTPUT_PORT},
 
 	/* (8192 * 4320) / 256 */
 	{MBPF, ENC, CODECS_ALL, 64, 138240, 1, 138240},
@@ -210,8 +211,8 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 	{MBPS, ENC, CODECS_ALL, 64, 3916800, 1, 3916800},
 	/* ((1920 * 1088) / 256) * 960 fps */
 	{MBPS, DEC, CODECS_ALL, 64, 7833600, 1, 7833600},
-	/* ((4096 * 2304) / 256) * 60 */
-	{MBPS, DEC, VP9, 36, 2211840, 1, 2211840},
+	/* ((4096 * 2304) / 256) * 120 */
+	{MBPS, DEC, VP9, 36, 4423680, 1, 4423680},
 	/* ((4096 * 2304) / 256) * 60 fps */
 	{POWER_SAVE_MBPS, ENC, CODECS_ALL, 0, 2211840, 1, 2211840},
 
@@ -220,7 +221,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		1, (DEFAULT_FPS << 16),
 		0,
 		HFI_PROP_FRAME_RATE,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT,
+		CAP_FLAG_OUTPUT_PORT,
 		{0}, {0},
 		NULL, msm_vidc_set_q16},
 
@@ -229,7 +230,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		1, (DEFAULT_FPS << 16)},
 
 	{FRAME_RATE, DEC, VP9,
-		(MINIMUM_FPS << 16), (MAXIMUM_VP9_FPS << 16),
+		(MINIMUM_FPS << 16), (MAXIMUM_OVERRIDE_VP9_FPS << 16),
 		1, (DEFAULT_FPS << 16)},
 
 	{OPERATING_RATE, ENC|DEC, CODECS_ALL,
@@ -237,7 +238,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		1, (DEFAULT_FPS << 16)},
 
 	{OPERATING_RATE, DEC, VP9,
-		(MINIMUM_FPS << 16), (MAXIMUM_VP9_FPS << 16),
+		(MINIMUM_FPS << 16), (MAXIMUM_OVERRIDE_VP9_FPS << 16),
 		1, (DEFAULT_FPS << 16)},
 
 	{SCALE_FACTOR, ENC, H264|HEVC, 1, 8, 1, 8},
@@ -273,7 +274,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_CID_HFLIP,
 		HFI_PROP_FLIP,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT |
+		CAP_FLAG_OUTPUT_PORT |
 			CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED,
 		{0},
 		{0},
@@ -295,7 +296,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		0, 270, 90, 0,
 		V4L2_CID_ROTATE,
 		HFI_PROP_ROTATION,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT,
+		CAP_FLAG_OUTPUT_PORT,
 		{0},
 		{0},
 		NULL, msm_vidc_set_rotation},
@@ -318,7 +319,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_MPEG_VIDEO_HEADER_MODE_SEPARATE,
 		V4L2_CID_MPEG_VIDEO_HEADER_MODE,
 		HFI_PROP_SEQ_HEADER_MODE,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
 		{0}, {0},
 		NULL, msm_vidc_set_header_mode},
 
@@ -340,7 +341,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_CID_MPEG_VIDEO_HEVC_WITHOUT_STARTCODE,
 		HFI_PROP_NAL_LENGTH_FIELD,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT,
+		CAP_FLAG_OUTPUT_PORT,
 		{0}, {0},
 		NULL, msm_vidc_set_nal_length},
 
@@ -385,7 +386,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_MPEG_VIDEO_BITRATE_MODE_VBR,
 		V4L2_CID_MPEG_VIDEO_BITRATE_MODE,
 		HFI_PROP_RATE_CONTROL,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
 		{0},
 		{LTR_COUNT, IR_RANDOM, TIME_DELTA_BASED_RC, I_FRAME_QP,
 			P_FRAME_QP, B_FRAME_QP, ENH_LAYER_COUNT, BIT_RATE,
@@ -403,7 +404,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_MPEG_VIDEO_BITRATE_MODE_VBR,
 		V4L2_CID_MPEG_VIDEO_BITRATE_MODE,
 		HFI_PROP_RATE_CONTROL,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
 		{0},
 		{LTR_COUNT, IR_RANDOM, TIME_DELTA_BASED_RC, I_FRAME_QP,
 			P_FRAME_QP, B_FRAME_QP, CONSTANT_QUALITY, ENH_LAYER_COUNT,
@@ -499,7 +500,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_CID_MPEG_VIDC_VIDEO_VPE_CSC_CUSTOM_MATRIX,
 		HFI_PROP_CSC_MATRIX,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT,
+		CAP_FLAG_OUTPUT_PORT,
 		{0}, {0},
 		NULL, msm_vidc_set_csc_custom_matrix},
 
@@ -518,7 +519,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_CID_MPEG_VIDC_LOWLATENCY_REQUEST,
 		HFI_PROP_SEQ_CHANGE_AT_SYNC_FRAME,
-		CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED},
+		CAP_FLAG_INPUT_PORT},
 
 	{LTR_COUNT, ENC, H264|HEVC,
 		0, 2, 1, 0,
@@ -552,7 +553,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		0, MAX_BASE_LAYER_PRIORITY_ID, 1, 0,
 		V4L2_CID_MPEG_VIDEO_BASELAYER_PRIORITY_ID,
 		HFI_PROP_BASELAYER_PRIORITYID,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT},
+		CAP_FLAG_OUTPUT_PORT},
 
 	{IR_RANDOM, ENC, H264|HEVC,
 		0, INT_MAX, 1, 0,
@@ -568,7 +569,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_CID_MPEG_VIDEO_AU_DELIMITER,
 		HFI_PROP_AUD,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT,
+		CAP_FLAG_OUTPUT_PORT,
 		{0}, {0},
 		NULL, msm_vidc_set_u32},
 
@@ -648,7 +649,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		MIN_QP_8BIT, MAX_QP, 1, MIN_QP_8BIT,
 		V4L2_CID_MPEG_VIDEO_H264_MIN_QP,
 		HFI_PROP_MIN_QP_PACKED,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT,
+		CAP_FLAG_OUTPUT_PORT,
 		{0}, {0},
 		NULL, msm_vidc_set_min_qp},
 
@@ -688,7 +689,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		MIN_QP_8BIT, MAX_QP, 1, MAX_QP,
 		V4L2_CID_MPEG_VIDEO_H264_MAX_QP,
 		HFI_PROP_MAX_QP_PACKED,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT,
+		CAP_FLAG_OUTPUT_PORT,
 		{0}, {0},
 		NULL, msm_vidc_set_max_qp},
 
@@ -983,7 +984,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_MPEG_VIDEO_H264_PROFILE_HIGH,
 		V4L2_CID_MPEG_VIDEO_H264_PROFILE,
 		HFI_PROP_PROFILE,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
 		{0},
 		{ENTROPY_MODE, TRANSFORM_8X8},
 		NULL, msm_vidc_set_u32_enum},
@@ -999,7 +1000,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_MPEG_VIDEO_H264_PROFILE_HIGH,
 		V4L2_CID_MPEG_VIDEO_H264_PROFILE,
 		HFI_PROP_PROFILE,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
 		{0},
 		{ENTROPY_MODE},
 		NULL, msm_vidc_set_u32_enum},
@@ -1027,7 +1028,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_MPEG_VIDEO_VP9_PROFILE_0,
 		V4L2_CID_MPEG_VIDEO_VP9_PROFILE,
 		HFI_PROP_PROFILE,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
 		{0},
 		{0},
 		NULL, msm_vidc_set_u32_enum},
@@ -1050,7 +1051,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_MPEG_VIDEO_VP9_LEVEL_6_0,
 		V4L2_CID_MPEG_VIDEO_VP9_LEVEL,
 		HFI_PROP_LEVEL,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
 		{0},
 		{0},
 		NULL, msm_vidc_set_u32_enum},
@@ -1080,7 +1081,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_MPEG_VIDEO_H264_LEVEL_6_1,
 		V4L2_CID_MPEG_VIDEO_H264_LEVEL,
 		HFI_PROP_LEVEL,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
 		{0},
 		{0},
 		NULL, msm_vidc_set_u32_enum},
@@ -1109,7 +1110,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_MPEG_VIDEO_H264_LEVEL_5_0,
 		V4L2_CID_MPEG_VIDEO_H264_LEVEL,
 		HFI_PROP_LEVEL,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
 		{0},
 		{0},
 		NULL, msm_vidc_set_level},
@@ -1132,7 +1133,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_MPEG_VIDEO_HEVC_LEVEL_6_1,
 		V4L2_CID_MPEG_VIDEO_HEVC_LEVEL,
 		HFI_PROP_LEVEL,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
 		{0},
 		{0},
 		NULL, msm_vidc_set_u32_enum},
@@ -1154,7 +1155,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_MPEG_VIDEO_HEVC_LEVEL_5,
 		V4L2_CID_MPEG_VIDEO_HEVC_LEVEL,
 		HFI_PROP_LEVEL,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
 		{0},
 		{0},
 		NULL, msm_vidc_set_level},
@@ -1171,7 +1172,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_MPEG_VIDEO_HEVC_TIER_HIGH,
 		V4L2_CID_MPEG_VIDEO_HEVC_TIER,
 		HFI_PROP_TIER,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
 		{0},
 		{0},
 		NULL, msm_vidc_set_u32_enum},
@@ -1185,7 +1186,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_MPEG_VIDEO_H264_LOOP_FILTER_MODE_ENABLED,
 		V4L2_CID_MPEG_VIDEO_H264_LOOP_FILTER_MODE,
 		HFI_PROP_DEBLOCKING_MODE,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
 		{0}, {0},
 		NULL, msm_vidc_set_deblock_mode},
 
@@ -1198,7 +1199,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_MPEG_VIDEO_HEVC_LOOP_FILTER_MODE_ENABLED,
 		V4L2_CID_MPEG_VIDEO_HEVC_LOOP_FILTER_MODE,
 		HFI_PROP_DEBLOCKING_MODE,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
 		{0}, {0},
 		NULL, msm_vidc_set_deblock_mode},
 
@@ -1250,7 +1251,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		1, V4L2_MPEG_MSM_VIDC_ENABLE,
 		V4L2_CID_MPEG_VIDEO_MB_RC_ENABLE,
 		0,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT},
+		CAP_FLAG_OUTPUT_PORT},
 
 	{TRANSFORM_8X8, ENC, H264,
 		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,
@@ -1266,7 +1267,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		1, MAX_CHROMA_QP_OFFSET,
 		V4L2_CID_MPEG_VIDEO_H264_CHROMA_QP_INDEX_OFFSET,
 		HFI_PROP_CHROMA_QP_OFFSET,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT,
+		CAP_FLAG_OUTPUT_PORT,
 		{0}, {0},
 		msm_vidc_adjust_chroma_qp_index_offset,
 		msm_vidc_set_chroma_qp_index_offset},
@@ -1276,26 +1277,26 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_CID_MPEG_VIDEO_DEC_DISPLAY_DELAY_ENABLE,
 		HFI_PROP_DECODE_ORDER_OUTPUT,
-		CAP_FLAG_ROOT | CAP_FLAG_INPUT_PORT},
+		CAP_FLAG_INPUT_PORT},
 
 	{DISPLAY_DELAY, DEC, H264|HEVC|VP9,
 		0, 1, 1, 0,
 		V4L2_CID_MPEG_VIDEO_DEC_DISPLAY_DELAY,
 		HFI_PROP_DECODE_ORDER_OUTPUT,
-		CAP_FLAG_ROOT | CAP_FLAG_INPUT_PORT},
+		CAP_FLAG_INPUT_PORT},
 
 	/* conceal color */
 	{CONCEAL_COLOR_8BIT, DEC, CODECS_ALL, 0x0, 0xff3fcff, 1,
 		DEFAULT_VIDEO_CONCEAL_COLOR_BLACK,
 		V4L2_CID_MPEG_VIDEO_MUTE_YUV,
 		HFI_PROP_CONCEAL_COLOR_8BIT,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT},
+		CAP_FLAG_OUTPUT_PORT},
 
 	{CONCEAL_COLOR_10BIT, DEC, CODECS_ALL, 0x0, 0x3fffffff, 1,
 		DEFAULT_VIDEO_CONCEAL_COLOR_BLACK,
 		V4L2_CID_MPEG_VIDEO_MUTE_YUV,
 		HFI_PROP_CONCEAL_COLOR_10BIT,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT},
+		CAP_FLAG_OUTPUT_PORT},
 
 	// TODO
 	{STAGE, DEC|ENC, CODECS_ALL,
@@ -1304,7 +1305,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		MSM_VIDC_STAGE_2,
 		0,
 		HFI_PROP_STAGE,
-		CAP_FLAG_ROOT,
+		0,
 		{0}, {0},
 		NULL, msm_vidc_set_stage},
 
@@ -1324,7 +1325,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		MSM_VIDC_PIPE_4,
 		0,
 		HFI_PROP_PIPE,
-		CAP_FLAG_ROOT,
+		0,
 		{0}, {0},
 		NULL, msm_vidc_set_pipe},
 	{POC, DEC, H264, 0, 18, 1, 1},
@@ -1382,7 +1383,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		0, 2, 1, 1,
 		V4L2_CID_MPEG_VIDC_PRIORITY,
 		HFI_PROP_SESSION_PRIORITY,
-		CAP_FLAG_ROOT | CAP_FLAG_DYNAMIC_ALLOWED,
+		CAP_FLAG_DYNAMIC_ALLOWED,
 		{0}, {0},
 		msm_vidc_adjust_session_priority, msm_vidc_set_session_priority},
 
@@ -1409,6 +1410,23 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		{GOP_SIZE, B_FRAME},
 		{LTR_COUNT, IR_RANDOM, SLICE_MODE},
 		msm_vidc_adjust_all_intra, NULL},
+
+	{INPUT_METADATA_FD, ENC|DEC, CODECS_ALL,
+		-1, INT_MAX, 1, -1,
+		V4L2_CID_MPEG_VIDC_INPUT_METADATA_FD,
+		0,
+		CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED,
+		{0}, {0},
+		NULL, NULL},
+
+	{INPUT_META_VIA_REQUEST, ENC|DEC, CODECS_ALL,
+		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,
+		1, V4L2_MPEG_MSM_VIDC_DISABLE,
+		V4L2_CID_MPEG_VIDC_INPUT_METADATA_VIA_REQUEST_ENABLE,
+		0,
+		CAP_FLAG_INPUT_PORT,
+		{0}, {0},
+		NULL, NULL},
 
 	{META_LTR_MARK_USE, ENC, H264|HEVC,
 		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,
@@ -1481,7 +1499,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_CID_MPEG_VIDC_METADATA_EVA_STATS,
 		HFI_PROP_EVA_STAT_INFO,
-		CAP_FLAG_ROOT,
+		0,
 		{0},
 		{ENH_LAYER_COUNT}},
 
@@ -1557,7 +1575,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_MPEG_VIDEO_BITRATE_MODE_CQ,
 		V4L2_CID_MPEG_VIDEO_BITRATE_MODE,
 		HFI_PROP_RATE_CONTROL,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
 		{0},
 		{TIME_DELTA_BASED_RC, CONSTANT_QUALITY},
 		msm_vidc_adjust_bitrate_mode, msm_vidc_set_u32_enum},
@@ -1566,7 +1584,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_CID_MPEG_VIDC_TIME_DELTA_BASED_RC,
 		HFI_PROP_TIME_DELTA_BASED_RATE_CONTROL,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT,
+		CAP_FLAG_OUTPUT_PORT,
 		{BITRATE_MODE}, {0},
 		msm_vidc_adjust_delta_based_rc, msm_vidc_set_u32},
 	{CONSTANT_QUALITY, ENC, HEIC,
@@ -1582,14 +1600,14 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		1, V4L2_MPEG_MSM_VIDC_ENABLE,
 		0,
 		HFI_PROP_HEIC_GRID_ENABLE,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT,
+		CAP_FLAG_OUTPUT_PORT,
 		{0}, {0},
 		NULL, msm_vidc_set_u32},
 	{GOP_SIZE, ENC, HEIC,
 		0, INT_MAX, 1, 0 /* all intra */,
 		V4L2_CID_MPEG_VIDEO_GOP_SIZE,
 		HFI_PROP_MAX_GOP_FRAMES,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT |
+		CAP_FLAG_OUTPUT_PORT |
 			CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED,
 		{0}, {0},
 		NULL, msm_vidc_set_u32},
@@ -1598,7 +1616,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_CID_MPEG_VIDEO_B_FRAMES,
 		HFI_PROP_MAX_B_FRAMES,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT,
+		CAP_FLAG_OUTPUT_PORT,
 		{0}, {0},
 		NULL, msm_vidc_set_u32},
 	{PIX_FMTS, ENC, HEIC,
@@ -1607,7 +1625,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		MSM_VIDC_FMT_NV12 | MSM_VIDC_FMT_P010,
 		MSM_VIDC_FMT_NV12,
 		0, 0,
-		CAP_FLAG_ROOT,
+		0,
 		{0},
 		{PROFILE}},
 	{HEVC_TIER, ENC|DEC, HEIC,
@@ -1617,7 +1635,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		V4L2_MPEG_VIDEO_HEVC_TIER_MAIN,
 		V4L2_CID_MPEG_VIDEO_HEVC_TIER,
 		HFI_PROP_TIER,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
 		{0},
 		{0},
 		NULL, msm_vidc_set_u32_enum},
@@ -1626,7 +1644,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		1, (MINIMUM_FPS << 16),
 		0,
 		HFI_PROP_FRAME_RATE,
-		CAP_FLAG_ROOT | CAP_FLAG_OUTPUT_PORT,
+		CAP_FLAG_OUTPUT_PORT,
 		{0}, {0},
 		NULL, msm_vidc_set_q16},
 	{META_SUBFRAME_OUTPUT, ENC, HEIC,
@@ -1676,7 +1694,7 @@ static u32 bus_bw_nrt[] = {
 	11000000,
 };
 
-static struct msm_vidc_platform_data waipio_data = {
+static const struct msm_vidc_platform_data waipio_data = {
 	.core_data = core_data_waipio,
 	.core_data_size = ARRAY_SIZE(core_data_waipio),
 	.instance_data = instance_data_waipio,

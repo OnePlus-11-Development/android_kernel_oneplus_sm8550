@@ -9,11 +9,15 @@
 #include <linux/version.h>
 #include <linux/bits.h>
 #include <linux/workqueue.h>
+#include <linux/spinlock.h>
+#include <linux/sync_file.h>
+#include <linux/dma-fence.h>
 #include <media/v4l2-dev.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-ioctl.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-ctrls.h>
+#include <media/v4l2-mem2mem.h>
 #include <media/videobuf2-core.h>
 #include <media/videobuf2-v4l2.h>
 
@@ -57,6 +61,7 @@
 #define MAX_SUPPORTED_MIN_QUALITY            70
 #define MIN_CHROMA_QP_OFFSET                -12
 #define MAX_CHROMA_QP_OFFSET                  0
+#define INVALID_FD                           -1
 
 #define DCVS_WINDOW 16
 #define ENC_FPS_WINDOW 3
@@ -286,11 +291,6 @@ enum msm_vidc_matrix_coefficients {
 	MSM_VIDC_MATRIX_COEFF_BT2100                         = 14,
 };
 
-enum msm_vidc_ctrl_list_type {
-	CHILD_LIST          = BIT(0),
-	FW_LIST             = BIT(1),
-};
-
 enum msm_vidc_core_capability_type {
 	CORE_CAP_NONE = 0,
 	ENC_CODECS,
@@ -336,6 +336,18 @@ enum msm_vidc_core_capability_type {
 	CORE_CAP_MAX,
 };
 
+/**
+ * msm_vidc_prepare_dependency_list() api will prepare caps_list by looping over
+ * enums(msm_vidc_inst_capability_type) from 0 to INST_CAP_MAX and arranges the
+ * node in such a way that parents willbe at the front and dependent children
+ * in the back.
+ *
+ * caps_list preparation may become CPU intensive task, so to save CPU cycles,
+ * organize enum in proper order(root caps at the beginning and dependent caps
+ * at back), so that during caps_list preparation num CPU cycles spent will reduce.
+ *
+ * Note: It will work, if enum kept at different places, but not efficient.
+ */
 enum msm_vidc_inst_capability_type {
 	INST_CAP_NONE = 0,
 	FRAME_WIDTH,
@@ -348,9 +360,9 @@ enum msm_vidc_inst_capability_type {
 	MIN_BUFFERS_INPUT,
 	MIN_BUFFERS_OUTPUT,
 	MBPF,
-	LOSSLESS_MBPF,
 	BATCH_MBPF,
 	BATCH_FPS,
+	LOSSLESS_MBPF,
 	SECURE_MBPF,
 	MBPS,
 	POWER_SAVE_MBPS,
@@ -363,87 +375,63 @@ enum msm_vidc_inst_capability_type {
 	MB_CYCLES_FW,
 	MB_CYCLES_FW_VPP,
 	SECURE_MODE,
+	INPUT_META_OUTBUF_FENCE,
+	FENCE_ID,
+	FENCE_FD,
 	TS_REORDER,
+	SLICE_INTERFACE,
 	HFLIP,
 	VFLIP,
 	ROTATION,
 	SUPER_FRAME,
-	SLICE_INTERFACE,
 	HEADER_MODE,
 	PREPEND_SPSPPS_TO_IDR,
 	META_SEQ_HDR_NAL,
 	WITHOUT_STARTCODE,
 	NAL_LENGTH_FIELD,
 	REQUEST_I_FRAME,
-	BIT_RATE,
 	BITRATE_MODE,
 	LOSSLESS,
 	FRAME_SKIP_MODE,
 	FRAME_RC_ENABLE,
-	CONSTANT_QUALITY,
-	GOP_SIZE,
 	GOP_CLOSURE,
-	B_FRAME,
-	BLUR_TYPES,
-	BLUR_RESOLUTION,
 	CSC,
 	CSC_CUSTOM_MATRIX,
-	GRID,
-	LOWLATENCY_MODE,
-	LTR_COUNT,
 	USE_LTR,
 	MARK_LTR,
 	BASELAYER_PRIORITY,
-	IR_RANDOM,
 	AU_DELIMITER,
-	TIME_DELTA_BASED_RC,
-	CONTENT_ADAPTIVE_CODING,
-	BITRATE_BOOST,
-	MIN_QUALITY,
-	VBV_DELAY,
-	PEAK_BITRATE,
-	MIN_FRAME_QP,
+	GRID,
 	I_FRAME_MIN_QP,
 	P_FRAME_MIN_QP,
 	B_FRAME_MIN_QP,
-	MAX_FRAME_QP,
 	I_FRAME_MAX_QP,
 	P_FRAME_MAX_QP,
 	B_FRAME_MAX_QP,
-	I_FRAME_QP,
-	P_FRAME_QP,
-	B_FRAME_QP,
 	LAYER_TYPE,
 	LAYER_ENABLE,
-	ENH_LAYER_COUNT,
 	L0_BR,
 	L1_BR,
 	L2_BR,
 	L3_BR,
 	L4_BR,
 	L5_BR,
-	ENTROPY_MODE,
-	PROFILE,
 	LEVEL,
 	HEVC_TIER,
 	AV1_TIER,
-	LF_MODE,
-	LF_ALPHA,
-	LF_BETA,
-	SLICE_MODE,
-	SLICE_MAX_BYTES,
-	SLICE_MAX_MB,
-	MB_RC,
-	TRANSFORM_8X8,
-	CHROMA_QP_INDEX_OFFSET,
 	DISPLAY_DELAY_ENABLE,
 	DISPLAY_DELAY,
 	CONCEAL_COLOR_8BIT,
 	CONCEAL_COLOR_10BIT,
-	STAGE,
+	LF_MODE,
+	LF_ALPHA,
+	LF_BETA,
+	SLICE_MAX_BYTES,
+	SLICE_MAX_MB,
+	MB_RC,
+	CHROMA_QP_INDEX_OFFSET,
 	PIPE,
 	POC,
-	QUALITY_MODE,
 	CODED_FRAMES,
 	BIT_DEPTH,
 	CODEC_CONFIG,
@@ -452,18 +440,21 @@ enum msm_vidc_inst_capability_type {
 	DEFAULT_HEADER,
 	RAP_FRAME,
 	SEQ_CHANGE_AT_SYNC_FRAME,
+	QUALITY_MODE,
 	PRIORITY,
-	ENC_IP_CR,
 	DPB_LIST,
 	FILM_GRAIN,
 	SUPER_BLOCK,
-	ALL_INTRA,
+	DRAP,
+	INPUT_METADATA_FD,
+	INPUT_META_VIA_REQUEST,
 	META_BITSTREAM_RESOLUTION,
 	META_CROP_OFFSETS,
-	META_LTR_MARK_USE,
 	META_DPB_MISR,
 	META_OPB_MISR,
 	META_INTERLACE,
+	ENC_IP_CR,
+	META_LTR_MARK_USE,
 	META_TIMESTAMP,
 	META_CONCEALED_MB_CNT,
 	META_HIST_INFO,
@@ -476,25 +467,57 @@ enum msm_vidc_inst_capability_type {
 	META_OUTPUT_BUF_TAG,
 	META_SUBFRAME_OUTPUT,
 	META_ENC_QP_METADATA,
-	META_ROI_INFO,
 	META_DEC_QP_METADATA,
 	COMPLEXITY,
 	META_MAX_NUM_REORDER_FRAMES,
+	/* place all root(no parent) enums before this line */
+
+	PROFILE,
+	META_ROI_INFO,
+	ENH_LAYER_COUNT,
+	BIT_RATE,
+	LOWLATENCY_MODE,
+	GOP_SIZE,
+	B_FRAME,
+	ALL_INTRA,
+	MIN_QUALITY,
+	CONTENT_ADAPTIVE_CODING,
+	BLUR_TYPES,
+	/* place all intermittent(having both parent and child) enums before this line */
+
+	MIN_FRAME_QP,
+	MAX_FRAME_QP,
+	I_FRAME_QP,
+	P_FRAME_QP,
+	B_FRAME_QP,
+	TIME_DELTA_BASED_RC,
+	CONSTANT_QUALITY,
+	VBV_DELAY,
+	PEAK_BITRATE,
+	ENTROPY_MODE,
+	TRANSFORM_8X8,
+	STAGE,
+	LTR_COUNT,
+	IR_RANDOM,
+	BITRATE_BOOST,
+	SLICE_MODE,
+	BLUR_RESOLUTION,
+	/* place all leaf(no child) enums before this line */
+
 	INST_CAP_MAX,
 };
 
 enum msm_vidc_inst_capability_flags {
 	CAP_FLAG_NONE                    = 0,
-	CAP_FLAG_ROOT                    = BIT(0),
-	CAP_FLAG_DYNAMIC_ALLOWED         = BIT(1),
-	CAP_FLAG_MENU                    = BIT(2),
-	CAP_FLAG_INPUT_PORT              = BIT(3),
-	CAP_FLAG_OUTPUT_PORT             = BIT(4),
-	CAP_FLAG_CLIENT_SET              = BIT(5),
+	CAP_FLAG_DYNAMIC_ALLOWED         = BIT(0),
+	CAP_FLAG_MENU                    = BIT(1),
+	CAP_FLAG_INPUT_PORT              = BIT(2),
+	CAP_FLAG_OUTPUT_PORT             = BIT(3),
+	CAP_FLAG_CLIENT_SET              = BIT(4),
 };
 
 struct msm_vidc_inst_cap {
-	enum msm_vidc_inst_capability_type cap;
+	enum msm_vidc_inst_capability_type cap_id;
 	s32 min;
 	s32 max;
 	u32 step_or_mask;
@@ -777,6 +800,21 @@ struct msm_vidc_power {
 	u32                    fw_cf;
 };
 
+struct msm_vidc_fence_context {
+        char name[MAX_NAME_LENGTH];
+        u64 ctx_num;
+        u64 seq_num;
+};
+
+struct msm_vidc_fence {
+	struct list_head            list;
+	struct dma_fence            dma_fence;
+	char                        name[MAX_NAME_LENGTH];
+	spinlock_t                  lock;
+	struct sync_file            *sync_file;
+	int                         fd;
+};
+
 struct msm_vidc_alloc {
 	struct list_head            list;
 	enum msm_vidc_buffer_type   type;
@@ -824,6 +862,7 @@ struct msm_vidc_buffer {
 	u32                                flags;
 	u64                                timestamp;
 	enum msm_vidc_buffer_attributes    attr;
+	u64                                fence_id;
 };
 
 struct msm_vidc_buffers {

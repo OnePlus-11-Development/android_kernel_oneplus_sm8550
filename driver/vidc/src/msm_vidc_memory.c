@@ -17,6 +17,7 @@
 #include "msm_vidc_dt.h"
 #include "msm_vidc_core.h"
 #include "msm_vidc_events.h"
+#include "venus_hfi.h"
 
 struct msm_vidc_buf_region_name {
 	enum msm_vidc_buffer_region region;
@@ -95,7 +96,7 @@ struct dma_buf *msm_vidc_memory_get_dmabuf(struct msm_vidc_inst *inst, int fd)
 	}
 
 	/* get tracker instance from pool */
-	buf = msm_memory_alloc(inst, MSM_MEM_POOL_DMABUF);
+	buf = msm_memory_pool_alloc(inst, MSM_MEM_POOL_DMABUF);
 	if (!buf) {
 		i_vpr_e(inst, "%s: dmabuf alloc failed\n", __func__);
 		dma_buf_put(dmabuf);
@@ -146,7 +147,7 @@ void msm_vidc_memory_put_dmabuf(struct msm_vidc_inst *inst, struct dma_buf *dmab
 	dma_buf_put(buf->dmabuf);
 
 	/* put tracker instance back to pool */
-	msm_memory_free(inst, buf);
+	msm_memory_pool_free(inst, buf);
 }
 
 void msm_vidc_memory_put_dmabuf_completely(struct msm_vidc_inst *inst,
@@ -167,7 +168,7 @@ void msm_vidc_memory_put_dmabuf_completely(struct msm_vidc_inst *inst,
 			dma_buf_put(buf->dmabuf);
 
 			/* put tracker instance back to pool */
-			msm_memory_free(inst, buf);
+			msm_memory_pool_free(inst, buf);
 			break;
 		}
 	}
@@ -445,7 +446,7 @@ int msm_vidc_memory_free(struct msm_vidc_core *core, struct msm_vidc_alloc *mem)
 	return rc;
 };
 
-void *msm_memory_alloc(struct msm_vidc_inst *inst, enum msm_memory_pool_type type)
+void *msm_memory_pool_alloc(struct msm_vidc_inst *inst, enum msm_memory_pool_type type)
 {
 	struct msm_memory_alloc_header *hdr;
 	struct msm_memory_pool *pool;
@@ -488,7 +489,7 @@ void *msm_memory_alloc(struct msm_vidc_inst *inst, enum msm_memory_pool_type typ
 	return hdr->buf;
 }
 
-void msm_memory_free(struct msm_vidc_inst *inst, void *vidc_buf)
+void msm_memory_pool_free(struct msm_vidc_inst *inst, void *vidc_buf)
 {
 	struct msm_memory_alloc_header *hdr;
 	struct msm_memory_pool *pool;
@@ -583,12 +584,14 @@ struct msm_vidc_type_size_name {
 	char                     *name;
 };
 
-static struct msm_vidc_type_size_name buftype_size_name_arr[] = {
+static const struct msm_vidc_type_size_name buftype_size_name_arr[] = {
 	{MSM_MEM_POOL_BUFFER,     sizeof(struct msm_vidc_buffer),     "MSM_MEM_POOL_BUFFER"     },
 	{MSM_MEM_POOL_MAP,        sizeof(struct msm_vidc_map),        "MSM_MEM_POOL_MAP"        },
 	{MSM_MEM_POOL_ALLOC,      sizeof(struct msm_vidc_alloc),      "MSM_MEM_POOL_ALLOC"      },
 	{MSM_MEM_POOL_TIMESTAMP,  sizeof(struct msm_vidc_timestamp),  "MSM_MEM_POOL_TIMESTAMP"  },
 	{MSM_MEM_POOL_DMABUF,     sizeof(struct msm_memory_dmabuf),   "MSM_MEM_POOL_DMABUF"     },
+	{MSM_MEM_POOL_PACKET,     sizeof(struct hfi_pending_packet) + MSM_MEM_POOL_PACKET_SIZE,
+		"MSM_MEM_POOL_PACKET"},
 };
 
 int msm_memory_pools_init(struct msm_vidc_inst *inst)

@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  */
+/* Copyright (c) 2022. Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #include <linux/types.h>
 #include <linux/hash.h>
@@ -16,6 +17,7 @@
 #include "msm_vidc_debug.h"
 #include "msm_vidc_control.h"
 #include "msm_vidc_power.h"
+#include "msm_vidc_fence.h"
 #include "msm_vidc_memory.h"
 #include "venus_hfi_response.h"
 #include "msm_vidc.h"
@@ -25,8 +27,6 @@
 
 /* kernel/msm-4.19 */
 #define MSM_VIDC_VERSION     ((5 << 16) + (10 << 8) + 0)
-
-#define MAX_EVENTS 30
 
 static inline bool valid_v4l2_buffer(struct v4l2_buffer *b,
 		struct msm_vidc_inst *inst)
@@ -51,7 +51,7 @@ static int get_poll_flags(struct msm_vidc_inst *inst, u32 port)
 			__func__, inst, port);
 		return poll;
 	}
-	q = &inst->vb2q[port];
+	q = inst->bufq[port].vb2q;
 
 	spin_lock_irqsave(&q->done_lock, flags);
 	if (!list_empty(&q->done_list))
@@ -85,10 +85,10 @@ int msm_vidc_poll(void *instance, struct file *filp,
 	}
 
 	poll_wait(filp, &inst->event_handler.wait, wait);
-	poll_wait(filp, &inst->vb2q[INPUT_META_PORT].done_wq, wait);
-	poll_wait(filp, &inst->vb2q[OUTPUT_META_PORT].done_wq, wait);
-	poll_wait(filp, &inst->vb2q[INPUT_PORT].done_wq, wait);
-	poll_wait(filp, &inst->vb2q[OUTPUT_PORT].done_wq, wait);
+	poll_wait(filp, &inst->bufq[INPUT_META_PORT].vb2q->done_wq, wait);
+	poll_wait(filp, &inst->bufq[OUTPUT_META_PORT].vb2q->done_wq, wait);
+	poll_wait(filp, &inst->bufq[INPUT_PORT].vb2q->done_wq, wait);
+	poll_wait(filp, &inst->bufq[OUTPUT_PORT].vb2q->done_wq, wait);
 
 	if (v4l2_event_pending(&inst->event_handler))
 		poll |= POLLPRI;
@@ -402,7 +402,7 @@ int msm_vidc_reqbufs(void *instance, struct v4l2_requestbuffers *b)
 		goto exit;
 	}
 
-	rc = vb2_reqbufs(&inst->vb2q[port], b);
+	rc = vb2_reqbufs(inst->bufq[port].vb2q, b);
 	if (rc) {
 		i_vpr_e(inst, "%s: vb2_reqbufs(%d) failed, %d\n",
 			__func__, b->type, rc);
@@ -414,23 +414,75 @@ exit:
 }
 EXPORT_SYMBOL(msm_vidc_reqbufs);
 
+int msm_vidc_querybuf(void *instance, struct v4l2_buffer *b)
+{
+	int rc = 0;
+	struct msm_vidc_inst *inst = instance;
+	int port;
+
+	if (!inst || !b) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	port = v4l2_type_to_driver_port(inst, b->type, __func__);
+	if (port < 0) {
+		rc = -EINVAL;
+		goto exit;
+	}
+
+	rc = vb2_querybuf(inst->bufq[port].vb2q, b);
+	if (rc) {
+		i_vpr_e(inst, "%s: vb2_querybuf(%d) failed, %d\n",
+			__func__, b->type, rc);
+		goto exit;
+	}
+
+exit:
+	return rc;
+}
+EXPORT_SYMBOL(msm_vidc_querybuf);
+
+int msm_vidc_create_bufs(void *instance, struct v4l2_create_buffers *b)
+{
+	int rc = 0;
+	struct msm_vidc_inst *inst = instance;
+	int port;
+	struct v4l2_format *f;
+
+	if (!inst || !b) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	f = &b->format;
+	port = v4l2_type_to_driver_port(inst, f->type, __func__);
+	if (port < 0) {
+		rc = -EINVAL;
+		goto exit;
+	}
+
+	rc = vb2_create_bufs(inst->bufq[port].vb2q, b);
+	if (rc) {
+		i_vpr_e(inst, "%s: vb2_create_bufs(%d) failed, %d\n",
+			__func__, f->type, rc);
+		goto exit;
+	}
+
+exit:
+	return rc;
+}
+EXPORT_SYMBOL(msm_vidc_create_bufs);
+
 int msm_vidc_qbuf(void *instance, struct media_device *mdev,
 		struct v4l2_buffer *b)
 {
 	int rc = 0;
 	struct msm_vidc_inst *inst = instance;
 	struct vb2_queue *q;
-	u64 timestamp_us = 0;
 
 	if (!inst || !inst->core || !b || !valid_v4l2_buffer(b, inst)) {
 		d_vpr_e("%s: invalid params %pK %pK\n", __func__, inst, b);
-		return -EINVAL;
-	}
-
-	/* Expecting non-zero filledlen on INPUT port */
-	if (b->type == INPUT_MPLANE && !b->m.planes[0].bytesused) {
-		i_vpr_e(inst,
-			"%s: zero bytesused input buffer not supported\n", __func__);
 		return -EINVAL;
 	}
 
@@ -439,13 +491,6 @@ int msm_vidc_qbuf(void *instance, struct media_device *mdev,
 		rc = -EINVAL;
 		goto exit;
 	}
-
-	if (is_encode_session(inst) && b->type == INPUT_MPLANE) {
-		timestamp_us = (u64)((b->timestamp.tv_sec * USEC_PER_SEC) +
-			b->timestamp.tv_usec);
-		msm_vidc_set_auto_framerate(inst, timestamp_us);
-	}
-	inst->last_qbuf_time_ns = ktime_get_ns();
 
 	rc = vb2_qbuf(q, mdev, b);
 	if (rc)
@@ -511,7 +556,7 @@ int msm_vidc_streamon(void *instance, enum v4l2_buf_type type)
 		goto exit;
 	}
 
-	rc = vb2_streamon(&inst->vb2q[port], type);
+	rc = vb2_streamon(inst->bufq[port].vb2q, type);
 	if (rc) {
 		i_vpr_e(inst, "%s: vb2_streamon(%d) failed, %d\n",
 			__func__, type, rc);
@@ -556,7 +601,7 @@ int msm_vidc_streamoff(void *instance, enum v4l2_buf_type type)
 		goto exit;
 	}
 
-	rc = vb2_streamoff(&inst->vb2q[port], type);
+	rc = vb2_streamoff(inst->bufq[port].vb2q, type);
 	if (rc) {
 		i_vpr_e(inst, "%s: vb2_streamoff(%d) failed, %d\n",
 			__func__, type, rc);
@@ -742,12 +787,14 @@ int msm_vidc_subscribe_event(void *instance,
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
+
 	i_vpr_h(inst, "%s: type %d id %d\n", __func__, sub->type, sub->id);
-	rc = v4l2_event_subscribe(&inst->event_handler,
-		sub, MAX_EVENTS, NULL);
-	if (rc)
-		i_vpr_e(inst, "%s: fialed, type %d id %d\n",
-			__func__, sub->type, sub->id);
+
+	if (inst->domain == MSM_VIDC_DECODER)
+		rc = msm_vdec_subscribe_event(inst, sub);
+	if (inst->domain == MSM_VIDC_ENCODER)
+		rc = msm_venc_subscribe_event(inst, sub);
+
 	return rc;
 }
 EXPORT_SYMBOL(msm_vidc_subscribe_event);
@@ -765,7 +812,7 @@ int msm_vidc_unsubscribe_event(void *instance,
 	i_vpr_h(inst, "%s: type %d id %d\n", __func__, sub->type, sub->id);
 	rc = v4l2_event_unsubscribe(&inst->event_handler, sub);
 	if (rc)
-		i_vpr_e(inst, "%s: fialed, type %d id %d\n",
+		i_vpr_e(inst, "%s: failed, type %d id %d\n",
 			 __func__, sub->type, sub->id);
 	return rc;
 }
@@ -833,6 +880,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	inst->auto_framerate = DEFAULT_FPS << 16;
 	kref_init(&inst->kref);
 	mutex_init(&inst->lock);
+	mutex_init(&inst->request_lock);
 	msm_vidc_update_debug_str(inst);
 	i_vpr_h(inst, "Opening video instance: %d\n", session_type);
 
@@ -843,6 +891,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 		return NULL;
 	}
 	INIT_LIST_HEAD(&inst->response_works);
+	INIT_LIST_HEAD(&inst->caps_list);
 	INIT_LIST_HEAD(&inst->timestamps.list);
 	INIT_LIST_HEAD(&inst->ts_reorder.list);
 	INIT_LIST_HEAD(&inst->buffers.input.list);
@@ -879,10 +928,12 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	INIT_LIST_HEAD(&inst->mappings.dpb.list);
 	INIT_LIST_HEAD(&inst->mappings.persist.list);
 	INIT_LIST_HEAD(&inst->mappings.vpss.list);
-	INIT_LIST_HEAD(&inst->children.list);
-	INIT_LIST_HEAD(&inst->firmware.list);
+	INIT_LIST_HEAD(&inst->children_list);
+	INIT_LIST_HEAD(&inst->firmware_list);
 	INIT_LIST_HEAD(&inst->enc_input_crs);
 	INIT_LIST_HEAD(&inst->dmabuf_tracker);
+	INIT_LIST_HEAD(&inst->pending_pkts);
+	INIT_LIST_HEAD(&inst->fence_list);
 	for (i = 0; i < MAX_SIGNAL; i++)
 		init_completion(&inst->completions[i]);
 
@@ -903,10 +954,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 		goto error;
 	}
 
-	if (is_decode_session(inst))
-		rc = msm_vdec_inst_init(inst);
-	else if (is_encode_session(inst))
-		rc = msm_venc_inst_init(inst);
+	rc = msm_vidc_event_queue_init(inst);
 	if (rc)
 		goto error;
 
@@ -914,7 +962,14 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	if (rc)
 		goto error;
 
-	rc = msm_vidc_event_queue_init(inst);
+	if (is_decode_session(inst))
+		rc = msm_vdec_inst_init(inst);
+	else if (is_encode_session(inst))
+		rc = msm_venc_inst_init(inst);
+	if (rc)
+		goto error;
+
+	rc = msm_vidc_fence_init(inst);
 	if (rc)
 		goto error;
 

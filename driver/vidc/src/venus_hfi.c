@@ -3047,6 +3047,43 @@ unlock:
 	return rc;
 }
 
+static int venus_hfi_cache_packet(struct msm_vidc_inst *inst)
+{
+	int rc = 0;
+	struct hfi_header *hdr;
+	struct hfi_pending_packet *packet;
+
+	if (!inst->packet) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	hdr = (struct hfi_header *)inst->packet;
+	if (hdr->size < sizeof(struct hfi_header)) {
+		d_vpr_e("%s: invalid hdr size %d\n", __func__, hdr->size);
+		return -EINVAL;
+	}
+
+	packet = msm_memory_pool_alloc(inst, MSM_MEM_POOL_PACKET);
+	if (!packet) {
+		i_vpr_e(inst, "%s: failed to allocate pending packet\n", __func__);
+		return -ENOMEM;
+	}
+
+	INIT_LIST_HEAD(&packet->list);
+	list_add_tail(&packet->list, &inst->pending_pkts);
+	packet->data = (u8 *)packet + sizeof(struct hfi_pending_packet);
+
+	if (hdr->size > MSM_MEM_POOL_PACKET_SIZE) {
+		i_vpr_e(inst, "%s: header size %d exceeds pool packet size %d\n",
+			__func__, hdr->size, MSM_MEM_POOL_PACKET_SIZE);
+		return -EINVAL;
+	}
+	memcpy(packet->data, inst->packet, hdr->size);
+
+	return rc;
+}
+
 int venus_hfi_session_property(struct msm_vidc_inst *inst,
 	u32 pkt_type, u32 flags, u32 port, u32 payload_type,
 	void *payload, u32 payload_size)
@@ -3080,6 +3117,12 @@ int venus_hfi_session_property(struct msm_vidc_inst *inst,
 				payload_size);
 	if (rc)
 		goto unlock;
+
+	/* skip sending packet to firmware */
+	if (inst->request) {
+		rc = venus_hfi_cache_packet(inst);
+		goto unlock;
+	}
 
 	rc = __iface_cmdq_write(inst->core, inst->packet);
 	if (rc)
@@ -3381,6 +3424,48 @@ unlock:
 	return rc;
 }
 
+static int venus_hfi_add_pending_packets(struct msm_vidc_inst *inst)
+{
+	int rc = 0;
+	int num_packets = 0;
+	struct hfi_pending_packet *pkt_info, *dummy;
+	struct hfi_header *hdr, *src_hdr;
+	struct hfi_packet *src_pkt;
+
+	if (!inst || !inst->packet) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	hdr = (struct hfi_header *)inst->packet;
+	if (hdr->size < sizeof(struct hfi_header)) {
+		i_vpr_e(inst, "%s: invalid hdr size %d\n",
+			__func__, hdr->size);
+		return -EINVAL;
+	}
+
+	list_for_each_entry_safe(pkt_info, dummy, &inst->pending_pkts, list) {
+		src_hdr = (struct hfi_header *)(pkt_info->data);
+		num_packets = src_hdr->num_packets;
+		src_pkt = (struct hfi_packet *)((u8 *)src_hdr + sizeof(struct hfi_header));
+		while (num_packets > 0) {
+			memcpy((u8 *)hdr + hdr->size, (void *)src_pkt, src_pkt->size);
+			hdr->num_packets++;
+			hdr->size += src_pkt->size;
+			num_packets--;
+			src_pkt = (struct hfi_packet *)((u8 *)src_pkt + src_pkt->size);
+			if ((u8 *)src_pkt < (u8 *)src_hdr ||
+					(u8 *)src_pkt > (u8 *)src_hdr + hdr->size) {
+				i_vpr_e(inst, "%s: invalid packet address\n", __func__);
+				return -EINVAL;
+			}
+		}
+		list_del(&pkt_info->list);
+		msm_memory_pool_free(inst, pkt_info);
+	}
+	return rc;
+}
+
 int venus_hfi_queue_buffer(struct msm_vidc_inst *inst,
 	struct msm_vidc_buffer *buffer, struct msm_vidc_buffer *metabuf)
 {
@@ -3388,7 +3473,7 @@ int venus_hfi_queue_buffer(struct msm_vidc_inst *inst,
 	struct msm_vidc_core *core;
 	struct hfi_buffer hfi_buffer;
 
-	if (!inst || !inst->core || !inst->packet) {
+	if (!inst || !inst->core || !inst->packet || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
@@ -3437,6 +3522,25 @@ int venus_hfi_queue_buffer(struct msm_vidc_inst *inst,
 		if (rc)
 			goto unlock;
 	}
+
+	if (inst->capabilities->cap[INPUT_META_OUTBUF_FENCE].value &&
+		is_output_buffer(buffer->type)) {
+		rc = hfi_create_packet(inst->packet,
+			inst->packet_size,
+			HFI_PROP_FENCE,
+			0,
+			HFI_PAYLOAD_U64,
+			HFI_PORT_RAW,
+			core->packet_id++,
+			&buffer->fence_id,
+			sizeof(u64));
+		if (rc)
+			goto unlock;
+	}
+
+	rc = venus_hfi_add_pending_packets(inst);
+	if (rc)
+		goto unlock;
 
 	rc = __iface_cmdq_write(inst->core, inst->packet);
 	if (rc)
