@@ -158,15 +158,16 @@ ktime_t sde_encoder_calc_last_vsync_timestamp(struct drm_encoder *drm_enc)
 	struct intf_status intf_status = {0};
 	unsigned long features;
 	u32 fps;
+	bool is_cmd, is_vid;
 
 	sde_enc = to_sde_encoder_virt(drm_enc);
 	cur_master = sde_enc->cur_master;
 	fps = sde_encoder_get_fps(drm_enc);
+	is_cmd = sde_encoder_check_curr_mode(drm_enc, MSM_DISPLAY_CMD_MODE);
+	is_vid = sde_encoder_check_curr_mode(drm_enc, MSM_DISPLAY_VIDEO_MODE);
 
 	if (!cur_master || !cur_master->hw_intf || !fps
-		|| !cur_master->hw_intf->ops.get_vsync_timestamp
-		|| (!sde_encoder_check_curr_mode(drm_enc, MSM_DISPLAY_CMD_MODE)
-			&& !sde_encoder_check_curr_mode(drm_enc, MSM_DISPLAY_VIDEO_MODE)))
+			|| !cur_master->hw_intf->ops.get_vsync_timestamp || (!is_cmd && !is_vid))
 		return 0;
 
 	features = cur_master->hw_intf->cap->features;
@@ -182,7 +183,7 @@ ktime_t sde_encoder_calc_last_vsync_timestamp(struct drm_encoder *drm_enc)
 			return 0;
 	}
 
-	vsync_counter = cur_master->hw_intf->ops.get_vsync_timestamp(cur_master->hw_intf);
+	vsync_counter = cur_master->hw_intf->ops.get_vsync_timestamp(cur_master->hw_intf, is_vid);
 	qtmr_counter = arch_timer_read_counter();
 	cur_time = ktime_get_ns();
 
