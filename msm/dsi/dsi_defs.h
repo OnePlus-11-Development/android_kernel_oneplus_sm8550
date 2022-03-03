@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -620,6 +621,7 @@ struct dsi_host_config {
  * @topology:             Topology selected for the panel
  * @dsc:                  DSC compression info
  * @vdc:                  VDC compression info
+ * @wd_jitter:            WD Jitter config.
  * @dsc_enabled:          DSC compression enabled
  * @vdc_enabled:          VDC compression enabled
  * @pclk_scale:           pclk scale factor, target bpp to source bpp
@@ -647,6 +649,7 @@ struct dsi_display_mode_priv_info {
 	struct msm_display_topology topology;
 	struct msm_display_dsc_info dsc;
 	struct msm_display_vdc_info vdc;
+	struct msm_display_wd_jitter_config wd_jitter;
 	bool dsc_enabled;
 	bool vdc_enabled;
 	struct msm_ratio pclk_scale;

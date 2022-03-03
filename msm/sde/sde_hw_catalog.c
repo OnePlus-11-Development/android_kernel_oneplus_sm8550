@@ -2366,6 +2366,7 @@ static int sde_intf_parse_dt(struct device_node *np,
 
 		if (SDE_HW_MAJOR(sde_cfg->hw_rev) >= SDE_HW_MAJOR(SDE_HW_VER_900)) {
 			set_bit(SDE_INTF_MDP_VSYNC_TS, &intf->features);
+			set_bit(SDE_INTF_WD_JITTER, &intf->features);
 		}
 	}
 

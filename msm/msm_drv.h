@@ -257,6 +257,18 @@ enum msm_display_compression_type {
 	MSM_DISPLAY_COMPRESSION_VDC
 };
 
+/**
+ * enum msm_display_wd_jitter_type - Type of WD jitter used
+ * @MSM_DISPLAY_WD_JITTER_NONE:      No WD timer jitter enabled
+ * @MSM_DISPLAY_WD_INSTANTANEOUS_JITTER:  Instantaneous WD jitter enabled
+ * @MSM_DISPLAY_WD_LTJ_JITTER:       LTJ WD jitter enabled
+ */
+enum msm_display_wd_jitter_type {
+	MSM_DISPLAY_WD_JITTER_NONE = BIT(0),
+	MSM_DISPLAY_WD_INSTANTANEOUS_JITTER = BIT(1),
+	MSM_DISPLAY_WD_LTJ_JITTER = BIT(2),
+};
+
 #define MSM_DISPLAY_COMPRESSION_RATIO_NONE 1
 #define MSM_DISPLAY_COMPRESSION_RATIO_MAX 5
 
@@ -745,6 +757,24 @@ struct msm_dyn_clk_list {
 };
 
 /**
+ * struct msm_display_wd_jitter_config - defines jitter properties for WD timer
+ * @jitter_type:        Type of WD jitter enabled.
+ * @inst_jitter_numer:  Instantaneous jitter numerator.
+ * @inst_jitter_denom:  Instantaneous jitter denominator.
+ * @ltj_max_numer:      LTJ max numerator.
+ * @ltj_max_denom:      LTJ max denominator.
+ * @ltj_time_sec:       LTJ time in seconds.
+ */
+struct msm_display_wd_jitter_config {
+	enum msm_display_wd_jitter_type jitter_type;
+	u32 inst_jitter_numer;
+	u32 inst_jitter_denom;
+	u32 ltj_max_numer;
+	u32 ltj_max_denom;
+	u32 ltj_time_sec;
+};
+
+/**
  * struct msm_mode_info - defines all msm custom mode info
  * @frame_rate:      frame_rate of the mode
  * @vtotal:          vtotal calculated for the mode
@@ -764,6 +794,7 @@ struct msm_dyn_clk_list {
  * @disable_rsc_solver: Dynamically disable RSC solver for the timing mode due to lower bitclk rate.
  * @dyn_clk_list: List of dynamic clock rates for RFI.
  * @qsync_min_fps: qsync min fps rate
+ * @wd_jitter:         Info for WD jitter.
  */
 struct msm_mode_info {
 	uint32_t frame_rate;
@@ -783,6 +814,7 @@ struct msm_mode_info {
 	bool disable_rsc_solver;
 	struct msm_dyn_clk_list dyn_clk_list;
 	u32 qsync_min_fps;
+	struct msm_display_wd_jitter_config wd_jitter;
 };
 
 /**
