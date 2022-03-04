@@ -5386,23 +5386,23 @@ static const struct ipa_ep_configuration ipa3_ep_mapping
 			true,
 			IPA_DPS_HPS_SEQ_TYPE_2ND_PKT_PROCESS_PASS_NO_DEC_UCP,
 			QMB_MASTER_SELECT_DDR,
-			{ 1, 0, 8, 16, IPA_EE_AP, GSI_ESCAPE_BUF_ONLY, 0	},
+			{ 1, 0, 8, 16, IPA_EE_AP, GSI_ESCAPE_BUF_ONLY, 0 },
 			IPA_TX_INSTANCE_NA },
 
 	[IPA_5_5][IPA_CLIENT_TEST3_PROD] = {
-			true, IPA_v5_5_GROUP_UL,
+			true, IPA_v5_5_GROUP_URLLC,
 			true,
 			IPA_DPS_HPS_SEQ_TYPE_2ND_PKT_PROCESS_PASS_NO_DEC_UCP,
 			QMB_MASTER_SELECT_DDR,
-			{ 11, 9, 8, 16, IPA_EE_AP, GSI_SMART_PRE_FETCH, 3 },
+			{ 10, 5, 10, 16, IPA_EE_AP, GSI_SMART_PRE_FETCH, 3 },
 			IPA_TX_INSTANCE_NA },
 
 	[IPA_5_5][IPA_CLIENT_TEST4_PROD] = {
 			true, IPA_v5_5_GROUP_UL,
 			true,
-			IPA_DPS_HPS_SEQ_TYPE_DMA_ONLY,
+			IPA_DPS_HPS_SEQ_TYPE_2ND_PKT_PROCESS_PASS_NO_DEC_UCP,
 			QMB_MASTER_SELECT_DDR,
-			{ 7, 17, 8, 16, IPA_EE_AP, GSI_ESCAPE_BUF_ONLY, 0	},
+			{ 2, 11, 25, 32, IPA_EE_AP, GSI_SMART_PRE_FETCH, 3 },
 			IPA_TX_INSTANCE_NA },
 
 	[IPA_5_5][IPA_CLIENT_TEST_CONS] = {
@@ -5410,7 +5410,7 @@ static const struct ipa_ep_configuration ipa3_ep_mapping
 			false,
 			IPA_DPS_HPS_SEQ_TYPE_INVALID,
 			QMB_MASTER_SELECT_DDR,
-			{ 32, 8, 9, 9, IPA_EE_AP, GSI_SMART_PRE_FETCH, 3	},
+			{ 32, 8, 9, 9, IPA_EE_AP, GSI_SMART_PRE_FETCH, 3 },
 			IPA_TX_INSTANCE_DL },
 
 	[IPA_5_5][IPA_CLIENT_TEST1_CONS] = {
@@ -5418,7 +5418,7 @@ static const struct ipa_ep_configuration ipa3_ep_mapping
 			false,
 			IPA_DPS_HPS_SEQ_TYPE_INVALID,
 			QMB_MASTER_SELECT_DDR,
-			{ 34, 6, 8, 14, IPA_EE_AP, GSI_SMART_PRE_FETCH, 3	},
+			{ 26, 2, 5, 5, IPA_EE_AP, GSI_ESCAPE_BUF_ONLY, 0 },
 			IPA_TX_INSTANCE_DL },
 
 	[IPA_5_5][IPA_CLIENT_TEST2_CONS] = {
@@ -5426,7 +5426,7 @@ static const struct ipa_ep_configuration ipa3_ep_mapping
 			false,
 			IPA_DPS_HPS_SEQ_TYPE_INVALID,
 			QMB_MASTER_SELECT_DDR,
-			{ 33, 10, 9, 9, IPA_EE_AP, GSI_SMART_PRE_FETCH, 3	},
+			{ 33, 10, 9, 9, IPA_EE_AP, GSI_SMART_PRE_FETCH, 3 },
 			IPA_TX_INSTANCE_DL },
 
 	[IPA_5_5][IPA_CLIENT_TEST3_CONS] = {
@@ -5434,7 +5434,7 @@ static const struct ipa_ep_configuration ipa3_ep_mapping
 			false,
 			IPA_DPS_HPS_SEQ_TYPE_INVALID,
 			QMB_MASTER_SELECT_DDR,
-			{ 30, 23, 9, 9, IPA_EE_AP, GSI_SMART_PRE_FETCH, 3	},
+			{ 30, 23, 9, 9, IPA_EE_AP, GSI_SMART_PRE_FETCH, 3 },
 			IPA_TX_INSTANCE_DL },
 
 	[IPA_5_5][IPA_CLIENT_TEST4_CONS] = {
@@ -5442,7 +5442,7 @@ static const struct ipa_ep_configuration ipa3_ep_mapping
 			false,
 			IPA_DPS_HPS_SEQ_TYPE_INVALID,
 			QMB_MASTER_SELECT_DDR,
-			{ 35, 25, 8, 14, IPA_EE_AP, GSI_SMART_PRE_FETCH, 3	},
+			{ 24, 1, 9, 9, IPA_EE_AP, GSI_SMART_PRE_FETCH, 3 },
 			IPA_TX_INSTANCE_DL },
 };
 
