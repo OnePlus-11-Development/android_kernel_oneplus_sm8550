@@ -25,6 +25,40 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted (subject to the limitations in the
+ * disclaimer below) provided that the following conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *
+ *     * Redistributions in binary form must reproduce the above
+ *       copyright notice, this list of conditions and the following
+ *       disclaimer in the documentation and/or other materials provided
+ *       with the distribution.
+ *
+ *     * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+ *       contributors may be used to endorse or promote products derived
+ *       from this software without specific prior written permission.
+ *
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
  */
 
 #include <stdio.h>
@@ -47,8 +81,8 @@ using namespace std;
 extern Logger g_Logger;
 
 static uint8_t IPv4Packet[IP4_PACKET_SIZE] = {
-		0x45, 0x00, 0x00, 0x29,
-		0x00, 0x00, 0x40, 0x00,
+		0x45, 0x00, 0x00, 0x46,
+		0x45, 0x00, 0x00, 0x00,
 		0xff, 0x06, 0xf5, 0xfd,// Protocol = 06 (TCP)
 		0xc0, 0xa8, 0x02, 0x13,// IPv4 SRC Addr 192.168.2.19
 		0xc0, 0xa8, 0x02, 0x68,// IPv4 DST Addr 192.168.2.104
@@ -117,7 +151,7 @@ static const uint8_t Eth2IPv4Packet[] =
 	0x08, 0x00,		// ETH2 TYPE IPv4 - ETH_P_IP 0x0800
 
 	// IPv4
-	0x45, 0x00, 0x00, 0x2e,
+	0x45, 0x00, 0x00, 0x29,
 	0x00, 0x00, 0x40, 0x00,
 	0xff, 0x06, 0xf5, 0xfd, // Protocol = 06 (TCP)
 	0xc0, 0xa8, 0x02, 0x13, // IPv4 SRC Addr 192.168.2.19
@@ -161,7 +195,7 @@ static const uint8_t WLANEth2IPv4Packet[] =
 	0x08, 0x00,			// ETH2 TYPE IPv4 - ETH_P_IP 0x0800
 
 	// IPv4
-	0x45, 0x00, 0x00, 0x2e,
+	0x45, 0x00, 0x00, 0x29,
 	0x00, 0x00, 0x40, 0x00,
 	0xff, 0x06, 0xf5, 0xfd,	// Protocol = 06 (TCP)
 	0xc0, 0xa8, 0x02, 0x13,	// IPv4 SRC Addr 192.168.2.19
@@ -188,7 +222,7 @@ static const uint8_t WLAN802_3IPv4Packet[] =
 	0x08, 0x00,				// Ethrtype - 0x0800
 
 	// IPv4
-	0x45, 0x00, 0x00, 0x2e,
+	0x45, 0x00, 0x00, 0x29,
 	0x00, 0x00, 0x40, 0x00,
 	0xff, 0x06, 0xf5, 0xfd,	// Protocol = 06 (TCP)
 	0xc0, 0xa8, 0x02, 0x13,	// IPv4 SRC Addr 192.168.2.19
@@ -1221,13 +1255,36 @@ bool CompareResultVsGolden(Byte *goldenBuffer,   unsigned int goldenSize,
 	return !memcmp((void*)receivedBuffer, (void*)goldenBuffer, goldenSize);
 }
 
+size_t GetPacketStatusSize(void)
+{
+		switch (TestManager::GetInstance()->GetIPAHwType()) {
+				case IPA_HW_v5_5:
+						return sizeof(struct ipa3_hw_pkt_status_hw_v5_5);
+				case IPA_HW_v5_0:
+				case IPA_HW_v5_1:
+						return sizeof(struct ipa3_hw_pkt_status_hw_v5_0);
+				default:
+						return sizeof(struct ipa3_hw_pkt_status);
+		}
+}
+
 bool CompareResultVsGolden_w_Status(Byte *goldenBuffer,   unsigned int goldenSize,
 			   Byte *receivedBuffer, unsigned int receivedSize)
 {
 	size_t stts_size = sizeof(struct ipa3_hw_pkt_status);
 
-	if (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_0) {
-		stts_size = sizeof(struct ipa3_hw_pkt_status_hw_v5_0);
+	switch (TestManager::GetInstance()->GetIPAHwType()) {
+		case IPA_HW_v5_5:
+				stts_size = sizeof(struct ipa3_hw_pkt_status_hw_v5_5);
+				break;
+		case IPA_HW_v5_0:
+		case IPA_HW_v5_1:
+				stts_size = sizeof(struct ipa3_hw_pkt_status_hw_v5_0);
+				break;
+		default:
+				stts_size = sizeof(struct ipa3_hw_pkt_status);
+				break;
+
 	}
 
 	if ((receivedSize - stts_size) != goldenSize) {
