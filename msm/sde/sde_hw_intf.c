@@ -501,13 +501,10 @@ static void sde_hw_intf_setup_vsync_source(struct sde_hw_intf *intf, u32 frame_r
 	c = &intf->hw;
 
 	reg = CALCULATE_WD_LOAD_VALUE(frame_rate);
-	if (intf->cap->features & BIT(SDE_INTF_WD_JITTER))
-		reg *= MDP_TICK_COUNT;
-
 	SDE_REG_WRITE(c, INTF_WD_TIMER_0_LOAD_VALUE, reg);
 
 	SDE_REG_WRITE(c, INTF_WD_TIMER_0_CTL, BIT(0)); /* clear timer */
-	reg |= BIT(8); /* enable heartbeat timer */
+	reg = BIT(8); /* enable heartbeat timer */
 	reg |= BIT(0); /* enable WD timer */
 	reg |= BIT(1); /* select default 16 clock ticks */
 	SDE_REG_WRITE(c, INTF_WD_TIMER_0_CTL2, reg);

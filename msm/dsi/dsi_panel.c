@@ -2210,7 +2210,7 @@ static int dsi_panel_parse_wd_jitter_config(struct dsi_display_mode_priv_info *p
 	struct msm_display_wd_jitter_config *wd_jitter = &priv_info->wd_jitter;
 	u32 ltj[DEFAULT_PANEL_JITTER_ARRAY_SIZE] = {0, 1};
 	u32 ltj_time = 0;
-	const u32 min_ltj = 10;
+	const u32 max_ltj = 10;
 
 	if (!(utils->read_bool(utils->data, "qcom,dsi-wd-jitter-enable"))) {
 		priv_info->panel_jitter_numer = DEFAULT_PANEL_JITTER_NUMERATOR;
@@ -2221,7 +2221,7 @@ static int dsi_panel_parse_wd_jitter_config(struct dsi_display_mode_priv_info *p
 	rc = utils->read_u32_array(utils->data, "qcom,dsi-wd-ltj-max-jitter", ltj,
 			DEFAULT_PANEL_JITTER_ARRAY_SIZE);
 	rc |= utils->read_u32(utils->data, "qcom,dsi-wd-ltj-time-sec", &ltj_time);
-	if (rc || !ltj[1] || !ltj_time || (ltj[0] / ltj[1] < min_ltj)) {
+	if (rc || !ltj[1] || !ltj_time || (ltj[0] / ltj[1] >= max_ltj)) {
 		DSI_DEBUG("No valid long term jitter defined\n");
 		priv_info->panel_jitter_numer = DEFAULT_PANEL_JITTER_NUMERATOR;
 		priv_info->panel_jitter_denom = DEFAULT_PANEL_JITTER_DENOMINATOR;
