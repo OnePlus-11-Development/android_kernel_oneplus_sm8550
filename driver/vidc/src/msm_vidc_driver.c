@@ -205,6 +205,9 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{BITRATE_BOOST,                  "BITRATE_BOOST"              },
 	{SLICE_MODE,                     "SLICE_MODE"                 },
 	{BLUR_RESOLUTION,                "BLUR_RESOLUTION"            },
+	{OUTPUT_ORDER,                   "OUTPUT_ORDER"               },
+	{INPUT_BUF_HOST_MAX_COUNT,       "INPUT_BUF_HOST_MAX_COUNT"   },
+	{OUTPUT_BUF_HOST_MAX_COUNT,      "OUTPUT_BUF_HOST_MAX_COUNT"  },
 	{INST_CAP_MAX,                   "INST_CAP_MAX"               },
 };
 
