@@ -8669,6 +8669,11 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	ipa3_ctx->stats.page_recycle_stats[1].tmp_alloc = 0;
 	memset(ipa3_ctx->stats.page_recycle_cnt, 0,
 		sizeof(ipa3_ctx->stats.page_recycle_cnt));
+	ipa3_ctx->stats.num_sort_tasklet_sched[0] = 0;
+	ipa3_ctx->stats.num_sort_tasklet_sched[1] = 0;
+	ipa3_ctx->stats.num_sort_tasklet_sched[2] = 0;
+	ipa3_ctx->stats.num_of_times_wq_reschd = 0;
+	ipa3_ctx->stats.page_recycle_cnt_in_tasklet = 0;
 	ipa3_ctx->skip_uc_pipe_reset = resource_p->skip_uc_pipe_reset;
 	ipa3_ctx->tethered_flow_control = resource_p->tethered_flow_control;
 	ipa3_ctx->ee = resource_p->ee;
@@ -8775,6 +8780,7 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	ipa3_ctx->ipa_endp_delay_wa = resource_p->ipa_endp_delay_wa;
 	ipa3_ctx->ipa_endp_delay_wa_v2 = resource_p->ipa_endp_delay_wa_v2;
 	ipa3_ctx->ulso_wa = resource_p->ulso_wa;
+	ipa3_ctx->coal_ipv4_id_ignore = resource_p->coal_ipv4_id_ignore;
 
 	WARN(!IPA_IS_REGULAR_CLK_MODE(ipa3_ctx->ipa3_hw_mode),
 		"Non NORMAL IPA HW mode, is this emulation platform ?");
@@ -8880,6 +8886,10 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 
 	/* Initialize Page poll threshold. */
 	ipa3_ctx->page_poll_threshold = IPA_PAGE_POLL_DEFAULT_THRESHOLD;
+
+	/*Initialize number napi without prealloc buff*/
+	ipa3_ctx->ipa_max_napi_sort_page_thrshld = IPA_MAX_NAPI_SORT_PAGE_THRSHLD;
+	ipa3_ctx->page_wq_reschd_time = IPA_MAX_PAGE_WQ_RESCHED_TIME;
 
 	/* Use common page pool for Def/Coal pipe. */
 	if (ipa3_ctx->ipa_hw_type >= IPA_HW_v5_1)
@@ -9598,6 +9608,7 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 	ipa_drv_res->rmnet_ctl_enable = 0;
 	ipa_drv_res->rmnet_ll_enable = 0;
 	ipa_drv_res->ulso_wa = false;
+	ipa_drv_res->coal_ipv4_id_ignore = true;
 
 	/* Get IPA HW Version */
 	result = of_property_read_u32(pdev->dev.of_node, "qcom,ipa-hw-ver",
@@ -10242,6 +10253,17 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 	else
 		IPADBG(": found ipa_drv_res->max_num_smmu_cb = %d\n",
 			ipa_drv_res->max_num_smmu_cb);
+
+	result = of_property_read_u8(pdev->dev.of_node,
+					"qcom,coal-ipv4-id-ignore",
+					&ipa_drv_res->coal_ipv4_id_ignore);
+	if (result || ipa_drv_res->coal_ipv4_id_ignore > 1) {
+		IPADBG(":Resource not present for coal-ipv4-id-ignore, use def\n");
+		ipa_drv_res->coal_ipv4_id_ignore = true;
+	}
+	IPADBG(": coal-ipv4-id-ignore = %s\n",
+			ipa_drv_res->coal_ipv4_id_ignore
+			? "True" : "False");
 
 	return 0;
 }

@@ -180,6 +180,7 @@ static const char *ipareg_name_to_str[IPA_REG_MAX] = {
 	__stringify(IPA_RAM_INGRESS_POLICER_DB_BASE_ADDR),
 	__stringify(IPA_RAM_EGRESS_SHAPING_PROD_DB_BASE_ADDR),
 	__stringify(IPA_RAM_EGRESS_SHAPING_TC_DB_BASE_ADDR),
+	__stringify(IPA_COAL_MASTER_CFG),
 };
 
 static void ipareg_construct_dummy(enum ipahal_reg_name reg,
@@ -3331,6 +3332,46 @@ static void ipareg_parse_coal_qmap_cfg(enum ipahal_reg_name reg,
 		IPA_COAL_QMAP_CFG_SHFT, IPA_COAL_QMAP_CFG_BMSK);
 }
 
+static void ipareg_construct_coal_master_cfg(enum ipahal_reg_name reg,
+	const void *fields, u32 *val)
+{
+	struct ipahal_reg_coal_master_cfg *master_cfg =
+		(struct ipahal_reg_coal_master_cfg *)fields;
+
+	IPA_SETFIELD_IN_REG(*val, master_cfg->coal_ipv4_id_ignore,
+		IPA_COAL_MASTER_CFG_IPV4_ID_IGNORE_EN_SHFT,
+		IPA_COAL_MASTER_CFG_IPV4_ID_IGNORE_EN_BMSK);
+
+	IPA_SETFIELD_IN_REG(*val, master_cfg->coal_enhanced_ipv4_id_en,
+		IPA_COAL_MASTER_CFG_ENHANCED_IPV4_ID_EN_SHFT,
+		IPA_COAL_MASTER_CFG_ENHANCED_IPV4_ID_EN_BMSK);
+
+	IPA_SETFIELD_IN_REG(*val, master_cfg->coal_force_to_default,
+		IPA_COAL_MASTER_CFG_FORCE_TO_DEFAULT_EN_SHFT,
+		IPA_COAL_MASTER_CFG_FORCE_TO_DEFAULT_EN_BMSK);
+}
+
+static void ipareg_parse_coal_master_cfg(enum ipahal_reg_name reg,
+	void *fields, u32 val)
+{
+	struct ipahal_reg_coal_master_cfg *master_cfg =
+		(struct ipahal_reg_coal_master_cfg *)fields;
+
+	memset(master_cfg, 0, sizeof(*master_cfg));
+
+	master_cfg->coal_ipv4_id_ignore = IPA_GETFIELD_FROM_REG(val,
+		IPA_COAL_MASTER_CFG_IPV4_ID_IGNORE_EN_SHFT,
+		IPA_COAL_MASTER_CFG_IPV4_ID_IGNORE_EN_BMSK);
+
+	master_cfg->coal_enhanced_ipv4_id_en = IPA_GETFIELD_FROM_REG(val,
+		IPA_COAL_MASTER_CFG_ENHANCED_IPV4_ID_EN_SHFT,
+		IPA_COAL_MASTER_CFG_ENHANCED_IPV4_ID_EN_BMSK);
+
+	master_cfg->coal_force_to_default = IPA_GETFIELD_FROM_REG(val,
+		IPA_COAL_MASTER_CFG_FORCE_TO_DEFAULT_EN_SHFT,
+		IPA_COAL_MASTER_CFG_FORCE_TO_DEFAULT_EN_BMSK);
+}
+
 static void ipareg_parse_ipa_flavor_0(enum ipahal_reg_name reg,
 	void *fields, u32 val)
 {
@@ -5129,6 +5170,9 @@ static struct ipahal_reg_obj ipahal_reg_objs[IPA_HW_MAX][IPA_REG_MAX] = {
 	[IPA_HW_v5_5][IPA_COAL_EVICT_LRU] = {
 		ipareg_construct_coal_evict_lru_v5_5, ipareg_parse_coal_evict_lru_v5_5,
 		0x00000918, 0, 0, 0, 0, 0},
+	[IPA_HW_v5_5][IPA_COAL_MASTER_CFG] = {
+		ipareg_construct_coal_master_cfg, ipareg_parse_coal_master_cfg,
+		0x00000914, 0, 0, 0, 0, 0},
 	[IPA_HW_v5_5][IPA_COAL_QMAP_CFG] = {
 		ipareg_construct_coal_qmap_cfg, ipareg_parse_coal_qmap_cfg,
 		0x0000091c, 0, 0, 0, 0, 0},
