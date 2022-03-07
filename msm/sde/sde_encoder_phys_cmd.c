@@ -740,6 +740,10 @@ static int _sde_encoder_phys_cmd_wait_for_idle(
 		return -EINVAL;
 	}
 
+	if (sde_encoder_check_ctl_done_support(phys_enc->parent)
+			&& !sde_encoder_phys_cmd_is_master(phys_enc))
+		return 0;
+
 	if (atomic_read(&phys_enc->pending_kickoff_cnt) > 1)
 		wait_info.count_check = 1;
 
@@ -1538,6 +1542,10 @@ static int sde_encoder_phys_cmd_wait_for_tx_complete(
 
 	cmd_enc = to_sde_encoder_phys_cmd(phys_enc);
 
+	if (sde_encoder_check_ctl_done_support(phys_enc->parent)
+			&& !sde_encoder_phys_cmd_is_master(phys_enc))
+		return 0;
+
 	if (!atomic_read(&phys_enc->pending_kickoff_cnt)) {
 		SDE_EVT32(DRMID(phys_enc->parent),
 			phys_enc->intf_idx - INTF_0,
@@ -1624,6 +1632,10 @@ static int sde_encoder_phys_cmd_wait_for_commit_done(
 		return -EINVAL;
 
 	cmd_enc = to_sde_encoder_phys_cmd(phys_enc);
+
+	if (sde_encoder_check_ctl_done_support(phys_enc->parent)
+			&& !sde_encoder_phys_cmd_is_master(phys_enc))
+		return 0;
 
 	/* only required for master controller */
 	if (sde_encoder_phys_cmd_is_master(phys_enc)) {
