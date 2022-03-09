@@ -4064,6 +4064,14 @@ static long ipa3_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			macsec_map);
 		break;
 
+	case IPA_IOC_SET_NAT_EXC_RT_TBL_IDX:
+		retval = ipa3_set_nat_conn_track_exc_rt_tbl(arg, IPA_IP_v4);
+		break;
+
+	case IPA_IOC_SET_CONN_TRACK_EXC_RT_TBL_IDX:
+		retval = ipa3_set_nat_conn_track_exc_rt_tbl(arg, IPA_IP_v6);
+		break;
+
 	default:
 		IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
 		return -ENOTTY;
@@ -6159,6 +6167,12 @@ long compat_ipa3_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	case IPA_IOC_DEL_EoGRE_MAPPING32:
 		cmd = IPA_IOC_DEL_EoGRE_MAPPING;
+		break;
+	case IPA_IOC_SET_NAT_EXC_RT_TBL_IDX32:
+		cmd = IPA_IOC_SET_NAT_EXC_RT_TBL_IDX;
+		break;
+	case IPA_IOC_SET_CONN_TRACK_EXC_RT_TBL_IDX32:
+		cmd = IPA_IOC_SET_CONN_TRACK_EXC_RT_TBL_IDX;
 		break;
 	case IPA_IOC_COMMIT_HDR:
 	case IPA_IOC_RESET_HDR:

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/bitops.h>
@@ -2547,3 +2548,54 @@ bail:
 	iounmap(ipa_sram_mmio);
 	return res;
 }
+
+/**
+ * ipa3_set_nat_conn_track_exc_rt_tbl() - Set the exception routing handle
+ * @rt_tbl_hdl:	[in] the routing table handle to be set
+ *
+ * Returns:	0 on success, negative on failure
+ *
+ * Note:	Should not be called from atomic context
+ */
+int ipa3_set_nat_conn_track_exc_rt_tbl(u32 rt_tbl_hdl, enum ipa_ip_type ip)
+{
+	struct ipa3_rt_tbl *entry;
+	int result = 0;
+
+	if (((ip != IPA_IP_v4) && (ip != IPA_IP_v6)) ||
+		(ipa3_ctx->ipa_hw_type < IPA_HW_v5_5)) {
+		IPAERR_RL("bad params: %d,\n", ip);
+		return -EINVAL;
+	}
+
+	mutex_lock(&ipa3_ctx->lock);
+	entry = ipa3_id_find(rt_tbl_hdl);
+	if (entry == NULL) {
+		IPAERR_RL("lookup failed\n");
+		result = -EINVAL;
+		goto ret;
+	}
+
+	if ((entry->cookie != IPA_RT_TBL_COOKIE) || entry->ref_cnt == 0) {
+		IPAERR_RL("bad params\n");
+		result = -EINVAL;
+		goto ret;
+	}
+
+	if (ip == IPA_IP_v4)
+		ipahal_write_reg_mn(IPA_IPV4_NAT_EXC_SUPPRESS_ROUT_TABLE_INDX,
+			0, 0, entry->idx);
+	else
+		ipahal_write_reg_mn(IPA_IPV6_CONN_TRACK_EXC_SUPPRESS_ROUT_TABLE_INDX,
+			0, 0, entry->idx);
+
+	IPADBG("Set exception routing table for %d, ID: %d", ip, entry->idx);
+
+	result = 0;
+
+ret:
+	mutex_unlock(&ipa3_ctx->lock);
+
+	return result;
+}
+

@@ -524,6 +524,12 @@ enum {
 #define IPA_IOC_DEL_EoGRE_MAPPING32 _IOWR(IPA_IOC_MAGIC, \
 				IPA_IOCTL_DEL_EoGRE_MAPPING, \
 				compat_uptr_t)
+#define IPA_IOC_SET_NAT_EXC_RT_TBL_IDX32 _IOWR(IPA_IOC_MAGIC, \
+				IPA_IOCTL_SET_NAT_EXC_RT_TBL_IDX, \
+				compat_uptr_t)
+#define IPA_IOC_SET_CONN_TRACK_EXC_RT_TBL_IDX32 _IOWR(IPA_IOC_MAGIC, \
+				IPA_IOCTL_SET_CONN_TRACK_EXC_RT_TBL_IDX, \
+				compat_uptr_t)
 #endif /* #ifdef CONFIG_COMPAT */
 
 #define IPA_TZ_UNLOCK_ATTRIBUTE 0x0C0311
@@ -2875,6 +2881,8 @@ int ipa3_query_rt_index(struct ipa_ioc_get_rt_tbl_indx *in);
 int ipa3_mdfy_rt_rule(struct ipa_ioc_mdfy_rt_rule *rules);
 
 int ipa3_mdfy_rt_rule_v2(struct ipa_ioc_mdfy_rt_rule_v2 *rules);
+
+int ipa3_set_nat_conn_track_exc_rt_tbl(u32 rt_tbl_hdl, enum ipa_ip_type ip);
 
 /*
  * Filtering

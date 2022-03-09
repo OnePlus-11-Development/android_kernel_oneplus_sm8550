@@ -181,6 +181,8 @@ static const char *ipareg_name_to_str[IPA_REG_MAX] = {
 	__stringify(IPA_RAM_EGRESS_SHAPING_PROD_DB_BASE_ADDR),
 	__stringify(IPA_RAM_EGRESS_SHAPING_TC_DB_BASE_ADDR),
 	__stringify(IPA_COAL_MASTER_CFG),
+	__stringify(IPA_IPV4_NAT_EXC_SUPPRESS_ROUT_TABLE_INDX),
+	__stringify(IPA_IPV6_CONN_TRACK_EXC_SUPPRESS_ROUT_TABLE_INDX),
 };
 
 static void ipareg_construct_dummy(enum ipahal_reg_name reg,
@@ -5024,6 +5026,12 @@ static struct ipahal_reg_obj ipahal_reg_objs[IPA_HW_MAX][IPA_REG_MAX] = {
 		ipareg_construct_timers_pulse_gran_cfg_v5_0,
 		ipareg_parse_timers_pulse_gran_cfg_v5_0,
 		0x0000004B4, 0, 0, 0, 1, 0},
+	[IPA_HW_v5_5][IPA_IPV4_NAT_EXC_SUPPRESS_ROUT_TABLE_INDX] = {
+		ipareg_construct_dummy, ipareg_parse_dummy,
+		0x0000004E4, 0, 0, 0, 0, 0},
+	[IPA_HW_v5_5][IPA_IPV6_CONN_TRACK_EXC_SUPPRESS_ROUT_TABLE_INDX] = {
+		ipareg_construct_dummy, ipareg_parse_dummy,
+		0x0000004E8, 0, 0, 0, 0, 0},
 	[IPA_HW_v5_5][IPA_SRC_RSRC_GRP_01_RSRC_TYPE_n] = {
 		ipareg_construct_rsrg_grp_xy_v5_0, ipareg_parse_dummy,
 		0x00000500, 0x20, 0, 0, 0, 0},
