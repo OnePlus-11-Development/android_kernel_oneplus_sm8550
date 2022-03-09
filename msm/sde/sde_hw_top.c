@@ -60,6 +60,17 @@
 
 #define DCE_SEL                           0x450
 
+#define MDP_SID_V2_VIG0          0x000
+#define MDP_SID_V2_DMA0          0x040
+#define MDP_SID_V2_CTL_0         0x100
+#define MDP_SID_V2_LTM0          0x400
+#define MDP_SID_V2_IPC_READ      0x200
+#define MDP_SID_V2_LUTDMA_RD     0x300
+#define MDP_SID_V2_LUTDMA_WR     0x304
+#define MDP_SID_V2_LUTDMA_SB_RD  0x308
+#define MDP_SID_V2_DSI0          0x500
+#define MDP_SID_V2_DSI1          0x504
+
 #define MDP_SID_VIG0			  0x0
 #define MDP_SID_VIG1			  0x4
 #define MDP_SID_VIG2			  0x8
@@ -385,6 +396,40 @@ static void sde_hw_mdp_events(struct sde_hw_mdp *mdp, bool enable)
 	SDE_REG_WRITE(c, HW_EVENTS_CTL, enable);
 }
 
+void sde_hw_set_vm_sid_v2(struct sde_hw_sid *sid, u32 vm, struct sde_mdss_cfg *m)
+{
+	u32 offset = 0;
+	int i;
+
+	if (!sid || !m)
+		return;
+
+	for (i = 0; i < m->ctl_count; i++) {
+		offset = MDP_SID_V2_CTL_0 + (i * 4);
+		SDE_REG_WRITE(&sid->hw, offset, vm << 2);
+	}
+
+	for (i = 0; i < m->ltm_count; i++) {
+		offset = MDP_SID_V2_LTM0 + (i * 4);
+		SDE_REG_WRITE(&sid->hw, offset, vm << 2);
+	}
+
+	SDE_REG_WRITE(&sid->hw, MDP_SID_V2_IPC_READ, vm << 2);
+	SDE_REG_WRITE(&sid->hw, MDP_SID_V2_LUTDMA_RD, vm << 2);
+	SDE_REG_WRITE(&sid->hw, MDP_SID_V2_LUTDMA_WR, vm << 2);
+	SDE_REG_WRITE(&sid->hw, MDP_SID_V2_LUTDMA_SB_RD, vm << 2);
+	SDE_REG_WRITE(&sid->hw, MDP_SID_V2_DSI0, vm << 2);
+	SDE_REG_WRITE(&sid->hw, MDP_SID_V2_DSI1, vm << 2);
+}
+
+void sde_hw_set_vm_sid(struct sde_hw_sid *sid, u32 vm, struct sde_mdss_cfg *m)
+{
+	if (!sid || !m)
+		return;
+
+	SDE_REG_WRITE(&sid->hw, MDP_SID_XIN7, vm << 2);
+}
+
 struct sde_hw_sid *sde_hw_sid_init(void __iomem *addr,
 	u32 sid_len, const struct sde_mdss_cfg *m)
 {
@@ -400,6 +445,11 @@ struct sde_hw_sid *sde_hw_sid_init(void __iomem *addr,
 	c->hw.hw_rev = m->hw_rev;
 	c->hw.log_mask = SDE_DBG_MASK_SID;
 
+	if (IS_SDE_SID_REV_200(m->sid_rev))
+		c->ops.set_vm_sid = sde_hw_set_vm_sid_v2;
+	else
+		c->ops.set_vm_sid = sde_hw_set_vm_sid;
+
 	return c;
 }
 
@@ -412,29 +462,29 @@ void sde_hw_set_rotator_sid(struct sde_hw_sid *sid)
 	SDE_REG_WRITE(&sid->hw, MDP_SID_ROT_WR, ROT_SID_ID_VAL);
 }
 
-void sde_hw_set_sspp_sid(struct sde_hw_sid *sid, u32 pipe, u32 vm)
+void sde_hw_set_sspp_sid(struct sde_hw_sid *sid, u32 pipe, u32 vm,
+		struct sde_mdss_cfg *m)
 {
 	u32 offset = 0;
+	u32 vig_sid_offset = MDP_SID_VIG0;
+	u32 dma_sid_offset = MDP_SID_DMA0;
 
 	if (!sid)
 		return;
 
+	if (IS_SDE_SID_REV_200(m->sid_rev)) {
+		vig_sid_offset = MDP_SID_V2_VIG0;
+		dma_sid_offset = MDP_SID_V2_DMA0;
+	}
+
 	if (SDE_SSPP_VALID_VIG(pipe))
-		offset = MDP_SID_VIG0 + ((pipe - SSPP_VIG0) * 4);
+		offset = vig_sid_offset + ((pipe - SSPP_VIG0) * 4);
 	else if (SDE_SSPP_VALID_DMA(pipe))
-		offset = MDP_SID_DMA0 + ((pipe - SSPP_DMA0) * 4);
+		offset = dma_sid_offset + ((pipe - SSPP_DMA0) * 4);
 	else
 		return;
 
 	SDE_REG_WRITE(&sid->hw, offset, vm << 2);
-}
-
-void sde_hw_set_lutdma_sid(struct sde_hw_sid *sid, u32 vm)
-{
-	if (!sid)
-		return;
-
-	SDE_REG_WRITE(&sid->hw, MDP_SID_XIN7, vm << 2);
 }
 
 static void sde_hw_program_cwb_ppb_ctrl(struct sde_hw_mdp *mdp,

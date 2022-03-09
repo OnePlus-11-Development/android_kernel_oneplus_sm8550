@@ -1110,17 +1110,29 @@ int sde_kms_vm_primary_prepare_commit(struct sde_kms *sde_kms,
 	return rc;
 }
 
+void sde_kms_vm_set_sid(struct sde_kms *sde_kms, u32 vm)
+{
+	struct drm_plane *plane;
+	struct drm_device *ddev;
+	struct sde_mdss_cfg *sde_cfg;
+
+	ddev = sde_kms->dev;
+	sde_cfg = sde_kms->catalog;
+
+	list_for_each_entry(plane, &ddev->mode_config.plane_list, head)
+		sde_plane_set_sid(plane, vm);
+
+	if (sde_kms->hw_sid && sde_kms->hw_sid->ops.set_vm_sid)
+		sde_kms->hw_sid->ops.set_vm_sid(sde_kms->hw_sid, vm, sde_kms->catalog);
+}
+
 int sde_kms_vm_trusted_prepare_commit(struct sde_kms *sde_kms,
 					   struct drm_atomic_state *state)
 {
-	struct drm_device *ddev;
-	struct drm_plane *plane;
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *new_cstate;
 	struct sde_crtc_state *cstate;
 	enum sde_crtc_vm_req vm_req;
-
-	ddev = sde_kms->dev;
 
 	crtc = sde_kms_vm_get_vm_crtc(state);
 	if (!crtc)
@@ -1137,10 +1149,7 @@ int sde_kms_vm_trusted_prepare_commit(struct sde_kms *sde_kms,
 		sde_kms->hw_intr->ops.clear_all_irqs(sde_kms->hw_intr);
 
 	/* Program the SID's for the trusted VM */
-	list_for_each_entry(plane, &ddev->mode_config.plane_list, head)
-		sde_plane_set_sid(plane, 1);
-
-	sde_hw_set_lutdma_sid(sde_kms->hw_sid, 1);
+	sde_kms_vm_set_sid(sde_kms, 1);
 
 	sde_dbg_set_hw_ownership_status(true);
 
@@ -1373,9 +1382,7 @@ int sde_kms_vm_trusted_post_commit(struct sde_kms *sde_kms,
 	struct drm_atomic_state *state)
 {
 	struct sde_vm_ops *vm_ops;
-	struct drm_device *ddev;
 	struct drm_crtc *crtc;
-	struct drm_plane *plane;
 	struct sde_crtc_state *cstate;
 	struct drm_crtc_state *new_cstate;
 	enum sde_crtc_vm_req vm_req;
@@ -1385,7 +1392,6 @@ int sde_kms_vm_trusted_post_commit(struct sde_kms *sde_kms,
 		return -EINVAL;
 
 	vm_ops = sde_vm_get_ops(sde_kms);
-	ddev = sde_kms->dev;
 
 	crtc = sde_kms_vm_get_vm_crtc(state);
 	if (!crtc)
@@ -1398,11 +1404,7 @@ int sde_kms_vm_trusted_post_commit(struct sde_kms *sde_kms,
 		return 0;
 
 	sde_kms_vm_pre_release(sde_kms, state, false);
-
-	list_for_each_entry(plane, &ddev->mode_config.plane_list, head)
-		sde_plane_set_sid(plane, 0);
-
-	sde_hw_set_lutdma_sid(sde_kms->hw_sid, 0);
+	sde_kms_vm_set_sid(sde_kms, 0);
 
 	sde_vm_lock(sde_kms);
 
