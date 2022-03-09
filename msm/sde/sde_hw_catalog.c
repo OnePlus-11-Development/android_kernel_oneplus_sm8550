@@ -2045,10 +2045,10 @@ static int sde_ctl_parse_dt(struct device_node *np,
 	return 0;
 }
 
-void sde_hw_mixer_set_preference(struct sde_mdss_cfg *sde_cfg, u32 num_lm,
+u32 sde_hw_mixer_set_preference(struct sde_mdss_cfg *sde_cfg, u32 num_lm,
 		uint32_t disp_type)
 {
-	u32 i, cnt = 0, sec_cnt = 0;
+	u32 i, cnt = 0, sec_cnt = 0, lm_mask = 0;
 
 	if (disp_type == SDE_CONNECTOR_PRIMARY) {
 		for (i = 0; i < sde_cfg->mixer_count; i++) {
@@ -2067,6 +2067,7 @@ void sde_hw_mixer_set_preference(struct sde_mdss_cfg *sde_cfg, u32 num_lm,
 			if (cnt < num_lm) {
 				set_bit(SDE_DISP_PRIMARY_PREF,
 						&sde_cfg->mixer[i].features);
+				lm_mask |=  BIT(sde_cfg->mixer[i].id - 1);
 				cnt++;
 			}
 
@@ -2105,10 +2106,13 @@ void sde_hw_mixer_set_preference(struct sde_mdss_cfg *sde_cfg, u32 num_lm,
 					BIT(SDE_DISP_PRIMARY_PREF))) {
 				set_bit(SDE_DISP_SECONDARY_PREF,
 						&sde_cfg->mixer[i].features);
+				lm_mask |= BIT(sde_cfg->mixer[i].id - 1);
 				cnt++;
 			}
 		}
 	}
+
+	return lm_mask;
 }
 
 static int sde_mixer_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
