@@ -3289,7 +3289,7 @@ int msm_vidc_queue_buffer_single(struct msm_vidc_inst *inst, struct vb2_buffer *
 {
 	int rc = 0;
 	struct msm_vidc_buffer *buf;
-	struct msm_vidc_fence *fence;
+	struct msm_vidc_fence *fence = NULL;
 	enum msm_vidc_allow allow;
 
 	if (!inst || !vb2 || !inst->capabilities) {
@@ -3329,7 +3329,8 @@ int msm_vidc_queue_buffer_single(struct msm_vidc_inst *inst, struct vb2_buffer *
 exit:
 	if (rc) {
 		i_vpr_e(inst, "%s: qbuf failed\n", __func__);
-		msm_vidc_fence_destroy(inst, fence);
+		if (fence)
+			msm_vidc_fence_destroy(inst, fence);
 	}
 	return rc;
 }
