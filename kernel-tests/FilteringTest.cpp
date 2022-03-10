@@ -7938,14 +7938,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		uint32_t vlan_802_1Q_tag;
-		if (
-			(NULL == m_sendBuffer) ||
-			(NULL == m_sendBuffer2) ||
-			(NULL == m_sendBuffer3)
-			) {
-			printf("Error : %s was called with NULL Buffers\n", __FUNCTION__);
-			return false;
-		}
 
 		vlan_802_1Q_tag = ntohl(0x81002005); //VLAN ID == 5
 		memcpy(&m_sendBuffer[TAG_802_1Q_OFFSET], &vlan_802_1Q_tag, sizeof(vlan_802_1Q_tag));
@@ -8232,11 +8224,6 @@ private:
 	bool __ModifyPackets(int i)
 	{
 		int address;
-		if (NULL == m_sendBuffer)
-		{
-			printf ("Error : %s was called with NULL Buffer\n", __FUNCTION__);
-			return false;
-		}
 
 		address = ntohl(0xC0A80101 + i); // 192.168.1.(1+i)
 		memcpy(&m_sendBuffer[IPV4_DST_ADDR_OFFSET], &address, sizeof(address));
@@ -8365,14 +8352,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		int address;
-		if (
-			(NULL == m_sendBuffer) ||
-			(NULL == m_sendBuffer2) ||
-			(NULL == m_sendBuffer3)
-			) {
-			printf("Error : %s was called with NULL Buffers\n", __FUNCTION__);
-			return false;
-		}
 
 		address = ntohl(0x7F000001);//127.0.0.1
 		memcpy(&m_sendBuffer[IPV4_DST_ADDR_OFFSET], &address, sizeof(address));
@@ -8777,14 +8756,6 @@ public:
 
 	virtual bool ModifyPackets()
 	{
-		if (
-			(NULL == m_sendBuffer) ||
-			(NULL == m_sendBuffer2) ||
-			(NULL == m_sendBuffer3)
-			) {
-			printf("Error : %s was called with NULL Buffers\n", __FUNCTION__);
-			return false;
-		}
 		m_sendBuffer[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
 		m_sendBuffer2[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
 		m_sendBuffer3[DST_ADDR_LSB_OFFSET_IPV6] = 0xCC;
