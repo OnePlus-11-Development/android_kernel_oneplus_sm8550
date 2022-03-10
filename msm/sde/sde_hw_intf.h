@@ -236,7 +236,7 @@ struct sde_hw_intf_ops {
 	/**
 	 * Get the HW vsync timestamp counter
 	 */
-	u64 (*get_vsync_timestamp)(struct sde_hw_intf *intf);
+	u64 (*get_vsync_timestamp)(struct sde_hw_intf *intf, bool is_vid);
 
 	/**
 	 * Enable processing of 2 pixels per clock

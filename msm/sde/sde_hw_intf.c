@@ -224,14 +224,14 @@ static void sde_hw_intf_reset_counter(struct sde_hw_intf *ctx)
 	SDE_REG_WRITE(c, INTF_LINE_COUNT, BIT(31));
 }
 
-static u64 sde_hw_intf_get_vsync_timestamp(struct sde_hw_intf *ctx)
+static u64 sde_hw_intf_get_vsync_timestamp(struct sde_hw_intf *ctx, bool is_vid)
 {
 	struct sde_hw_blk_reg_map *c = &ctx->hw;
 	u32 timestamp_lo, timestamp_hi;
 	u64 timestamp = 0;
 	u32 reg_ts_0, reg_ts_1;
 
-	if (ctx->cap->features & BIT(SDE_INTF_MDP_VSYNC_TS)) {
+	if (ctx->cap->features & BIT(SDE_INTF_MDP_VSYNC_TS) && is_vid) {
 		reg_ts_0 = INTF_MDP_VSYNC_TIMESTAMP0;
 		reg_ts_1 = INTF_MDP_VSYNC_TIMESTAMP1;
 	} else {
