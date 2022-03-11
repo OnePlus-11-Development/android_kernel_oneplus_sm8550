@@ -474,6 +474,35 @@ exit:
 }
 EXPORT_SYMBOL(msm_vidc_create_bufs);
 
+int msm_vidc_prepare_buf(void *instance, struct media_device *mdev,
+	struct v4l2_buffer *b)
+{
+	int rc = 0;
+	struct msm_vidc_inst *inst = instance;
+	struct vb2_queue *q;
+
+	if (!inst || !inst->core || !b || !valid_v4l2_buffer(b, inst)) {
+		d_vpr_e("%s: invalid params %pK %pK\n", __func__, inst, b);
+		return -EINVAL;
+	}
+
+	q = msm_vidc_get_vb2q(inst, b->type, __func__);
+	if (!q) {
+		rc = -EINVAL;
+		goto exit;
+	}
+
+	rc = vb2_prepare_buf(q, mdev, b);
+	if (rc) {
+		i_vpr_e(inst, "%s: failed with %d\n", __func__, rc);
+		goto exit;
+	}
+
+exit:
+	return rc;
+}
+EXPORT_SYMBOL(msm_vidc_prepare_buf);
+
 int msm_vidc_qbuf(void *instance, struct media_device *mdev,
 		struct v4l2_buffer *b)
 {

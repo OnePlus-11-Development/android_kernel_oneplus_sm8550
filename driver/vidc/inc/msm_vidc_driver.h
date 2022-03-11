@@ -450,7 +450,7 @@ bool res_is_less_than(u32 width, u32 height,
 bool res_is_less_than_or_equal_to(u32 width, u32 height,
 	u32 ref_width, u32 ref_height);
 int msm_vidc_get_properties(struct msm_vidc_inst *inst);
-int msm_vidc_create_input_metadata_buffer(struct msm_vidc_inst *inst, u32 buf_fd);
+int msm_vidc_create_input_metadata_buffer(struct msm_vidc_inst *inst, int buf_fd);
 int msm_vidc_update_input_meta_buffer_index(struct msm_vidc_inst *inst, struct vb2_buffer *vb2);
 #endif // _MSM_VIDC_DRIVER_H_
 

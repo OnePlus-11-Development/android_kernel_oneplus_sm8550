@@ -371,6 +371,31 @@ unlock:
 	return rc;
 }
 
+int msm_v4l2_prepare_buf(struct file *filp, void *fh,
+				struct v4l2_buffer *b)
+{
+	struct msm_vidc_inst *inst = get_vidc_inst(filp, fh);
+	struct video_device *vdev = video_devdata(filp);
+	int rc = 0;
+
+	inst = get_inst_ref(g_core, inst);
+	if (!inst) {
+		d_vpr_e("%s: invalid instance\n", __func__);
+		return -EINVAL;
+	}
+
+	inst_lock(inst, __func__);
+	rc = msm_vidc_prepare_buf((void *)inst, vdev->v4l2_dev->mdev, b);
+	if (rc)
+		goto unlock;
+
+unlock:
+	inst_unlock(inst, __func__);
+	put_inst(inst);
+
+	return rc;
+}
+
 int msm_v4l2_qbuf(struct file *filp, void *fh,
 				struct v4l2_buffer *b)
 {
@@ -748,17 +773,19 @@ unlock:
 
 int msm_v4l2_request_validate(struct media_request *req)
 {
+	d_vpr_l("%s()\n", __func__);
 	return vb2_request_validate(req);
 }
 
 void msm_v4l2_request_queue(struct media_request *req)
 {
+	d_vpr_l("%s()\n", __func__);
 	v4l2_m2m_request_queue(req);
 }
 
 void msm_v4l2_m2m_device_run(void *priv)
 {
-	d_vpr_l("%s: \n", __func__);
+	d_vpr_l("%s()\n", __func__);
 }
 
 void msm_v4l2_m2m_job_abort(void *priv)
