@@ -22,14 +22,12 @@ static const u32 msm_venc_input_set_prop[] = {
 	HFI_PROP_COLOR_FORMAT,
 	HFI_PROP_RAW_RESOLUTION,
 	HFI_PROP_LINEAR_STRIDE_SCANLINE,
-	HFI_PROP_BUFFER_HOST_MAX_COUNT,
 	HFI_PROP_SIGNAL_COLOR_INFO,
 };
 
 static const u32 msm_venc_output_set_prop[] = {
 	HFI_PROP_BITSTREAM_RESOLUTION,
 	HFI_PROP_CROP_OFFSETS,
-	HFI_PROP_BUFFER_HOST_MAX_COUNT,
 	HFI_PROP_CSC,
 };
 
@@ -287,28 +285,6 @@ static int msm_venc_set_crop_offsets(struct msm_vidc_inst *inst,
 	return 0;
 }
 
-static int msm_venc_set_host_max_buf_count(struct msm_vidc_inst *inst,
-	enum msm_vidc_port_type port)
-{
-	int rc = 0;
-	u32 count = DEFAULT_MAX_HOST_BUF_COUNT;
-
-	if (msm_vidc_is_super_buffer(inst) || is_image_session(inst))
-		count = DEFAULT_MAX_HOST_BURST_BUF_COUNT;
-
-	i_vpr_h(inst, "%s: count: %u port: %u\n", __func__, count, port);
-	rc = venus_hfi_session_property(inst,
-			HFI_PROP_BUFFER_HOST_MAX_COUNT,
-			HFI_HOST_FLAGS_NONE,
-			get_hfi_port(inst, port),
-			HFI_PAYLOAD_U32,
-			&count,
-			sizeof(u32));
-	if (rc)
-		return rc;
-	return 0;
-}
-
 static int msm_venc_set_colorspace(struct msm_vidc_inst* inst,
 	enum msm_vidc_port_type port)
 {
@@ -456,7 +432,6 @@ static int msm_venc_set_input_properties(struct msm_vidc_inst *inst)
 		{HFI_PROP_COLOR_FORMAT,               msm_venc_set_colorformat                 },
 		{HFI_PROP_RAW_RESOLUTION,             msm_venc_set_raw_resolution              },
 		{HFI_PROP_LINEAR_STRIDE_SCANLINE,     msm_venc_set_stride_scanline             },
-		{HFI_PROP_BUFFER_HOST_MAX_COUNT,      msm_venc_set_host_max_buf_count          },
 		{HFI_PROP_SIGNAL_COLOR_INFO,          msm_venc_set_colorspace                  },
 	};
 
@@ -493,7 +468,6 @@ static int msm_venc_set_output_properties(struct msm_vidc_inst *inst)
 	static const struct msm_venc_prop_type_handle prop_type_handle_arr[] = {
 		{HFI_PROP_BITSTREAM_RESOLUTION,       msm_venc_set_bitstream_resolution    },
 		{HFI_PROP_CROP_OFFSETS,               msm_venc_set_crop_offsets            },
-		{HFI_PROP_BUFFER_HOST_MAX_COUNT,      msm_venc_set_host_max_buf_count      },
 		{HFI_PROP_CSC,                        msm_venc_set_csc                     },
 	};
 

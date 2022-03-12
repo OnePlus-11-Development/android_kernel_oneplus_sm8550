@@ -1071,6 +1071,7 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 	struct msm_vidc_inst *inst;
 	enum msm_vidc_inst_capability_type cap_id;
 	struct msm_vidc_inst_capability *capability;
+	u32 port;
 
 	if (!ctrl) {
 		d_vpr_e("%s: invalid ctrl parameter\n", __func__);
@@ -1113,7 +1114,9 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	/* mark client set flag */
 	capability->cap[cap_id].flags |= CAP_FLAG_CLIENT_SET;
-	if (!inst->bufq[OUTPUT_PORT].vb2q->streaming) {
+
+	port = is_encode_session(inst) ? OUTPUT_PORT : INPUT_PORT;
+	if (!inst->bufq[port].vb2q->streaming) {
 		/* static case */
 		rc = msm_vidc_update_static_property(inst, cap_id, ctrl);
 		if (rc)
@@ -1444,6 +1447,87 @@ int msm_vidc_adjust_delta_based_rc(void *instance, struct v4l2_ctrl *ctrl)
 		adjusted_value = 0;
 
 	msm_vidc_update_cap_value(inst, TIME_DELTA_BASED_RC,
+		adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_output_order(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	struct msm_vidc_inst_capability *capability;
+	s32 tn_mode = -1, display_delay = -1, display_delay_enable = -1;
+	u32 adjusted_value;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val :
+		capability->cap[OUTPUT_ORDER].value;
+
+	if (msm_vidc_get_parent_value(inst, OUTPUT_ORDER, THUMBNAIL_MODE,
+			&tn_mode, __func__) ||
+		msm_vidc_get_parent_value(inst, OUTPUT_ORDER, DISPLAY_DELAY,
+			&display_delay, __func__) ||
+		msm_vidc_get_parent_value(inst, OUTPUT_ORDER, DISPLAY_DELAY_ENABLE,
+			&display_delay_enable, __func__))
+		return -EINVAL;
+
+	if (tn_mode || (display_delay_enable && !display_delay))
+		adjusted_value = 1;
+
+	msm_vidc_update_cap_value(inst, OUTPUT_ORDER,
+		adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_input_buf_host_max_count(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	struct msm_vidc_inst_capability *capability;
+	u32 adjusted_value;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val :
+		capability->cap[INPUT_BUF_HOST_MAX_COUNT].value;
+
+	if (msm_vidc_is_super_buffer(inst) || is_image_session(inst))
+		adjusted_value = DEFAULT_MAX_HOST_BURST_BUF_COUNT;
+
+	msm_vidc_update_cap_value(inst, INPUT_BUF_HOST_MAX_COUNT,
+		adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_output_buf_host_max_count(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	struct msm_vidc_inst_capability *capability;
+	u32 adjusted_value;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val :
+		capability->cap[OUTPUT_BUF_HOST_MAX_COUNT].value;
+
+	if (msm_vidc_is_super_buffer(inst) || is_image_session(inst))
+		adjusted_value = DEFAULT_MAX_HOST_BURST_BUF_COUNT;
+
+	msm_vidc_update_cap_value(inst, OUTPUT_BUF_HOST_MAX_COUNT,
 		adjusted_value, __func__);
 
 	return 0;
@@ -3887,6 +3971,34 @@ int msm_vidc_set_u32(void *instance,
 	return rc;
 }
 
+int msm_vidc_set_u32_packed(void *instance,
+	enum msm_vidc_inst_capability_type cap_id)
+{
+	int rc = 0;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+	u32 hfi_value;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	if (inst->capabilities->cap[cap_id].flags & CAP_FLAG_MENU) {
+		rc = msm_vidc_v4l2_menu_to_hfi(inst, cap_id, &hfi_value);
+		if (rc)
+			return -EINVAL;
+	} else {
+		hfi_value = inst->capabilities->cap[cap_id].value;
+	}
+
+	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_32_PACKED,
+		&hfi_value, sizeof(u32), __func__);
+	if (rc)
+		return rc;
+
+	return rc;
+}
+
 int msm_vidc_set_u32_enum(void *instance,
 	enum msm_vidc_inst_capability_type cap_id)
 {
@@ -3981,6 +4093,7 @@ int msm_vidc_v4l2_to_hfi_enum(struct msm_vidc_inst *inst,
 	case V4L2_CID_MPEG_VIDEO_AV1_PROFILE:
 	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:
 	case V4L2_CID_MPEG_VIDEO_H264_LEVEL:
+	case V4L2_CID_MPEG_VIDEO_VP9_LEVEL:
 	case V4L2_CID_MPEG_VIDEO_AV1_LEVEL:
 	case V4L2_CID_MPEG_VIDEO_HEVC_TIER:
 	case V4L2_CID_MPEG_VIDEO_AV1_TIER:
