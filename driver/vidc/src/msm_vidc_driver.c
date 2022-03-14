@@ -82,7 +82,7 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{MB_CYCLES_FW,                   "MB_CYCLES_FW"               },
 	{MB_CYCLES_FW_VPP,               "MB_CYCLES_FW_VPP"           },
 	{SECURE_MODE,                    "SECURE_MODE"                },
-	{INPUT_META_OUTBUF_FENCE,        "INPUT_META_OUTBUF_FENCE"    },
+	{META_OUTBUF_FENCE,              "META_OUTBUF_FENCE"          },
 	{FENCE_ID,                       "FENCE_ID"                   },
 	{FENCE_FD,                       "FENCE_FD"                   },
 	{TS_REORDER,                     "TS_REORDER"                 },
@@ -1416,10 +1416,10 @@ bool msm_vidc_allow_property(struct msm_vidc_inst *inst, u32 hfi_id)
 		}
 		break;
 	case HFI_PROP_FENCE:
-		if (!inst->capabilities->cap[INPUT_META_OUTBUF_FENCE].value) {
+		if (!is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE)) {
 			i_vpr_h(inst,
 				"%s: cap: %24s not enabled, hence not allowed to subscribe\n",
-				__func__, cap_name(INPUT_META_OUTBUF_FENCE));
+				__func__, cap_name(META_OUTBUF_FENCE));
 			is_allowed = false;
 		}
 		break;
@@ -3305,7 +3305,7 @@ int msm_vidc_queue_buffer_single(struct msm_vidc_inst *inst, struct vb2_buffer *
 	if (!buf)
 		return -EINVAL;
 
-	if (inst->capabilities->cap[INPUT_META_OUTBUF_FENCE].value &&
+	if (is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE) &&
 		is_output_buffer(buf->type)) {
 		fence = msm_vidc_fence_create(inst);
 		if (!fence)
@@ -3786,7 +3786,7 @@ int msm_vidc_buffer_done(struct msm_vidc_inst *inst,
 
 	if (buf->type == MSM_VIDC_BUF_INPUT_META &&
 		inst->capabilities->cap[INPUT_META_VIA_REQUEST].value) {
-		if (inst->capabilities->cap[INPUT_META_OUTBUF_FENCE].value)
+		if (is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE))
 			return msm_vidc_v4l2_buffer_event(inst, buf);
 	} else {
 		return msm_vidc_vb2_buffer_done(inst, buf);

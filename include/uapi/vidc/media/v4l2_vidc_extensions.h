@@ -89,6 +89,16 @@ enum v4l2_mpeg_vidc_blur_types {
 	(V4L2_CID_MPEG_VIDC_BASE + 0x12)
 
 /* various Metadata - encoder & decoder */
+enum v4l2_mpeg_vidc_metadata_bits {
+	V4L2_MPEG_VIDC_META_DISABLE          = 0x0,
+	V4L2_MPEG_VIDC_META_ENABLE           = 0x1,
+	V4L2_MPEG_VIDC_META_TX_INPUT         = 0x2,
+	V4L2_MPEG_VIDC_META_TX_OUTPUT        = 0x4,
+	V4L2_MPEG_VIDC_META_RX_INPUT         = 0x8,
+	V4L2_MPEG_VIDC_META_RX_OUTPUT        = 0x10,
+	V4L2_MPEG_VIDC_META_MAX              = 0x20,
+};
+
 #define V4L2_CID_MPEG_VIDC_METADATA_LTR_MARK_USE_DETAILS                      \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x13)
 #define V4L2_CID_MPEG_VIDC_METADATA_SEQ_HEADER_NAL                            \
@@ -201,7 +211,7 @@ enum v4l2_mpeg_video_av1_tier {
 #define V4L2_CID_MPEG_VIDC_INPUT_METADATA_VIA_REQUEST_ENABLE                 \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x37)
 /* Enables Output buffer fence id via input metadata */
-#define V4L2_CID_MPEG_VIDC_INPUT_METADATA_OUTBUF_FENCE                       \
+#define V4L2_CID_MPEG_VIDC_METADATA_OUTBUF_FENCE                             \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x38)
 /* Control to set fence id to driver in order get corresponding fence fd */
 #define V4L2_CID_MPEG_VIDC_SW_FENCE_ID                                       \

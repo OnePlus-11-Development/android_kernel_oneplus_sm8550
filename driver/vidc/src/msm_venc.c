@@ -681,7 +681,8 @@ static int msm_venc_metadata_delivery(struct msm_vidc_inst *inst,
 	u32 payload[32] = {0};
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
-	static const u32 metadata_list[] = {
+	static const u32 metadata_output_list[] = {};
+	static const u32 metadata_input_list[] = {
 		META_SEI_MASTERING_DISP,
 		META_SEI_CLL,
 		META_HDR10PLUS,
@@ -699,12 +700,26 @@ static int msm_venc_metadata_delivery(struct msm_vidc_inst *inst,
 
 	capability = inst->capabilities;
 	payload[0] = HFI_MODE_METADATA;
-	for (i = 0; i < ARRAY_SIZE(metadata_list); i++) {
-		if (capability->cap[metadata_list[i]].value) {
-			payload[count + 1] =
-				capability->cap[metadata_list[i]].hfi_id;
-			count++;
+
+	if (port == INPUT_PORT) {
+		for (i = 0; i < ARRAY_SIZE(metadata_input_list); i++) {
+			if (is_meta_tx_inp_enabled(inst, metadata_input_list[i])) {
+				payload[count + 1] =
+					capability->cap[metadata_input_list[i]].hfi_id;
+				count++;
+			}
 		}
+	} else if (port == OUTPUT_PORT) {
+		for (i = 0; i < ARRAY_SIZE(metadata_output_list); i++) {
+			if (is_meta_tx_out_enabled(inst, metadata_output_list[i])) {
+				payload[count + 1] =
+					capability->cap[metadata_output_list[i]].hfi_id;
+				count++;
+			}
+		}
+	} else {
+		i_vpr_e(inst, "%s: invalid port: %d\n", __func__, port);
+		return -EINVAL;
 	}
 
 	rc = venus_hfi_session_command(inst,
@@ -726,7 +741,8 @@ static int msm_venc_metadata_subscription(struct msm_vidc_inst *inst,
 	u32 payload[32] = {0};
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
-	static const u32 metadata_list[] = {
+	static const u32 metadata_input_list[] = {};
+	static const u32 metadata_output_list[] = {
 		META_LTR_MARK_USE,
 		META_SEQ_HDR_NAL,
 		META_TIMESTAMP,
@@ -743,12 +759,26 @@ static int msm_venc_metadata_subscription(struct msm_vidc_inst *inst,
 
 	capability = inst->capabilities;
 	payload[0] = HFI_MODE_METADATA;
-	for (i = 0; i < ARRAY_SIZE(metadata_list); i++) {
-		if (capability->cap[metadata_list[i]].value) {
-			payload[count + 1] =
-				capability->cap[metadata_list[i]].hfi_id;
-			count++;
+
+	if (port == INPUT_PORT) {
+		for (i = 0; i < ARRAY_SIZE(metadata_input_list); i++) {
+			if (is_meta_rx_inp_enabled(inst, metadata_input_list[i])) {
+				payload[count + 1] =
+					capability->cap[metadata_input_list[i]].hfi_id;
+				count++;
+			}
 		}
+	} else if (port == OUTPUT_PORT) {
+		for (i = 0; i < ARRAY_SIZE(metadata_output_list); i++) {
+			if (is_meta_rx_out_enabled(inst, metadata_output_list[i])) {
+				payload[count + 1] =
+					capability->cap[metadata_output_list[i]].hfi_id;
+				count++;
+			}
+		}
+	} else {
+		i_vpr_e(inst, "%s: invalid port: %d\n", __func__, port);
+		return -EINVAL;
 	}
 
 	rc = venus_hfi_session_command(inst,

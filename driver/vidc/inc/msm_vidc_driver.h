@@ -8,6 +8,7 @@
 
 #include <linux/workqueue.h>
 #include <linux/iommu.h>
+#include <media/v4l2_vidc_extensions.h>
 #include "msm_vidc_internal.h"
 #include "msm_vidc_core.h"
 #include "msm_vidc_inst.h"
@@ -99,18 +100,68 @@ static inline is_internal_buffer(enum msm_vidc_buffer_type buffer_type)
 		buffer_type == MSM_VIDC_BUF_VPSS;
 }
 
+static inline bool is_meta_rx_inp_enabled(struct msm_vidc_inst *inst, u32 cap)
+{
+	bool enabled = false;
+
+	if (inst->capabilities->cap[cap].value & V4L2_MPEG_VIDC_META_ENABLE &&
+		inst->capabilities->cap[cap].value & V4L2_MPEG_VIDC_META_RX_INPUT)
+		enabled = true;
+
+	return enabled;
+}
+
+static inline bool is_meta_rx_out_enabled(struct msm_vidc_inst *inst, u32 cap)
+{
+	bool enabled = false;
+
+	if (inst->capabilities->cap[cap].value & V4L2_MPEG_VIDC_META_ENABLE &&
+		inst->capabilities->cap[cap].value & V4L2_MPEG_VIDC_META_RX_OUTPUT)
+		enabled = true;
+
+	return enabled;
+}
+
+static inline bool is_meta_tx_inp_enabled(struct msm_vidc_inst *inst, u32 cap)
+{
+	bool enabled = false;
+
+	if (inst->capabilities->cap[cap].value & V4L2_MPEG_VIDC_META_ENABLE &&
+		inst->capabilities->cap[cap].value & V4L2_MPEG_VIDC_META_TX_INPUT)
+		enabled = true;
+
+	return enabled;
+}
+
+static inline bool is_meta_tx_out_enabled(struct msm_vidc_inst *inst, u32 cap)
+{
+	bool enabled = false;
+
+	if (inst->capabilities->cap[cap].value & V4L2_MPEG_VIDC_META_ENABLE &&
+		inst->capabilities->cap[cap].value & V4L2_MPEG_VIDC_META_TX_OUTPUT)
+		enabled = true;
+
+	return enabled;
+}
+
 static inline bool is_input_meta_enabled(struct msm_vidc_inst *inst)
 {
 	bool enabled = false;
 
 	if (is_decode_session(inst)) {
-		enabled = inst->capabilities->cap[META_BUF_TAG].value ?
-			true : false;
+		enabled = is_meta_tx_inp_enabled(inst, META_BUF_TAG) ||
+			is_meta_rx_inp_enabled(inst, META_BUF_TAG) ||
+			is_meta_tx_inp_enabled(inst, META_OUTBUF_FENCE) ||
+			is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE);
 	} else if (is_encode_session(inst)) {
-		enabled = (inst->capabilities->cap[META_SEQ_HDR_NAL].value ||
-			inst->capabilities->cap[META_EVA_STATS].value ||
-			inst->capabilities->cap[META_BUF_TAG].value ||
-			inst->capabilities->cap[META_ROI_INFO].value);
+		enabled = is_meta_tx_inp_enabled(inst, META_SEQ_HDR_NAL) ||
+			is_meta_rx_inp_enabled(inst, META_SEQ_HDR_NAL) ||
+			is_meta_tx_inp_enabled(inst, META_EVA_STATS) ||
+			is_meta_rx_inp_enabled(inst, META_EVA_STATS) ||
+			is_meta_tx_inp_enabled(inst, META_BUF_TAG) ||
+			is_meta_rx_inp_enabled(inst, META_BUF_TAG) ||
+			is_meta_tx_inp_enabled(inst, META_ROI_INFO) ||
+			is_meta_rx_inp_enabled(inst, META_ROI_INFO);
 	}
 	return enabled;
 }
@@ -120,23 +171,37 @@ static inline bool is_output_meta_enabled(struct msm_vidc_inst *inst)
 	bool enabled = false;
 
 	if (is_decode_session(inst)) {
-		enabled = (inst->capabilities->cap[META_BITSTREAM_RESOLUTION].value ||
-			inst->capabilities->cap[META_CROP_OFFSETS].value ||
-			inst->capabilities->cap[META_DPB_MISR].value ||
-			inst->capabilities->cap[META_OPB_MISR].value ||
-			inst->capabilities->cap[META_INTERLACE].value ||
-			inst->capabilities->cap[META_CONCEALED_MB_CNT].value ||
-			inst->capabilities->cap[META_HIST_INFO].value ||
-			inst->capabilities->cap[META_SEI_MASTERING_DISP].value ||
-			inst->capabilities->cap[META_SEI_CLL].value ||
-			inst->capabilities->cap[META_BUF_TAG].value ||
-			inst->capabilities->cap[META_DPB_TAG_LIST].value ||
-			inst->capabilities->cap[META_SUBFRAME_OUTPUT].value ||
-			inst->capabilities->cap[META_MAX_NUM_REORDER_FRAMES].value);
+		enabled = is_meta_tx_out_enabled(inst, META_BITSTREAM_RESOLUTION) ||
+			is_meta_rx_out_enabled(inst, META_BITSTREAM_RESOLUTION) ||
+			is_meta_tx_out_enabled(inst, META_CROP_OFFSETS) ||
+			is_meta_rx_out_enabled(inst, META_CROP_OFFSETS) ||
+			is_meta_tx_out_enabled(inst, META_DPB_MISR) ||
+			is_meta_rx_out_enabled(inst, META_DPB_MISR) ||
+			is_meta_tx_out_enabled(inst, META_OPB_MISR) ||
+			is_meta_rx_out_enabled(inst, META_OPB_MISR) ||
+			is_meta_tx_out_enabled(inst, META_INTERLACE) ||
+			is_meta_rx_out_enabled(inst, META_INTERLACE) ||
+			is_meta_tx_out_enabled(inst, META_CONCEALED_MB_CNT) ||
+			is_meta_rx_out_enabled(inst, META_CONCEALED_MB_CNT) ||
+			is_meta_tx_out_enabled(inst, META_SEI_MASTERING_DISP) ||
+			is_meta_rx_out_enabled(inst, META_SEI_MASTERING_DISP) ||
+			is_meta_tx_out_enabled(inst, META_SEI_CLL) ||
+			is_meta_rx_out_enabled(inst, META_SEI_CLL) ||
+			is_meta_tx_out_enabled(inst, META_BUF_TAG) ||
+			is_meta_rx_out_enabled(inst, META_BUF_TAG) ||
+			is_meta_tx_out_enabled(inst, META_DPB_TAG_LIST) ||
+			is_meta_rx_out_enabled(inst, META_DPB_TAG_LIST) ||
+			is_meta_tx_out_enabled(inst, META_SUBFRAME_OUTPUT) ||
+			is_meta_rx_out_enabled(inst, META_SUBFRAME_OUTPUT) ||
+			is_meta_tx_out_enabled(inst, META_MAX_NUM_REORDER_FRAMES) ||
+			is_meta_rx_out_enabled(inst, META_MAX_NUM_REORDER_FRAMES);
 	} else if (is_encode_session(inst)) {
-		enabled = (inst->capabilities->cap[META_LTR_MARK_USE].value ||
-			inst->capabilities->cap[META_BUF_TAG].value);
+		enabled = is_meta_tx_out_enabled(inst, META_LTR_MARK_USE) ||
+			is_meta_rx_out_enabled(inst, META_LTR_MARK_USE) ||
+			is_meta_tx_out_enabled(inst, META_BUF_TAG) ||
+			is_meta_rx_out_enabled(inst, META_BUF_TAG);
 	}
+
 	return enabled;
 }
 
