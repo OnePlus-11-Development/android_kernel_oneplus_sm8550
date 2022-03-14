@@ -12,4 +12,11 @@ LINUXINCLUDE += -I$(MMRM_ROOT)/vm/common/inc/
 obj-m += vm/be/
 endif
 
+else
+
+LINUXINCLUDE += -I$(MMRM_ROOT)/vm/common/inc/
+
+obj-m += vm/fe/
+obj-y += vm/fe/vm_test/
+
 endif
