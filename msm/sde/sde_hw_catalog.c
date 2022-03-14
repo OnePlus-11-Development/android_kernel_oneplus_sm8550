@@ -3526,6 +3526,7 @@ static int sde_cache_parse_dt(struct device_node *np,
 			return -EINVAL;
 		}
 
+		sc_cfg->llcc_uid = usecase_id;
 		sc_cfg->llcc_scid = llcc_get_slice_id(slice);
 		sc_cfg->llcc_slice_size = llcc_get_slice_size(slice);
 		SDE_DEBUG("img cache:%d usecase_id:%d, scid:%d slice_size:%zu kb\n",

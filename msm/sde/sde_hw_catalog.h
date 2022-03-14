@@ -1634,11 +1634,13 @@ struct sde_perf_cdp_cfg {
 /**
  * struct sde_sc_cfg - define system cache configuration
  * @has_sys_cache: true if system cache is enabled
+ * @llcc_uuid: llcc use case id for the system cache
  * @llcc_scid: scid for the system cache
  * @llcc_slice_size: slice size of the system cache
  */
 struct sde_sc_cfg {
 	bool has_sys_cache;
+	int llcc_uid;
 	int llcc_scid;
 	size_t llcc_slice_size;
 };

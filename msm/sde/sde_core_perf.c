@@ -13,7 +13,6 @@
 #include <linux/clk.h>
 #include <linux/bitmap.h>
 #include <linux/sde_rsc.h>
-#include <linux/platform_device.h>
 #include <linux/soc/qcom/llcc-qcom.h>
 
 #include "msm_prop.h"
@@ -328,7 +327,6 @@ static int _sde_core_perf_activate_llcc(struct sde_kms *kms,
 	struct drm_device *drm_dev;
 	struct device *dev;
 	struct platform_device *pdev;
-	u32 llcc_id[SDE_SYS_CACHE_MAX] = {LLCC_DISP};
 	int rc = 0;
 
 	if (!kms || !kms->dev || !kms->dev->dev) {
@@ -354,10 +352,10 @@ static int _sde_core_perf_activate_llcc(struct sde_kms *kms,
 		activate ? "" : "de",
 		type, kms->perf.llcc_active[type]);
 
-	slice = llcc_slice_getd(llcc_id[type]);
+	slice = llcc_slice_getd(kms->catalog->sc_cfg[type].llcc_uid);
 	if (IS_ERR_OR_NULL(slice))  {
 		SDE_ERROR("failed to get llcc slice for uid:%d\n",
-				llcc_id[type]);
+				kms->catalog->sc_cfg[type].llcc_uid);
 		rc = -EINVAL;
 		goto exit;
 	}
