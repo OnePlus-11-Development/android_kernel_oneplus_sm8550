@@ -407,7 +407,7 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 	}
 
 	if (is_encode_session(inst) && vb2->type == INPUT_MPLANE) {
-		timestamp_us = vb2->timestamp;
+		timestamp_us = div_u64(vb2->timestamp, 1000);
 		msm_vidc_set_auto_framerate(inst, timestamp_us);
 	}
 	inst->last_qbuf_time_ns = ktime_get_ns();
