@@ -1056,7 +1056,17 @@ static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
 
 		msm_vidc_allow_dcvs(inst);
 	}
+	if (ctrl->id == V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER) {
+		u32 enable;
 
+		/* enable LAYER_ENABLE cap if HEVC_HIER enh layers > 0 */
+		if (ctrl->val > 0)
+			enable = 1;
+		else
+			enable = 0;
+
+		msm_vidc_update_cap_value(inst, LAYER_ENABLE, enable, __func__);
+	}
 	if (is_meta_cap(cap_id)) {
 		/* validate metadata control value against allowed settings */
 		if ((ctrl->val & inst->capabilities->cap[cap_id].max) != ctrl->val) {
@@ -2413,12 +2423,13 @@ int msm_vidc_adjust_blur_resolution(void *instance, struct v4l2_ctrl *ctrl)
 	return 0;
 }
 
-int msm_vidc_adjust_cac(void *instance, struct v4l2_ctrl *ctrl)
+int msm_vidc_adjust_brs(void *instance, struct v4l2_ctrl *ctrl)
 {
 	struct msm_vidc_inst_capability *capability;
 	s32 adjusted_value;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
-	s32 min_quality = -1, rc_type = -1;
+	s32 rc_type = -1, layer_enabled = -1, layer_type = -1;
+	bool hp_requested = false;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -2433,22 +2444,36 @@ int msm_vidc_adjust_cac(void *instance, struct v4l2_ctrl *ctrl)
 		return 0;
 
 	if (msm_vidc_get_parent_value(inst, CONTENT_ADAPTIVE_CODING,
-		MIN_QUALITY, &min_quality, __func__) ||
+		BITRATE_MODE, &rc_type, __func__) ||
 		msm_vidc_get_parent_value(inst, CONTENT_ADAPTIVE_CODING,
-		BITRATE_MODE, &rc_type, __func__))
+		LAYER_ENABLE, &layer_enabled, __func__) ||
+		msm_vidc_get_parent_value(inst, CONTENT_ADAPTIVE_CODING,
+		LAYER_TYPE, &layer_type, __func__))
 		return -EINVAL;
 
 	/*
-	 * CAC is supported only for VBR rc type.
-	 * Hence, do not adjust or set to firmware for non VBR rc's
+	 * -BRS is supported only for VBR rc type.
+	 *  Hence, do not adjust or set to firmware for non VBR rc's
+	 * -If HP is enabled then BRS is not allowed.
 	 */
 	if (rc_type != HFI_RC_VBR_CFR) {
 		adjusted_value = 0;
 		goto adjust;
 	}
 
-	if (min_quality) {
-		adjusted_value = 1;
+	if (inst->codec == MSM_VIDC_H264) {
+		layer_type = V4L2_MPEG_VIDEO_H264_HIERARCHICAL_CODING_P;
+	} else if (inst->codec == MSM_VIDC_HEVC) {
+		layer_type = V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_P;
+	}
+	hp_requested = (inst->capabilities->cap[LAYER_TYPE].value == layer_type);
+
+	/*
+	 * Disable BRS in case of HP encoding
+	 * Hence set adjust value to 0.
+	 */
+	if (layer_enabled == 1 && hp_requested) {
+		adjusted_value = 0;
 		goto adjust;
 	}
 
