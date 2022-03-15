@@ -463,18 +463,11 @@ int msm_v4l2_streamon(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
-	inst_lock(inst, __func__);
-	if (is_session_error(inst)) {
-		i_vpr_e(inst, "%s: inst in error state\n", __func__);
-		rc = -EBUSY;
-		goto unlock;
-	}
 	rc = msm_vidc_streamon((void *)inst, i);
 	if (rc)
-		goto unlock;
+		goto exit;
 
-unlock:
-	inst_unlock(inst, __func__);
+exit:
 	put_inst(inst);
 
 	return rc;
@@ -492,13 +485,11 @@ int msm_v4l2_streamoff(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
-	inst_lock(inst, __func__);
 	rc = msm_vidc_streamoff((void *)inst, i);
 	if (rc)
-		goto unlock;
+		goto exit;
 
-unlock:
-	inst_unlock(inst, __func__);
+exit:
 	put_inst(inst);
 
 	return rc;

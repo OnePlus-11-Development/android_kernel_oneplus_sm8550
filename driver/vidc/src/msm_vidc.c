@@ -571,14 +571,6 @@ int msm_vidc_streamon(void *instance, enum v4l2_buf_type type)
 		return -EINVAL;
 	}
 
-	if (!msm_vidc_allow_streamon(inst, type)) {
-		rc = -EBUSY;
-		goto exit;
-	}
-	rc = msm_vidc_state_change_streamon(inst, type);
-	if (rc)
-		goto exit;
-
 	port = v4l2_type_to_driver_port(inst, type, __func__);
 	if (port < 0) {
 		rc = -EINVAL;
@@ -589,7 +581,6 @@ int msm_vidc_streamon(void *instance, enum v4l2_buf_type type)
 	if (rc) {
 		i_vpr_e(inst, "%s: vb2_streamon(%d) failed, %d\n",
 			__func__, type, rc);
-		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
 		goto exit;
 	}
 
@@ -603,26 +594,11 @@ int msm_vidc_streamoff(void *instance, enum v4l2_buf_type type)
 	int rc = 0;
 	struct msm_vidc_inst *inst = instance;
 	int port;
-	enum msm_vidc_allow allow;
 
 	if (!inst) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
-
-	allow = msm_vidc_allow_streamoff(inst, type);
-	if (allow == MSM_VIDC_DISALLOW) {
-		rc = -EBUSY;
-		goto exit;
-	} else if (allow == MSM_VIDC_IGNORE) {
-		goto exit;
-	} else if (allow != MSM_VIDC_ALLOW) {
-		rc = -EINVAL;
-		goto exit;
-	}
-	rc = msm_vidc_state_change_streamoff(inst, type);
-	if (rc)
-		goto exit;
 
 	port = v4l2_type_to_driver_port(inst, type, __func__);
 	if (port < 0) {
@@ -634,7 +610,6 @@ int msm_vidc_streamoff(void *instance, enum v4l2_buf_type type)
 	if (rc) {
 		i_vpr_e(inst, "%s: vb2_streamoff(%d) failed, %d\n",
 			__func__, type, rc);
-		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
 		goto exit;
 	}
 
