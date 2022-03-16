@@ -389,7 +389,7 @@ static void _sde_encoder_phys_wb_setup_roi(struct sde_encoder_phys *phys_enc,
 	struct sde_crtc_state *cstate = to_sde_crtc_state(crtc_state);
 	struct sde_rect pu_roi = {0,};
 
-	if (hw_wb->ops.setup_roi)
+	if (!hw_wb->ops.setup_roi)
 		return;
 
 	if (hw_wb->ops.setup_crop && phys_enc->in_clone_mode) {
