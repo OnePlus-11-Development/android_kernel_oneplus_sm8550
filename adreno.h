@@ -603,6 +603,8 @@ struct adreno_device {
 	struct adreno_coresight_device gx_coresight;
 	/** @gx_coresight:  A coresight instance for CX */
 	struct adreno_coresight_device cx_coresight;
+	/** @funnel_gfx:  A coresight instance for gfx funnel */
+	struct adreno_funnel_device funnel_gfx;
 #endif
 
 	uint32_t gpmu_throttle_counters[ADRENO_GPMU_THROTTLE_COUNTERS];

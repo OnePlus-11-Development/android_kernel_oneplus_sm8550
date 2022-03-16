@@ -4,7 +4,6 @@
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
-#include <linux/coresight.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
 
@@ -214,6 +213,65 @@ void adreno_coresight_remove(struct adreno_device *adreno_dev)
 		coresight_unregister(adreno_dev->cx_coresight.dev);
 }
 
+static int funnel_gfx_enable(struct coresight_device *csdev, int inport,
+			 int outport)
+{
+	struct kgsl_device *device = kgsl_get_device(0);
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	int ret;
+
+	if (!device)
+		return -ENODEV;
+
+	mutex_lock(&device->mutex);
+
+	ret = adreno_active_count_get(adreno_dev);
+	if (ret)
+		goto err;
+
+	/* Now that GPU is up, Call into coresight driver to enable funnel */
+	ret = adreno_dev->funnel_gfx.funnel_ops->link_ops->enable(csdev, inport, outport);
+
+	adreno_active_count_put(adreno_dev);
+err:
+	mutex_unlock(&device->mutex);
+	return ret;
+}
+
+static void funnel_gfx_disable(struct coresight_device *csdev, int inport,
+			   int outport)
+{
+	struct kgsl_device *device = kgsl_get_device(0);
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	int ret;
+
+	if (!device)
+		return;
+
+	mutex_lock(&device->mutex);
+
+	ret = adreno_active_count_get(adreno_dev);
+	if (ret)
+		goto err;
+
+	/* Now that GPU is up, Call into coresight driver to disable funnel */
+	adreno_dev->funnel_gfx.funnel_ops->link_ops->disable(csdev, inport, outport);
+
+	adreno_active_count_put(adreno_dev);
+err:
+	mutex_unlock(&device->mutex);
+	return;
+}
+
+struct coresight_ops_link funnel_link_gfx_ops = {
+	.enable = funnel_gfx_enable,
+	.disable = funnel_gfx_disable,
+};
+
+struct coresight_ops funnel_gfx_ops = {
+	.link_ops = &funnel_link_gfx_ops,
+};
+
 static void adreno_coresight_dev_probe(struct kgsl_device *device,
 		const struct adreno_coresight *coresight,
 		struct adreno_coresight_device *adreno_csdev,
@@ -260,9 +318,15 @@ void adreno_coresight_add_device(struct adreno_device *adreno_dev, const char *n
 {
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	struct device_node *node = of_find_compatible_node(device->pdev->dev.of_node, NULL, name);
+	struct adreno_funnel_device *funnel_gfx = &adreno_dev->funnel_gfx;
 
 	if (!node)
 		return;
+
+	/* Set the funnel ops as graphics ops to bring GPU up before enabling funnel */
+	if (funnel_gfx !=NULL && funnel_gfx->funnel_csdev != NULL
+						&& funnel_gfx->funnel_csdev->ops == NULL)
+		funnel_gfx->funnel_csdev->ops = &funnel_gfx_ops;
 
 	adreno_coresight_dev_probe(device, coresight, adreno_csdev, node);
 

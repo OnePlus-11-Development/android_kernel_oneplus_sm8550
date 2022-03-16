@@ -4,6 +4,8 @@
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
+#include <linux/amba/bus.h>
+
 #include "adreno.h"
 #include "adreno_gen7.h"
 #include "adreno_coresight.h"
@@ -424,6 +426,31 @@ static const struct adreno_coresight gen7_coresight_cx = {
 
 void gen7_coresight_init(struct adreno_device *adreno_dev)
 {
+	struct adreno_funnel_device *funnel_gfx = &adreno_dev->funnel_gfx;
+	struct device *amba_dev;
+
+	/* Find the amba funnel device associated with gfx coresight funnel */
+	amba_dev = bus_find_device_by_name(&amba_bustype, NULL, "10963000.funnel");
+	if (!amba_dev)
+		return;
+
+	funnel_gfx->funnel_dev = device_find_child_by_name(amba_dev, "coresight-funnel-gfx");
+	if (funnel_gfx->funnel_dev == NULL)
+		return;
+
+	funnel_gfx->funnel_csdev = to_coresight_device(funnel_gfx->funnel_dev);
+	if (funnel_gfx->funnel_csdev == NULL)
+		return;
+
+	/*
+	 * Since coresight_funnel_gfx component is in graphics block, GPU has to be powered up
+	 * before enabling the funnel. Currently the generic coresight driver doesnt handle that.
+	 * Override the funnel ops set by coresight driver with graphics funnel ops, so that the
+	 * GPU can be brought up before enabling the funnel.
+	 */
+	funnel_gfx->funnel_ops = funnel_gfx->funnel_csdev->ops;
+	funnel_gfx->funnel_csdev->ops = NULL;
+
 	adreno_coresight_add_device(adreno_dev, "qcom,gpu-coresight-gx",
 		&gen7_coresight, &adreno_dev->gx_coresight);
 
