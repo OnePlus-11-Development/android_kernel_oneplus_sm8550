@@ -239,7 +239,7 @@ void sde_plane_set_sid(struct drm_plane *plane, u32 vm)
 	sde_kms = to_sde_kms(priv->kms);
 
 	psde = to_sde_plane(plane);
-	sde_hw_set_sspp_sid(sde_kms->hw_sid, psde->pipe, vm);
+	sde_hw_set_sspp_sid(sde_kms->hw_sid, psde->pipe, vm, sde_kms->catalog);
 }
 
 static void _sde_plane_set_qos_lut(struct drm_plane *plane,

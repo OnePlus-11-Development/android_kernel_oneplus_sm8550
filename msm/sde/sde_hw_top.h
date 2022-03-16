@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -11,6 +12,7 @@
 #include "sde_hw_util.h"
 
 struct sde_hw_mdp;
+struct sde_hw_sid;
 
 /**
  * struct traffic_shaper_cfg: traffic shaper configuration
@@ -213,9 +215,25 @@ struct sde_hw_mdp {
 	struct sde_hw_mdp_ops ops;
 };
 
+/**
+ * struct sde_hw_sid_ops - callback functions for SID HW programming
+ */
+struct sde_hw_sid_ops {
+	/**
+	 * set_vm_sid - programs SID HW during VM transition
+	 * @sid: sde_hw_sid passed from kms
+	 * @vm: vm id to set for SIDs
+	 * @m: Pointer to mdss catalog data
+	 */
+	void (*set_vm_sid)(struct sde_hw_sid *sid, u32 vm,
+		struct sde_mdss_cfg *m);
+};
+
 struct sde_hw_sid {
 	/* rotator base */
 	struct sde_hw_blk_reg_map hw;
+	/* ops */
+	struct sde_hw_sid_ops ops;
 };
 
 /**
@@ -238,15 +256,9 @@ void sde_hw_set_rotator_sid(struct sde_hw_sid *sid);
  * sid: sde_hw_sid passed from kms
  * pipe: sspp id
  * vm: vm id to set for SIDs
+ * @m: Pointer to mdss catalog data
  */
-void sde_hw_set_sspp_sid(struct sde_hw_sid *sid, u32 pipe, u32 vm);
-
-/**
- * sde_hw_set_lutdma_sid - set sid values for the pipes
- * sid: sde_hw_sid passed from kms
- * vm: vm id to set for SIDs
- */
-void sde_hw_set_lutdma_sid(struct sde_hw_sid *sid, u32 vm);
+void sde_hw_set_sspp_sid(struct sde_hw_sid *sid, u32 pipe, u32 vm, struct sde_mdss_cfg *m);
 
 /**
  * sde_hw_mdptop_init - initializes the top driver for the passed idx

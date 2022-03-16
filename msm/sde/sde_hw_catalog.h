@@ -104,6 +104,10 @@
 #define IS_SDE_CP_VER_1_0(version) \
 	(version == SDE_COLOR_PROCESS_VER(0x1, 0x0))
 
+#define SDE_SID_VERSION_2_0_0       0x200
+#define IS_SDE_SID_REV_200(rev) \
+	((rev) == SDE_SID_VERSION_2_0_0)
+
 #define MAX_XIN_COUNT 16
 #define SSPP_SUBBLK_COUNT_MAX 2
 #define MAX_CWB_SESSIONS 1
@@ -1734,6 +1738,7 @@ struct sde_perf_cfg {
  * @qseed_hw_rev        qseed HW block version
  * @smart_dma_rev       smartDMA block version
  * @ctl_rev             control path block version
+ * @sid_rev             SID version
  * @has_precise_vsync_ts  indicates if HW has vsyc timestamp logging capability
  * @has_reduced_ob_max indicate if DSC size is limited to 10k
  * @ts_prefill_rev      prefill traffic shaper feature revision
@@ -1838,6 +1843,7 @@ struct sde_mdss_cfg {
 	u32 qseed_hw_rev;
 	u32 smart_dma_rev;
 	u32 ctl_rev;
+	u32 sid_rev;
 	bool has_precise_vsync_ts;
 	bool has_reduced_ob_max;
 	u32 ts_prefill_rev;
