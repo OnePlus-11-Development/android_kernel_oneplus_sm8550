@@ -443,7 +443,7 @@ int dsi_pwr_panel_regulator_mode_set(struct dsi_regulator_info *regs,
 	}
 
 	if (i >= regs->count) {
-		DSI_ERR("Regulator %s was not found\n", reg_name);
+		DSI_DEBUG("Regulator %s was not found\n", reg_name);
 		return -EINVAL;
 	}
 
