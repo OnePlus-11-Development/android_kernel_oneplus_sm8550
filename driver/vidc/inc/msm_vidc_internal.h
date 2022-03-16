@@ -178,6 +178,7 @@ enum msm_vidc_buffer_type {
 	MSM_VIDC_BUF_DPB                   = 12,
 	MSM_VIDC_BUF_PERSIST               = 13,
 	MSM_VIDC_BUF_VPSS                  = 14,
+	MSM_VIDC_BUF_PARTIAL_DATA          = 15,
 };
 
 /* always match with v4l2 flags V4L2_BUF_FLAG_* */

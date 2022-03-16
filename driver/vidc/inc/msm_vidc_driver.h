@@ -96,7 +96,8 @@ static inline is_internal_buffer(enum msm_vidc_buffer_type buffer_type)
 		buffer_type == MSM_VIDC_BUF_LINE ||
 		buffer_type == MSM_VIDC_BUF_DPB ||
 		buffer_type == MSM_VIDC_BUF_PERSIST ||
-		buffer_type == MSM_VIDC_BUF_VPSS;
+		buffer_type == MSM_VIDC_BUF_VPSS ||
+		buffer_type == MSM_VIDC_BUF_PARTIAL_DATA;
 }
 
 static inline bool is_input_meta_enabled(struct msm_vidc_inst *inst)

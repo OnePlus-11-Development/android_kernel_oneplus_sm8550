@@ -247,6 +247,7 @@ static const struct msm_vidc_buf_type_name buf_type_name_arr[] = {
 	{MSM_VIDC_BUF_DPB,               "DPB"                        },
 	{MSM_VIDC_BUF_PERSIST,           "PERSIST"                    },
 	{MSM_VIDC_BUF_VPSS,              "VPSS"                       },
+	{MSM_VIDC_BUF_PARTIAL_DATA,      "PARTIAL_DATA"               },
 };
 
 const char *buf_name(enum msm_vidc_buffer_type type)
@@ -983,6 +984,7 @@ u32 msm_vidc_get_buffer_region(struct msm_vidc_inst *inst,
 			break;
 		case MSM_VIDC_BUF_DPB:
 		case MSM_VIDC_BUF_VPSS:
+		case MSM_VIDC_BUF_PARTIAL_DATA:
 			region = MSM_VIDC_NON_SECURE_PIXEL;
 			break;
 		case MSM_VIDC_BUF_INPUT_META:
@@ -1018,6 +1020,7 @@ u32 msm_vidc_get_buffer_region(struct msm_vidc_inst *inst,
 			break;
 		case MSM_VIDC_BUF_DPB:
 		case MSM_VIDC_BUF_VPSS:
+		case MSM_VIDC_BUF_PARTIAL_DATA:
 			region = MSM_VIDC_SECURE_PIXEL;
 			break;
 		case MSM_VIDC_BUF_BIN:
@@ -1070,6 +1073,8 @@ struct msm_vidc_buffers *msm_vidc_get_buffers(
 		return &inst->buffers.persist;
 	case MSM_VIDC_BUF_VPSS:
 		return &inst->buffers.vpss;
+	case MSM_VIDC_BUF_PARTIAL_DATA:
+		return &inst->buffers.partial_data;
 	case MSM_VIDC_BUF_QUEUE:
 		return NULL;
 	default:
@@ -1108,6 +1113,8 @@ struct msm_vidc_mappings *msm_vidc_get_mappings(
 		return &inst->mappings.persist;
 	case MSM_VIDC_BUF_VPSS:
 		return &inst->mappings.vpss;
+	case MSM_VIDC_BUF_PARTIAL_DATA:
+		return &inst->mappings.partial_data;
 	default:
 		i_vpr_e(inst, "%s: invalid driver buffer type %d\n",
 			func, buffer_type);
@@ -1136,6 +1143,8 @@ struct msm_vidc_allocations *msm_vidc_get_allocations(
 		return &inst->allocations.persist;
 	case MSM_VIDC_BUF_VPSS:
 		return &inst->allocations.vpss;
+	case MSM_VIDC_BUF_PARTIAL_DATA:
+		return &inst->allocations.partial_data;
 	default:
 		i_vpr_e(inst, "%s: invalid driver buffer type %d\n",
 			func, buffer_type);
@@ -5266,6 +5275,7 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 		MSM_VIDC_BUF_DPB,
 		MSM_VIDC_BUF_PERSIST,
 		MSM_VIDC_BUF_VPSS,
+		MSM_VIDC_BUF_PARTIAL_DATA,
 	};
 	int i;
 

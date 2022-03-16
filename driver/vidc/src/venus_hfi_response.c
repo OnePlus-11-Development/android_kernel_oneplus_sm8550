@@ -169,7 +169,8 @@ bool is_valid_hfi_buffer_type(struct msm_vidc_inst *inst,
 	    buffer_type != HFI_BUFFER_LINE &&
 	    buffer_type != HFI_BUFFER_DPB &&
 	    buffer_type != HFI_BUFFER_PERSIST &&
-	    buffer_type != HFI_BUFFER_VPSS) {
+	    buffer_type != HFI_BUFFER_VPSS &&
+	    buffer_type != HFI_BUFFER_PARTIAL_DATA) {
 		i_vpr_e(inst, "%s: invalid buffer type %#x\n",
 			func, buffer_type);
 		return false;
@@ -1217,6 +1218,7 @@ static int handle_session_buffer(struct msm_vidc_inst *inst,
 		{HFI_BUFFER_NON_COMV,       handle_release_internal_buffer    },
 		{HFI_BUFFER_LINE,           handle_release_internal_buffer    },
 		{HFI_BUFFER_PERSIST,        handle_release_internal_buffer    },
+		{HFI_BUFFER_PARTIAL_DATA,   handle_release_internal_buffer    },
 	};
 	static const struct msm_vidc_hfi_buffer_handle dec_output_hfi_handle[] = {
 		{HFI_BUFFER_METADATA,       handle_output_metadata_buffer     },

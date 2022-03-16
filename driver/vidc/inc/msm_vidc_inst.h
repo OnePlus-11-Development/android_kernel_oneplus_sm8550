@@ -38,6 +38,7 @@ struct msm_vidc_allocations_info {
 	struct msm_vidc_allocations     dpb;
 	struct msm_vidc_allocations     persist;
 	struct msm_vidc_allocations     vpss;
+	struct msm_vidc_allocations     partial_data;
 };
 
 struct msm_vidc_mappings_info {
@@ -53,6 +54,7 @@ struct msm_vidc_mappings_info {
 	struct msm_vidc_mappings        dpb;
 	struct msm_vidc_mappings        persist;
 	struct msm_vidc_mappings        vpss;
+	struct msm_vidc_mappings        partial_data;
 };
 
 struct msm_vidc_buffers_info {
@@ -70,6 +72,7 @@ struct msm_vidc_buffers_info {
 	struct msm_vidc_buffers        dpb;
 	struct msm_vidc_buffers        persist;
 	struct msm_vidc_buffers        vpss;
+	struct msm_vidc_buffers        partial_data;
 };
 
 enum msm_vidc_inst_state {
