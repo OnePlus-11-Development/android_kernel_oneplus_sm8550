@@ -275,6 +275,10 @@ void dsi_ctrl_hw_22_config_clk_gating(struct dsi_ctrl_hw *ctrl, bool enable,
 void dsi_ctrl_hw_cmn_set_continuous_clk(struct dsi_ctrl_hw *ctrl, bool enable);
 void dsi_ctrl_hw_cmn_hs_req_sel(struct dsi_ctrl_hw *ctrl, bool sel_phy);
 
+void dsi_ctrl_hw_22_setup_misr(struct dsi_ctrl_hw *ctrl, enum dsi_op_mode panel_mode,
+			bool enable, u32 frame_count);
+u32 dsi_ctrl_hw_22_collect_misr(struct dsi_ctrl_hw *ctrl, enum dsi_op_mode panel_mode);
+
 /* dynamic refresh specific functions */
 void dsi_phy_hw_v3_0_dyn_refresh_helper(struct dsi_phy_hw *phy, u32 offset);
 void dsi_phy_hw_v3_0_dyn_refresh_config(struct dsi_phy_hw *phy,
