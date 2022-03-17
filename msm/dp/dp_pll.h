@@ -37,6 +37,15 @@ enum dp_pll_revision {
 	DP_PLL_5NM_V1,
 	DP_PLL_5NM_V2,
 	DP_PLL_4NM_V1,
+	DP_PLL_4NM_V1_1,
+};
+
+enum hsclk_rate {
+	HSCLK_RATE_1620MHZ,
+	HSCLK_RATE_2700MHZ,
+	HSCLK_RATE_5400MHZ,
+	HSCLK_RATE_8100MHZ,
+	HSCLK_RATE_MAX,
 };
 
 static inline const char *dp_pll_get_revision(enum dp_pll_revision rev)
@@ -46,6 +55,7 @@ static inline const char *dp_pll_get_revision(enum dp_pll_revision rev)
 	case DP_PLL_5NM_V1:	return "DP_PLL_5NM_V1";
 	case DP_PLL_5NM_V2:	return "DP_PLL_5NM_V2";
 	case DP_PLL_4NM_V1:	return "DP_PLL_4NM_V1";
+	case DP_PLL_4NM_V1_1:	return "DP_PLL_4NM_V1_1";
 	default:		return "???";
 	}
 }
@@ -91,31 +101,40 @@ struct dp_pll {
 	int (*pll_unprepare)(struct dp_pll *pll);
 };
 
-struct dp_pll_db {
-	struct dp_pll *pll;
-
-	/* lane and orientation settings */
-	u8 lane_cnt;
-	u8 orientation;
-
+struct dp_pll_params {
 	/* COM PHY settings */
 	u32 hsclk_sel;
+	u32 integloop_gain0_mode0;
+	u32 integloop_gain1_mode0;
+	u32 lock_cmp_en;
+	/* PHY vco divider */
+	u32 phy_vco_div;
 	u32 dec_start_mode0;
 	u32 div_frac_start1_mode0;
 	u32 div_frac_start2_mode0;
 	u32 div_frac_start3_mode0;
-	u32 integloop_gain0_mode0;
-	u32 integloop_gain1_mode0;
 	u32 lock_cmp1_mode0;
 	u32 lock_cmp2_mode0;
-	u32 lock_cmp_en;
 	u32 ssc_step_size1_mode0;
 	u32 ssc_step_size2_mode0;
 	u32 ssc_per1;
+	u32 ssc_per2;
 	u32 cmp_code1_mode0;
 	u32 cmp_code2_mode0;
-	/* PHY vco divider */
-	u32 phy_vco_div;
+	u32 pll_ivco;
+	u32 bg_timer;
+	u32 core_clk_en;
+	u32 lane_offset_tx;
+	u32 lane_offset_rx;
+};
+
+struct dp_pll_db {
+	struct dp_pll *pll;
+	/* lane and orientation settings */
+	u8 lane_cnt;
+	u8 orientation;
+	u32 rate_idx;
+	const struct dp_pll_params *pll_params;
 };
 
 static inline struct dp_pll_vco_clk *to_dp_vco_hw(struct clk_hw *hw)
