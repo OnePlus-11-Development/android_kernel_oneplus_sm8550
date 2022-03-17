@@ -1040,6 +1040,7 @@ static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
 		if (rc)
 			return rc;
 	}
+
 	if (ctrl->id == V4L2_CID_MPEG_VIDC_PRIORITY) {
 		rc = msm_vidc_adjust_session_priority(inst, ctrl);
 		if (rc)
@@ -2744,6 +2745,69 @@ int msm_vidc_adjust_roi_info(void *instance, struct v4l2_ctrl *ctrl)
 
 	return 0;
 }
+
+int msm_vidc_adjust_frame_rate(void *instance, struct v4l2_ctrl *ctrl)
+{
+	int rc = 0;
+	struct msm_vidc_inst_capability *capability;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	u32 adjusted_value;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val : capability->cap[FRAME_RATE].value;
+
+	if (is_realtime_session(inst)) {
+		rc = msm_vidc_check_core_mbps(inst);
+		if (rc) {
+			i_vpr_e(inst, "%s: unsupported load\n", __func__);
+			return rc;
+		}
+	}
+
+	inst->priority_level = MSM_VIDC_PRIORITY_HIGH;
+	capability->cap[FRAME_RATE].flags |= CAP_FLAG_CLIENT_SET;
+
+	msm_vidc_update_cap_value(inst, FRAME_RATE, adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_operating_rate(void *instance, struct v4l2_ctrl *ctrl)
+{
+	int rc = 0;
+	struct msm_vidc_inst_capability *capability;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	u32 adjusted_value;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val : capability->cap[OPERATING_RATE].value;
+
+	if (is_realtime_session(inst)) {
+		rc = msm_vidc_check_core_mbps(inst);
+		if (rc) {
+			i_vpr_e(inst, "%s: unsupported load\n", __func__);
+			return rc;
+		}
+	}
+
+	inst->priority_level = MSM_VIDC_PRIORITY_HIGH;
+	capability->cap[OPERATING_RATE].flags |= CAP_FLAG_CLIENT_SET;
+
+	msm_vidc_update_cap_value(inst, OPERATING_RATE, adjusted_value, __func__);
+
+	return 0;
+}
+
 
 int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst)
 {
