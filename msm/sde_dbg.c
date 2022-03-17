@@ -304,6 +304,8 @@ struct sde_dbg_base {
 	u32 cur_reglog_index;
 	enum sde_dbg_dump_context dump_mode;
 	bool hw_ownership;
+	char *read_buf;
+	bool is_dumped;
 } sde_dbg_base;
 
 static LIST_HEAD(sde_dbg_dsi_list);
@@ -1339,21 +1341,19 @@ static void _sde_dump_array(bool do_panic, const char *name, bool dump_secure, u
 }
 
 #ifdef CONFIG_DEV_COREDUMP
-static ssize_t sde_devcoredump_read(char *buffer, loff_t offset,
-		size_t count, void *data, size_t datalen)
+#define MAX_BUFF_SIZE ((3072 - 256) * 1024)
+
+static ssize_t sde_devcoredump_drm_read(char *buffer, size_t size)
 {
 	struct drm_print_iterator iter;
 	struct drm_printer p;
 
 	iter.data = buffer;
-	iter.offset = 0;
-	iter.start = offset;
-	iter.remain = count;
+	iter.start = 0;
+	iter.remain = size;
 
 	p = drm_coredump_printer(&iter);
-
 	drm_printf(&p, "---\n");
-
 	drm_printf(&p, "module: " KBUILD_MODNAME "\n");
 	drm_printf(&p, "sde devcoredump\n");
 
@@ -1363,7 +1363,34 @@ static ssize_t sde_devcoredump_read(char *buffer, loff_t offset,
 	_sde_dump_array(false, "devcoredump", sde_dbg_base.dump_secure,
 		sde_dbg_base.dump_blk_mask);
 
-	return count - iter.remain;
+	return size - iter.remain;
+}
+
+static ssize_t sde_devcoredump_read(char *buffer, loff_t offset,
+		size_t count, void *data, size_t datalen)
+{
+	static u32 read_size;
+
+	if (!sde_dbg_base.read_buf) {
+		sde_dbg_base.read_buf = kvzalloc(MAX_BUFF_SIZE, GFP_KERNEL);
+		if (!sde_dbg_base.read_buf)
+			return -ENOMEM;
+		sde_dbg_base.is_dumped = false;
+	}
+
+	if (!sde_dbg_base.is_dumped) {
+		read_size = sde_devcoredump_drm_read(sde_dbg_base.read_buf, MAX_BUFF_SIZE);
+		sde_dbg_base.is_dumped = true;
+	}
+
+	if (read_size > offset) {
+		memcpy(buffer, sde_dbg_base.read_buf + offset,
+			min(count, (size_t)(read_size - offset)));
+	} else {
+		return 0;
+	}
+
+	return min(count, (size_t)(read_size - offset));
 }
 
 static void sde_devcoredump_free(void *data)
@@ -1371,6 +1398,11 @@ static void sde_devcoredump_free(void *data)
 	if (sde_dbg_base.evtlog->dumped_evtlog) {
 		kvfree(sde_dbg_base.evtlog->dumped_evtlog);
 		sde_dbg_base.evtlog->dumped_evtlog = NULL;
+	}
+
+	if (sde_dbg_base.read_buf) {
+		kvfree(sde_dbg_base.read_buf);
+		sde_dbg_base.read_buf = NULL;
 	}
 
 	sde_dbg_base.coredump_reading = false;
