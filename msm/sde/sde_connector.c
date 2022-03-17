@@ -3115,7 +3115,8 @@ static int _sde_connector_install_properties(struct drm_device *dev,
 			msm_property_install_enum(&c_conn->property_info,
 			"panel_mode", 0, 0,
 			e_panel_mode,
-			ARRAY_SIZE(e_panel_mode), 0,
+			ARRAY_SIZE(e_panel_mode),
+			(dsi_display->panel->panel_mode == DSI_OP_VIDEO_MODE) ? 0 : 1,
 			CONNECTOR_PROP_SET_PANEL_MODE);
 
 		if (test_bit(SDE_FEATURE_DEMURA, sde_kms->catalog->features)) {
