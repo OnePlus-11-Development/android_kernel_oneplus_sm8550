@@ -17,9 +17,6 @@
 #if defined(CONFIG_MSM_VIDC_KALAMA)
 #include "msm_vidc_kalama.h"
 #endif
-#if defined(CONFIG_MSM_VIDC_DIWALI)
-#include "msm_vidc_diwali.h"
-#endif
 #if defined(CONFIG_MSM_VIDC_IRIS2)
 #include "msm_vidc_iris2.h"
 #endif
@@ -198,16 +195,6 @@ static int msm_vidc_deinit_platform_variant(struct msm_vidc_core *core, struct d
 	}
 #endif
 
-#if defined(CONFIG_MSM_VIDC_DIWALI)
-	if (of_device_is_compatible(dev->of_node, "qcom,msm-vidc-diwali")) {
-		rc = msm_vidc_deinit_platform_diwali(core, dev);
-		if (rc)
-			d_vpr_e("%s: failed msm-vidc-diwali with %d\n",
-				__func__, rc);
-		return rc;
-	}
-#endif
-
 	return rc;
 }
 
@@ -235,16 +222,6 @@ static int msm_vidc_init_platform_variant(struct msm_vidc_core *core, struct dev
 		rc = msm_vidc_init_platform_kalama(core, dev);
 		if (rc)
 			d_vpr_e("%s: failed with %d\n", __func__, rc);
-		return rc;
-	}
-#endif
-
-#if defined(CONFIG_MSM_VIDC_DIWALI)
-	if (of_device_is_compatible(dev->of_node, "qcom,msm-vidc-diwali")) {
-		rc = msm_vidc_init_platform_diwali(core, dev);
-		if (rc)
-			d_vpr_e("%s: failed msm-vidc-diwali with %d\n",
-				__func__, rc);
 		return rc;
 	}
 #endif
