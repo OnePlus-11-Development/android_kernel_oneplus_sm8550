@@ -6270,7 +6270,7 @@ int msm_vidc_get_properties(struct msm_vidc_inst *inst)
 	return 0;
 }
 
-int msm_vidc_create_input_metadata_buffer(struct msm_vidc_inst *inst, u32 fd)
+int msm_vidc_create_input_metadata_buffer(struct msm_vidc_inst *inst, int fd)
 {
 	int rc = 0;
 	struct msm_vidc_buffer *buf = NULL;
@@ -6282,7 +6282,7 @@ int msm_vidc_create_input_metadata_buffer(struct msm_vidc_inst *inst, u32 fd)
 		return -EINVAL;
 	}
 
-	if (fd <= 0) {
+	if (fd < 0) {
 		i_vpr_e(inst, "%s: invalid input metadata buffer fd %d\n",
 			__func__, fd);
 		return -EINVAL;

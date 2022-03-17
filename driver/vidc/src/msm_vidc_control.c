@@ -1102,6 +1102,12 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 	}
 
 	if (ctrl->id == V4L2_CID_MPEG_VIDC_INPUT_METADATA_FD) {
+		if (ctrl->val == INVALID_FD || ctrl->val == INT_MAX) {
+			i_vpr_e(inst,
+				"%s: client configured invalid input metadata fd %d\n",
+				__func__, ctrl->val);
+			return 0;
+		}
 		if (!capability->cap[INPUT_META_VIA_REQUEST].value) {
 			i_vpr_e(inst,
 				"%s: input metadata not enabled via request\n", __func__);

@@ -1474,7 +1474,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		msm_vidc_adjust_all_intra, NULL},
 
 	{INPUT_METADATA_FD, ENC|DEC, CODECS_ALL,
-		-1, INT_MAX, 1, -1,
+		INVALID_FD, INT_MAX, 1, INVALID_FD,
 		V4L2_CID_MPEG_VIDC_INPUT_METADATA_FD,
 		0,
 		CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED,
