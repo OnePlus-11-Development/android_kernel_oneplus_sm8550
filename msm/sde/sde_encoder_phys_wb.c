@@ -838,7 +838,7 @@ static int _sde_enc_phys_wb_validate_cwb(struct sde_encoder_phys *phys_enc,
 	struct sde_rect wb_roi = {0,}, pu_roi = {0,};
 	u32  out_width = 0, out_height = 0;
 	const struct sde_format *fmt;
-	int prog_line, ret = 0, i;
+	int prog_line, ret = 0;
 
 	fb = sde_wb_connector_state_get_output_fb(conn_state);
 	if (!fb) {
@@ -900,16 +900,6 @@ static int _sde_enc_phys_wb_validate_cwb(struct sde_encoder_phys *phys_enc,
 		SDE_ERROR("invalid wb roi[%dx%d] out[%dx%d]\n",
 				wb_roi.w, wb_roi.h, out_width, out_height);
 		return -EINVAL;
-	}
-
-	/* pitch has to be multiple of 256 bits */
-	for (i = 0; i < fb->format->num_planes; i++) {
-		if (fb->pitches[i] % 32) {
-			SDE_ERROR("invalid stride plane:%d pitch:%u fmt: %4.4s bpp:%d wxh:%dx%d\n",
-				i, fb->pitches[i], (char *)&fmt->base.pixel_format,
-				fmt->bpp, wb_roi.w, wb_roi.h);
-			return -EINVAL;
-		}
 	}
 
 	/*
