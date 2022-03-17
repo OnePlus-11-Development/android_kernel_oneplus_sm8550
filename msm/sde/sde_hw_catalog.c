@@ -3483,6 +3483,17 @@ static int sde_cache_parse_dt(struct device_node *np,
 	struct llcc_slice_desc *slice;
 	struct device_node *llcc_node;
 	int i;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+	const u32 sde_sys_cache_usecase_id[SDE_SYS_CACHE_MAX] = {
+		[SDE_SYS_CACHE_DISP] = LLCC_DISP,
+		[SDE_SYS_CACHE_DISP_WB] = LLCC_DISP_WB,
+	};
+#else
+	const u32 sde_sys_cache_usecase_id[SDE_SYS_CACHE_MAX] = {
+		[SDE_SYS_CACHE_DISP] = LLCC_DISP,
+		[SDE_SYS_CACHE_DISP_WB] = 0,
+	};
+#endif
 
 	if (!sde_cfg) {
 		SDE_ERROR("invalid argument\n");
@@ -3502,23 +3513,12 @@ static int sde_cache_parse_dt(struct device_node *np,
 		if (!sc_cfg->has_sys_cache)
 			continue;
 
-		switch (i) {
-		case SDE_SYS_CACHE_DISP:
-			usecase_id = LLCC_DISP;
-			break;
-
-		case SDE_SYS_CACHE_DISP_WB:
-			usecase_id = LLCC_DISP;
-			break;
-
-		default:
-			usecase_id = 0;
-			SDE_DEBUG("invalid sys cache:%d\n", i);
-			break;
-		}
-
-		if (!usecase_id)
+		usecase_id = sde_sys_cache_usecase_id[i];
+		if (!usecase_id) {
+			sc_cfg->has_sys_cache = false;
+			SDE_DEBUG("invalid usecase-id for sys cache:%d\n", i);
 			continue;
+		}
 
 		slice = llcc_slice_getd(usecase_id);
 		if (IS_ERR_OR_NULL(slice)) {
@@ -5146,6 +5146,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		set_bit(SDE_FEATURE_CTL_DONE, sde_cfg->features);
 		set_bit(SDE_FEATURE_TRUSTED_VM, sde_cfg->features);
 		sde_cfg->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache = true;
+		sde_cfg->sc_cfg[SDE_SYS_CACHE_DISP_WB].has_sys_cache = true;
 		sde_cfg->allowed_dsc_reservation_switch = SDE_DP_DSC_RESERVATION_SWITCH;
 		sde_cfg->autorefresh_disable_seq = AUTOREFRESH_DISABLE_SEQ2;
 		sde_cfg->perf.min_prefill_lines = 40;
