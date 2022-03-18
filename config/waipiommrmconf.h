@@ -4,3 +4,6 @@
  */
 
 #define CONFIG_MSM_MMRM 1
+
+// if activate mmrm para virtualizaion, uncomment line below
+//#define CONFIG_MSM_MMRM_VM 1

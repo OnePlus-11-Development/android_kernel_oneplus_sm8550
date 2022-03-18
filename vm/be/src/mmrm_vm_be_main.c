@@ -51,20 +51,18 @@ static int mmrm_vm_be_driver_probe(struct platform_device *pdev)
 		goto msgq_init_err;
 	}
 
+	drv_vm_be->dev = dev;
 	dev_err(dev, "msgq probe success");
 	return 0;
 
+msgq_init_err:
+	dev_set_drvdata(&pdev->dev, NULL);
+	msm_mmrm_debugfs_deinit(drv_vm_be->debugfs_root);
+	return -EINVAL;
 client_tbl_err:
 	dev_err(dev, "msgq register alloc memory failed");
 	return -ENOMEM;
-msgq_init_err:
-	kfree(drv_vm_be->clk_client_tbl);
-	msm_mmrm_debugfs_deinit(drv_vm_be->debugfs_root);
-	mmrm_vm_msgq_deinit(drv_vm_be);
-	dev_set_drvdata(&pdev->dev, NULL);
 clk_count_err:
-	kfree(drv_vm_be);
-	drv_vm_be = (void *) -EPROBE_DEFER;
 	return -EINVAL;
 }
 
@@ -74,7 +72,6 @@ static int mmrm_vm_be_driver_remove(struct platform_device *pdev)
 	msm_mmrm_debugfs_deinit(drv_vm_be->debugfs_root);
 
 	dev_set_drvdata(&pdev->dev, NULL);
-	kfree(drv_vm_be);
 	drv_vm_be = (void *) -EPROBE_DEFER;
 	return 0;
 }
