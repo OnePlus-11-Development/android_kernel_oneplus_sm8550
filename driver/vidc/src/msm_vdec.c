@@ -86,6 +86,7 @@ static const u32 msm_vdec_internal_buffer_type[] = {
 	MSM_VIDC_BUF_COMV,
 	MSM_VIDC_BUF_NON_COMV,
 	MSM_VIDC_BUF_LINE,
+	MSM_VIDC_BUF_PARTIAL_DATA,
 };
 
 struct msm_vdec_prop_type_handle {

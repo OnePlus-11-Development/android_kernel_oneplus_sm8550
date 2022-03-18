@@ -181,7 +181,8 @@ u32 msm_vidc_internal_buffer_count(struct msm_vidc_inst *inst,
 	if (is_decode_session(inst)) {
 		if (buffer_type == MSM_VIDC_BUF_BIN ||
 			buffer_type == MSM_VIDC_BUF_LINE ||
-			buffer_type == MSM_VIDC_BUF_PERSIST) {
+			buffer_type == MSM_VIDC_BUF_PERSIST ||
+			buffer_type == MSM_VIDC_BUF_PARTIAL_DATA) {
 			count = 1;
 		} else if (buffer_type == MSM_VIDC_BUF_COMV ||
 			buffer_type == MSM_VIDC_BUF_NON_COMV) {

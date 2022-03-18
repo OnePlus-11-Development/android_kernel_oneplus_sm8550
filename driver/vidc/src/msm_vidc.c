@@ -912,6 +912,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	INIT_LIST_HEAD(&inst->buffers.dpb.list);
 	INIT_LIST_HEAD(&inst->buffers.persist.list);
 	INIT_LIST_HEAD(&inst->buffers.vpss.list);
+	INIT_LIST_HEAD(&inst->buffers.partial_data.list);
 	INIT_LIST_HEAD(&inst->allocations.bin.list);
 	INIT_LIST_HEAD(&inst->allocations.arp.list);
 	INIT_LIST_HEAD(&inst->allocations.comv.list);
@@ -920,6 +921,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	INIT_LIST_HEAD(&inst->allocations.dpb.list);
 	INIT_LIST_HEAD(&inst->allocations.persist.list);
 	INIT_LIST_HEAD(&inst->allocations.vpss.list);
+	INIT_LIST_HEAD(&inst->allocations.partial_data.list);
 	INIT_LIST_HEAD(&inst->mappings.input.list);
 	INIT_LIST_HEAD(&inst->mappings.input_meta.list);
 	INIT_LIST_HEAD(&inst->mappings.output.list);
@@ -932,6 +934,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	INIT_LIST_HEAD(&inst->mappings.dpb.list);
 	INIT_LIST_HEAD(&inst->mappings.persist.list);
 	INIT_LIST_HEAD(&inst->mappings.vpss.list);
+	INIT_LIST_HEAD(&inst->mappings.partial_data.list);
 	INIT_LIST_HEAD(&inst->children_list);
 	INIT_LIST_HEAD(&inst->firmware_list);
 	INIT_LIST_HEAD(&inst->enc_input_crs);
