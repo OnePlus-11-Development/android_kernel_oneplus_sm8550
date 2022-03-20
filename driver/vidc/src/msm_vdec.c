@@ -932,7 +932,7 @@ static int msm_vdec_subscribe_metadata(struct msm_vidc_inst *inst,
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
 	static const u32 metadata_input_list[] = {
-		INPUT_META_OUTBUF_FENCE,
+		META_OUTBUF_FENCE,
 		/*
 		 * when fence enabled, client needs output buffer_tag
 		 * in input metadata buffer done.
@@ -971,7 +971,7 @@ static int msm_vdec_subscribe_metadata(struct msm_vidc_inst *inst,
 	payload[0] = HFI_MODE_METADATA;
 	if (port == INPUT_PORT) {
 		for (i = 0; i < ARRAY_SIZE(metadata_input_list); i++) {
-			if (capability->cap[metadata_input_list[i]].value &&
+			if (is_meta_rx_inp_enabled(inst, metadata_input_list[i]) &&
 				msm_vidc_allow_metadata(inst, metadata_input_list[i])) {
 				payload[count + 1] =
 					capability->cap[metadata_input_list[i]].hfi_id;
@@ -980,7 +980,7 @@ static int msm_vdec_subscribe_metadata(struct msm_vidc_inst *inst,
 		}
 	} else if (port == OUTPUT_PORT) {
 		for (i = 0; i < ARRAY_SIZE(metadata_output_list); i++) {
-			if (capability->cap[metadata_output_list[i]].value &&
+			if (is_meta_rx_out_enabled(inst, metadata_output_list[i]) &&
 				msm_vidc_allow_metadata(inst, metadata_output_list[i])) {
 				payload[count + 1] =
 					capability->cap[metadata_output_list[i]].hfi_id;
@@ -1029,7 +1029,7 @@ static int msm_vdec_set_delivery_mode_metadata(struct msm_vidc_inst *inst,
 
 	if (port == INPUT_PORT) {
 		for (i = 0; i < ARRAY_SIZE(metadata_input_list); i++) {
-			if (capability->cap[metadata_input_list[i]].value) {
+			if (is_meta_tx_inp_enabled(inst, metadata_input_list[i])) {
 				payload[count + 1] =
 					capability->cap[metadata_input_list[i]].hfi_id;
 				count++;
@@ -1037,7 +1037,7 @@ static int msm_vdec_set_delivery_mode_metadata(struct msm_vidc_inst *inst,
 		}
 	} else if (port == OUTPUT_PORT) {
 		for (i = 0; i < ARRAY_SIZE(metadata_output_list); i++) {
-			if (capability->cap[metadata_output_list[i]].value  &&
+			if (is_meta_tx_out_enabled(inst, metadata_output_list[i])  &&
 				msm_vidc_allow_metadata(inst, metadata_output_list[i])) {
 				payload[count + 1] =
 					capability->cap[metadata_output_list[i]].hfi_id;
@@ -1069,7 +1069,7 @@ static int msm_vdec_set_delivery_mode_property(struct msm_vidc_inst *inst,
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
 	static const u32 property_output_list[] = {
-		INPUT_META_OUTBUF_FENCE,
+		META_OUTBUF_FENCE,
 	};
 	static const u32 property_input_list[] = {};
 
@@ -1092,6 +1092,20 @@ static int msm_vdec_set_delivery_mode_property(struct msm_vidc_inst *inst,
 		}
 	} else if (port == OUTPUT_PORT) {
 		for (i = 0; i < ARRAY_SIZE(property_output_list); i++) {
+			if (property_output_list[i] == META_OUTBUF_FENCE &&
+				is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE)) {
+				/*
+				 * if output buffer fence enabled via
+				 * META_OUTBUF_FENCE, then driver will send
+				 * fence id via HFI_PROP_FENCE to firmware.
+				 * So enable HFI_PROP_FENCE property as
+				 * delivery mode property.
+				 */
+				payload[count + 1] =
+					capability->cap[property_output_list[i]].hfi_id;
+				count++;
+				continue;
+			}
 			if (capability->cap[property_output_list[i]].value) {
 				payload[count + 1] =
 					capability->cap[property_output_list[i]].hfi_id;
@@ -2055,7 +2069,7 @@ int msm_vdec_qbuf(struct msm_vidc_inst *inst, struct vb2_buffer *vb2)
 	}
 
 	if (vb2->type == OUTPUT_META_PLANE) {
-		if (inst->capabilities->cap[META_DPB_TAG_LIST].value) {
+		if (is_meta_rx_out_enabled(inst, META_DPB_TAG_LIST)) {
 			/*
 			 * vb2 is not allowing client to pass data in output meta plane.
 			 * adjust the bytesused as client will send buffer tag metadata

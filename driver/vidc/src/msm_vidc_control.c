@@ -82,8 +82,11 @@ static bool is_meta_ctrl(u32 id)
 		id == V4L2_CID_MPEG_VIDC_METADATA_ROI_INFO ||
 		id == V4L2_CID_MPEG_VIDC_METADATA_TIMESTAMP ||
 		id == V4L2_CID_MPEG_VIDC_METADATA_ENC_QP_METADATA ||
+		id == V4L2_CID_MPEG_VIDC_METADATA_DEC_QP_METADATA ||
 		id == V4L2_CID_MPEG_VIDC_METADATA_BITSTREAM_RESOLUTION ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_CROP_OFFSETS);
+		id == V4L2_CID_MPEG_VIDC_METADATA_CROP_OFFSETS ||
+		id == V4L2_CID_MPEG_VIDC_METADATA_MAX_NUM_REORDER_FRAMES ||
+		id == V4L2_CID_MPEG_VIDC_METADATA_OUTBUF_FENCE);
 }
 
 static const char *const mpeg_video_rate_control[] = {
@@ -420,18 +423,42 @@ static bool is_parent_available(struct msm_vidc_inst *inst,
 int msm_vidc_update_cap_value(struct msm_vidc_inst *inst, u32 cap_id,
 	s32 adjusted_val, const char *func)
 {
+	int prev_value = 0;
+	bool is_updated = false;
+
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	if (inst->capabilities->cap[cap_id].value != adjusted_val)
+	prev_value = inst->capabilities->cap[cap_id].value;
+
+	if (is_meta_ctrl(inst->capabilities->cap[cap_id].v4l2_id)) {
+		/*
+		 * cumulative control value if client set same metadata
+		 * control multiple times.
+		 */
+		if (adjusted_val & V4L2_MPEG_VIDC_META_ENABLE) {
+			/* enable metadata */
+			inst->capabilities->cap[cap_id].value |= adjusted_val;
+		} else {
+			/* disable metadata */
+			inst->capabilities->cap[cap_id].value &= ~adjusted_val;
+		}
+		if (prev_value != (prev_value | adjusted_val))
+			is_updated = true;
+	} else {
+		inst->capabilities->cap[cap_id].value = adjusted_val;
+		if (prev_value != adjusted_val)
+			is_updated = true;
+	}
+
+	if (is_updated) {
 		i_vpr_h(inst,
 			"%s: updated database: name: %s, value: %#x -> %#x\n",
 			func, cap_name(cap_id),
-			inst->capabilities->cap[cap_id].value, adjusted_val);
-
-	inst->capabilities->cap[cap_id].value = adjusted_val;
+			prev_value, adjusted_val);
+	}
 
 	return 0;
 }
@@ -1047,11 +1074,13 @@ static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
 			 * To subscribe HFI_PROP_DPB_TAG_LIST
 			 * data in FBD, HFI_PROP_BUFFER_TAG data
 			 * must be delivered via FTB. Hence, update
-			 * META_OUTPUT_BUF_TAG when META_DPB_TAG_LIST
-			 * is updated.
+			 * META_OUTPUT_BUF_TAG to transfer on output port
+			 * when META_DPB_TAG_LIST is enbaled.
 			 */
-			msm_vidc_update_cap_value(inst, META_OUTPUT_BUF_TAG,
-				ctrl->val, __func__);
+			if (is_meta_rx_out_enabled(inst, META_DPB_TAG_LIST)) {
+				inst->capabilities->cap[META_OUTPUT_BUF_TAG].value |=
+					V4L2_MPEG_VIDC_META_TX_OUTPUT | V4L2_MPEG_VIDC_META_ENABLE;
+			}
 		}
 
 		rc = msm_vidc_update_meta_port_settings(inst);
@@ -1754,7 +1783,7 @@ static int msm_vidc_adjust_static_layer_count_and_type(struct msm_vidc_inst *ins
 		goto exit;
 	}
 
-	if (!inst->capabilities->cap[META_EVA_STATS].value &&
+	if (!is_meta_tx_inp_enabled(inst, META_EVA_STATS) &&
 		hb_requested && (layer_count > 1)) {
 		layer_count = 1;
 		i_vpr_h(inst,
@@ -2577,7 +2606,7 @@ int msm_vidc_adjust_min_quality(void *instance, struct v4l2_ctrl *ctrl)
 		goto update_and_exit;
 	}
 
-	if (roi_enable) {
+	if (is_meta_tx_inp_enabled(inst, META_ROI_INFO)) {
 		i_vpr_h(inst,
 			"%s: min quality not supported with roi metadata\n",
 			__func__);
@@ -2585,7 +2614,7 @@ int msm_vidc_adjust_min_quality(void *instance, struct v4l2_ctrl *ctrl)
 		goto update_and_exit;
 	}
 
-	if (enh_layer_count && inst->hfi_layer_type != HFI_HIER_B) {
+	if (enh_layer_count > 0 && inst->hfi_layer_type != HFI_HIER_B) {
 		i_vpr_h(inst,
 			"%s: min quality not supported for HP encoding\n",
 			__func__);
@@ -2927,7 +2956,7 @@ int msm_vidc_set_header_mode(void *instance,
 {
 	int rc = 0;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
-	int header_mode, prepend_sps_pps, hdr_metadata;
+	int header_mode, prepend_sps_pps;
 	u32 hfi_value = 0;
 	struct msm_vidc_inst_capability *capability;
 
@@ -2939,7 +2968,6 @@ int msm_vidc_set_header_mode(void *instance,
 
 	header_mode = capability->cap[cap_id].value;
 	prepend_sps_pps = capability->cap[PREPEND_SPSPPS_TO_IDR].value;
-	hdr_metadata = capability->cap[META_SEQ_HDR_NAL].value;
 
 	/* prioritize PREPEND_SPSPPS_TO_IDR mode over other header modes */
 	if (prepend_sps_pps)
@@ -2949,7 +2977,7 @@ int msm_vidc_set_header_mode(void *instance,
 	else
 		hfi_value = HFI_SEQ_HEADER_SEPERATE_FRAME;
 
-	if (hdr_metadata)
+	if (is_meta_rx_inp_enabled(inst, META_SEQ_HDR_NAL))
 		hfi_value |= HFI_SEQ_HEADER_METADATA;
 
 	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_U32_ENUM,

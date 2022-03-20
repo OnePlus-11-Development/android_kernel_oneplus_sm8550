@@ -1559,7 +1559,7 @@ static int handle_session_property(struct msm_vidc_inst *inst,
 				__func__,  payload_ptr[0], inst->capabilities->cap[PIPE].value);
 		break;
 	case HFI_PROP_FENCE:
-		if (inst->capabilities->cap[INPUT_META_OUTBUF_FENCE].value) {
+		if (is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE)) {
 			if (payload_ptr) {
 				fence_id = payload_ptr[0];
 				rc = msm_vidc_fence_signal(inst, fence_id);

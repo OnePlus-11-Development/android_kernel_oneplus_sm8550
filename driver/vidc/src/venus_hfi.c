@@ -3523,7 +3523,7 @@ int venus_hfi_queue_buffer(struct msm_vidc_inst *inst,
 			goto unlock;
 	}
 
-	if (inst->capabilities->cap[INPUT_META_OUTBUF_FENCE].value &&
+	if (is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE) &&
 		is_output_buffer(buffer->type)) {
 		rc = hfi_create_packet(inst->packet,
 			inst->packet_size,
