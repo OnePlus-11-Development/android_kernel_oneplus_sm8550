@@ -1417,41 +1417,18 @@ static int handle_dpb_list_property(struct msm_vidc_inst *inst,
 	return 0;
 }
 
-static int handle_session_property(struct msm_vidc_inst *inst,
-	struct hfi_packet *pkt)
+static int handle_property_with_payload(struct msm_vidc_inst *inst,
+	struct hfi_packet *pkt, u32 port)
 {
 	int rc = 0;
-	u32 port;
 	u32 *payload_ptr = NULL;
 	u32 fence_id = 0;
 
-	if (!inst || !inst->capabilities) {
-		d_vpr_e("%s: Invalid params\n", __func__);
-		return -EINVAL;
-	}
-
-	i_vpr_l(inst, "%s: property type %#x\n", __func__, pkt->type);
-
-	port = vidc_port_from_hfi(inst, pkt->port);
-	if (port >= MAX_PORT) {
+	payload_ptr = (u32 *)((u8 *)pkt + sizeof(struct hfi_packet));
+	if (!payload_ptr) {
 		i_vpr_e(inst,
-				"%s: invalid port: %d for property %#x\n",
-				__func__, pkt->port, pkt->type);
+			"%s: payload_ptr cannot be null\n", __func__);
 		return -EINVAL;
-	}
-
-	if (pkt->payload_info != HFI_PAYLOAD_NONE) {
-		if (!check_for_packet_payload(inst, pkt, __func__))
-			return 0;
-
-		payload_ptr = (u32 *)((u8 *)pkt + sizeof(struct hfi_packet));
-	}
-
-	if (pkt->flags & HFI_FW_FLAGS_INFORMATION) {
-		i_vpr_h(inst,
-			"%s: information flag received for property %#x packet\n",
-			__func__, pkt->type);
-		return 0;
 	}
 
 	switch (pkt->type) {
@@ -1497,16 +1474,6 @@ static int handle_session_property(struct msm_vidc_inst *inst,
 		if (inst->hfi_frame_info.picture_type & HFI_PICTURE_B)
 			inst->has_bframe = true;
 		break;
-	case HFI_PROP_NO_OUTPUT:
-		if (port != INPUT_PORT) {
-			i_vpr_e(inst,
-				"%s: invalid port: %d for property %#x\n",
-				__func__, pkt->port, pkt->type);
-			break;
-		}
-		i_vpr_h(inst, "received no_output property\n");
-		inst->hfi_frame_info.no_output = 1;
-		break;
 	case HFI_PROP_WORST_COMPRESSION_RATIO:
 		inst->hfi_frame_info.cr = payload_ptr[0];
 		break;
@@ -1537,36 +1504,28 @@ static int handle_session_property(struct msm_vidc_inst *inst,
 		}
 		break;
 	case HFI_PROP_QUALITY_MODE:
-		if (payload_ptr &&
-			inst->capabilities->cap[QUALITY_MODE].value !=  payload_ptr[0])
+		if (inst->capabilities->cap[QUALITY_MODE].value !=  payload_ptr[0])
 			i_vpr_e(inst,
 				"%s: fw quality mode(%d) not matching the capability value(%d)\n",
 				__func__,  payload_ptr[0],
 				inst->capabilities->cap[QUALITY_MODE].value);
 		break;
 	case HFI_PROP_STAGE:
-		if (payload_ptr &&
-			inst->capabilities->cap[STAGE].value !=  payload_ptr[0])
+		if (inst->capabilities->cap[STAGE].value !=  payload_ptr[0])
 			i_vpr_e(inst,
 				"%s: fw stage mode(%d) not matching the capability value(%d)\n",
 				__func__,  payload_ptr[0], inst->capabilities->cap[STAGE].value);
 		break;
 	case HFI_PROP_PIPE:
-		if (payload_ptr &&
-			inst->capabilities->cap[PIPE].value !=  payload_ptr[0])
+		if (inst->capabilities->cap[PIPE].value !=  payload_ptr[0])
 			i_vpr_e(inst,
 				"%s: fw pipe mode(%d) not matching the capability value(%d)\n",
 				__func__,  payload_ptr[0], inst->capabilities->cap[PIPE].value);
 		break;
 	case HFI_PROP_FENCE:
 		if (is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE)) {
-			if (payload_ptr) {
-				fence_id = payload_ptr[0];
-				rc = msm_vidc_fence_signal(inst, fence_id);
-			} else {
-				i_vpr_e(inst, "%s: fence payload is null\n", __func__);
-				rc = -EINVAL;
-			}
+			fence_id = payload_ptr[0];
+			rc = msm_vidc_fence_signal(inst, fence_id);
 		} else {
 			i_vpr_e(inst, "%s: fence is not enabled for this session\n",
 				__func__);
@@ -1576,6 +1535,70 @@ static int handle_session_property(struct msm_vidc_inst *inst,
 		i_vpr_e(inst, "%s: invalid property %#x\n",
 			__func__, pkt->type);
 		break;
+	}
+
+	return rc;
+}
+
+static int handle_property_without_payload(struct msm_vidc_inst *inst,
+	struct hfi_packet *pkt, u32 port)
+{
+	switch (pkt->type) {
+	case HFI_PROP_NO_OUTPUT:
+		if (port != INPUT_PORT) {
+			i_vpr_e(inst,
+				"%s: invalid port: %d for property %#x\n",
+				__func__, pkt->port, pkt->type);
+			break;
+		}
+		i_vpr_h(inst, "received no_output property\n");
+		inst->hfi_frame_info.no_output = 1;
+		break;
+	default:
+		i_vpr_e(inst, "%s: invalid property %#x\n",
+			__func__, pkt->type);
+		break;
+	}
+
+	return 0;
+}
+
+static int handle_session_property(struct msm_vidc_inst *inst,
+	struct hfi_packet *pkt)
+{
+	int rc = 0;
+	u32 port;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: Invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	i_vpr_l(inst, "%s: property type %#x\n", __func__, pkt->type);
+
+	port = vidc_port_from_hfi(inst, pkt->port);
+	if (port >= MAX_PORT) {
+		i_vpr_e(inst,
+			"%s: invalid port: %d for property %#x\n",
+			__func__, pkt->port, pkt->type);
+		return -EINVAL;
+	}
+
+	if (pkt->flags & HFI_FW_FLAGS_INFORMATION) {
+		i_vpr_h(inst,
+			"%s: information flag received for property %#x packet\n",
+			__func__, pkt->type);
+		return 0;
+	}
+
+	if (check_for_packet_payload(inst, pkt, __func__)) {
+		rc = handle_property_with_payload(inst, pkt, port);
+		if (rc)
+			return rc;
+	} else {
+		rc = handle_property_without_payload(inst, pkt, port);
+		if (rc)
+			return rc;
 	}
 
 	return rc;
