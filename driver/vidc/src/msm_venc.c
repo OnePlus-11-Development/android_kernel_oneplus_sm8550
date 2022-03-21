@@ -681,15 +681,6 @@ static int msm_venc_metadata_delivery(struct msm_vidc_inst *inst,
 	u32 payload[32] = {0};
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
-	static const u32 metadata_output_list[] = {};
-	static const u32 metadata_input_list[] = {
-		META_SEI_MASTERING_DISP,
-		META_SEI_CLL,
-		META_HDR10PLUS,
-		META_EVA_STATS,
-		META_BUF_TAG,
-		META_ROI_INFO,
-	};
 
 	if (!inst || !inst->core) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -702,18 +693,16 @@ static int msm_venc_metadata_delivery(struct msm_vidc_inst *inst,
 	payload[0] = HFI_MODE_METADATA;
 
 	if (port == INPUT_PORT) {
-		for (i = 0; i < ARRAY_SIZE(metadata_input_list); i++) {
-			if (is_meta_tx_inp_enabled(inst, metadata_input_list[i])) {
-				payload[count + 1] =
-					capability->cap[metadata_input_list[i]].hfi_id;
+		for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+			if (is_meta_tx_inp_enabled(inst, i)) {
+				payload[count + 1] = capability->cap[i].hfi_id;
 				count++;
 			}
 		}
 	} else if (port == OUTPUT_PORT) {
-		for (i = 0; i < ARRAY_SIZE(metadata_output_list); i++) {
-			if (is_meta_tx_out_enabled(inst, metadata_output_list[i])) {
-				payload[count + 1] =
-					capability->cap[metadata_output_list[i]].hfi_id;
+		for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+			if (is_meta_tx_out_enabled(inst, i)) {
+				payload[count + 1] = capability->cap[i].hfi_id;
 				count++;
 			}
 		}
@@ -741,15 +730,6 @@ static int msm_venc_metadata_subscription(struct msm_vidc_inst *inst,
 	u32 payload[32] = {0};
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
-	static const u32 metadata_input_list[] = {};
-	static const u32 metadata_output_list[] = {
-		META_LTR_MARK_USE,
-		META_SEQ_HDR_NAL,
-		META_TIMESTAMP,
-		META_BUF_TAG,
-		META_SUBFRAME_OUTPUT,
-		META_ENC_QP_METADATA,
-	};
 
 	if (!inst) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -761,18 +741,16 @@ static int msm_venc_metadata_subscription(struct msm_vidc_inst *inst,
 	payload[0] = HFI_MODE_METADATA;
 
 	if (port == INPUT_PORT) {
-		for (i = 0; i < ARRAY_SIZE(metadata_input_list); i++) {
-			if (is_meta_rx_inp_enabled(inst, metadata_input_list[i])) {
-				payload[count + 1] =
-					capability->cap[metadata_input_list[i]].hfi_id;
+		for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+			if (is_meta_rx_inp_enabled(inst, i)) {
+				payload[count + 1] = capability->cap[i].hfi_id;
 				count++;
 			}
 		}
 	} else if (port == OUTPUT_PORT) {
-		for (i = 0; i < ARRAY_SIZE(metadata_output_list); i++) {
-			if (is_meta_rx_out_enabled(inst, metadata_output_list[i])) {
-				payload[count + 1] =
-					capability->cap[metadata_output_list[i]].hfi_id;
+		for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+			if (is_meta_rx_out_enabled(inst, i)) {
+				payload[count + 1] = capability->cap[i].hfi_id;
 				count++;
 			}
 		}

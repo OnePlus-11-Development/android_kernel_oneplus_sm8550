@@ -57,6 +57,29 @@ struct msm_vidc_cap_name {
 
 static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{INST_CAP_NONE,                  "INST_CAP_NONE"              },
+	{META_SEQ_HDR_NAL,               "META_SEQ_HDR_NAL"           },
+	{META_BITSTREAM_RESOLUTION,      "META_BITSTREAM_RESOLUTION"  },
+	{META_CROP_OFFSETS,              "META_CROP_OFFSETS"          },
+	{META_DPB_MISR,                  "META_DPB_MISR"              },
+	{META_OPB_MISR,                  "META_OPB_MISR"              },
+	{META_INTERLACE,                 "META_INTERLACE"             },
+	{META_OUTBUF_FENCE,              "META_OUTBUF_FENCE"          },
+	{META_LTR_MARK_USE,              "META_LTR_MARK_USE"          },
+	{META_TIMESTAMP,                 "META_TIMESTAMP"             },
+	{META_CONCEALED_MB_CNT,          "META_CONCEALED_MB_CNT"      },
+	{META_HIST_INFO,                 "META_HIST_INFO"             },
+	{META_SEI_MASTERING_DISP,        "META_SEI_MASTERING_DISP"    },
+	{META_SEI_CLL,                   "META_SEI_CLL"               },
+	{META_HDR10PLUS,                 "META_HDR10PLUS"             },
+	{META_BUF_TAG,                   "META_BUF_TAG"               },
+	{META_DPB_TAG_LIST,              "META_DPB_TAG_LIST"          },
+	{META_SUBFRAME_OUTPUT,           "META_SUBFRAME_OUTPUT"       },
+	{META_ENC_QP_METADATA,           "META_ENC_QP_METADATA"       },
+	{META_DEC_QP_METADATA,           "META_DEC_QP_METADATA"       },
+	{META_MAX_NUM_REORDER_FRAMES,    "META_MAX_NUM_REORDER_FRAMES"},
+	{META_EVA_STATS,                 "META_EVA_STATS"             },
+	{META_ROI_INFO,                  "META_ROI_INFO"              },
+	{META_CAP_MAX,                   "META_CAP_MAX"               },
 	{FRAME_WIDTH,                    "FRAME_WIDTH"                },
 	{LOSSLESS_FRAME_WIDTH,           "LOSSLESS_FRAME_WIDTH"       },
 	{SECURE_FRAME_WIDTH,             "SECURE_FRAME_WIDTH"         },
@@ -83,7 +106,6 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{MB_CYCLES_FW,                   "MB_CYCLES_FW"               },
 	{MB_CYCLES_FW_VPP,               "MB_CYCLES_FW_VPP"           },
 	{SECURE_MODE,                    "SECURE_MODE"                },
-	{META_OUTBUF_FENCE,              "META_OUTBUF_FENCE"          },
 	{FENCE_ID,                       "FENCE_ID"                   },
 	{FENCE_FD,                       "FENCE_FD"                   },
 	{TS_REORDER,                     "TS_REORDER"                 },
@@ -94,7 +116,6 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{SUPER_FRAME,                    "SUPER_FRAME"                },
 	{HEADER_MODE,                    "HEADER_MODE"                },
 	{PREPEND_SPSPPS_TO_IDR,          "PREPEND_SPSPPS_TO_IDR"      },
-	{META_SEQ_HDR_NAL,               "META_SEQ_HDR_NAL"           },
 	{WITHOUT_STARTCODE,              "WITHOUT_STARTCODE"          },
 	{NAL_LENGTH_FIELD,               "NAL_LENGTH_FIELD"           },
 	{REQUEST_I_FRAME,                "REQUEST_I_FRAME"            },
@@ -156,30 +177,9 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{DRAP,                           "DRAP"                       },
 	{INPUT_METADATA_FD,              "INPUT_METADATA_FD"          },
 	{INPUT_META_VIA_REQUEST,         "INPUT_META_VIA_REQUEST"     },
-	{META_BITSTREAM_RESOLUTION,      "META_BITSTREAM_RESOLUTION"  },
-	{META_CROP_OFFSETS,              "META_CROP_OFFSETS"          },
-	{META_DPB_MISR,                  "META_DPB_MISR"              },
-	{META_OPB_MISR,                  "META_OPB_MISR"              },
-	{META_INTERLACE,                 "META_INTERLACE"             },
 	{ENC_IP_CR,                      "ENC_IP_CR"                  },
-	{META_LTR_MARK_USE,              "META_LTR_MARK_USE"          },
-	{META_TIMESTAMP,                 "META_TIMESTAMP"             },
-	{META_CONCEALED_MB_CNT,          "META_CONCEALED_MB_CNT"      },
-	{META_HIST_INFO,                 "META_HIST_INFO"             },
-	{META_SEI_MASTERING_DISP,        "META_SEI_MASTERING_DISP"    },
-	{META_SEI_CLL,                   "META_SEI_CLL"               },
-	{META_HDR10PLUS,                 "META_HDR10PLUS"             },
-	{META_EVA_STATS,                 "META_EVA_STATS"             },
-	{META_BUF_TAG,                   "META_BUF_TAG"               },
-	{META_DPB_TAG_LIST,              "META_DPB_TAG_LIST"          },
-	{META_OUTPUT_BUF_TAG,            "META_OUTPUT_BUF_TAG"        },
-	{META_SUBFRAME_OUTPUT,           "META_SUBFRAME_OUTPUT"       },
-	{META_ENC_QP_METADATA,           "META_ENC_QP_METADATA"       },
-	{META_DEC_QP_METADATA,           "META_DEC_QP_METADATA"       },
 	{COMPLEXITY,                     "COMPLEXITY"                 },
-	{META_MAX_NUM_REORDER_FRAMES,    "META_MAX_NUM_REORDER_FRAMES"},
 	{PROFILE,                        "PROFILE"                    },
-	{META_ROI_INFO,                  "META_ROI_INFO"              },
 	{ENH_LAYER_COUNT,                "ENH_LAYER_COUNT"            },
 	{BIT_RATE,                       "BIT_RATE"                   },
 	{LOWLATENCY_MODE,                "LOWLATENCY_MODE"            },
@@ -1379,7 +1379,14 @@ exit:
 	return allow;
 }
 
-bool msm_vidc_allow_metadata(struct msm_vidc_inst *inst, u32 cap_id)
+bool msm_vidc_allow_metadata_delivery(struct msm_vidc_inst *inst, u32 cap_id,
+	u32 port)
+{
+	return true;
+}
+
+bool msm_vidc_allow_metadata_subscription(struct msm_vidc_inst *inst, u32 cap_id,
+	u32 port)
 {
 	bool is_allowed = true;
 
@@ -1388,19 +1395,42 @@ bool msm_vidc_allow_metadata(struct msm_vidc_inst *inst, u32 cap_id)
 		return false;
 	}
 
-	switch (cap_id) {
-	case META_OUTPUT_BUF_TAG:
-	case META_DPB_TAG_LIST:
-		if (!is_ubwc_colorformat(inst->capabilities->cap[PIX_FMTS].value)) {
-			i_vpr_h(inst,
-				"%s: cap: %24s not allowed for split mode\n",
-				__func__, cap_name(cap_id));
-			is_allowed = false;
+	if (port == INPUT_PORT) {
+		switch (cap_id) {
+		case META_BUF_TAG:
+		case META_BITSTREAM_RESOLUTION:
+		case META_CROP_OFFSETS:
+		case META_SEI_MASTERING_DISP:
+		case META_SEI_CLL:
+		case META_HDR10PLUS:
+			if (!is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE)) {
+				i_vpr_h(inst,
+					"%s: cap: %24s not allowed as output buffer fence is disabled\n",
+					__func__, cap_name(cap_id));
+				is_allowed = false;
+			}
+			break;
+		default:
+			is_allowed = true;
+			break;
 		}
-		break;
-	default:
-		is_allowed = true;
-		break;
+	} else if (port == OUTPUT_PORT) {
+		switch (cap_id) {
+		case META_DPB_TAG_LIST:
+			if (!is_ubwc_colorformat(inst->capabilities->cap[PIX_FMTS].value)) {
+				i_vpr_h(inst,
+					"%s: cap: %24s not allowed for split mode\n",
+					__func__, cap_name(cap_id));
+				is_allowed = false;
+			}
+			break;
+		default:
+			is_allowed = true;
+			break;
+		}
+	} else {
+		i_vpr_e(inst, "%s: invalid port %d\n", __func__, port);
+		is_allowed = false;
 	}
 
 	return is_allowed;
