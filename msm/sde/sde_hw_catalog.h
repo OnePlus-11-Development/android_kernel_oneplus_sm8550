@@ -104,8 +104,13 @@
 #define IS_SDE_CP_VER_1_0(version) \
 	(version == SDE_COLOR_PROCESS_VER(0x1, 0x0))
 
+#define SDE_SID_VERSION_2_0_0       0x200
+#define IS_SDE_SID_REV_200(rev) \
+	((rev) == SDE_SID_VERSION_2_0_0)
+
 #define MAX_XIN_COUNT 16
 #define SSPP_SUBBLK_COUNT_MAX 2
+#define MAX_CWB_SESSIONS 1
 
 #define SDE_CTL_CFG_VERSION_1_0_0       0x100
 #define MAX_INTF_PER_CTL_V1                 2
@@ -567,6 +572,7 @@ enum {
  * @SDE_INTF_PANEL_VSYNC_TS     INTF block has panel vsync timestamp logged
  * @SDE_INTF_MDP_VSYNC_TS       INTF block has mdp vsync timestamp logged
  * @SDE_INTF_AVR_STATUS         INTF block has AVR_STATUS field in AVR_CONTROL register
+ * @SDE_INTF_WD_JITTER          INTF block has WD timer jitter support
  * @SDE_INTF_MAX
  */
 enum {
@@ -579,6 +585,7 @@ enum {
 	SDE_INTF_PANEL_VSYNC_TS,
 	SDE_INTF_MDP_VSYNC_TS,
 	SDE_INTF_AVR_STATUS,
+	SDE_INTF_WD_JITTER,
 	SDE_INTF_MAX
 };
 
@@ -1731,6 +1738,7 @@ struct sde_perf_cfg {
  * @qseed_hw_rev        qseed HW block version
  * @smart_dma_rev       smartDMA block version
  * @ctl_rev             control path block version
+ * @sid_rev             SID version
  * @has_precise_vsync_ts  indicates if HW has vsyc timestamp logging capability
  * @has_reduced_ob_max indicate if DSC size is limited to 10k
  * @ts_prefill_rev      prefill traffic shaper feature revision
@@ -1804,6 +1812,7 @@ struct sde_perf_cfg {
  * @max_dsc_width       max dsc line width
  * @max_mixer_width     max layer mixer line width
  * @max_mixer_blendstages       max layer mixer blend stages (z orders)
+ * @max_cwb             max number of cwb supported
  * @vbif_qos_nlvl       number of vbif QoS priority levels
  * @qos_target_time_ns  normalized qos target time for line-based qos
  * @macrotile_mode      UBWC parameter for macro tile channel distribution
@@ -1834,6 +1843,7 @@ struct sde_mdss_cfg {
 	u32 qseed_hw_rev;
 	u32 smart_dma_rev;
 	u32 ctl_rev;
+	u32 sid_rev;
 	bool has_precise_vsync_ts;
 	bool has_reduced_ob_max;
 	u32 ts_prefill_rev;
@@ -1913,6 +1923,7 @@ struct sde_mdss_cfg {
 	u32 max_dsc_width;
 	u32 max_mixer_width;
 	u32 max_mixer_blendstages;
+	u32 max_cwb;
 
 	/* Configs */
 	u32 vbif_qos_nlvl;

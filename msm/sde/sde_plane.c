@@ -239,7 +239,7 @@ void sde_plane_set_sid(struct drm_plane *plane, u32 vm)
 	sde_kms = to_sde_kms(priv->kms);
 
 	psde = to_sde_plane(plane);
-	sde_hw_set_sspp_sid(sde_kms->hw_sid, psde->pipe, vm);
+	sde_hw_set_sspp_sid(sde_kms->hw_sid, psde->pipe, vm, sde_kms->catalog);
 }
 
 static void _sde_plane_set_qos_lut(struct drm_plane *plane,
@@ -2709,27 +2709,12 @@ modeset_update:
 	return ret;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-static int sde_plane_atomic_check(struct drm_plane *plane,
-		struct drm_atomic_state *atomic_state)
-#else
-static int sde_plane_atomic_check(struct drm_plane *plane,
+static int _sde_plane_atomic_check(struct drm_plane *plane,
 		struct drm_plane_state *state)
-#endif
 {
 	int ret = 0;
 	struct sde_plane *psde;
 	struct sde_plane_state *pstate;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-	struct drm_plane_state *state = drm_atomic_get_new_plane_state(atomic_state, plane);
-#endif
-
-	if (!plane || !state) {
-		SDE_ERROR("invalid arg(s), plane %d state %d\n",
-				!plane, !state);
-		ret = -EINVAL;
-		goto exit;
-	}
 
 	psde = to_sde_plane(plane);
 	pstate = to_sde_plane_state(state);
@@ -2745,6 +2730,35 @@ static int sde_plane_atomic_check(struct drm_plane *plane,
 exit:
 	return ret;
 }
+
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+static int sde_plane_atomic_check(struct drm_plane *plane,
+		struct drm_atomic_state *atomic_state)
+{
+	struct drm_plane_state *state = NULL;
+
+	if (!plane || !atomic_state) {
+		SDE_ERROR("invalid arg(s), plane %d atomic_state %d\n",
+				!plane, !atomic_state);
+		return -EINVAL;
+	}
+	state = drm_atomic_get_new_plane_state(atomic_state, plane);
+	return _sde_plane_atomic_check(plane, state);
+}
+#else
+static int sde_plane_atomic_check(struct drm_plane *plane,
+		struct drm_plane_state *state)
+{
+	if (!plane || !state) {
+		SDE_ERROR("invalid arg(s), plane %d state %d\n",
+				!plane, !state);
+		return -EINVAL;
+	}
+
+	return _sde_plane_atomic_check(plane, state);
+}
+#endif
 
 void sde_plane_flush(struct drm_plane *plane)
 {

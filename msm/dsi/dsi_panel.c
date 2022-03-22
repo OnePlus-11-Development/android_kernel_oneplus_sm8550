@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -2203,16 +2203,71 @@ static int dsi_panel_parse_misc_features(struct dsi_panel *panel)
 	return 0;
 }
 
+static int dsi_panel_parse_wd_jitter_config(struct dsi_display_mode_priv_info *priv_info,
+		struct dsi_parser_utils *utils, u32 *jitter)
+{
+	int rc = 0;
+	struct msm_display_wd_jitter_config *wd_jitter = &priv_info->wd_jitter;
+	u32 ltj[DEFAULT_PANEL_JITTER_ARRAY_SIZE] = {0, 1};
+	u32 ltj_time = 0;
+	const u32 max_ltj = 10;
+
+	if (!(utils->read_bool(utils->data, "qcom,dsi-wd-jitter-enable"))) {
+		priv_info->panel_jitter_numer = DEFAULT_PANEL_JITTER_NUMERATOR;
+		priv_info->panel_jitter_denom = DEFAULT_PANEL_JITTER_DENOMINATOR;
+		return 0;
+	}
+
+	rc = utils->read_u32_array(utils->data, "qcom,dsi-wd-ltj-max-jitter", ltj,
+			DEFAULT_PANEL_JITTER_ARRAY_SIZE);
+	rc |= utils->read_u32(utils->data, "qcom,dsi-wd-ltj-time-sec", &ltj_time);
+	if (rc || !ltj[1] || !ltj_time || (ltj[0] / ltj[1] >= max_ltj)) {
+		DSI_DEBUG("No valid long term jitter defined\n");
+		priv_info->panel_jitter_numer = DEFAULT_PANEL_JITTER_NUMERATOR;
+		priv_info->panel_jitter_denom = DEFAULT_PANEL_JITTER_DENOMINATOR;
+		rc = -EINVAL;
+	} else {
+		wd_jitter->ltj_max_numer = ltj[0];
+		wd_jitter->ltj_max_denom = ltj[1];
+		wd_jitter->ltj_time_sec = ltj_time;
+		wd_jitter->jitter_type = MSM_DISPLAY_WD_LTJ_JITTER;
+	}
+
+	if (jitter[0] && jitter[1]) {
+		if (jitter[0] / jitter[1] > MAX_PANEL_JITTER) {
+			wd_jitter->inst_jitter_numer = DEFAULT_PANEL_JITTER_NUMERATOR;
+			wd_jitter->inst_jitter_denom = DEFAULT_PANEL_JITTER_DENOMINATOR;
+		} else {
+			wd_jitter->inst_jitter_numer = jitter[0];
+			wd_jitter->inst_jitter_denom = jitter[1];
+		}
+		wd_jitter->jitter_type |= MSM_DISPLAY_WD_INSTANTANEOUS_JITTER;
+	} else if (rc) {
+		wd_jitter->inst_jitter_numer = DEFAULT_PANEL_JITTER_NUMERATOR;
+		wd_jitter->inst_jitter_denom = DEFAULT_PANEL_JITTER_DENOMINATOR;
+		wd_jitter->jitter_type |= MSM_DISPLAY_WD_INSTANTANEOUS_JITTER;
+	}
+
+	priv_info->panel_jitter_numer = rc ?
+			wd_jitter->inst_jitter_numer : wd_jitter->ltj_max_numer;
+	priv_info->panel_jitter_denom = rc ?
+			wd_jitter->inst_jitter_denom : wd_jitter->ltj_max_denom;
+
+	return 0;
+}
+
 static int dsi_panel_parse_jitter_config(
 				struct dsi_display_mode *mode,
 				struct dsi_parser_utils *utils)
 {
 	int rc;
 	struct dsi_display_mode_priv_info *priv_info;
+	struct dsi_panel *panel;
 	u32 jitter[DEFAULT_PANEL_JITTER_ARRAY_SIZE] = {0, 0};
 	u64 jitter_val = 0;
 
 	priv_info = mode->priv_info;
+	panel = container_of(utils, struct dsi_panel, utils);
 
 	rc = utils->read_u32_array(utils->data, "qcom,mdss-dsi-panel-jitter",
 				jitter, DEFAULT_PANEL_JITTER_ARRAY_SIZE);
@@ -2223,10 +2278,11 @@ static int dsi_panel_parse_jitter_config(
 		jitter_val = div_u64(jitter_val, jitter[1]);
 	}
 
-	if (rc || !jitter_val || (jitter_val > MAX_PANEL_JITTER)) {
+	if (panel->te_using_watchdog_timer) {
+		dsi_panel_parse_wd_jitter_config(priv_info, utils, jitter);
+	} else if (rc || !jitter_val || (jitter_val > MAX_PANEL_JITTER)) {
 		priv_info->panel_jitter_numer = DEFAULT_PANEL_JITTER_NUMERATOR;
-		priv_info->panel_jitter_denom =
-					DEFAULT_PANEL_JITTER_DENOMINATOR;
+		priv_info->panel_jitter_denom = DEFAULT_PANEL_JITTER_DENOMINATOR;
 	} else {
 		priv_info->panel_jitter_numer = jitter[0];
 		priv_info->panel_jitter_denom = jitter[1];

@@ -69,6 +69,9 @@
 #define INTF_VSYNC_TIMESTAMP1           0x218
 #define INTF_MDP_VSYNC_TIMESTAMP0       0x21C
 #define INTF_MDP_VSYNC_TIMESTAMP1       0x220
+#define INTF_WD_TIMER_0_JITTER_CTL      0x224
+#define INTF_WD_TIMER_0_LTJ_SLOPE       0x228
+#define INTF_WD_TIMER_0_LTJ_MAX         0x22C
 #define INTF_WD_TIMER_0_CTL             0x230
 #define INTF_WD_TIMER_0_CTL2            0x234
 #define INTF_WD_TIMER_0_LOAD_VALUE      0x238
@@ -221,14 +224,14 @@ static void sde_hw_intf_reset_counter(struct sde_hw_intf *ctx)
 	SDE_REG_WRITE(c, INTF_LINE_COUNT, BIT(31));
 }
 
-static u64 sde_hw_intf_get_vsync_timestamp(struct sde_hw_intf *ctx)
+static u64 sde_hw_intf_get_vsync_timestamp(struct sde_hw_intf *ctx, bool is_vid)
 {
 	struct sde_hw_blk_reg_map *c = &ctx->hw;
 	u32 timestamp_lo, timestamp_hi;
 	u64 timestamp = 0;
 	u32 reg_ts_0, reg_ts_1;
 
-	if (ctx->cap->features & BIT(SDE_INTF_MDP_VSYNC_TS)) {
+	if (ctx->cap->features & BIT(SDE_INTF_MDP_VSYNC_TS) && is_vid) {
 		reg_ts_0 = INTF_MDP_VSYNC_TIMESTAMP0;
 		reg_ts_1 = INTF_MDP_VSYNC_TIMESTAMP1;
 	} else {
@@ -455,8 +458,39 @@ static void sde_hw_intf_setup_prg_fetch(
 	SDE_REG_WRITE(c, INTF_CONFIG, fetch_enable);
 }
 
-static void sde_hw_intf_setup_vsync_source(struct sde_hw_intf *intf,
-		u32 frame_rate)
+static void sde_hw_intf_configure_wd_timer_jitter(struct sde_hw_intf *intf,
+		struct intf_wd_jitter_params *wd_jitter)
+{
+	struct sde_hw_blk_reg_map *c;
+	u32 reg, jitter_ctl = 0;
+
+	c = &intf->hw;
+
+	/*
+	 * Load Jitter values with jitter feature disabled.
+	 */
+	SDE_REG_WRITE(c, INTF_WD_TIMER_0_JITTER_CTL, 0x1);
+
+	if (wd_jitter->jitter)
+		jitter_ctl |= ((wd_jitter->jitter & 0x3FF) << 16);
+
+	if (wd_jitter->ltj_max) {
+		SDE_REG_WRITE(c, INTF_WD_TIMER_0_LTJ_MAX, wd_jitter->ltj_max);
+		SDE_REG_WRITE(c, INTF_WD_TIMER_0_LTJ_SLOPE, wd_jitter->ltj_slope);
+	}
+
+	reg = SDE_REG_READ(c, INTF_WD_TIMER_0_JITTER_CTL);
+	reg |= jitter_ctl;
+	SDE_REG_WRITE(c, INTF_WD_TIMER_0_JITTER_CTL, reg);
+
+	if (wd_jitter->jitter)
+		reg |= BIT(31);
+	if (wd_jitter->ltj_max)
+		reg |= BIT(30);
+	SDE_REG_WRITE(c, INTF_WD_TIMER_0_JITTER_CTL, reg);
+}
+
+static void sde_hw_intf_setup_vsync_source(struct sde_hw_intf *intf, u32 frame_rate)
 {
 	struct sde_hw_blk_reg_map *c;
 	u32 reg = 0;
@@ -466,10 +500,11 @@ static void sde_hw_intf_setup_vsync_source(struct sde_hw_intf *intf,
 
 	c = &intf->hw;
 
-	SDE_REG_WRITE(c, INTF_WD_TIMER_0_LOAD_VALUE, CALCULATE_WD_LOAD_VALUE(frame_rate));
+	reg = CALCULATE_WD_LOAD_VALUE(frame_rate);
+	SDE_REG_WRITE(c, INTF_WD_TIMER_0_LOAD_VALUE, reg);
 
 	SDE_REG_WRITE(c, INTF_WD_TIMER_0_CTL, BIT(0)); /* clear timer */
-	reg |= BIT(8); /* enable heartbeat timer */
+	reg = BIT(8); /* enable heartbeat timer */
 	reg |= BIT(0); /* enable WD timer */
 	reg |= BIT(1); /* select default 16 clock ticks */
 	SDE_REG_WRITE(c, INTF_WD_TIMER_0_CTL2, reg);
@@ -928,6 +963,9 @@ static void _setup_intf_ops(struct sde_hw_intf_ops *ops,
 
 	if (cap & (BIT(SDE_INTF_PANEL_VSYNC_TS) | BIT(SDE_INTF_MDP_VSYNC_TS)))
 		ops->get_vsync_timestamp = sde_hw_intf_get_vsync_timestamp;
+
+	if (cap & BIT(SDE_INTF_WD_JITTER))
+		ops->configure_wd_jitter = sde_hw_intf_configure_wd_timer_jitter;
 }
 
 struct sde_hw_blk_reg_map *sde_hw_intf_init(enum sde_intf idx,

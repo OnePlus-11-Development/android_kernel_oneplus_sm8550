@@ -37,7 +37,6 @@
 #define DP_PHY_AUX_CFG1				0x0024
 #define DP_PHY_AUX_CFG2				0x0028
 
-#define DP_PHY_VCO_DIV				0x0070
 #define DP_PHY_TX0_TX1_LANE_CTL			0x0078
 #define DP_PHY_TX2_TX3_LANE_CTL			0x009C
 
@@ -129,14 +128,12 @@
 #define DP_5NM_PHY_READY	BIT(1)
 #define DP_5NM_TSYNC_DONE	BIT(0)
 
-static int dp_vco_clk_set_div(struct dp_pll *pll, unsigned int div)
+static int set_vco_div(struct dp_pll *pll, unsigned long rate)
 {
-	u32 val = 0;
+	u32 div, val;
 
-	if (!pll) {
-		DP_ERR("invalid input parameters\n");
+	if (!pll)
 		return -EINVAL;
-	}
 
 	if (is_gdsc_disabled(pll))
 		return -EINVAL;
@@ -144,22 +141,22 @@ static int dp_vco_clk_set_div(struct dp_pll *pll, unsigned int div)
 	val = dp_pll_read(dp_phy, DP_PHY_VCO_DIV);
 	val &= ~0x03;
 
-	switch (div) {
-	case 2:
+	switch (rate) {
+	case DP_VCO_HSCLK_RATE_1620MHZDIV1000:
+	case DP_VCO_HSCLK_RATE_2700MHZDIV1000:
+		div = 2;
 		val |= 1;
 		break;
-	case 4:
+	case DP_VCO_HSCLK_RATE_5400MHZDIV1000:
+		div = 4;
 		val |= 2;
 		break;
-	case 6:
-	/* When div = 6, val is 0, so do nothing here */
-		;
-		break;
-	case 8:
-		val |= 3;
+	case DP_VCO_HSCLK_RATE_8100MHZDIV1000:
+		div = 6;
+		/* val = 0 for this case, so no update needed */
 		break;
 	default:
-		DP_DEBUG("unsupported div value %d\n", div);
+		/* No other link rates are supported */
 		return -EINVAL;
 	}
 
@@ -167,27 +164,16 @@ static int dp_vco_clk_set_div(struct dp_pll *pll, unsigned int div)
 	/* Make sure the PHY registers writes are done */
 	wmb();
 
-	DP_DEBUG("val=%d div=%x\n", val, div);
-	return 0;
-}
+	/*
+	 * Set the rate for the link and pixel clock sources so that the
+	 * linux clock framework can appropriately compute the MND values
+	 * whenever the pixel clock rate is set.
+	 */
+	clk_set_rate(pll->clk_data->clks[0], pll->vco_rate / 10);
+	clk_set_rate(pll->clk_data->clks[1], pll->vco_rate / div);
 
-static int set_vco_div(struct dp_pll *pll, unsigned long rate)
-{
-	int div;
-	int rc = 0;
-
-	if (rate == DP_VCO_HSCLK_RATE_8100MHZDIV1000)
-		div = 6;
-	else if (rate == DP_VCO_HSCLK_RATE_5400MHZDIV1000)
-		div = 4;
-	else
-		div = 2;
-
-	rc = dp_vco_clk_set_div(pll, div);
-	if (rc < 0) {
-		DP_DEBUG("set vco div failed\n");
-		return rc;
-	}
+	DP_DEBUG("val=%#x div=%x link_clk rate=%lu vco_div_clk rate=%lu\n",
+			val, div, pll->vco_rate / 10, pll->vco_rate / div);
 
 	return 0;
 }
@@ -604,13 +590,14 @@ static int dp_pll_configure(struct dp_pll *pll, unsigned long rate)
 	else
 		rate = DP_VCO_HSCLK_RATE_8100MHZDIV1000;
 
+	pll->vco_rate = rate;
 	rc = dp_vco_set_rate_5nm(pll, rate);
 	if (rc < 0) {
 		DP_ERR("pll rate %s set failed\n", rate);
+		pll->vco_rate = 0;
 		return rc;
 	}
 
-	pll->vco_rate = rate;
 	DP_DEBUG("pll rate %lu set success\n", rate);
 	return rc;
 }
@@ -645,7 +632,7 @@ static int dp_pll_prepare(struct dp_pll *pll)
 	return rc;
 }
 
-static int  dp_pll_unprepare(struct dp_pll *pll)
+static int dp_pll_unprepare(struct dp_pll *pll)
 {
 	int rc = 0;
 
@@ -664,6 +651,7 @@ static int  dp_pll_unprepare(struct dp_pll *pll)
 	}
 
 	dp_pll_disable_5nm(pll);
+	pll->vco_rate = 0;
 
 	return rc;
 }

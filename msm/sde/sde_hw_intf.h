@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -65,6 +66,17 @@ struct intf_avr_params {
 	u32 avr_mode; /* one of enum @sde_rm_qsync_modes */
 	u32 avr_step_lines; /* 0 or 1 means disabled */
 };
+/**
+ * struct intf_wd_jitter_params : Interface to the INTF WD Jitter params.
+ * jitter : max instantaneous jitter.
+ * ltj_max : max long term jitter value.
+ * ltj_slope : slope of long term jitter.
+ */
+struct intf_wd_jitter_params {
+	u32 jitter;
+	u32 ltj_max;
+	u32 ltj_slope;
+};
 
 /**
  * struct sde_hw_intf_ops : Interface to the interface Hw driver functions
@@ -80,6 +92,7 @@ struct intf_avr_params {
  * @ get_underrun_line_count: reads current underrun pixel clock count and
  *                            converts it into line count
  * @setup_vsync_source: Configure vsync source selection for intf
+ * @configure_wd_jitter: Configure WD jitter.
  * @bind_pingpong_blk: enable/disable the connection with pingpong which will
  *                     feed pixels to this interface
  */
@@ -115,6 +128,8 @@ struct sde_hw_intf_ops {
 	u32 (*get_underrun_line_count)(struct sde_hw_intf *intf);
 
 	void (*setup_vsync_source)(struct sde_hw_intf *intf, u32 frame_rate);
+	void (*configure_wd_jitter)(struct sde_hw_intf *intf,
+			struct intf_wd_jitter_params *wd_jitter);
 
 	void (*bind_pingpong_blk)(struct sde_hw_intf *intf,
 			bool enable,
@@ -221,7 +236,7 @@ struct sde_hw_intf_ops {
 	/**
 	 * Get the HW vsync timestamp counter
 	 */
-	u64 (*get_vsync_timestamp)(struct sde_hw_intf *intf);
+	u64 (*get_vsync_timestamp)(struct sde_hw_intf *intf, bool is_vid);
 
 	/**
 	 * Enable processing of 2 pixels per clock

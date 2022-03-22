@@ -2610,18 +2610,32 @@ sde_connector_best_encoder(struct drm_connector *connector)
 static struct drm_encoder *
 sde_connector_atomic_best_encoder(struct drm_connector *connector,
 		struct drm_atomic_state *state)
+{
+	struct sde_connector *c_conn;
+	struct drm_encoder *encoder = NULL;
+	struct drm_connector_state *connector_state = NULL;
+
+	if (!connector) {
+		SDE_ERROR("invalid connector\n");
+		return NULL;
+	}
+
+	connector_state = drm_atomic_get_new_connector_state(state, connector);
+	c_conn = to_sde_connector(connector);
+
+	if (c_conn->ops.atomic_best_encoder)
+		encoder = c_conn->ops.atomic_best_encoder(connector,
+				c_conn->display, connector_state);
+
+	return encoder;
+}
 #else
 static struct drm_encoder *
 sde_connector_atomic_best_encoder(struct drm_connector *connector,
 		struct drm_connector_state *connector_state)
-#endif
 {
 	struct sde_connector *c_conn;
 	struct drm_encoder *encoder = NULL;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-	struct drm_connector_state *connector_state =
-			drm_atomic_get_new_connector_state(state, connector);
-#endif
 
 	if (!connector) {
 		SDE_ERROR("invalid connector\n");
@@ -2636,6 +2650,7 @@ sde_connector_atomic_best_encoder(struct drm_connector *connector,
 
 	return encoder;
 }
+#endif
 
 static int sde_connector_atomic_check(struct drm_connector *connector,
 		struct drm_atomic_state *state)

@@ -2366,6 +2366,7 @@ static int sde_intf_parse_dt(struct device_node *np,
 
 		if (SDE_HW_MAJOR(sde_cfg->hw_rev) >= SDE_HW_MAJOR(SDE_HW_VER_900)) {
 			set_bit(SDE_INTF_MDP_VSYNC_TS, &intf->features);
+			set_bit(SDE_INTF_WD_JITTER, &intf->features);
 		}
 	}
 
@@ -5142,6 +5143,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		set_bit(SDE_FEATURE_AVR_STEP, sde_cfg->features);
 		set_bit(SDE_FEATURE_VBIF_CLK_SPLIT, sde_cfg->features);
 		set_bit(SDE_FEATURE_CTL_DONE, sde_cfg->features);
+		set_bit(SDE_FEATURE_TRUSTED_VM, sde_cfg->features);
 		sde_cfg->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache = true;
 		sde_cfg->allowed_dsc_reservation_switch = SDE_DP_DSC_RESERVATION_SWITCH;
 		sde_cfg->autorefresh_disable_seq = AUTOREFRESH_DISABLE_SEQ2;
@@ -5152,6 +5154,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
 		sde_cfg->true_inline_rot_rev = SDE_INLINE_ROT_VERSION_2_0_1;
 		sde_cfg->uidle_cfg.uidle_rev = SDE_UIDLE_VERSION_1_0_3;
+		sde_cfg->sid_rev = SDE_SID_VERSION_2_0_0;
 		sde_cfg->mdss_hw_block_size = 0x158;
 		sde_cfg->demura_supported[SSPP_DMA1][0] = 0;
 		sde_cfg->demura_supported[SSPP_DMA1][1] = 1;
@@ -5248,6 +5251,7 @@ static int _sde_hardware_post_caps(struct sde_mdss_cfg *sde_cfg,
 
 	sde_cfg->min_display_height = MIN_DISPLAY_HEIGHT;
 	sde_cfg->min_display_width = MIN_DISPLAY_WIDTH;
+	sde_cfg->max_cwb = min_t(u32, sde_cfg->wb_count, MAX_CWB_SESSIONS);
 
 	rc = _sde_hw_dnsc_blur_filter_caps(sde_cfg);
 
