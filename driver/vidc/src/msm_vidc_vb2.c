@@ -42,8 +42,9 @@ struct vb2_queue *msm_vidc_get_vb2q(struct msm_vidc_inst *inst,
 }
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
-void *msm_vb2_get_userptr(struct device *dev, unsigned long vaddr,
-			unsigned long size, enum dma_data_direction dma_dir)
+void *msm_vb2_alloc(struct device *dev, unsigned long attrs,
+	unsigned long size, enum dma_data_direction dma_dir,
+	gfp_t gfp_flags)
 {
 	return (void *)0xdeadbeef;
 }
@@ -53,9 +54,10 @@ void *msm_vb2_attach_dmabuf(struct device *dev, struct dma_buf *dbuf,
 {
 	return (void *)0xdeadbeef;
 }
+
 #else
-void *msm_vb2_get_userptr(struct vb2_buffer *vb, struct device *dev,
-	unsigned long vaddr, unsigned long size)
+void *msm_vb2_alloc(struct vb2_buffer *vb, struct device *dev,
+	unsigned long size)
 {
 	return (void *)0xdeadbeef;
 }
@@ -67,8 +69,13 @@ void *msm_vb2_attach_dmabuf(struct vb2_buffer *vb, struct device *dev,
 }
 #endif
 
-void msm_vb2_put_userptr(void *buf_priv)
+void msm_vb2_put(void *buf_priv)
 {
+}
+
+int msm_vb2_mmap(void *buf_priv, struct vm_area_struct *vma)
+{
+	return 0;
 }
 
 void msm_vb2_detach_dmabuf(void *buf_priv)
@@ -91,6 +98,7 @@ int msm_vidc_queue_setup(struct vb2_queue *q,
 	int rc = 0;
 	struct msm_vidc_inst *inst;
 	int port;
+	struct v4l2_format *f;
 
 	if (!q || !num_buffers || !num_planes
 		|| !sizes || !q->drv_priv) {
@@ -112,6 +120,21 @@ int msm_vidc_queue_setup(struct vb2_queue *q,
 	port = v4l2_type_to_driver_port(inst, q->type, __func__);
 	if (port < 0)
 		return -EINVAL;
+
+	if (*num_planes) {
+		f = &inst->fmts[port];
+		if (*num_planes != f->fmt.pix_mp.num_planes) {
+			i_vpr_i(inst, "%s: requested num_planes %d not supported\n",
+			__func__, *num_planes, f->fmt.pix_mp.num_planes);
+			return -EINVAL;
+		}
+		if (sizes[0] < inst->fmts[port].fmt.pix_mp.plane_fmt[0].sizeimage) {
+			i_vpr_e(inst, "%s: requested size %d not acceptable\n",
+			__func__, sizes[0]);
+			return -EINVAL;
+		}
+	}
+
 
 	if (port == INPUT_PORT) {
 		*num_planes = 1;
@@ -384,7 +407,7 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 	}
 
 	if (is_encode_session(inst) && vb2->type == INPUT_MPLANE) {
-		timestamp_us = vb2->timestamp;
+		timestamp_us = div_u64(vb2->timestamp, 1000);
 		msm_vidc_set_auto_framerate(inst, timestamp_us);
 	}
 	inst->last_qbuf_time_ns = ktime_get_ns();

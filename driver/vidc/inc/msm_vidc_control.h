@@ -25,6 +25,9 @@ int msm_vidc_adjust_use_ltr(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_mark_ltr(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_ir_random(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_delta_based_rc(void *instance, struct v4l2_ctrl *ctrl);
+int msm_vidc_adjust_output_order(void *instance, struct v4l2_ctrl *ctrl);
+int msm_vidc_adjust_input_buf_host_max_count(void *instance, struct v4l2_ctrl *ctrl);
+int msm_vidc_adjust_output_buf_host_max_count(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_transform_8x8(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_chroma_qp_index_offset(void *instance,
 	struct v4l2_ctrl *ctrl);
@@ -75,6 +78,8 @@ int msm_vidc_set_bitrate(void *instance,
 int msm_vidc_set_dynamic_layer_bitrate(void *instance,
 	enum msm_vidc_inst_capability_type cap_id);
 int msm_vidc_set_u32(void *instance,
+	enum msm_vidc_inst_capability_type cap_id);
+int msm_vidc_set_u32_packed(void *instance,
 	enum msm_vidc_inst_capability_type cap_id);
 int msm_vidc_set_u32_enum(void *instance,
 	enum msm_vidc_inst_capability_type cap_id);

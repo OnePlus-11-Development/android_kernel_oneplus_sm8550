@@ -205,6 +205,9 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{BITRATE_BOOST,                  "BITRATE_BOOST"              },
 	{SLICE_MODE,                     "SLICE_MODE"                 },
 	{BLUR_RESOLUTION,                "BLUR_RESOLUTION"            },
+	{OUTPUT_ORDER,                   "OUTPUT_ORDER"               },
+	{INPUT_BUF_HOST_MAX_COUNT,       "INPUT_BUF_HOST_MAX_COUNT"   },
+	{OUTPUT_BUF_HOST_MAX_COUNT,      "OUTPUT_BUF_HOST_MAX_COUNT"  },
 	{INST_CAP_MAX,                   "INST_CAP_MAX"               },
 };
 
@@ -2277,7 +2280,8 @@ int msm_vidc_set_auto_framerate(struct msm_vidc_inst *inst, u64 timestamp)
 
 	core = inst->core;
 	if (!core->capabilities[ENC_AUTO_FRAMERATE].value ||
-			is_image_session(inst) || msm_vidc_is_super_buffer(inst))
+			is_image_session(inst) || msm_vidc_is_super_buffer(inst) ||
+			!inst->capabilities->cap[TIME_DELTA_BASED_RC].value)
 		goto exit;
 
 	rc = msm_vidc_update_timestamp(inst, timestamp);
@@ -3289,7 +3293,7 @@ int msm_vidc_queue_buffer_single(struct msm_vidc_inst *inst, struct vb2_buffer *
 {
 	int rc = 0;
 	struct msm_vidc_buffer *buf;
-	struct msm_vidc_fence *fence;
+	struct msm_vidc_fence *fence = NULL;
 	enum msm_vidc_allow allow;
 
 	if (!inst || !vb2 || !inst->capabilities) {
@@ -3329,7 +3333,8 @@ int msm_vidc_queue_buffer_single(struct msm_vidc_inst *inst, struct vb2_buffer *
 exit:
 	if (rc) {
 		i_vpr_e(inst, "%s: qbuf failed\n", __func__);
-		msm_vidc_fence_destroy(inst, fence);
+		if (fence)
+			msm_vidc_fence_destroy(inst, fence);
 	}
 	return rc;
 }
@@ -3850,7 +3855,7 @@ static int vb2q_init(struct msm_vidc_inst *inst,
 	core = inst->core;
 
 	q->type = type;
-	q->io_modes = VB2_DMABUF;
+	q->io_modes = VB2_MMAP | VB2_DMABUF;
 	q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_COPY;
 	q->ops = core->vb2_ops;
 	q->mem_ops = core->vb2_mem_ops;
