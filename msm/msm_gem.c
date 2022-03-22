@@ -1171,7 +1171,6 @@ struct drm_gem_object *msm_gem_import(struct drm_device *dev,
 	struct drm_gem_object *obj = NULL;
 	uint32_t size;
 	int ret;
-	unsigned long flags = 0;
 
 	size = PAGE_ALIGN(dmabuf->size);
 
@@ -1200,10 +1199,6 @@ struct drm_gem_object *msm_gem_import(struct drm_device *dev,
 	 *      will be NULL upon gem obj creation.
 	 */
 	msm_obj->flags |= MSM_BO_EXTBUF;
-
-	ret = dma_buf_get_flags(dmabuf, &flags);
-	if (ret)
-		DRM_ERROR("dma_buf_get_flags failure, err=%d\n", ret);
 
 	mutex_unlock(&msm_obj->lock);
 
