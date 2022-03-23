@@ -541,7 +541,7 @@ enum msm_vidc_codec_type v4l2_codec_to_driver(u32 v4l2_codec, const char *func)
 		codec = MSM_VIDC_HEIC;
 		break;
 	default:
-		d_vpr_e("%s: invalid v4l2 codec %#x\n", func, v4l2_codec);
+		d_vpr_h("%s: invalid v4l2 codec %#x\n", func, v4l2_codec);
 		break;
 	}
 	return codec;
@@ -5610,42 +5610,26 @@ int msm_vidc_update_meta_port_settings(struct msm_vidc_inst *inst)
 	core = inst->core;
 
 	fmt = &inst->fmts[INPUT_META_PORT];
-	if (is_input_meta_enabled(inst)) {
-		fmt->fmt.meta.buffersize = call_session_op(core,
-			buffer_size, inst, MSM_VIDC_BUF_INPUT_META);
-		inst->buffers.input_meta.min_count =
-				inst->buffers.input.min_count;
-		inst->buffers.input_meta.extra_count =
-				inst->buffers.input.extra_count;
-		inst->buffers.input_meta.actual_count =
-				inst->buffers.input.actual_count;
-		inst->buffers.input_meta.size = fmt->fmt.meta.buffersize;
-	} else {
-		fmt->fmt.meta.buffersize = 0;
-		inst->buffers.input_meta.min_count = 0;
-		inst->buffers.input_meta.extra_count = 0;
-		inst->buffers.input_meta.actual_count = 0;
-		inst->buffers.input_meta.size = 0;
-	}
+	fmt->fmt.meta.buffersize = call_session_op(core,
+		buffer_size, inst, MSM_VIDC_BUF_INPUT_META);
+	inst->buffers.input_meta.min_count =
+			inst->buffers.input.min_count;
+	inst->buffers.input_meta.extra_count =
+			inst->buffers.input.extra_count;
+	inst->buffers.input_meta.actual_count =
+			inst->buffers.input.actual_count;
+	inst->buffers.input_meta.size = fmt->fmt.meta.buffersize;
 
 	fmt = &inst->fmts[OUTPUT_META_PORT];
-	if (is_output_meta_enabled(inst)) {
-		fmt->fmt.meta.buffersize = call_session_op(core,
-			buffer_size, inst, MSM_VIDC_BUF_OUTPUT_META);
-		inst->buffers.output_meta.min_count =
-				inst->buffers.output.min_count;
-		inst->buffers.output_meta.extra_count =
-				inst->buffers.output.extra_count;
-		inst->buffers.output_meta.actual_count =
-				inst->buffers.output.actual_count;
-		inst->buffers.output_meta.size = fmt->fmt.meta.buffersize;
-	} else {
-		fmt->fmt.meta.buffersize = 0;
-		inst->buffers.output_meta.min_count = 0;
-		inst->buffers.output_meta.extra_count = 0;
-		inst->buffers.output_meta.actual_count = 0;
-		inst->buffers.output_meta.size = 0;
-	}
+	fmt->fmt.meta.buffersize = call_session_op(core,
+		buffer_size, inst, MSM_VIDC_BUF_OUTPUT_META);
+	inst->buffers.output_meta.min_count =
+			inst->buffers.output.min_count;
+	inst->buffers.output_meta.extra_count =
+			inst->buffers.output.extra_count;
+	inst->buffers.output_meta.actual_count =
+			inst->buffers.output.actual_count;
+	inst->buffers.output_meta.size = fmt->fmt.meta.buffersize;
 	return 0;
 }
 

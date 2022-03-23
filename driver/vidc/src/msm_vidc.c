@@ -694,13 +694,16 @@ int msm_vidc_enum_framesizes(void *instance, struct v4l2_frmsizeenum *fsize)
 	if (fsize->index)
 		return -EINVAL;
 
-	/* validate pixel format */
-	codec = v4l2_codec_to_driver(fsize->pixel_format, __func__);
-	if (!codec) {
-		colorfmt = v4l2_colorformat_to_driver(fsize->pixel_format, __func__);
-		if (colorfmt == MSM_VIDC_FMT_NONE) {
-			i_vpr_e(inst, "%s: unsupported pix fmt %#x\n", __func__, fsize->pixel_format);
-			return -EINVAL;
+	if (fsize->pixel_format != V4L2_META_FMT_VIDC) {
+		/* validate pixel format */
+		codec = v4l2_codec_to_driver(fsize->pixel_format, __func__);
+		if (!codec) {
+			colorfmt = v4l2_colorformat_to_driver(fsize->pixel_format, __func__);
+			if (colorfmt == MSM_VIDC_FMT_NONE) {
+				i_vpr_e(inst, "%s: unsupported pix fmt %#x\n",
+					__func__, fsize->pixel_format);
+				return -EINVAL;
+			}
 		}
 	}
 
@@ -749,11 +752,14 @@ int msm_vidc_enum_frameintervals(void *instance, struct v4l2_frmivalenum *fival)
 	if (fival->index)
 		return -EINVAL;
 
-	/* validate pixel format */
-	colorfmt = v4l2_colorformat_to_driver(fival->pixel_format, __func__);
-	if (colorfmt == MSM_VIDC_FMT_NONE) {
-		i_vpr_e(inst, "%s: unsupported pix fmt %#x\n", __func__, fival->pixel_format);
-		return -EINVAL;
+	if (fival->pixel_format != V4L2_META_FMT_VIDC) {
+		/* validate pixel format */
+		colorfmt = v4l2_colorformat_to_driver(fival->pixel_format, __func__);
+		if (colorfmt == MSM_VIDC_FMT_NONE) {
+			i_vpr_e(inst, "%s: unsupported pix fmt %#x\n",
+				__func__, fival->pixel_format);
+			return -EINVAL;
+		}
 	}
 
 	/* validate resolution */

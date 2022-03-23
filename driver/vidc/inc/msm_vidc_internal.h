@@ -134,6 +134,8 @@
   */
 #define MAX_DPB_LIST_ARRAY_SIZE (16 * 4)
 #define MAX_DPB_LIST_PAYLOAD_SIZE (16 * 4 * 4)
+/* Default metadata size */
+#define MSM_VIDC_METADATA_SIZE ALIGN(16 * 1024, SZ_4K)
 
 enum msm_vidc_domain_type {
 	MSM_VIDC_ENCODER           = BIT(0),
