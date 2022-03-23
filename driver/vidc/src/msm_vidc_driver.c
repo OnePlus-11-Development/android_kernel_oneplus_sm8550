@@ -1322,7 +1322,11 @@ bool msm_vidc_allow_s_ctrl(struct msm_vidc_inst *inst, u32 id)
 			}
 		}
 	} else if (is_encode_session(inst)) {
-		if (inst->state == MSM_VIDC_START || inst->state == MSM_VIDC_START_OUTPUT) {
+		if (!inst->bufq[OUTPUT_PORT].vb2q->streaming) {
+			allow = true;
+			goto exit;
+		}
+		if (inst->bufq[OUTPUT_PORT].vb2q->streaming) {
 			switch (id) {
 			case V4L2_CID_MPEG_VIDEO_BITRATE:
 			case V4L2_CID_MPEG_VIDEO_GOP_SIZE:
