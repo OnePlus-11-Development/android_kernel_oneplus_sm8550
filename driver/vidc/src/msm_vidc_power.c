@@ -133,12 +133,7 @@ static int msm_vidc_set_buses(struct msm_vidc_inst* inst)
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
-
 	core = inst->core;
-	if (!core || !core->platform || !core->platform->data.bus_bw_nrt) {
-		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
 
 	mutex_lock(&core->lock);
 	curr_time_ns = ktime_get_ns();
@@ -152,11 +147,6 @@ static int msm_vidc_set_buses(struct msm_vidc_inst* inst)
 		if (temp->power.power_mode == VIDC_POWER_TURBO) {
 			total_bw_ddr = total_bw_llcc = INT_MAX;
 			break;
-		}
-
-		if (!is_realtime_session(inst)) {
-			temp->power.ddr_bw = core->platform->data.bus_bw_nrt[0];
-			temp->power.sys_cache_bw = core->platform->data.bus_bw_nrt[0];
 		}
 
 		total_bw_ddr += temp->power.ddr_bw;
@@ -188,7 +178,7 @@ int msm_vidc_scale_buses(struct msm_vidc_inst *inst)
 	struct vidc_bus_vote_data *vote_data;
 	struct v4l2_format *out_f;
 	struct v4l2_format *inp_f;
-	int codec = 0, frame_rate, buf_ts_fps;
+	int codec = 0, frame_rate, buf_ts_fps, input_rate;
 
 	if (!inst || !inst->core || !inst->capabilities) {
 		d_vpr_e("%s: invalid params: %pK\n", __func__, inst);
@@ -238,7 +228,19 @@ int msm_vidc_scale_buses(struct msm_vidc_inst *inst)
 			buf_ts_fps, vote_data->fps);
 		vote_data->fps = buf_ts_fps;
 	}
-
+	if (!is_realtime_session(inst)) {
+		input_rate = msm_vidc_get_input_rate(inst);
+		if (input_rate > vote_data->fps) {
+			i_vpr_h(inst, "%s: use input rate %d for fps (%u)\n", __func__,
+				input_rate, vote_data->fps);
+			vote_data->fps = input_rate;
+			/*
+			 * add 12.5% more fps to increase power to make firmware
+			 * processing little faster than client queuing rate
+			 */
+			vote_data->fps = vote_data->fps + vote_data->fps / 8;
+		}
+	}
 	if (inst->domain == MSM_VIDC_ENCODER) {
 		vote_data->domain = MSM_VIDC_ENCODER;
 		vote_data->bitrate = inst->capabilities->cap[BIT_RATE].value;

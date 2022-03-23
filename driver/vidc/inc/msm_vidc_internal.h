@@ -66,6 +66,7 @@
 #define DCVS_WINDOW 16
 #define ENC_FPS_WINDOW 3
 #define DEC_FPS_WINDOW 10
+#define INPUT_TIMER_LIST_SIZE 30
 
 #define INPUT_MPLANE V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE
 #define OUTPUT_MPLANE V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE
@@ -369,6 +370,7 @@ enum msm_vidc_inst_capability_type {
 	POWER_SAVE_MBPS,
 	FRAME_RATE,
 	OPERATING_RATE,
+	INPUT_RATE,
 	SCALE_FACTOR,
 	MB_CYCLES_VSP,
 	MB_CYCLES_VPP,
@@ -892,6 +894,11 @@ struct msm_vidc_timestamps {
 	struct list_head       list;
 	u32                    count;
 	u64                    rank;
+};
+
+struct msm_vidc_input_timer {
+	struct list_head       list;
+	u64                    time_us;
 };
 
 enum msm_vidc_allow {
