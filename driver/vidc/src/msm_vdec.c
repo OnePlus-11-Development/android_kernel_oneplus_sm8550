@@ -1435,6 +1435,10 @@ int msm_vdec_streamon_input(struct msm_vidc_inst *inst)
 	if (rc)
 		return rc;
 
+	rc = msm_vdec_subscribe_metadata(inst, INPUT_PORT);
+	if (rc)
+		return rc;
+
 	rc = msm_vdec_set_delivery_mode_metadata(inst, INPUT_PORT);
 	if (rc)
 		return rc;

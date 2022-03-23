@@ -3525,6 +3525,11 @@ int venus_hfi_queue_buffer(struct msm_vidc_inst *inst,
 
 	if (is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE) &&
 		is_output_buffer(buffer->type)) {
+		if (!buffer->fence_id) {
+			i_vpr_e(inst, "%s: fence id cannot be 0\n", __func__);
+			rc = -EINVAL;
+			goto unlock;
+		}
 		rc = hfi_create_packet(inst->packet,
 			inst->packet_size,
 			HFI_PROP_FENCE,

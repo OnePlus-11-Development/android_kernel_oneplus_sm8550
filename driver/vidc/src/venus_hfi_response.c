@@ -1063,6 +1063,14 @@ static int msm_vidc_check_meta_buffers(struct msm_vidc_inst *inst)
 	};
 
 	for (i = 0; i < ARRAY_SIZE(buffer_type); i++) {
+		/*
+		 * skip input meta buffers check as meta buffers were
+		 * already delivered if output fence enabled.
+		 */
+		if (is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE)) {
+			if (buffer_type[i] == MSM_VIDC_BUF_INPUT)
+				continue;
+		}
 		buffers = msm_vidc_get_buffers(inst, buffer_type[i], __func__);
 		if (!buffers)
 			return -EINVAL;
@@ -1116,7 +1124,13 @@ static int handle_dequeue_buffers(struct msm_vidc_inst *inst)
 						"vb2 done already", inst, buf);
 				} else {
 					buf->attr |= MSM_VIDC_ATTR_BUFFER_DONE;
-					msm_vidc_buffer_done(inst, buf);
+					rc = msm_vidc_buffer_done(inst, buf);
+					if (rc) {
+						print_vidc_buffer(VIDC_HIGH, "err ",
+							"vb2 done failed", inst, buf);
+						/* ignore the error */
+						rc = 0;
+					}
 				}
 				msm_vidc_put_driver_buf(inst, buf);
 			}
@@ -1734,12 +1748,12 @@ static int __handle_session_response(struct msm_vidc_inst *inst,
 		}
 	}
 
-	memset(&inst->hfi_frame_info, 0, sizeof(struct msm_vidc_hfi_frame_info));
 	if (dequeue) {
 		rc = handle_dequeue_buffers(inst);
 		if (rc)
 			return rc;
 	}
+	memset(&inst->hfi_frame_info, 0, sizeof(struct msm_vidc_hfi_frame_info));
 
 	return rc;
 }

@@ -227,6 +227,8 @@ enum v4l2_mpeg_video_av1_tier {
  */
 #define V4L2_CID_MPEG_VIDC_SW_FENCE_FD                                       \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x3A)
+#define V4L2_CID_MPEG_VIDC_METADATA_PICTURE_TYPE                             \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x3B)
 
 /* add new controls above this line */
 /* Deprecate below controls once availble in gki and gsi bionic header */
@@ -355,6 +357,7 @@ enum v4l2_mpeg_vidc_metadata {
 	METADATA_TIMESTAMP                    = 0x0300015c,
 	METADATA_CONCEALED_MB_COUNT           = 0x0300015f,
 	METADATA_HISTOGRAM_INFO               = 0x03000161,
+	METADATA_PICTURE_TYPE                 = 0x03000162,
 	METADATA_SEI_MASTERING_DISPLAY_COLOUR = 0x03000163,
 	METADATA_SEI_CONTENT_LIGHT_LEVEL      = 0x03000164,
 	METADATA_HDR10PLUS                    = 0x03000165,
@@ -403,7 +406,10 @@ enum meta_interlace_info {
 struct v4l2_event_vidc_metadata {
 	__u32                                type;
 	__s32                                fd;
-	__u8                                 reserved[56];
+	__u32                                index;
+	__u32                                bytesused;
+	__u32                                offset;
+	__u8                                 reserved[44];
 };
 /* vendor events end */
 

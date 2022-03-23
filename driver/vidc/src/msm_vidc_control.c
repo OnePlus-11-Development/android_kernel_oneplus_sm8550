@@ -707,7 +707,8 @@ void msm_vidc_add_volatile_flag(struct v4l2_ctrl *ctrl)
 {
 	if (ctrl->id == V4L2_CID_MIN_BUFFERS_FOR_OUTPUT ||
 		ctrl->id == V4L2_CID_MIN_BUFFERS_FOR_CAPTURE ||
-		ctrl->id == V4L2_CID_MPEG_VIDC_AV1D_FILM_GRAIN_PRESENT)
+		ctrl->id == V4L2_CID_MPEG_VIDC_AV1D_FILM_GRAIN_PRESENT ||
+		ctrl->id == V4L2_CID_MPEG_VIDC_SW_FENCE_FD)
 		ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
 }
 
