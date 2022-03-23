@@ -96,6 +96,8 @@ static void dsi_catalog_cmn_init(struct dsi_ctrl_hw *ctrl,
 			dsi_ctrl_hw_22_reset_trigger_controls;
 		ctrl->ops.log_line_count = dsi_ctrl_hw_22_log_line_count;
 		ctrl->ops.splitlink_cmd_setup = dsi_ctrl_hw_22_configure_splitlink;
+		ctrl->ops.setup_misr = dsi_ctrl_hw_22_setup_misr;
+		ctrl->ops.collect_misr = dsi_ctrl_hw_22_collect_misr;
 		break;
 	default:
 		break;
