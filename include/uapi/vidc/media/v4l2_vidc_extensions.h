@@ -137,6 +137,8 @@ enum v4l2_mpeg_vidc_metadata_bits {
 	(V4L2_CID_MPEG_VIDC_BASE + 0x24)
 #define V4L2_CID_MPEG_VIDC_METADATA_CROP_OFFSETS                              \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x25)
+#define V4L2_CID_MPEG_VIDC_METADATA_SALIENCY_INFO                             \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x26)
 
 /* Encoder Super frame control */
 #define V4L2_CID_MPEG_VIDC_SUPERFRAME           (V4L2_CID_MPEG_VIDC_BASE + 0x28)
@@ -319,6 +321,12 @@ enum v4l2_mpeg_vidc_metapayload_header_flags {
 	METADATA_FLAGS_TOP_FIELD        = (1 << 0),
 	METADATA_FLAGS_BOTTOM_FIELD     = (1 << 1),
 };
+
+enum saliency_roi_info {
+	METADATA_SALIENCY_NONE,
+	METADATA_SALIENCY_TYPE0,
+};
+
 struct msm_vidc_metabuf_header {
 	__u32 count;
 	__u32 size;
@@ -355,6 +363,7 @@ enum v4l2_mpeg_vidc_metadata {
 	METADATA_ROI_INFO                     = 0x03000173,
 	METADATA_DPB_TAG_LIST                 = 0x03000179,
 	METADATA_MAX_NUM_REORDER_FRAMES       = 0x03000127,
+	METADATA_SALIENCY_INFO                = 0x0300018A,
 	METADATA_FENCE                        = 0x0300018B,
 };
 enum meta_interlace_info {

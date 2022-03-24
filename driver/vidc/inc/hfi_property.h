@@ -543,6 +543,12 @@ enum hfi_nal_length_field_type {
 
 #define HFI_PROP_AV1_DRAP_CONFIG                                0x03000189
 
+enum hfi_saliency_type {
+     HFI_SALIENCY_NONE,
+     HFI_SALIENCY_TYPE0,
+};
+#define HFI_PROP_ROI_AS_SALIENCY_INFO                           0x0300018A
+
 #define HFI_PROP_FENCE                                          0x0300018B
 
 #define HFI_PROP_END                                            0x03FFFFFF
