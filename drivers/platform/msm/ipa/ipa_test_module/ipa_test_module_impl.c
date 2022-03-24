@@ -1,6 +1,7 @@
 ﻿// SPDX-License-Identifier: GPL-2.0-only
 /*
 * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+* Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
 */
 
 #include <linux/types.h>	/* u32 */
@@ -350,7 +351,7 @@ static ssize_t channel_write_gsi(struct file *filp, const char __user *buf,
 	int res = 0;
 	void *data_address = channel_dev->mem.base
 		+ channel_dev->mem_buff_index * TX_BUFF_SIZE;
-	u32 data_phys_addr = channel_dev->mem.phys_base
+	u64 data_phys_addr = channel_dev->mem.phys_base
 		+ channel_dev->mem_buff_index * TX_BUFF_SIZE;
 	struct gsi_xfer_elem gsi_xfer;
 
@@ -413,7 +414,7 @@ static ssize_t channel_read_gsi(struct file *filp, char __user *buf,
 			break;
 
 		IPATEST_DBG("channel empty %d/%d\n", i + 1, max_retry);
-		msleep(5);
+		msleep(1000);
 	}
 
 	if (i == max_retry) {
@@ -448,6 +449,8 @@ static ssize_t channel_read_gsi(struct file *filp, char __user *buf,
 		IPATEST_ERR("gsi_queue_xfer failed %d\n", res);
 		return 0;
 	}
+
+	msleep(20);
 
 	IPATEST_DBG("Returning %d.\n", xfer_notify.bytes_xfered);
 	return xfer_notify.bytes_xfered;
@@ -2741,13 +2744,6 @@ int configure_system_7(void)
 
 	memset(&ipa_ep_cfg, 0, sizeof(ipa_ep_cfg));
 
-	res = exception_hdl_init();
-	if (0 != res) {
-		IPATEST_ERR("exception_hdl_init() failed (%d)\n", res);
-		return res;
-	}
-
-
 	/* Connect first Rx IPA --> APPS MEM */
 	memset(&sys_in, 0, sizeof(sys_in));
 	sys_in.client = IPA_CLIENT_TEST2_CONS;
@@ -3134,7 +3130,8 @@ int configure_system_20(void)
 	u32 ipa_pipe_num;
 
 	memset(&ipa_ep_cfg, 0, sizeof(ipa_ep_cfg));
-
+	ipa_ep_cfg.hdr.hdr_len = 18;
+	sys_in.ipa_ep_cfg = ipa_ep_cfg;
 
 	/* Connect first Rx IPA --> AP MEM */
 	memset(&sys_in, 0, sizeof(sys_in));
@@ -4215,6 +4212,8 @@ static int configure_app_to_ipa_path(struct ipa_channel_config __user *to_ipa_us
 	/* Connect IPA --> Apps */
 	memset(&sys_in, 0, sizeof(sys_in));
 	sys_in.client = to_ipa_channel_config.client;
+	sys_in.notify = &notify_upon_exception;
+	sys_in.priv = &(p_exception_hdl_data->notify_cb_data);
 	IPATEST_DBG("copying from 0x%px\n", to_ipa_channel_config.cfg);
 	retval = copy_from_user(&sys_in.ipa_ep_cfg, to_ipa_channel_config.cfg, to_ipa_channel_config.config_size);
 	if (retval) {
@@ -4379,6 +4378,12 @@ static int configure_test_scenario(
 		return -EFAULT;
 	}
 
+	if (isUlso) {
+		rx_size = RX_SZ_ULSO;
+	} else {
+		rx_size = RX_SZ;
+	}
+
 	for (i = 0 ; i < ipa_test_config_header->from_ipa_channels_num ; i++) {
 		IPATEST_DBG("starting configuration of from_ipa_%d\n", i);
 		retval = configure_app_from_ipa_path(from_ipa_channel_config_array[i], isUlso);
@@ -4386,12 +4391,6 @@ static int configure_test_scenario(
 			IPATEST_ERR("fail to configure from_ipa_%d", i);
 			goto fail;
 		}
-	}
-
-	if (isUlso) {
-		rx_size = RX_SZ_ULSO;
-	} else {
-		rx_size = RX_SZ;
 	}
 
 	retval = insert_descriptors_into_rx_endpoints(RX_BUFF_SIZE);
@@ -4426,33 +4425,41 @@ fail:
 
 static int handle_add_hdr_hpc(unsigned long ioctl_arg)
 {
-    struct ipa_ioc_add_hdr hdrs;
+    struct ipa_ioc_add_hdr *hdrs;
     struct ipa_hdr_add *hdr;
     int retval;
 
 	IPATEST_ERR("copying from 0x%px\n", (u8 *)ioctl_arg);
-	retval = copy_from_user(&hdrs, (u8 *)ioctl_arg, sizeof(hdrs) + sizeof(*hdr));
+	hdrs = kzalloc(sizeof(struct ipa_ioc_add_hdr) + sizeof(struct ipa_hdr_add), GFP_KERNEL);
+	if (!hdrs)
+		return -ENOMEM;
+	retval = copy_from_user(hdrs, (u8 *)ioctl_arg,
+				sizeof(struct ipa_ioc_add_hdr) + sizeof(struct ipa_hdr_add));
 	if (retval) {
 			IPATEST_ERR("failing copying header from user\n");
+			kfree(hdrs);
 			return retval;
 	}
-    retval = ipa3_add_hdr_hpc(&hdrs);
+    retval = ipa3_add_hdr_hpc(hdrs);
     if (retval) {
         IPATEST_ERR("ipa3_add_hdr_hpc failed\n");
+        kfree(hdrs);
         return retval;
     }
 	IPATEST_ERR("ELIAD: \n");
-	hdr = &hdrs.hdr[0];
+	hdr = &hdrs->hdr[0];
     if (hdr->status) {
         IPATEST_ERR("ipa3_add_hdr_hpc failed\n");
         return hdr->status;
     }
 	IPATEST_ERR("ELIAD: \n");
-    if (copy_to_user((void __user *)ioctl_arg, &hdrs, sizeof(hdrs) + sizeof(*hdr))) {
+    if (copy_to_user((void __user *)ioctl_arg, hdrs,
+    	sizeof(struct ipa_ioc_add_hdr) + sizeof(struct ipa_hdr_add))) {
         retval = -EFAULT;
     }
 	IPATEST_ERR("ELIAD: \n");
 
+	kfree(hdrs);
     return 0;
 }
 
@@ -4813,6 +4820,10 @@ static int __init ipa_test_init(void)
 	ret = datapath_ds_init();
 	if (ret != 0)
 		IPATEST_DBG("datapath_ds_init() failed (%d)\n", ret);
+
+	ret = exception_hdl_init();
+	if (ret != 0)
+		IPATEST_DBG("exception_hdl_init() failed (%d)\n", ret);
 
 	return ret;
 }

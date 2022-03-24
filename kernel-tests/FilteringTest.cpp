@@ -25,6 +25,40 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted (subject to the limitations in the
+ * disclaimer below) provided that the following conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *
+ *     * Redistributions in binary form must reproduce the above
+ *       copyright notice, this list of conditions and the following
+ *       disclaimer in the documentation and/or other materials provided
+ *       with the distribution.
+ *
+ *     * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+ *       contributors may be used to endorse or promote products derived
+ *       from this software without specific prior written permission.
+ *
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
  */
 
 #include <stdio.h>
@@ -33,6 +67,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <cstring> // for memcpy
 #include <sys/ioctl.h> //for ioctl
 #include "hton.h" // for htonl
@@ -47,7 +82,9 @@
 //TODO Add Enum for IP/TCP/UDP Fields
 
 #define IP4_TOS_FIELD_OFFSET (1)
+#define IPV4_TTL_OFFSET      (8)
 #define IPV4_PROTOCOL_OFFSET (9)
+#define IPV4_CSUM_OFFSET     (10)
 #define IPV6_NEXT_HDR_OFFSET (6)
 #define IPV4_SRC_ADDR_OFFSET (12)
 #define IPV4_DST_ADDR_OFFSET (16)
@@ -58,6 +95,8 @@
 
 #define DST_ADDR_LSB_OFFSET_IPV4 (19)
 #define DST_ADDR_LSB_OFFSET_IPV6 (39)
+
+#define HOP_LIMIT_OFFSET_IPV6 (7)
 
 #define IPV4_FRAGMENT_FLAGS_OFFSET (6)
 #define IPV6_FRAGMENT_FLAGS_OFFSET (42)
@@ -169,6 +208,7 @@ public:
 		m_consumer.Open(INTERFACE1_TO_IPA_DATA_PATH, INTERFACE1_FROM_IPA_DATA_PATH);
 		m_consumer2.Open(INTERFACE2_TO_IPA_DATA_PATH, INTERFACE2_FROM_IPA_DATA_PATH);
 		m_defaultConsumer.Open(INTERFACE3_TO_IPA_DATA_PATH, INTERFACE3_FROM_IPA_DATA_PATH);
+		m_Exceptions.Open(INTERFACE_TO_IPA_EXCEPTION_PATH, INTERFACE_FROM_IPA_EXCEPTION_PATH);
 
 		if (!m_routing.DeviceNodeIsOpened())
 		{
@@ -198,6 +238,7 @@ public:
 		m_consumer.Open(INTERFACE1_TO_IPA_DATA_PATH, INTERFACE1_FROM_IPA_DATA_PATH);
 		m_consumer2.Open(INTERFACE2_TO_IPA_DATA_PATH, INTERFACE2_FROM_IPA_DATA_PATH);
 		m_defaultConsumer.Open(INTERFACE3_TO_IPA_DATA_PATH, INTERFACE3_FROM_IPA_DATA_PATH);
+		m_Exceptions.Open(INTERFACE_TO_IPA_EXCEPTION_PATH, INTERFACE_FROM_IPA_EXCEPTION_PATH);
 
 		if (!m_routing.DeviceNodeIsOpened())
 		{
@@ -222,6 +263,7 @@ public:
 		m_consumer.Close();
 		m_consumer2.Close();
 		m_defaultConsumer.Close();
+		m_Exceptions.Close();
 		return true;
 	} // Teardown()
 
@@ -273,6 +315,22 @@ public:
 		return true;
 	}
 
+	inline bool VerifyStatusReceived_wo_status(size_t SendSize, size_t RecvSize)
+	{
+		size_t stts_size = sizeof(struct ipa3_hw_pkt_status);
+
+		if (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_0) {
+			stts_size = sizeof(struct ipa3_hw_pkt_status_hw_v5_0);
+		}
+
+		if ((RecvSize != SendSize)){
+			printf("received buffer size does not match! sent:receive [%zu]:[%zu]\n",SendSize,RecvSize);
+			return false;
+		}
+
+		return true;
+	}
+
 	inline bool IsCacheHit(size_t SendSize, size_t RecvSize, void *Buff)
 	{
 		struct ipa3_hw_pkt_status *pStatus = (struct ipa3_hw_pkt_status *)Buff;
@@ -304,6 +362,40 @@ public:
 		}
 
 		printf ("%s::cache miss!! \n",__FUNCTION__);
+		return false;
+	}
+
+	inline bool IsTTLUpdated_v5_5(size_t SendSize, size_t RecvSize, void *Buff)
+	{
+		struct ipa3_hw_pkt_status_hw_v5_5 *pStatus = (struct ipa3_hw_pkt_status_hw_v5_5 *)Buff;
+
+		if (VerifyStatusReceived(SendSize,RecvSize) == false){
+			return false;
+		}
+
+		if((bool)pStatus->ttl_dec){
+			printf ("%s::TTL Updated!! \n",__FUNCTION__);
+			return true;
+		}
+
+		printf ("%s::TTL not updated!! \n",__FUNCTION__);
+		return false;
+	}
+
+	inline bool IsTTLUpdated_v5_5_wo_status(size_t SendSize, size_t RecvSize, void *Buff)
+	{
+		struct ipa3_hw_pkt_status_hw_v5_5 *pStatus = (struct ipa3_hw_pkt_status_hw_v5_5 *)Buff;
+
+		if (VerifyStatusReceived_wo_status(SendSize,RecvSize) == false){
+			return false;
+		}
+
+		if((bool)pStatus->ttl_dec){
+			printf ("%s::TTL Updated!! \n",__FUNCTION__);
+			return true;
+		}
+
+		printf ("%s::TTL not updated!! \n",__FUNCTION__);
 		return false;
 	}
 
@@ -861,6 +953,7 @@ public:
 	InterfaceAbstraction m_consumer;
 	InterfaceAbstraction m_consumer2;
 	InterfaceAbstraction m_defaultConsumer;
+	InterfaceAbstraction m_Exceptions;
 
 	static const size_t BUFF_MAX_SIZE = 1024;
 	static const uint32_t MAX_RULES_NUM = 250;
@@ -1010,15 +1103,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		int address;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		address = ntohl(0x7F000001);//127.0.0.1
@@ -1157,15 +1241,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		int address;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		address = ntohl(0x7F000001);//127.0.0.1
@@ -1305,15 +1380,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		unsigned short port;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Port should be switched to Network Mode.
 		port = ntohs(546);//DHCP Client Port
@@ -1462,15 +1528,6 @@ public:
 	{
 		unsigned short port;
 
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		port = htons(10);
 		memcpy(&m_sendBuffer[IPV4_SRC_PORT_OFFSET], &port, sizeof(port));
@@ -1615,15 +1672,6 @@ public:
 
 	virtual bool ModifyPackets()
 	{
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		m_sendBuffer[IPV4_PROTOCOL_OFFSET] = 0x11;// UDP 0x11 = 17
 		m_sendBuffer2[IPV4_PROTOCOL_OFFSET] = 0x06;// TCP 0x06 = 6
@@ -1762,15 +1810,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		int address;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		address = ntohl(0x7F000001);//127.0.0.1
@@ -1919,15 +1958,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		int address;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		address = ntohl(0x7F000001);//127.0.0.1
@@ -2076,15 +2106,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		unsigned short port;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Port should be switched to Network Mode.
 		port = ntohs(546);//DHCP Client Port
@@ -2242,15 +2263,6 @@ public:
 	{
 		unsigned short port;
 
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		port = htons(10);
 		memcpy(&m_sendBuffer[IPV4_SRC_PORT_OFFSET], &port, sizeof(port));
@@ -2397,15 +2409,6 @@ public:
 
 	virtual bool ModifyPackets()
 	{
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		m_sendBuffer[IPV4_PROTOCOL_OFFSET] = 0x11;// UDP 0x11 = 17
 		m_sendBuffer2[IPV4_PROTOCOL_OFFSET] = 0x06;// TCP 0x06 = 6
@@ -2537,15 +2540,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		int address;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		address = ntohl(0x7F000001);//127.0.0.1
@@ -2672,15 +2666,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		int address;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		address = ntohl(0x7F000001);//127.0.0.1
@@ -2808,15 +2793,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		unsigned short port;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Port should be switched to Network Mode.
 		port = ntohs(546);//DHCP Client Port
@@ -2955,15 +2931,6 @@ public:
 	{
 		unsigned short port;
 
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		port = htons(10);
 		memcpy(&m_sendBuffer[IPV4_SRC_PORT_OFFSET], &port, sizeof(port));
@@ -3097,15 +3064,6 @@ public:
 
 	virtual bool ModifyPackets()
 	{
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		m_sendBuffer[IPV4_PROTOCOL_OFFSET] = 0x11;// UDP 0x11 = 17
 		m_sendBuffer2[IPV4_PROTOCOL_OFFSET] = 0x06;// TCP 0x06 = 6
@@ -3243,15 +3201,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		int address;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		address = ntohl(0x7F000001);//127.0.0.1
@@ -3398,15 +3347,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		int address;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		address = ntohl(0x7F000001);//127.0.0.1
@@ -3554,15 +3494,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		unsigned short port;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Port should be switched to Network Mode.
 		port = ntohs(546);//DHCP Client Port
@@ -3719,15 +3650,6 @@ public:
 	{
 		unsigned short port;
 
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		port = htons(10);
 		memcpy(&m_sendBuffer[IPV4_SRC_PORT_OFFSET], &port, sizeof(port));
@@ -3873,15 +3795,6 @@ public:
 
 	virtual bool ModifyPackets()
 	{
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		m_sendBuffer[IPV4_PROTOCOL_OFFSET] = 0x11;// UDP 0x11 = 17
 		m_sendBuffer2[IPV4_PROTOCOL_OFFSET] = 0x06;// TCP 0x06 = 6
@@ -3991,15 +3904,6 @@ public:
 
 	virtual bool ModifyPackets()
 	{
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		m_sendBuffer[IPV4_FRAGMENT_FLAGS_OFFSET] = 0x20;//MF=1
 		m_sendBuffer[IPV4_FRAGMENT_FLAGS_OFFSET+1] = 0x0;//MF=1
 		m_sendBuffer2[IPV4_FRAGMENT_FLAGS_OFFSET] = 0x0;//MF=0 && frag_off =126
@@ -4203,15 +4107,6 @@ public:
 
 	virtual bool ModifyPackets()
 	{
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		m_sendBuffer[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
@@ -4342,15 +4237,6 @@ public:
 
 	virtual bool ModifyPackets()
 	{
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		m_sendBuffer[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
@@ -4486,15 +4372,6 @@ public:
 
 	virtual bool ModifyPackets()
 	{
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		m_sendBuffer[IPV6_NEXT_HDR_OFFSET] = 0x2C;//FRAGMENT HEADER(44)
 		m_sendBuffer[IPV6_FRAGMENT_NEXT_HDR_OFFSET] = 0x11;// UDP 0x11 = 17
 		m_sendBuffer2[IPV6_FRAGMENT_NEXT_HDR_OFFSET] = 0x06;// TCP 0x06 = 6
@@ -4612,15 +4489,6 @@ public:
 
 	virtual bool ModifyPackets()
 	{
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		m_sendBuffer[IPV6_NEXT_HDR_OFFSET] = 0x2C;//FRAGMENT HEADER(44)
 		m_sendBuffer[IPV6_FRAGMENT_FLAGS_OFFSET] = 0x00;//MF=1
 		m_sendBuffer[IPV6_FRAGMENT_FLAGS_OFFSET+1] = 0x1;//MF=1
@@ -4812,15 +4680,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		unsigned short port;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 
 		port = htons(1000);
 		memcpy(&m_sendBuffer[IPV6_SRC_PORT_OFFSET], &port, sizeof(port));
@@ -4958,15 +4817,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		int address;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		address = ntohl(0x7F000001);//127.0.0.1
@@ -5174,15 +5024,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		int address;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		address = ntohl(0x7F000001);//127.0.0.1
@@ -5405,15 +5246,6 @@ public:
 		int address;
 		unsigned short port;
 
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		address = ntohl(0x7F000001);//127.0.0.1
@@ -5640,15 +5472,6 @@ public:
 		int address;
 		unsigned short port;
 
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		address = ntohl(0x7F000001);//127.0.0.1
@@ -5876,15 +5699,6 @@ public:
 	{
 		int address;
 
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		address = ntohl(0x7F000001);//127.0.0.1
@@ -6102,15 +5916,6 @@ public:
 	{
 		int address;
 
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		address = ntohl(0x7F000001);//127.0.0.1
@@ -6354,15 +6159,6 @@ public:
 	{
 		int address;
 
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		address = ntohl(0x7F000001);//127.0.0.1
@@ -6793,15 +6589,6 @@ public:
 
 	virtual bool ModifyPackets()
 	{
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		m_sendBuffer[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
@@ -6910,15 +6697,6 @@ public:
 
 	virtual bool ModifyPackets()
 	{
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		// TODO: Add verification that we access only allocated addresses
 		// TODO: Fix this, doesn't match the Rule's Requirements
 		m_sendBuffer[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
@@ -7034,15 +6812,6 @@ public:
 	{
 
 		unsigned short port;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 
 		m_sendBuffer[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
 		port = ntohs(546);//DHCP Client Port
@@ -7163,15 +6932,6 @@ public:
 	{
 
 		unsigned short port;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 
 		m_sendBuffer[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
 		port = ntohs(546);//DHCP Client Port
@@ -7288,15 +7048,6 @@ public:
 
 	virtual bool ModifyPackets()
 	{
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 
 		m_sendBuffer[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
 		m_sendBuffer2[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
@@ -7409,15 +7160,6 @@ public:
 
 	virtual bool ModifyPackets()
 	{
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 
 		m_sendBuffer[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
 		m_sendBuffer2[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
@@ -7556,15 +7298,6 @@ public:
 
 	virtual bool ModifyPackets()
 	{
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 
 		m_sendBuffer[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
 		m_sendBuffer2[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
@@ -7893,15 +7626,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		int address;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 		address = ntohl(0x7F000001);//127.0.0.1
 		memcpy(&m_sendBuffer[IPV4_DST_ADDR_OFFSET], &address, sizeof(address));
 		m_sendBuffer[IP4_TOS_FIELD_OFFSET] = 0xFB;
@@ -8064,15 +7788,6 @@ public:
 	virtual bool ModifyPackets()
 	{
 		int address;
-		if (
-				(NULL == m_sendBuffer) ||
-				(NULL == m_sendBuffer2) ||
-				(NULL == m_sendBuffer3)
-			)
-		{
-			printf ("Error : %s was called with NULL Buffers\n",__FUNCTION__);
-			return false;
-		}
 
 		m_sendBuffer[IPv4_TCP_FLAGS_OFFSET] |= TCP_ACK_FLAG_MASK;
 		address = ntohl(0xC0A80105);//192.168.1.5
@@ -9125,6 +8840,1929 @@ protected:
 	uint32_t Hndl0, Hndl1, Hndl2;
 };
 
+/*---------------------------------------------------------------------------*/
+/* Test110: TTL Update on Filtering rule  */
+/*---------------------------------------------------------------------------*/
+class IpaFilteringBlockTest110 : public IpaFilteringBlockTestFixture
+{
+public:
+	IpaFilteringBlockTest110()
+	{
+		m_name = "IpaFilteringBlockTest110";
+		m_description =
+		"Filtering block test 110 - Destination IP address and subnet mask match against LAN subnet \
+		(End-Point specific Filtering Table, Insert all rules in a single commit) \
+		and check if TTL is updated. \
+		1. Generate and commit three routing tables. \
+			Each table contains a single \"bypass\" rule (all data goes to output pipe 0, 1  and 2 (accordingly)) \
+		2. Generate and commit Three filtering rules: (DST & Mask Match). \
+			All DST_IP == (127.0.0.1 & 255.0.0.255)traffic goes to routing table 0, enable TTL decrement in HW. \
+			All DST_IP == (192.169.1.1 & 255.0.0.255)traffic goes to routing table 1, enable TTL decrement in HW \
+			All DST_IP == (192.169.1.2 & 255.0.0.255)traffic goes to routing table 2, not enable TTL decrement in HW";
+		m_minIPAHwType = IPA_HW_v5_5;
+		Register(*this);
+	}
+
+
+	virtual bool AddRules()
+	{
+		printf("Entering %s, %s()\n",__FUNCTION__, __FILE__);
+
+		const char bypass0[20] = "Bypass0";
+		const char bypass1[20] = "Bypass1";
+		const char bypass2[20] = "Bypass2";
+		struct ipa_ioc_get_rt_tbl routing_table0,routing_table1,routing_table2;
+
+		if (!CreateThreeIPv4BypassRoutingTables (bypass0,bypass1,bypass2))
+		{
+			printf("CreateThreeBypassRoutingTables Failed\n");
+			return false;
+		}
+
+		printf("CreateThreeBypassRoutingTables completed successfully\n");
+		routing_table0.ip = IPA_IP_v4;
+		strlcpy(routing_table0.name, bypass0, sizeof(routing_table0.name));
+		if (!m_routing.GetRoutingTable(&routing_table0))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table0=0x%p) Failed.\n",&routing_table0);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass0, routing_table0.hdl);
+
+		routing_table1.ip = IPA_IP_v4;
+		strlcpy(routing_table1.name, bypass1, sizeof(routing_table1.name));
+		if (!m_routing.GetRoutingTable(&routing_table1))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table1=0x%p) Failed.\n",&routing_table1);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass1, routing_table1.hdl);
+
+		routing_table2.ip = IPA_IP_v4;
+		strlcpy(routing_table2.name, bypass2, sizeof(routing_table2.name));
+		if (!m_routing.GetRoutingTable(&routing_table2))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table2=0x%p) Failed.\n",&routing_table2);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass2, routing_table2.hdl);
+
+		IPAFilteringTable_v2 FilterTable0;
+		struct ipa_flt_rule_add_v2 flt_rule_entry;
+		FilterTable0.Init(IPA_IP_v4,IPA_CLIENT_TEST_PROD,false,3);
+		printf("FilterTable*.Init Completed Successfully..\n");
+
+		// Configuring Filtering Rule No.0
+		FilterTable0.GeneratePresetRule(1,flt_rule_entry);
+		flt_rule_entry.at_rear = true;
+		flt_rule_entry.flt_rule_hdl=-1; // return Value
+		flt_rule_entry.status = -1; // return value
+		flt_rule_entry.rule.action=IPA_PASS_TO_ROUTING;
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table0.hdl; //put here the handle corresponding to Routing Rule 1
+		flt_rule_entry.rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+		flt_rule_entry.rule.attrib.u.v4.dst_addr_mask = 0xFF0000FF; // Mask
+		flt_rule_entry.rule.attrib.u.v4.dst_addr = 0x7F000001; // Filter DST_IP == 127.0.0.1.
+		flt_rule_entry.rule.ttl_update = 1; // require ttl update
+		if ((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry))
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		}
+
+		// Configuring Filtering Rule No.1
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table1.hdl; //put here the handle corresponding to Routing Rule 2
+		flt_rule_entry.rule.attrib.u.v4.dst_addr = 0xC0A80101; // Filter DST_IP == 192.168.1.1.
+		if ((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry))
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		}
+
+		// Configuring Filtering Rule No.2
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table2.hdl; //put here the handle corresponding to Routing Rule 2
+		// TODO: Fix this, doesn't match the Rule's Requirements
+		flt_rule_entry.rule.attrib.u.v4.dst_addr = 0xC0A80102; // Filter DST_IP == 192.168.1.2.
+		flt_rule_entry.rule.ttl_update = 0; // doesn't require ttl update
+		if (
+				((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry)) ||
+				!m_filtering.AddFilteringRule(FilterTable0.GetFilteringTable())
+			)
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		} else
+		{
+			printf("flt rule hdl0=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(0)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(0)->status);
+			printf("flt rule hdl1=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(1)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(1)->status);
+			printf("flt rule hdl2=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(2)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(2)->status);
+		}
+
+		printf("Leaving %s, %s()\n",__FUNCTION__, __FILE__);
+		return true;
+	}// AddRules()
+
+	virtual bool ModifyPackets()
+	{
+		int address;
+		address = ntohl(0x7F000001);//127.0.0.1
+		memcpy(&m_sendBuffer[IPV4_DST_ADDR_OFFSET], &address, sizeof(address));
+		m_sendBuffer[IPV4_TTL_OFFSET] = 5;
+		address = ntohl(0xC0A80101);//192.168.1.1
+		memcpy(&m_sendBuffer2[IPV4_DST_ADDR_OFFSET], &address, sizeof(address));
+		m_sendBuffer2[IPV4_TTL_OFFSET] = 4;
+		address = ntohl(0xC0A80102);//192.168.1.2
+		memcpy(&m_sendBuffer3[IPV4_DST_ADDR_OFFSET], &address, sizeof(address));
+		m_sendBuffer3[IPV4_TTL_OFFSET] = 3;
+		return true;
+	}// ModifyPacktes ()
+
+	virtual bool ReceivePacketsAndCompare()
+	{
+		size_t receivedSize = 0;
+		size_t receivedSize2 = 0;
+		size_t receivedSize3 = 0;
+		uint16_t csum = 0;
+		bool pkt1_cmp_succ, pkt2_cmp_succ, pkt3_cmp_succ;
+
+		// Receive results
+		Byte *rxBuff1 = new Byte[0x400];
+		Byte *rxBuff2 = new Byte[0x400];
+		Byte *rxBuff3 = new Byte[0x400];
+
+		if (NULL == rxBuff1 || NULL == rxBuff2 || NULL == rxBuff3)
+		{
+			printf("Memory allocation error.\n");
+			return false;
+		}
+
+		memset(rxBuff1, 0, 0x400);
+		memset(rxBuff2, 0, 0x400);
+		memset(rxBuff3, 0, 0x400);
+
+		receivedSize = m_consumer.ReceiveData(rxBuff1, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize, m_consumer.m_fromChannelName.c_str());
+
+		receivedSize2 = m_consumer2.ReceiveData(rxBuff2, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize2, m_consumer2.m_fromChannelName.c_str());
+
+		receivedSize3 = m_defaultConsumer.ReceiveData(rxBuff3, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize3, m_defaultConsumer.m_fromChannelName.c_str());
+
+		/* Update TTL values. */
+		m_sendBuffer[IPV4_TTL_OFFSET] = 4;
+		m_sendBuffer2[IPV4_TTL_OFFSET] = 3;
+
+		/* Update Checksum.*/
+		csum = *((uint16_t *)(m_sendBuffer + IPV4_CSUM_OFFSET));
+		csum += 1;
+		*((uint16_t *)(m_sendBuffer+ IPV4_CSUM_OFFSET)) = csum;
+
+		csum = *((uint16_t *)(m_sendBuffer2 + IPV4_CSUM_OFFSET));
+		csum += 1;
+		*((uint16_t *)(m_sendBuffer2 + IPV4_CSUM_OFFSET)) = csum;
+
+		// Compare results
+		pkt1_cmp_succ = CompareResultVsGolden(m_sendBuffer, m_sendSize, rxBuff1, receivedSize);
+		pkt2_cmp_succ = CompareResultVsGolden(m_sendBuffer2, m_sendSize2, rxBuff2, receivedSize2);
+		pkt3_cmp_succ = CompareResultVsGolden(m_sendBuffer3, m_sendSize3, rxBuff3, receivedSize3);
+
+		size_t recievedBufferSize =
+			MAX3(receivedSize, receivedSize2, receivedSize3) * 3;
+		size_t sentBufferSize =
+			MAX3(m_sendSize, m_sendSize2, m_sendSize3) * 3;
+		char *recievedBuffer = new char[recievedBufferSize];
+		char *sentBuffer = new char[sentBufferSize];
+		size_t j;
+
+		if (NULL == recievedBuffer || NULL == sentBuffer) {
+			printf("Memory allocation error\n");
+			return false;
+		}
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer[j]);
+		for(j = 0; j < receivedSize; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff1[j]);
+		printf("Expected Value1 (%zu)\n%s\n, Received Value1(%zu)\n%s\n-->Value1 %s\n",
+			m_sendSize,sentBuffer,receivedSize,recievedBuffer,
+			pkt1_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize2; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer2[j]);
+		for(j = 0; j < receivedSize2; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff2[j]);
+		printf("Expected Value2 (%zu)\n%s\n, Received Value2(%zu)\n%s\n-->Value2 %s\n",
+			m_sendSize2,sentBuffer,receivedSize2,recievedBuffer,
+			pkt2_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize3; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer3[j]);
+		for(j = 0; j < receivedSize3; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff3[j]);
+		printf("Expected Value3 (%zu)\n%s\n, Received Value3(%zu)\n%s\n-->Value3 %s\n",
+			m_sendSize3,sentBuffer,receivedSize3,recievedBuffer,
+			pkt3_cmp_succ?"Match":"no Match");
+
+		delete[] recievedBuffer;
+		delete[] sentBuffer;
+
+		delete[] rxBuff1;
+		delete[] rxBuff2;
+		delete[] rxBuff3;
+
+		return pkt1_cmp_succ && pkt2_cmp_succ && pkt3_cmp_succ;
+	}
+
+	virtual bool Teardown()
+	{
+		return true;
+	} // Teardown()
+
+
+};
+
+/*---------------------------------------------------------------------------------------------*/
+/* Test111: TTL update based on Destination IPv6 address and Subnet Mask exact match against broadcast IP address  */
+/*---------------------------------------------------------------------------------------------*/
+class IpaFilteringBlockTest111 : public IpaFilteringBlockTestFixture
+{
+public:
+	IpaFilteringBlockTest111()
+	{
+		m_name = "IpaFilteringBlockTest111";
+		m_description =
+		"Filtering block test 111 - TTL update based on Destination IPv6 address and Mask exact match against broadcast IP address (End-Point specific Filtering Table, Insert all rules in a single commit)\
+		1. Generate and commit three routing tables. \
+			Each table contains a single \"bypass\" rule (all data goes to output pipe 0, 1  and 2 (accordingly with TTL update)) \
+		2. Generate and commit three filtering rules: (DST & Mask Match). \
+			All DST_IPv6 == 0x...AA traffic goes to routing table 1 \
+			All DST_IPv6 == 0x...BB traffic goes to routing table 2 \
+			All DST_IPv6 == 0x...CC traffic goes to routing table 3";
+		m_IpaIPType = IPA_IP_v6;
+		m_minIPAHwType = IPA_HW_v5_5;
+		Register(*this);
+	}
+
+
+	virtual bool AddRules()
+	{
+		printf("Entering %s, %s()\n",__FUNCTION__, __FILE__);
+		const char bypass0[20] = "Bypass0";
+		const char bypass1[20] = "Bypass1";
+		const char bypass2[20] = "Bypass2";
+		struct ipa_ioc_get_rt_tbl routing_table0,routing_table1,routing_table2;
+
+		if (!CreateThreeIPv6BypassRoutingTables (bypass0,bypass1,bypass2))
+		{
+			printf("CreateThreeBypassRoutingTables Failed\n");
+			return false;
+		}
+
+		printf("CreateThreeBypassRoutingTables completed successfully\n");
+		routing_table0.ip = IPA_IP_v6;
+		strlcpy(routing_table0.name, bypass0, sizeof(routing_table0.name));
+		if (!m_routing.GetRoutingTable(&routing_table0))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table0=0x%p) Failed.\n",&routing_table0);
+			return false;
+		}
+		routing_table1.ip = IPA_IP_v6;
+		strlcpy(routing_table1.name, bypass1, sizeof(routing_table1.name));
+		if (!m_routing.GetRoutingTable(&routing_table1))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table1=0x%p) Failed.\n",&routing_table1);
+			return false;
+		}
+
+		routing_table2.ip = IPA_IP_v6;
+		strlcpy(routing_table2.name, bypass2, sizeof(routing_table2.name));
+		if (!m_routing.GetRoutingTable(&routing_table2))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table2=0x%p) Failed.\n",&routing_table2);
+			return false;
+		}
+
+		IPAFilteringTable_v2 FilterTable0;
+		struct ipa_flt_rule_add_v2 flt_rule_entry;
+		FilterTable0.Init(IPA_IP_v6,IPA_CLIENT_TEST_PROD,false,3);
+
+		// Configuring Filtering Rule No.0
+		FilterTable0.GeneratePresetRule(1,flt_rule_entry);
+		flt_rule_entry.at_rear = true;
+		flt_rule_entry.flt_rule_hdl=-1; // return Value
+		flt_rule_entry.status = -1; // return value
+		flt_rule_entry.rule.action=IPA_PASS_TO_ROUTING;
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table0.hdl; //put here the handle corresponding to Routing Rule 1
+		flt_rule_entry.rule.attrib.attrib_mask = IPA_FLT_DST_ADDR; // TODO: Fix this, doesn't match the Rule's Requirements
+
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[0] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[1] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[2] = 0x00000000;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[3] = 0x000000FF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[0]      = 0XFF020000; // Filter DST_IP
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[1]      = 0x00000000;
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[2]      = 0x11223344;
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[3]      = 0X556677AA;
+
+		/* Enable ttl update in HW */
+		flt_rule_entry.rule.ttl_update = 1;
+		printf ("flt_rule_entry was set successfully, preparing for insertion....\n");
+		if ((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry))
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		}
+		// Configuring Filtering Rule No.1
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table1.hdl; //put here the handle corresponding to Routing Rule 1
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[3]      = 0X556677BB;
+		/* Disable ttl update in HW */
+		flt_rule_entry.rule.ttl_update = 0;
+		if ((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry))
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		}
+
+		// Configuring Filtering Rule No.2
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table2.hdl; //put here the handle corresponding to Routing Rule 2
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[3]      = 0X556677CC;
+		/* Enable ttl update in HW */
+		flt_rule_entry.rule.ttl_update = 1;
+		if (
+				((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry)) ||
+				!m_filtering.AddFilteringRule(FilterTable0.GetFilteringTable())
+			)
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		} else
+		{
+			printf("flt rule hdl0=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(0)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(0)->status);
+			printf("flt rule hdl1=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(1)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(1)->status);
+			printf("flt rule hdl2=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(2)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(2)->status);
+		}
+		printf("Leaving %s, %s()\n",__FUNCTION__, __FILE__);
+		return true;
+	}// AddRules()
+
+	virtual bool ModifyPackets()
+	{
+		// TODO: Add verification that we access only allocated addresses
+		// TODO: Fix this, doesn't match the Rule's Requirements
+		m_sendBuffer[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
+		m_sendBuffer[HOP_LIMIT_OFFSET_IPV6] = 5;
+		m_sendBuffer2[DST_ADDR_LSB_OFFSET_IPV6] = 0xBB;
+		m_sendBuffer2[HOP_LIMIT_OFFSET_IPV6] = 4;
+		m_sendBuffer3[DST_ADDR_LSB_OFFSET_IPV6] = 0xCC;
+		m_sendBuffer3[HOP_LIMIT_OFFSET_IPV6] = 3;
+		return true;
+	}// ModifyPacktes ()
+
+	virtual bool ReceivePacketsAndCompare()
+	{
+		size_t receivedSize = 0;
+		size_t receivedSize2 = 0;
+		size_t receivedSize3 = 0;
+		bool pkt1_cmp_succ, pkt2_cmp_succ, pkt3_cmp_succ;
+
+		// Receive results
+		Byte *rxBuff1 = new Byte[0x400];
+		Byte *rxBuff2 = new Byte[0x400];
+		Byte *rxBuff3 = new Byte[0x400];
+
+		if (NULL == rxBuff1 || NULL == rxBuff2 || NULL == rxBuff3)
+		{
+			printf("Memory allocation error.\n");
+			return false;
+		}
+
+		memset(rxBuff1, 0, 0x400);
+		memset(rxBuff2, 0, 0x400);
+		memset(rxBuff3, 0, 0x400);
+
+		receivedSize = m_consumer.ReceiveData(rxBuff1, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize, m_consumer.m_fromChannelName.c_str());
+
+		receivedSize2 = m_consumer2.ReceiveData(rxBuff2, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize2, m_consumer2.m_fromChannelName.c_str());
+
+		receivedSize3 = m_defaultConsumer.ReceiveData(rxBuff3, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize3, m_defaultConsumer.m_fromChannelName.c_str());
+
+		/* Update TTL values. */
+		m_sendBuffer[HOP_LIMIT_OFFSET_IPV6] = 4;
+		m_sendBuffer3[HOP_LIMIT_OFFSET_IPV6] = 2;
+
+		// Compare results
+		pkt1_cmp_succ = CompareResultVsGolden(m_sendBuffer, m_sendSize, rxBuff1, receivedSize);
+		pkt2_cmp_succ = CompareResultVsGolden(m_sendBuffer2, m_sendSize2, rxBuff2, receivedSize2);
+		pkt3_cmp_succ = CompareResultVsGolden(m_sendBuffer3, m_sendSize3, rxBuff3, receivedSize3);
+
+		size_t recievedBufferSize =
+			MAX3(receivedSize, receivedSize2, receivedSize3) * 3;
+		size_t sentBufferSize =
+			MAX3(m_sendSize, m_sendSize2, m_sendSize3) * 3;
+		char *recievedBuffer = new char[recievedBufferSize];
+		char *sentBuffer = new char[sentBufferSize];
+		size_t j;
+
+		if (NULL == recievedBuffer || NULL == sentBuffer) {
+			printf("Memory allocation error\n");
+			return false;
+		}
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer[j]);
+		for(j = 0; j < receivedSize; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff1[j]);
+		printf("Expected Value1 (%zu)\n%s\n, Received Value1(%zu)\n%s\n-->Value1 %s\n",
+			m_sendSize,sentBuffer,receivedSize,recievedBuffer,
+			pkt1_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize2; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer2[j]);
+		for(j = 0; j < receivedSize2; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff2[j]);
+		printf("Expected Value2 (%zu)\n%s\n, Received Value2(%zu)\n%s\n-->Value2 %s\n",
+			m_sendSize2,sentBuffer,receivedSize2,recievedBuffer,
+			pkt2_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize3; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer3[j]);
+		for(j = 0; j < receivedSize3; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff3[j]);
+		printf("Expected Value3 (%zu)\n%s\n, Received Value3(%zu)\n%s\n-->Value3 %s\n",
+			m_sendSize3,sentBuffer,receivedSize3,recievedBuffer,
+			pkt3_cmp_succ?"Match":"no Match");
+
+		delete[] recievedBuffer;
+		delete[] sentBuffer;
+
+		delete[] rxBuff1;
+		delete[] rxBuff2;
+		delete[] rxBuff3;
+
+		return pkt1_cmp_succ && pkt2_cmp_succ && pkt3_cmp_succ;
+	}
+
+};
+
+/*---------------------------------------------------------------------------*/
+/* Test112: TTL Update on Filtering rule with status enabled  */
+/*---------------------------------------------------------------------------*/
+class IpaFilteringBlockTest112 : public IpaFilteringBlockTestFixture
+{
+public:
+	IpaFilteringBlockTest112()
+	{
+		m_name = "IpaFilteringBlockTest112";
+		m_description =
+		"Filtering block test 112 - Destination IP address and subnet mask match against LAN subnet \
+		(End-Point specific Filtering Table, Insert all rules in a single commit) \
+		and check if TTL is updated in status and packet. \
+		1. Generate and commit three routing tables. \
+			Each table contains a single \"bypass\" rule (all data goes to output pipe 0, 1  and 2 (accordingly)) \
+		2. Generate and commit Three filtering rules: (DST & Mask Match). \
+			All DST_IP == (127.0.0.1 & 255.0.0.255)traffic goes to routing table 0, enable TTL decrement in HW. \
+			All DST_IP == (192.169.1.1 & 255.0.0.255)traffic goes to routing table 1, enable TTL decrement in HW \
+			All DST_IP == (192.169.1.2 & 255.0.0.255)traffic goes to routing table 2, not enable TTL decrement in HW";
+		m_minIPAHwType = IPA_HW_v5_5;
+		Register(*this);
+	}
+
+	bool Setup()
+	{
+		/* we want statuses on this test */
+		return IpaFilteringBlockTestFixture::Setup(true);
+	}
+
+	virtual bool AddRules()
+	{
+		printf("Entering %s, %s()\n",__FUNCTION__, __FILE__);
+
+		const char bypass0[20] = "Bypass0";
+		const char bypass1[20] = "Bypass1";
+		const char bypass2[20] = "Bypass2";
+		struct ipa_ioc_get_rt_tbl routing_table0,routing_table1,routing_table2;
+
+		if (!CreateThreeIPv4BypassRoutingTables (bypass0,bypass1,bypass2))
+		{
+			printf("CreateThreeBypassRoutingTables Failed\n");
+			return false;
+		}
+
+		printf("CreateThreeBypassRoutingTables completed successfully\n");
+		routing_table0.ip = IPA_IP_v4;
+		strlcpy(routing_table0.name, bypass0, sizeof(routing_table0.name));
+		if (!m_routing.GetRoutingTable(&routing_table0))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table0=0x%p) Failed.\n",&routing_table0);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass0, routing_table0.hdl);
+
+		routing_table1.ip = IPA_IP_v4;
+		strlcpy(routing_table1.name, bypass1, sizeof(routing_table1.name));
+		if (!m_routing.GetRoutingTable(&routing_table1))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table1=0x%p) Failed.\n",&routing_table1);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass1, routing_table1.hdl);
+
+		routing_table2.ip = IPA_IP_v4;
+		strlcpy(routing_table2.name, bypass2, sizeof(routing_table2.name));
+		if (!m_routing.GetRoutingTable(&routing_table2))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table2=0x%p) Failed.\n",&routing_table2);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass2, routing_table2.hdl);
+
+		IPAFilteringTable_v2 FilterTable0;
+		struct ipa_flt_rule_add_v2 flt_rule_entry;
+		FilterTable0.Init(IPA_IP_v4,IPA_CLIENT_TEST_PROD,false,3);
+		printf("FilterTable*.Init Completed Successfully..\n");
+
+		// Configuring Filtering Rule No.0
+		FilterTable0.GeneratePresetRule(1,flt_rule_entry);
+		flt_rule_entry.at_rear = true;
+		flt_rule_entry.flt_rule_hdl=-1; // return Value
+		flt_rule_entry.status = -1; // return value
+		flt_rule_entry.rule.action=IPA_PASS_TO_ROUTING;
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table0.hdl; //put here the handle corresponding to Routing Rule 1
+		flt_rule_entry.rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+		flt_rule_entry.rule.attrib.u.v4.dst_addr_mask = 0xFF0000FF; // Mask
+		flt_rule_entry.rule.attrib.u.v4.dst_addr = 0x7F000001; // Filter DST_IP == 127.0.0.1.
+		flt_rule_entry.rule.ttl_update = 1; // require ttl update
+		if ((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry))
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		}
+
+		// Configuring Filtering Rule No.1
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table1.hdl; //put here the handle corresponding to Routing Rule 2
+		flt_rule_entry.rule.attrib.u.v4.dst_addr = 0xC0A80101; // Filter DST_IP == 192.168.1.1.
+		if ((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry))
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		}
+
+		// Configuring Filtering Rule No.2
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table2.hdl; //put here the handle corresponding to Routing Rule 2
+		// TODO: Fix this, doesn't match the Rule's Requirements
+		flt_rule_entry.rule.attrib.u.v4.dst_addr = 0xC0A80102; // Filter DST_IP == 192.168.1.2.
+		flt_rule_entry.rule.ttl_update = 0; // doesn't require ttl update
+		if (
+				((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry)) ||
+				!m_filtering.AddFilteringRule(FilterTable0.GetFilteringTable())
+			)
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		} else
+		{
+			printf("flt rule hdl0=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(0)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(0)->status);
+			printf("flt rule hdl1=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(1)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(1)->status);
+			printf("flt rule hdl2=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(2)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(2)->status);
+		}
+
+		printf("Leaving %s, %s()\n",__FUNCTION__, __FILE__);
+		return true;
+	}// AddRules()
+
+	virtual bool ModifyPackets()
+	{
+		int address;
+		address = ntohl(0x7F000001);//127.0.0.1
+		memcpy(&m_sendBuffer[IPV4_DST_ADDR_OFFSET], &address, sizeof(address));
+		m_sendBuffer[IPV4_TTL_OFFSET] = 5;
+		address = ntohl(0xC0A80101);//192.168.1.1
+		memcpy(&m_sendBuffer2[IPV4_DST_ADDR_OFFSET], &address, sizeof(address));
+		m_sendBuffer2[IPV4_TTL_OFFSET] = 4;
+		address = ntohl(0xC0A80102);//192.168.1.2
+		memcpy(&m_sendBuffer3[IPV4_DST_ADDR_OFFSET], &address, sizeof(address));
+		m_sendBuffer3[IPV4_TTL_OFFSET] = 3;
+		return true;
+	}// ModifyPacktes ()
+
+	virtual bool ReceivePacketsAndCompare()
+	{
+		size_t receivedSize = 0;
+		size_t receivedSize2 = 0;
+		size_t receivedSize3 = 0;
+		uint16_t csum = 0;
+		bool pkt1_cmp_succ, pkt2_cmp_succ, pkt3_cmp_succ;
+
+		// Receive results
+		Byte *rxBuff1 = new Byte[0x400];
+		Byte *rxBuff2 = new Byte[0x400];
+		Byte *rxBuff3 = new Byte[0x400];
+
+		if (NULL == rxBuff1 || NULL == rxBuff2 || NULL == rxBuff3)
+		{
+			printf("Memory allocation error.\n");
+			return false;
+		}
+
+		memset(rxBuff1, 0, 0x400);
+		memset(rxBuff2, 0, 0x400);
+		memset(rxBuff3, 0, 0x400);
+
+		receivedSize = m_consumer.ReceiveData(rxBuff1, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize, m_consumer.m_fromChannelName.c_str());
+
+		receivedSize2 = m_consumer2.ReceiveData(rxBuff2, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize2, m_consumer2.m_fromChannelName.c_str());
+
+		receivedSize3 = m_defaultConsumer.ReceiveData(rxBuff3, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize3, m_defaultConsumer.m_fromChannelName.c_str());
+
+		/* Update TTL values. */
+		m_sendBuffer[IPV4_TTL_OFFSET] = 4;
+		m_sendBuffer2[IPV4_TTL_OFFSET] = 3;
+
+		/* Update Checksum.*/
+		csum = *((uint16_t *)(m_sendBuffer + IPV4_CSUM_OFFSET));
+		csum += 1;
+		*((uint16_t *)(m_sendBuffer+ IPV4_CSUM_OFFSET)) = csum;
+
+		csum = *((uint16_t *)(m_sendBuffer2 + IPV4_CSUM_OFFSET));
+		csum += 1;
+		*((uint16_t *)(m_sendBuffer2 + IPV4_CSUM_OFFSET)) = csum;
+
+		// Compare results
+		pkt1_cmp_succ = CompareResultVsGolden_w_Status(m_sendBuffer, m_sendSize, rxBuff1, receivedSize);
+		pkt2_cmp_succ = CompareResultVsGolden_w_Status(m_sendBuffer2, m_sendSize2, rxBuff2, receivedSize2);
+		pkt3_cmp_succ = CompareResultVsGolden_w_Status(m_sendBuffer3, m_sendSize3, rxBuff3, receivedSize3);
+
+		pkt1_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5(m_sendSize, receivedSize, rxBuff1) : true;
+		pkt2_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5(m_sendSize2, receivedSize2, rxBuff2) : true;
+		pkt3_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			!IsTTLUpdated_v5_5(m_sendSize3, receivedSize3, rxBuff3) : true;
+
+		size_t recievedBufferSize =
+			MAX3(receivedSize, receivedSize2, receivedSize3) * 3;
+		size_t sentBufferSize =
+			MAX3(m_sendSize, m_sendSize2, m_sendSize3) * 3;
+		char *recievedBuffer = new char[recievedBufferSize];
+		char *sentBuffer = new char[sentBufferSize];
+		size_t j;
+
+		if (NULL == recievedBuffer || NULL == sentBuffer) {
+			printf("Memory allocation error\n");
+			return false;
+		}
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer[j]);
+		for(j = 0; j < receivedSize; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff1[j]);
+		printf("Expected Value1 (%zu)\n%s\n, Received Value1(%zu)\n%s\n-->Value1 %s\n",
+			m_sendSize,sentBuffer,receivedSize,recievedBuffer,
+			pkt1_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize2; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer2[j]);
+		for(j = 0; j < receivedSize2; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff2[j]);
+		printf("Expected Value2 (%zu)\n%s\n, Received Value2(%zu)\n%s\n-->Value2 %s\n",
+			m_sendSize2,sentBuffer,receivedSize2,recievedBuffer,
+			pkt2_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize3; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer3[j]);
+		for(j = 0; j < receivedSize3; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff3[j]);
+		printf("Expected Value3 (%zu)\n%s\n, Received Value3(%zu)\n%s\n-->Value3 %s\n",
+			m_sendSize3,sentBuffer,receivedSize3,recievedBuffer,
+			pkt3_cmp_succ?"Match":"no Match");
+
+		delete[] recievedBuffer;
+		delete[] sentBuffer;
+
+		delete[] rxBuff1;
+		delete[] rxBuff2;
+		delete[] rxBuff3;
+
+		return pkt1_cmp_succ && pkt2_cmp_succ && pkt3_cmp_succ;
+	}
+
+	virtual bool Teardown()
+	{
+		return true;
+	} // Teardown()
+};
+
+/*-----------------------------------------------------------------------------------------------------------------*/
+/* Test113: TTL update based on Destination IPv6 address and Subnet Mask exact match against broadcast IP address  */
+/*-----------------------------------------------------------------------------------------------------------------*/
+class IpaFilteringBlockTest113 : public IpaFilteringBlockTestFixture
+{
+public:
+	IpaFilteringBlockTest113()
+	{
+		m_name = "IpaFilteringBlockTest113";
+		m_description =
+		"Filtering block test 113 - TTL update based on Destination IPv6 address and Mask exact match against broadcast IP address (End-Point specific Filtering Table, Insert all rules in a single commit)\
+		1. Generate and commit three routing tables. \
+			Each table contains a single \"bypass\" rule (all data goes to output pipe 0, 1  and 2 (accordingly with TTL update)) \
+		2. Generate and commit three filtering rules: (DST & Mask Match). \
+			All DST_IPv6 == 0x...AA traffic goes to routing table 1 \
+			All DST_IPv6 == 0x...BB traffic goes to routing table 2 \
+			All DST_IPv6 == 0x...CC traffic goes to routing table 3 \
+		3. Check if TTL is updated in packet and status.";
+		m_IpaIPType = IPA_IP_v6;
+		m_minIPAHwType = IPA_HW_v5_5;
+		Register(*this);
+	}
+
+	bool Setup()
+	{
+		/* we want statuses on this test */
+		return IpaFilteringBlockTestFixture::Setup(true);
+	}
+
+	virtual bool AddRules()
+	{
+		printf("Entering %s, %s()\n",__FUNCTION__, __FILE__);
+		const char bypass0[20] = "Bypass0";
+		const char bypass1[20] = "Bypass1";
+		const char bypass2[20] = "Bypass2";
+		struct ipa_ioc_get_rt_tbl routing_table0,routing_table1,routing_table2;
+
+		if (!CreateThreeIPv6BypassRoutingTables (bypass0,bypass1,bypass2))
+		{
+			printf("CreateThreeBypassRoutingTables Failed\n");
+			return false;
+		}
+
+		printf("CreateThreeBypassRoutingTables completed successfully\n");
+		routing_table0.ip = IPA_IP_v6;
+		strlcpy(routing_table0.name, bypass0, sizeof(routing_table0.name));
+		if (!m_routing.GetRoutingTable(&routing_table0))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table0=0x%p) Failed.\n",&routing_table0);
+			return false;
+		}
+		routing_table1.ip = IPA_IP_v6;
+		strlcpy(routing_table1.name, bypass1, sizeof(routing_table1.name));
+		if (!m_routing.GetRoutingTable(&routing_table1))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table1=0x%p) Failed.\n",&routing_table1);
+			return false;
+		}
+
+		routing_table2.ip = IPA_IP_v6;
+		strlcpy(routing_table2.name, bypass2, sizeof(routing_table2.name));
+		if (!m_routing.GetRoutingTable(&routing_table2))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table2=0x%p) Failed.\n",&routing_table2);
+			return false;
+		}
+
+		IPAFilteringTable_v2 FilterTable0;
+		struct ipa_flt_rule_add_v2 flt_rule_entry;
+		FilterTable0.Init(IPA_IP_v6,IPA_CLIENT_TEST_PROD,false,3);
+
+		// Configuring Filtering Rule No.0
+		FilterTable0.GeneratePresetRule(1,flt_rule_entry);
+		flt_rule_entry.at_rear = true;
+		flt_rule_entry.flt_rule_hdl=-1; // return Value
+		flt_rule_entry.status = -1; // return value
+		flt_rule_entry.rule.action=IPA_PASS_TO_ROUTING;
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table0.hdl; //put here the handle corresponding to Routing Rule 1
+		flt_rule_entry.rule.attrib.attrib_mask = IPA_FLT_DST_ADDR; // TODO: Fix this, doesn't match the Rule's Requirements
+
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[0] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[1] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[2] = 0x00000000;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[3] = 0x000000FF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[0]      = 0XFF020000; // Filter DST_IP
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[1]      = 0x00000000;
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[2]      = 0x11223344;
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[3]      = 0X556677AA;
+
+		/* Enable ttl update in HW */
+		flt_rule_entry.rule.ttl_update = 1;
+		printf ("flt_rule_entry was set successfully, preparing for insertion....\n");
+		if ((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry))
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		}
+		// Configuring Filtering Rule No.1
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table1.hdl; //put here the handle corresponding to Routing Rule 1
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[3]      = 0X556677BB;
+		/* Disable ttl update in HW */
+		flt_rule_entry.rule.ttl_update = 0;
+		if ((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry))
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		}
+
+		// Configuring Filtering Rule No.2
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table2.hdl; //put here the handle corresponding to Routing Rule 2
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[3]      = 0X556677CC;
+		/* Enable ttl update in HW */
+		flt_rule_entry.rule.ttl_update = 1;
+		if (
+				((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry)) ||
+				!m_filtering.AddFilteringRule(FilterTable0.GetFilteringTable())
+			)
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		} else
+		{
+			printf("flt rule hdl0=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(0)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(0)->status);
+			printf("flt rule hdl1=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(1)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(1)->status);
+			printf("flt rule hdl2=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(2)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(2)->status);
+		}
+		printf("Leaving %s, %s()\n",__FUNCTION__, __FILE__);
+		return true;
+	}// AddRules()
+
+	virtual bool ModifyPackets()
+	{
+		// TODO: Add verification that we access only allocated addresses
+		// TODO: Fix this, doesn't match the Rule's Requirements
+		m_sendBuffer[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
+		m_sendBuffer[HOP_LIMIT_OFFSET_IPV6] = 5;
+		m_sendBuffer2[DST_ADDR_LSB_OFFSET_IPV6] = 0xBB;
+		m_sendBuffer2[HOP_LIMIT_OFFSET_IPV6] = 4;
+		m_sendBuffer3[DST_ADDR_LSB_OFFSET_IPV6] = 0xCC;
+		m_sendBuffer3[HOP_LIMIT_OFFSET_IPV6] = 3;
+		return true;
+	}// ModifyPacktes ()
+
+	virtual bool ReceivePacketsAndCompare()
+	{
+		size_t receivedSize = 0;
+		size_t receivedSize2 = 0;
+		size_t receivedSize3 = 0;
+		bool pkt1_cmp_succ, pkt2_cmp_succ, pkt3_cmp_succ;
+
+		// Receive results
+		Byte *rxBuff1 = new Byte[0x400];
+		Byte *rxBuff2 = new Byte[0x400];
+		Byte *rxBuff3 = new Byte[0x400];
+
+		if (NULL == rxBuff1 || NULL == rxBuff2 || NULL == rxBuff3)
+		{
+			printf("Memory allocation error.\n");
+			return false;
+		}
+
+		memset(rxBuff1, 0, 0x400);
+		memset(rxBuff2, 0, 0x400);
+		memset(rxBuff3, 0, 0x400);
+
+		receivedSize = m_consumer.ReceiveData(rxBuff1, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize, m_consumer.m_fromChannelName.c_str());
+
+		receivedSize2 = m_consumer2.ReceiveData(rxBuff2, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize2, m_consumer2.m_fromChannelName.c_str());
+
+		receivedSize3 = m_defaultConsumer.ReceiveData(rxBuff3, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize3, m_defaultConsumer.m_fromChannelName.c_str());
+
+		/* Update TTL values. */
+		m_sendBuffer[HOP_LIMIT_OFFSET_IPV6] = 4;
+		m_sendBuffer3[HOP_LIMIT_OFFSET_IPV6] = 2;
+
+		// Compare results
+		pkt1_cmp_succ = CompareResultVsGolden_w_Status(m_sendBuffer, m_sendSize, rxBuff1, receivedSize);
+		pkt2_cmp_succ = CompareResultVsGolden_w_Status(m_sendBuffer2, m_sendSize2, rxBuff2, receivedSize2);
+		pkt3_cmp_succ = CompareResultVsGolden_w_Status(m_sendBuffer3, m_sendSize3, rxBuff3, receivedSize3);
+
+		pkt1_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5(m_sendSize, receivedSize, rxBuff1) : true;
+		pkt2_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5(m_sendSize2, receivedSize2, rxBuff2) : true;
+		pkt3_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			!IsTTLUpdated_v5_5(m_sendSize3, receivedSize3, rxBuff3) : true;
+
+		size_t recievedBufferSize =
+			MAX3(receivedSize, receivedSize2, receivedSize3) * 3;
+		size_t sentBufferSize =
+			MAX3(m_sendSize, m_sendSize2, m_sendSize3) * 3;
+		char *recievedBuffer = new char[recievedBufferSize];
+		char *sentBuffer = new char[sentBufferSize];
+		size_t j;
+
+		if (NULL == recievedBuffer || NULL == sentBuffer) {
+			printf("Memory allocation error\n");
+			return false;
+		}
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer[j]);
+		for(j = 0; j < receivedSize; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff1[j]);
+		printf("Expected Value1 (%zu)\n%s\n, Received Value1(%zu)\n%s\n-->Value1 %s\n",
+			m_sendSize,sentBuffer,receivedSize,recievedBuffer,
+			pkt1_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize2; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer2[j]);
+		for(j = 0; j < receivedSize2; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff2[j]);
+		printf("Expected Value2 (%zu)\n%s\n, Received Value2(%zu)\n%s\n-->Value2 %s\n",
+			m_sendSize2,sentBuffer,receivedSize2,recievedBuffer,
+			pkt2_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize3; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer3[j]);
+		for(j = 0; j < receivedSize3; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff3[j]);
+		printf("Expected Value3 (%zu)\n%s\n, Received Value3(%zu)\n%s\n-->Value3 %s\n",
+			m_sendSize3,sentBuffer,receivedSize3,recievedBuffer,
+			pkt3_cmp_succ?"Match":"no Match");
+
+		delete[] recievedBuffer;
+		delete[] sentBuffer;
+
+		delete[] rxBuff1;
+		delete[] rxBuff2;
+		delete[] rxBuff3;
+
+		return pkt1_cmp_succ && pkt2_cmp_succ && pkt3_cmp_succ;
+	}
+
+};
+
+/*---------------------------------------------------------------------------*/
+/* Test114: IPv4 TTL exception test */
+/*---------------------------------------------------------------------------*/
+class IpaFilteringBlockTest114 : public IpaFilteringBlockTestFixture
+{
+public:
+	IpaFilteringBlockTest114()
+	{
+		m_name = "IpaFilteringBlockTest114";
+		m_description = " \
+		Filtering block test 114 - IPv4 with TTL exception and TTL=1 \
+		1. Add filtering rule with TTL decrement marked as 1 \
+		2. Send packet with TTL=1 \
+		3. Verify packet arrival on the exception pipe \
+		4. Verify that the packet was not modified \
+		5. Verify packet status for the TTL exception";
+		m_minIPAHwType = IPA_HW_v5_5;
+		Register(*this);
+	}
+
+
+	bool Setup()
+	{
+		/* we want statuses on this test */
+		return IpaFilteringBlockTestFixture::Setup(true);
+	}
+
+	virtual bool AddRules()
+	{
+		printf("Entering %s, %s()\n",__FUNCTION__, __FILE__);
+
+		const char bypass0[20] = "Bypass0";
+		const char bypass1[20] = "Bypass1";
+		const char bypass2[20] = "Bypass2";
+		struct ipa_ioc_get_rt_tbl routing_table0,routing_table1,routing_table2;
+
+		if (!CreateThreeIPv4BypassRoutingTables (bypass0,bypass1,bypass2))
+		{
+			printf("CreateThreeBypassRoutingTables Failed\n");
+			return false;
+		}
+
+		printf("CreateThreeBypassRoutingTables completed successfully\n");
+		routing_table0.ip = IPA_IP_v4;
+		strlcpy(routing_table0.name, bypass0, sizeof(routing_table0.name));
+		if (!m_routing.GetRoutingTable(&routing_table0))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table0=0x%p) Failed.\n",&routing_table0);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass0, routing_table0.hdl);
+
+		routing_table1.ip = IPA_IP_v4;
+		strlcpy(routing_table1.name, bypass1, sizeof(routing_table1.name));
+		if (!m_routing.GetRoutingTable(&routing_table1))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table1=0x%p) Failed.\n",&routing_table1);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass1, routing_table1.hdl);
+
+		routing_table2.ip = IPA_IP_v4;
+		strlcpy(routing_table2.name, bypass2, sizeof(routing_table2.name));
+		if (!m_routing.GetRoutingTable(&routing_table2))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table2=0x%p) Failed.\n",&routing_table2);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass2, routing_table2.hdl);
+
+		IPAFilteringTable_v2 FilterTable0;
+		struct ipa_flt_rule_add_v2 flt_rule_entry;
+		FilterTable0.Init(IPA_IP_v4,IPA_CLIENT_TEST_PROD,false,3);
+		printf("FilterTable*.Init Completed Successfully..\n");
+
+		// Configuring Filtering Rule No.0
+		FilterTable0.GeneratePresetRule(1,flt_rule_entry);
+		flt_rule_entry.at_rear = true;
+		flt_rule_entry.flt_rule_hdl=-1; // return Value
+		flt_rule_entry.status = -1; // return value
+		flt_rule_entry.rule.action=IPA_PASS_TO_ROUTING;
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table0.hdl; //put here the handle corresponding to Routing Rule 1
+		flt_rule_entry.rule.ttl_update = 1; // require ttl update
+		if ((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry))
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		}
+
+		// Configuring Filtering Rule No.1
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table1.hdl; //put here the handle corresponding to Routing Rule 2
+		if ((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry))
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		}
+
+		// Configuring Filtering Rule No.2
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table2.hdl; //put here the handle corresponding to Routing Rule 2
+		flt_rule_entry.rule.ttl_update = 1;
+		flt_rule_entry.rule.ttl_update = 0; // doesn't require ttl update
+		if (
+				((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry)) ||
+				!m_filtering.AddFilteringRule(FilterTable0.GetFilteringTable())
+			)
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		} else
+		{
+			printf("flt rule hdl0=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(0)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(0)->status);
+			printf("flt rule hdl1=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(1)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(1)->status);
+			printf("flt rule hdl2=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(2)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(2)->status);
+		}
+
+		printf("Leaving %s, %s()\n",__FUNCTION__, __FILE__);
+		return true;
+	}// AddRules()
+
+	virtual bool ModifyPackets()
+	{
+		int address;
+
+		m_sendBuffer[IPV4_TTL_OFFSET] = 1;
+		m_sendBuffer2[IPV4_TTL_OFFSET] = 1;
+		m_sendBuffer3[IPV4_TTL_OFFSET] = 1;
+		return true;
+	}// ModifyPacktes ()
+
+	virtual bool ReceivePacketsAndCompare()
+	{
+		size_t receivedSize = 0;
+		size_t receivedSize2 = 0;
+		size_t receivedSize3 = 0;
+		bool pkt1_cmp_succ, pkt2_cmp_succ, pkt3_cmp_succ;
+
+		// Receive results
+		Byte *rxBuff1 = new Byte[0x400];
+		Byte *rxBuff2 = new Byte[0x400];
+		Byte *rxBuff3 = new Byte[0x400];
+
+		if (NULL == rxBuff1 || NULL == rxBuff2 || NULL == rxBuff3)
+		{
+			printf("Memory allocation error.\n");
+			return false;
+		}
+
+		memset(rxBuff1, 0, 0x400);
+		memset(rxBuff2, 0, 0x400);
+		memset(rxBuff3, 0, 0x400);
+
+		receivedSize = m_Exceptions.ReceiveData(rxBuff1, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize, m_Exceptions.m_fromChannelName.c_str());
+
+		receivedSize2 = m_Exceptions.ReceiveData(rxBuff2, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize2, m_Exceptions.m_fromChannelName.c_str());
+
+		receivedSize3 = m_Exceptions.ReceiveData(rxBuff3, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize3, m_Exceptions.m_fromChannelName.c_str());
+
+		/* Update TTL values. */
+		m_sendBuffer[IPV4_TTL_OFFSET] = 1;
+		m_sendBuffer2[IPV4_TTL_OFFSET] = 1;
+		m_sendBuffer3[IPV4_TTL_OFFSET] = 1;
+
+		// Compare results
+		pkt1_cmp_succ = CompareResultVsGolden(m_sendBuffer, m_sendSize, rxBuff1, receivedSize);
+		pkt2_cmp_succ = CompareResultVsGolden(m_sendBuffer2, m_sendSize2, rxBuff2, receivedSize2);
+		pkt3_cmp_succ = CompareResultVsGolden(m_sendBuffer3, m_sendSize3, rxBuff3, receivedSize3);
+
+		pkt1_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5_wo_status(m_sendSize, receivedSize, rxBuff1) : true;
+		pkt2_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5_wo_status(m_sendSize2, receivedSize2, rxBuff2) : true;
+		pkt3_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5_wo_status(m_sendSize3, receivedSize3, rxBuff3) : true;
+
+		size_t recievedBufferSize =
+			MAX3(receivedSize, receivedSize2, receivedSize3) * 3;
+		size_t sentBufferSize =
+			MAX3(m_sendSize, m_sendSize2, m_sendSize3) * 3;
+		char *recievedBuffer = new char[recievedBufferSize];
+		char *sentBuffer = new char[sentBufferSize];
+		size_t j;
+
+		if (NULL == recievedBuffer || NULL == sentBuffer) {
+			printf("Memory allocation error\n");
+			return false;
+		}
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer[j]);
+		for(j = 0; j < receivedSize; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff1[j]);
+		printf("Expected Value1 (%zu)\n%s\n, Received Value1(%zu)\n%s\n-->Value1 %s\n",
+			m_sendSize,sentBuffer,receivedSize,recievedBuffer,
+			pkt1_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize2; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer2[j]);
+		for(j = 0; j < receivedSize2; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff2[j]);
+		printf("Expected Value2 (%zu)\n%s\n, Received Value2(%zu)\n%s\n-->Value2 %s\n",
+			m_sendSize2,sentBuffer,receivedSize2,recievedBuffer,
+			pkt2_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize3; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer3[j]);
+		for(j = 0; j < receivedSize3; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff3[j]);
+		printf("Expected Value3 (%zu)\n%s\n, Received Value3(%zu)\n%s\n-->Value3 %s\n",
+			m_sendSize3,sentBuffer,receivedSize3,recievedBuffer,
+			pkt3_cmp_succ?"Match":"no Match");
+
+		delete[] recievedBuffer;
+		delete[] sentBuffer;
+
+		delete[] rxBuff1;
+		delete[] rxBuff2;
+		delete[] rxBuff3;
+
+		return pkt1_cmp_succ && pkt2_cmp_succ && pkt3_cmp_succ;
+	}
+
+	virtual bool Teardown()
+	{
+		return true;
+	} // Teardown()
+};
+
+/*---------------------------------------------------------------------------*/
+/* Test115: IPv6 TTL exception test */
+/*---------------------------------------------------------------------------*/
+class IpaFilteringBlockTest115 : public IpaFilteringBlockTestFixture
+{
+public:
+	IpaFilteringBlockTest115()
+	{
+		m_name = "IpaFilteringBlockTest115";
+		m_description = " \
+		Filtering block test 115 - IPv6 with TTL exception and TTL=1 \
+		1. Add filtering rule with TTL decrement marked as 1 \
+		2. Send packet with TTL=1 \
+		3. Verify packet arrival on the exception pipe \
+		4. Verify that the packet was not modified \
+		5. Verify packet status for the TTL exception";
+		m_minIPAHwType = IPA_HW_v5_5;
+		Register(*this);
+	}
+
+
+	bool Setup()
+	{
+		/* we want statuses on this test */
+		return IpaFilteringBlockTestFixture::Setup(true);
+	}
+
+	virtual bool AddRules()
+	{
+		printf("Entering %s, %s()\n",__FUNCTION__, __FILE__);
+
+		const char bypass0[20] = "Bypass0";
+		const char bypass1[20] = "Bypass1";
+		const char bypass2[20] = "Bypass2";
+		struct ipa_ioc_get_rt_tbl routing_table0,routing_table1,routing_table2;
+
+		if (!CreateThreeIPv6BypassRoutingTables(bypass0,bypass1,bypass2))
+		{
+			printf("CreateThreeIPv6BypassRoutingTables Failed\n");
+			return false;
+		}
+
+		printf("CreateThreeIPv6BypassRoutingTables completed successfully\n");
+		routing_table0.ip = IPA_IP_v6;
+		strlcpy(routing_table0.name, bypass0, sizeof(routing_table0.name));
+		if (!m_routing.GetRoutingTable(&routing_table0))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table0=0x%p) Failed.\n",&routing_table0);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass0, routing_table0.hdl);
+
+		routing_table1.ip = IPA_IP_v6;
+		strlcpy(routing_table1.name, bypass1, sizeof(routing_table1.name));
+		if (!m_routing.GetRoutingTable(&routing_table1))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table1=0x%p) Failed.\n",&routing_table1);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass1, routing_table1.hdl);
+
+		routing_table2.ip = IPA_IP_v6;
+		strlcpy(routing_table2.name, bypass2, sizeof(routing_table2.name));
+		if (!m_routing.GetRoutingTable(&routing_table2))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table2=0x%p) Failed.\n",&routing_table2);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass2, routing_table2.hdl);
+
+		IPAFilteringTable_v2 FilterTable0;
+		struct ipa_flt_rule_add_v2 flt_rule_entry;
+		FilterTable0.Init(IPA_IP_v6,IPA_CLIENT_TEST_PROD,false,3);
+		printf("FilterTable*.Init Completed Successfully..\n");
+
+		// Configuring Filtering Rule No.0
+		FilterTable0.GeneratePresetRule(1,flt_rule_entry);
+		flt_rule_entry.at_rear = true;
+		flt_rule_entry.flt_rule_hdl=-1; // return Value
+		flt_rule_entry.status = -1; // return value
+		flt_rule_entry.rule.action=IPA_PASS_TO_ROUTING;
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table0.hdl; //put here the handle corresponding to Routing Rule 1
+		flt_rule_entry.rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+		flt_rule_entry.rule.ttl_update = 1; // require ttl update
+		if ((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry))
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		}
+
+		// Configuring Filtering Rule No.1
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table1.hdl; //put here the handle corresponding to Routing Rule 2
+		if ((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry))
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		}
+
+		// Configuring Filtering Rule No.2
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table2.hdl; //put here the handle corresponding to Routing Rule 2
+		flt_rule_entry.rule.ttl_update = 1;
+		flt_rule_entry.rule.ttl_update = 0; // doesn't require ttl update
+
+		if (
+				((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry)) ||
+				!m_filtering.AddFilteringRule(FilterTable0.GetFilteringTable())
+			)
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		} else
+		{
+			printf("flt rule hdl0=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(0)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(0)->status);
+			printf("flt rule hdl1=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(1)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(1)->status);
+			printf("flt rule hdl2=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(2)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(2)->status);
+		}
+
+		printf("Leaving %s, %s()\n",__FUNCTION__, __FILE__);
+		return true;
+	}// AddRules()
+
+	virtual bool ModifyPackets()
+	{
+		int address;
+
+		m_sendBuffer[HOP_LIMIT_OFFSET_IPV6] = 1;
+		m_sendBuffer2[HOP_LIMIT_OFFSET_IPV6] = 1;
+		m_sendBuffer3[HOP_LIMIT_OFFSET_IPV6] = 1;
+		return true;
+	}// ModifyPacktes ()
+
+	virtual bool ReceivePacketsAndCompare()
+	{
+		size_t receivedSize = 0;
+		size_t receivedSize2 = 0;
+		size_t receivedSize3 = 0;
+		bool pkt1_cmp_succ, pkt2_cmp_succ, pkt3_cmp_succ;
+
+		// Receive results
+		Byte *rxBuff1 = new Byte[0x400];
+		Byte *rxBuff2 = new Byte[0x400];
+		Byte *rxBuff3 = new Byte[0x400];
+
+		if (NULL == rxBuff1 || NULL == rxBuff2 || NULL == rxBuff3)
+		{
+			printf("Memory allocation error.\n");
+			return false;
+		}
+
+		memset(rxBuff1, 0, 0x400);
+		memset(rxBuff2, 0, 0x400);
+		memset(rxBuff3, 0, 0x400);
+
+		receivedSize = m_Exceptions.ReceiveData(rxBuff1, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize, m_Exceptions.m_fromChannelName.c_str());
+
+		receivedSize2 = m_Exceptions.ReceiveData(rxBuff2, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize2, m_Exceptions.m_fromChannelName.c_str());
+
+		receivedSize3 = m_Exceptions.ReceiveData(rxBuff3, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize3, m_Exceptions.m_fromChannelName.c_str());
+
+		/* Update TTL values. */
+		m_sendBuffer[HOP_LIMIT_OFFSET_IPV6] = 1;
+		m_sendBuffer2[HOP_LIMIT_OFFSET_IPV6] = 1;
+		m_sendBuffer3[HOP_LIMIT_OFFSET_IPV6] = 1;
+
+		// Compare results
+		pkt1_cmp_succ = CompareResultVsGolden(m_sendBuffer, m_sendSize, rxBuff1, receivedSize);
+		pkt2_cmp_succ = CompareResultVsGolden(m_sendBuffer2, m_sendSize2, rxBuff2, receivedSize2);
+		pkt3_cmp_succ = CompareResultVsGolden(m_sendBuffer3, m_sendSize3, rxBuff3, receivedSize3);
+
+		pkt1_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5_wo_status(m_sendSize, receivedSize, rxBuff1) : true;
+		pkt2_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5_wo_status(m_sendSize2, receivedSize2, rxBuff2) : true;
+		pkt3_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5_wo_status(m_sendSize3, receivedSize3, rxBuff3) : true;
+
+		size_t recievedBufferSize =
+			MAX3(receivedSize, receivedSize2, receivedSize3) * 3;
+		size_t sentBufferSize =
+			MAX3(m_sendSize, m_sendSize2, m_sendSize3) * 3;
+		char *recievedBuffer = new char[recievedBufferSize];
+		char *sentBuffer = new char[sentBufferSize];
+		size_t j;
+
+		if (NULL == recievedBuffer || NULL == sentBuffer) {
+			printf("Memory allocation error\n");
+			return false;
+		}
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer[j]);
+		for(j = 0; j < receivedSize; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff1[j]);
+		printf("Expected Value1 (%zu)\n%s\n, Received Value1(%zu)\n%s\n-->Value1 %s\n",
+			m_sendSize,sentBuffer,receivedSize,recievedBuffer,
+			pkt1_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize2; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer2[j]);
+		for(j = 0; j < receivedSize2; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff2[j]);
+		printf("Expected Value2 (%zu)\n%s\n, Received Value2(%zu)\n%s\n-->Value2 %s\n",
+			m_sendSize2,sentBuffer,receivedSize2,recievedBuffer,
+			pkt2_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize3; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer3[j]);
+		for(j = 0; j < receivedSize3; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff3[j]);
+		printf("Expected Value3 (%zu)\n%s\n, Received Value3(%zu)\n%s\n-->Value3 %s\n",
+			m_sendSize3,sentBuffer,receivedSize3,recievedBuffer,
+			pkt3_cmp_succ?"Match":"no Match");
+
+		delete[] recievedBuffer;
+		delete[] sentBuffer;
+
+		delete[] rxBuff1;
+		delete[] rxBuff2;
+		delete[] rxBuff3;
+
+		return pkt1_cmp_succ && pkt2_cmp_succ && pkt3_cmp_succ;
+	}
+
+	virtual bool Teardown()
+	{
+		return true;
+	} // Teardown()
+};
+
+/*---------------------------------------------------------------------------*/
+/* Test114: IPv4 TTL exception test */
+/*---------------------------------------------------------------------------*/
+class IpaFilteringBlockTest116 : public IpaFilteringBlockTestFixture
+{
+public:
+	IpaFilteringBlockTest116()
+	{
+		m_name = "IpaFilteringBlockTest116";
+		m_description = " \
+		Filtering block test 116 - IPv4 with TTL exception and TTL=0 \
+		1. Add filtering rule with TTL decrement marked as 1 \
+		2. Send packet with TTL=0 \
+		3. Verify packet arrival on the exception pipe \
+		4. Verify that the packet was not modified \
+		5. Verify packet status for the TTL exception";
+		m_minIPAHwType = IPA_HW_v5_5;
+		Register(*this);
+	}
+
+
+	bool Setup()
+	{
+		/* we want statuses on this test */
+		return IpaFilteringBlockTestFixture::Setup(true);
+	}
+
+	virtual bool AddRules()
+	{
+		printf("Entering %s, %s()\n",__FUNCTION__, __FILE__);
+
+		const char bypass0[20] = "Bypass0";
+		const char bypass1[20] = "Bypass1";
+		const char bypass2[20] = "Bypass2";
+		struct ipa_ioc_get_rt_tbl routing_table0,routing_table1,routing_table2;
+
+		if (!CreateThreeIPv4BypassRoutingTables (bypass0,bypass1,bypass2))
+		{
+			printf("CreateThreeBypassRoutingTables Failed\n");
+			return false;
+		}
+
+		printf("CreateThreeBypassRoutingTables completed successfully\n");
+		routing_table0.ip = IPA_IP_v4;
+		strlcpy(routing_table0.name, bypass0, sizeof(routing_table0.name));
+		if (!m_routing.GetRoutingTable(&routing_table0))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table0=0x%p) Failed.\n",&routing_table0);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass0, routing_table0.hdl);
+
+		routing_table1.ip = IPA_IP_v4;
+		strlcpy(routing_table1.name, bypass1, sizeof(routing_table1.name));
+		if (!m_routing.GetRoutingTable(&routing_table1))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table1=0x%p) Failed.\n",&routing_table1);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass1, routing_table1.hdl);
+
+		routing_table2.ip = IPA_IP_v4;
+		strlcpy(routing_table2.name, bypass2, sizeof(routing_table2.name));
+		if (!m_routing.GetRoutingTable(&routing_table2))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table2=0x%p) Failed.\n",&routing_table2);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass2, routing_table2.hdl);
+
+		IPAFilteringTable_v2 FilterTable0;
+		struct ipa_flt_rule_add_v2 flt_rule_entry;
+		FilterTable0.Init(IPA_IP_v4,IPA_CLIENT_TEST_PROD,false,3);
+		printf("FilterTable*.Init Completed Successfully..\n");
+
+		// Configuring Filtering Rule No.0
+		FilterTable0.GeneratePresetRule(1,flt_rule_entry);
+		flt_rule_entry.at_rear = true;
+		flt_rule_entry.flt_rule_hdl=-1; // return Value
+		flt_rule_entry.status = -1; // return value
+		flt_rule_entry.rule.action=IPA_PASS_TO_ROUTING;
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table0.hdl; //put here the handle corresponding to Routing Rule 1
+		flt_rule_entry.rule.ttl_update = 1; // require ttl update
+		if ((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry))
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		}
+
+		// Configuring Filtering Rule No.1
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table1.hdl; //put here the handle corresponding to Routing Rule 2
+		if ((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry))
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		}
+
+		// Configuring Filtering Rule No.2
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table2.hdl; //put here the handle corresponding to Routing Rule 2
+		flt_rule_entry.rule.ttl_update = 0; // doesn't require ttl update
+		if (
+				((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry)) ||
+				!m_filtering.AddFilteringRule(FilterTable0.GetFilteringTable())
+			)
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		} else
+		{
+			printf("flt rule hdl0=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(0)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(0)->status);
+			printf("flt rule hdl1=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(1)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(1)->status);
+			printf("flt rule hdl2=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(2)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(2)->status);
+		}
+
+		printf("Leaving %s, %s()\n",__FUNCTION__, __FILE__);
+		return true;
+	}// AddRules()
+
+	virtual bool ModifyPackets()
+	{
+		int address;
+
+		m_sendBuffer[IPV4_TTL_OFFSET] = 0;
+		m_sendBuffer2[IPV4_TTL_OFFSET] = 0;
+		m_sendBuffer3[IPV4_TTL_OFFSET] = 0;
+		return true;
+	}// ModifyPacktes ()
+
+	virtual bool ReceivePacketsAndCompare()
+	{
+		size_t receivedSize = 0;
+		size_t receivedSize2 = 0;
+		size_t receivedSize3 = 0;
+		bool pkt1_cmp_succ, pkt2_cmp_succ, pkt3_cmp_succ;
+
+		// Receive results
+		Byte *rxBuff1 = new Byte[0x400];
+		Byte *rxBuff2 = new Byte[0x400];
+		Byte *rxBuff3 = new Byte[0x400];
+
+		if (NULL == rxBuff1 || NULL == rxBuff2 || NULL == rxBuff3)
+		{
+			printf("Memory allocation error.\n");
+			return false;
+		}
+
+		memset(rxBuff1, 0, 0x400);
+		memset(rxBuff2, 0, 0x400);
+		memset(rxBuff3, 0, 0x400);
+
+		receivedSize = m_Exceptions.ReceiveData(rxBuff1, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize, m_Exceptions.m_fromChannelName.c_str());
+
+		receivedSize2 = m_Exceptions.ReceiveData(rxBuff2, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize2, m_Exceptions.m_fromChannelName.c_str());
+
+		receivedSize3 = m_Exceptions.ReceiveData(rxBuff3, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize3, m_Exceptions.m_fromChannelName.c_str());
+
+		/* Update TTL values. */
+		m_sendBuffer[IPV4_TTL_OFFSET] = 0;
+		m_sendBuffer2[IPV4_TTL_OFFSET] = 0;
+		m_sendBuffer3[IPV4_TTL_OFFSET] = 0;
+
+		// Compare results
+		pkt1_cmp_succ = CompareResultVsGolden(m_sendBuffer, m_sendSize, rxBuff1, receivedSize);
+		pkt2_cmp_succ = CompareResultVsGolden(m_sendBuffer2, m_sendSize2, rxBuff2, receivedSize2);
+		pkt3_cmp_succ = CompareResultVsGolden(m_sendBuffer3, m_sendSize3, rxBuff3, receivedSize3);
+
+		pkt1_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5_wo_status(m_sendSize, receivedSize, rxBuff1) : true;
+		pkt2_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5_wo_status(m_sendSize2, receivedSize2, rxBuff2) : true;
+		pkt3_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5_wo_status(m_sendSize3, receivedSize3, rxBuff3) : true;
+
+		size_t recievedBufferSize =
+			MAX3(receivedSize, receivedSize2, receivedSize3) * 3;
+		size_t sentBufferSize =
+			MAX3(m_sendSize, m_sendSize2, m_sendSize3) * 3;
+		char *recievedBuffer = new char[recievedBufferSize];
+		char *sentBuffer = new char[sentBufferSize];
+		size_t j;
+
+		if (NULL == recievedBuffer || NULL == sentBuffer) {
+			printf("Memory allocation error\n");
+			return false;
+		}
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer[j]);
+		for(j = 0; j < receivedSize; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff1[j]);
+		printf("Expected Value1 (%zu)\n%s\n, Received Value1(%zu)\n%s\n-->Value1 %s\n",
+			m_sendSize,sentBuffer,receivedSize,recievedBuffer,
+			pkt1_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize2; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer2[j]);
+		for(j = 0; j < receivedSize2; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff2[j]);
+		printf("Expected Value2 (%zu)\n%s\n, Received Value2(%zu)\n%s\n-->Value2 %s\n",
+			m_sendSize2,sentBuffer,receivedSize2,recievedBuffer,
+			pkt2_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize3; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer3[j]);
+		for(j = 0; j < receivedSize3; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff3[j]);
+		printf("Expected Value3 (%zu)\n%s\n, Received Value3(%zu)\n%s\n-->Value3 %s\n",
+			m_sendSize3,sentBuffer,receivedSize3,recievedBuffer,
+			pkt3_cmp_succ?"Match":"no Match");
+
+		delete[] recievedBuffer;
+		delete[] sentBuffer;
+
+		delete[] rxBuff1;
+		delete[] rxBuff2;
+		delete[] rxBuff3;
+
+		return pkt1_cmp_succ && pkt2_cmp_succ && pkt3_cmp_succ;
+	}
+
+	virtual bool Teardown()
+	{
+		return true;
+	} // Teardown()
+};
+
+/*---------------------------------------------------------------------------*/
+/* Test117: IPv6 TTL exception test */
+/*---------------------------------------------------------------------------*/
+class IpaFilteringBlockTest117 : public IpaFilteringBlockTestFixture
+{
+public:
+	IpaFilteringBlockTest117()
+	{
+		m_name = "IpaFilteringBlockTest117";
+		m_description = " \
+		Filtering block test 117 - IPv6 with TTL exception and TTL=0 \
+		1. Add filtering rule with TTL decrement marked as 1 \
+		2. Send packet with TTL=0 \
+		3. Verify packet arrival on the exception pipe \
+		4. Verify that the packet was not modified \
+		5. Verify packet status for the TTL exception";
+		m_minIPAHwType = IPA_HW_v5_5;
+		Register(*this);
+	}
+
+
+	bool Setup()
+	{
+		/* we want statuses on this test */
+		return IpaFilteringBlockTestFixture::Setup(true);
+	}
+
+	virtual bool AddRules()
+	{
+		printf("Entering %s, %s()\n",__FUNCTION__, __FILE__);
+
+		const char bypass0[20] = "Bypass0";
+		const char bypass1[20] = "Bypass1";
+		const char bypass2[20] = "Bypass2";
+		struct ipa_ioc_get_rt_tbl routing_table0,routing_table1,routing_table2;
+
+		if (!CreateThreeIPv6BypassRoutingTables (bypass0,bypass1,bypass2))
+		{
+			printf("CreateThreeIPv6BypassRoutingTables Failed\n");
+			return false;
+		}
+
+		printf("CreateThreeIPv6BypassRoutingTables completed successfully\n");
+		routing_table0.ip = IPA_IP_v6;
+		strlcpy(routing_table0.name, bypass0, sizeof(routing_table0.name));
+		if (!m_routing.GetRoutingTable(&routing_table0))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table0=0x%p) Failed.\n",&routing_table0);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass0, routing_table0.hdl);
+
+		routing_table1.ip = IPA_IP_v6;
+		strlcpy(routing_table1.name, bypass1, sizeof(routing_table1.name));
+		if (!m_routing.GetRoutingTable(&routing_table1))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table1=0x%p) Failed.\n",&routing_table1);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass1, routing_table1.hdl);
+
+		routing_table2.ip = IPA_IP_v6;
+		strlcpy(routing_table2.name, bypass2, sizeof(routing_table2.name));
+		if (!m_routing.GetRoutingTable(&routing_table2))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table2=0x%p) Failed.\n",&routing_table2);
+			return false;
+		}
+		printf("%s route table handle = %u\n", bypass2, routing_table2.hdl);
+
+		IPAFilteringTable_v2 FilterTable0;
+		struct ipa_flt_rule_add_v2 flt_rule_entry;
+		FilterTable0.Init(IPA_IP_v6,IPA_CLIENT_TEST_PROD,false,3);
+		printf("FilterTable*.Init Completed Successfully..\n");
+
+		// Configuring Filtering Rule No.0
+		FilterTable0.GeneratePresetRule(1,flt_rule_entry);
+		flt_rule_entry.at_rear = true;
+		flt_rule_entry.flt_rule_hdl=-1; // return Value
+		flt_rule_entry.status = -1; // return value
+		flt_rule_entry.rule.action=IPA_PASS_TO_ROUTING;
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table0.hdl; //put here the handle corresponding to Routing Rule 1
+		flt_rule_entry.rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+		flt_rule_entry.rule.ttl_update = 1; // require ttl update
+		if ((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry))
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		}
+
+		// Configuring Filtering Rule No.1
+		flt_rule_entry.rule.rt_tbl_hdl=routing_table1.hdl; //put here the handle corresponding to Routing Rule 2
+		if ((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry))
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		}
+
+		flt_rule_entry.rule.ttl_update = 0; // doesn't require ttl update
+		if (
+				((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry)) ||
+				!m_filtering.AddFilteringRule(FilterTable0.GetFilteringTable())
+			)
+		{
+			printf ("%s::Error Adding Rule to Filter Table, aborting...\n",__FUNCTION__);
+			return false;
+		} else
+		{
+			printf("flt rule hdl0=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(0)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(0)->status);
+			printf("flt rule hdl1=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(1)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(1)->status);
+			printf("flt rule hdl2=0x%x, status=0x%x\n", FilterTable0.ReadRuleFromTable(2)->flt_rule_hdl,FilterTable0.ReadRuleFromTable(2)->status);
+		}
+
+		printf("Leaving %s, %s()\n",__FUNCTION__, __FILE__);
+		return true;
+	}// AddRules()
+
+	virtual bool ModifyPackets()
+	{
+		int address;
+		m_sendBuffer[HOP_LIMIT_OFFSET_IPV6] = 0;
+		m_sendBuffer2[HOP_LIMIT_OFFSET_IPV6] = 0;
+		m_sendBuffer3[HOP_LIMIT_OFFSET_IPV6] = 0;
+		return true;
+	}// ModifyPacktes ()
+
+	virtual bool ReceivePacketsAndCompare()
+	{
+		size_t receivedSize = 0;
+		size_t receivedSize2 = 0;
+		size_t receivedSize3 = 0;
+		bool pkt1_cmp_succ, pkt2_cmp_succ, pkt3_cmp_succ;
+
+		// Receive results
+		Byte *rxBuff1 = new Byte[0x400];
+		Byte *rxBuff2 = new Byte[0x400];
+		Byte *rxBuff3 = new Byte[0x400];
+
+		if (NULL == rxBuff1 || NULL == rxBuff2 || NULL == rxBuff3)
+		{
+			printf("Memory allocation error.\n");
+			return false;
+		}
+
+		memset(rxBuff1, 0, 0x400);
+		memset(rxBuff2, 0, 0x400);
+		memset(rxBuff3, 0, 0x400);
+
+		receivedSize = m_Exceptions.ReceiveData(rxBuff1, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize, m_Exceptions.m_fromChannelName.c_str());
+
+		receivedSize2 = m_Exceptions.ReceiveData(rxBuff2, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize2, m_Exceptions.m_fromChannelName.c_str());
+
+		receivedSize3 = m_Exceptions.ReceiveData(rxBuff3, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize3, m_Exceptions.m_fromChannelName.c_str());
+
+		/* Update TTL values. */
+		m_sendBuffer[HOP_LIMIT_OFFSET_IPV6] = 0;
+		m_sendBuffer2[HOP_LIMIT_OFFSET_IPV6] = 0;
+		m_sendBuffer3[HOP_LIMIT_OFFSET_IPV6] = 0;
+
+		pkt1_cmp_succ = CompareResultVsGolden(m_sendBuffer, m_sendSize, rxBuff1, receivedSize);
+		pkt2_cmp_succ = CompareResultVsGolden(m_sendBuffer2, m_sendSize2, rxBuff2, receivedSize2);
+		pkt3_cmp_succ = CompareResultVsGolden(m_sendBuffer3, m_sendSize3, rxBuff3, receivedSize3);
+
+		pkt1_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5_wo_status(m_sendSize, receivedSize, rxBuff1) : true;
+		pkt2_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5_wo_status(m_sendSize2, receivedSize2, rxBuff2) : true;
+		pkt3_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5_wo_status(m_sendSize3, receivedSize3, rxBuff3) : true;
+
+		size_t recievedBufferSize =
+			MAX3(receivedSize, receivedSize2, receivedSize3) * 3;
+		size_t sentBufferSize =
+			MAX3(m_sendSize, m_sendSize2, m_sendSize3) * 3;
+		char *recievedBuffer = new char[recievedBufferSize];
+		char *sentBuffer = new char[sentBufferSize];
+		size_t j;
+
+		if (NULL == recievedBuffer || NULL == sentBuffer) {
+			printf("Memory allocation error\n");
+			return false;
+		}
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer[j]);
+		for(j = 0; j < receivedSize; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff1[j]);
+		printf("Expected Value1 (%zu)\n%s\n, Received Value1(%zu)\n%s\n-->Value1 %s\n",
+			m_sendSize,sentBuffer,receivedSize,recievedBuffer,
+			pkt1_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize2; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer2[j]);
+		for(j = 0; j < receivedSize2; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff2[j]);
+		printf("Expected Value2 (%zu)\n%s\n, Received Value2(%zu)\n%s\n-->Value2 %s\n",
+			m_sendSize2,sentBuffer,receivedSize2,recievedBuffer,
+			pkt2_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize3; j++)
+			snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer3[j]);
+		for(j = 0; j < receivedSize3; j++)
+			snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff3[j]);
+		printf("Expected Value3 (%zu)\n%s\n, Received Value3(%zu)\n%s\n-->Value3 %s\n",
+			m_sendSize3,sentBuffer,receivedSize3,recievedBuffer,
+			pkt3_cmp_succ?"Match":"no Match");
+
+		delete[] recievedBuffer;
+		delete[] sentBuffer;
+
+		delete[] rxBuff1;
+		delete[] rxBuff2;
+		delete[] rxBuff3;
+
+		return pkt1_cmp_succ && pkt2_cmp_succ && pkt3_cmp_succ;
+	}
+
+	virtual bool Teardown()
+	{
+		return true;
+	} // Teardown()
+};
+
+
 static class IpaFilteringBlockTest001 ipaFilteringBlockTest001;//Global Filtering Test
 static class IpaFilteringBlockTest002 ipaFilteringBlockTest002;//Global Filtering Test
 static class IpaFilteringBlockTest003 ipaFilteringBlockTest003;//Global Filtering Test
@@ -9183,3 +10821,12 @@ static class IpaFilteringBlockTest100 ipaFilteringBlockTest100; // Cache LRU beh
 
 static class IpaFilteringBlockTest101 ipaFilteringBlockTest101; // Non hashed table SRAM <->DDR dynamic move
 static class IpaFilteringBlockTest102 ipaFilteringBlockTest102; // Non hashed table SRAM <->DDR dynamic move
+
+static class IpaFilteringBlockTest110 ipaFilteringBlockTest110; // Ipv4 TTL Update.
+static class IpaFilteringBlockTest111 ipaFilteringBlockTest111; // Ipv6 TTL Update.
+static class IpaFilteringBlockTest112 ipaFilteringBlockTest112; // Ipv4 TTL Update with status.
+static class IpaFilteringBlockTest113 ipaFilteringBlockTest113; // Ipv6 TTL Update with status.
+static class IpaFilteringBlockTest114 ipaFilteringBlockTest114; // IPv4 TTL exception test, TTL=1
+static class IpaFilteringBlockTest115 ipaFilteringBlockTest115; // IPv6 TTL exception test, TTL=1
+static class IpaFilteringBlockTest116 ipaFilteringBlockTest116; // IPv4 TTL exception test, TTL=0
+static class IpaFilteringBlockTest117 ipaFilteringBlockTest117; // IPv6 TTL exception test, TTL=0

@@ -25,6 +25,40 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted (subject to the limitations in the
+ * disclaimer below) provided that the following conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *
+ *     * Redistributions in binary form must reproduce the above
+ *       copyright notice, this list of conditions and the following
+ *       disclaimer in the documentation and/or other materials provided
+ *       with the distribution.
+ *
+ *     * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+ *       contributors may be used to endorse or promote products derived
+ *       from this software without specific prior written permission.
+ *
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
  */
 
 #include <stdio.h>
@@ -45,6 +79,8 @@
 #include "IPAFilteringTable.h"
 
 #define TOS_FIELD_OFFSET (1)
+#define IPV4_TTL_OFFSET      (8)
+#define IPV4_CSUM_OFFSET     (10)
 #define DST_ADDR_LSB_OFFSET_IPV4 (19)
 #define SRC_ADDR_LSB_OFFSET_IPV4 (15)
 #define DST_ADDR_MSB_OFFSET_IPV6 (24)
@@ -54,6 +90,7 @@
 #define FLOW_CLASS_MSB_OFFSET_IPV6 (1)
 #define FLOW_CLASS_MB_OFFSET_IPV6 (2)
 #define FLOW_CLASS_LSB_OFFSET_IPV6 (3)
+#define HOP_LIMIT_OFFSET_IPV6 (7)
 #define IPV4_DST_PORT_OFFSET (20+2)
 #define IPV6_SRC_PORT_OFFSET (40)
 #define IPV6_DST_PORT_OFFSET (40+2)
@@ -471,6 +508,23 @@ public:
 		}
 
 		if(!((bool)pStatus->route_hash)){
+			printf ("%s::cache miss!! \n",__FUNCTION__);
+			return true;
+		}
+
+		printf ("%s::cache hit!! \n",__FUNCTION__);
+		return false;
+	}
+
+	inline bool IsTTLUpdated_v5_5(size_t SendSize, size_t RecvSize, void *Buff)
+	{
+		struct ipa3_hw_pkt_status_hw_v5_5 *pStatus = (struct ipa3_hw_pkt_status_hw_v5_5 *)Buff;
+
+		if (VerifyStatusReceived(SendSize,RecvSize) == false){
+			return false;
+		}
+
+		if(!((bool)pStatus->ttl_dec)){
 			printf ("%s::cache miss!! \n",__FUNCTION__);
 			return true;
 		}
@@ -5095,6 +5149,995 @@ public:
 	} // Run()
 };
 
+/*---------------------------------------------------------------------------*/
+/* Test50: Test TTL update by routing to a destination address							     */
+/*---------------------------------------------------------------------------*/
+class IpaRoutingBlockTest050 : public IpaRoutingBlockTestFixture
+{
+public:
+	IpaRoutingBlockTest050()
+	{
+		m_name = "IpaRoutingBlockTest050";
+		m_description =" \
+		Routing block test 050 - Destination address exact match\1. Generate and commit a single routing tables. \
+		2. Generate and commit Three routing rules: (DST & Mask Match). \
+			All DST_IP == (192.169.2.170 & 255.255.255.255)traffic goes to pipe IPA_CLIENT_TEST2_CONS \
+			All DST_IP == (192.168.2.255 & 255.255.255.255)traffic goes to pipe IPA_CLIENT_TEST3_CONS\
+			All other traffic goes to pipe IPA_CLIENT_TEST4_CONS \
+		3. Check if TTL is updated. ";
+		m_IpaIPType = IPA_IP_v4;
+		m_minIPAHwType = IPA_HW_v5_5;
+		Register(*this);
+	}
+
+	bool Run()
+	{
+		bool res = false;
+		bool isSuccess = false;
+
+		// Add the relevant routing rules
+		res = AddRules();
+		if (false == res) {
+			printf("Failed adding routing rules.\n");
+			return false;
+		}
+
+		// Load input data (IP packet) from file
+		res = LoadFiles(IPA_IP_v4);
+		if (false == res) {
+			printf("Failed loading files.\n");
+			return false;
+		}
+
+		// Send first packet
+		m_sendBuffer[DST_ADDR_LSB_OFFSET_IPV4] = 0xFF;
+		m_sendBuffer[IPV4_TTL_OFFSET] = 5;
+		isSuccess = m_producer.SendData(m_sendBuffer, m_sendSize);
+		if (false == isSuccess)
+		{
+			printf("SendData failure.\n");
+			return false;
+		}
+
+		// Send second packet
+		m_sendBuffer2[DST_ADDR_LSB_OFFSET_IPV4] = 0xAA;
+		m_sendBuffer2[IPV4_TTL_OFFSET] = 4;
+		isSuccess = m_producer.SendData(m_sendBuffer2, m_sendSize2);
+		if (false == isSuccess)
+		{
+			printf("SendData failure.\n");
+			return false;
+		}
+
+		// Send third packet
+		m_sendBuffer3[IPV4_TTL_OFFSET] = 3;
+		isSuccess = m_producer.SendData(m_sendBuffer3, m_sendSize3);
+		if (false == isSuccess)
+		{
+			printf("SendData failure.\n");
+			return false;
+		}
+
+		// Receive packets from the channels and compare results
+		isSuccess = ReceivePacketsAndCompare();
+
+		return isSuccess;
+	} // Run()
+
+	bool ReceivePacketsAndCompare()
+	{
+		size_t receivedSize = 0;
+		size_t receivedSize2 = 0;
+		size_t receivedSize3 = 0;
+		bool pkt1_cmp_succ, pkt2_cmp_succ, pkt3_cmp_succ;
+		uint16_t csum = 0;
+
+		// Receive results
+		Byte *rxBuff1 = new Byte[0x400];
+		Byte *rxBuff2 = new Byte[0x400];
+		Byte *rxBuff3 = new Byte[0x400];
+
+		if (NULL == rxBuff1 || NULL == rxBuff2 || NULL == rxBuff3)
+		{
+			printf("Memory allocation error.\n");
+			return false;
+		}
+
+		memset(rxBuff1, 0, 0x400);
+		memset(rxBuff2, 0, 0x400);
+		memset(rxBuff3, 0, 0x400);
+
+		receivedSize = m_consumer.ReceiveData(rxBuff1, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize, m_consumer.m_fromChannelName.c_str());
+
+		receivedSize2 = m_consumer2.ReceiveData(rxBuff2, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize2, m_consumer2.m_fromChannelName.c_str());
+
+		receivedSize3 = m_defaultConsumer.ReceiveData(rxBuff3, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize3, m_defaultConsumer.m_fromChannelName.c_str());
+
+		/* Update TTL values. */
+		m_sendBuffer[IPV4_TTL_OFFSET] = 4;
+		m_sendBuffer2[IPV4_TTL_OFFSET] = 3;
+
+		/* Update Checksum.*/
+		csum = *((uint16_t *)(m_sendBuffer + IPV4_CSUM_OFFSET));
+		csum += 1;
+		*((uint16_t *)(m_sendBuffer+ IPV4_CSUM_OFFSET)) = csum;
+
+		csum = *((uint16_t *)(m_sendBuffer2 + IPV4_CSUM_OFFSET));
+		csum += 1;
+		*((uint16_t *)(m_sendBuffer2 + IPV4_CSUM_OFFSET)) = csum;
+
+		/* Compare results */
+		pkt1_cmp_succ = CompareResultVsGolden(m_sendBuffer,  m_sendSize,  rxBuff1, receivedSize);
+		pkt2_cmp_succ = CompareResultVsGolden(m_sendBuffer2, m_sendSize2, rxBuff2, receivedSize2);
+		pkt3_cmp_succ = CompareResultVsGolden(m_sendBuffer3, m_sendSize3, rxBuff3, receivedSize3);
+
+		size_t recievedBufferSize =
+			MAX3(receivedSize, receivedSize2, receivedSize3) * 3;
+		size_t sentBufferSize =
+			MAX3(m_sendSize, m_sendSize2, m_sendSize3) * 3;
+		char *recievedBuffer = new char[recievedBufferSize];
+		char *sentBuffer = new char[sentBufferSize];
+
+		if (NULL == recievedBuffer || NULL == sentBuffer) {
+			printf("Memory allocation error\n");
+			return false;
+		}
+
+		size_t j;
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize; j++)
+		    snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer[j]);
+		for(j = 0; j < receivedSize; j++)
+		    snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff1[j]);
+		printf("Expected Value1(%zu)\n%s\n, Received Value1(%zu)\n%s\n-->Value1 %s\n",
+			m_sendSize,sentBuffer,receivedSize,recievedBuffer,
+			pkt1_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize2; j++)
+		    snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer2[j]);
+		for(j = 0; j < receivedSize2; j++)
+		    snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff2[j]);
+		printf("Expected Value2 (%zu)\n%s\n, Received Value2(%zu)\n%s\n-->Value2 %s\n",
+			m_sendSize2,sentBuffer,receivedSize2,recievedBuffer,
+			pkt2_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize3; j++)
+		    snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer3[j]);
+		for(j = 0; j < receivedSize3; j++)
+		    snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff3[j]);
+		printf("Expected Value3 (%zu)\n%s\n, Received Value3(%zu)\n%s\n-->Value3 %s\n",
+			m_sendSize3,sentBuffer,receivedSize3,recievedBuffer,
+			pkt3_cmp_succ?"Match":"no Match");
+
+		delete[] recievedBuffer;
+		delete[] sentBuffer;
+
+		delete[] rxBuff1;
+		delete[] rxBuff2;
+		delete[] rxBuff3;
+
+		return pkt1_cmp_succ && pkt2_cmp_succ && pkt3_cmp_succ;
+	}
+
+
+	bool AddRules()
+	{
+		struct ipa_ioc_add_rt_rule_v2 *rt_rule;
+		struct ipa_rt_rule_add_v2 *rt_rule_entry;
+		const int NUM_RULES = 3;
+
+		rt_rule = (struct ipa_ioc_add_rt_rule_v2 *)
+			calloc(1, sizeof(struct ipa_ioc_add_rt_rule_v2));
+
+		if(!rt_rule) {
+			printf("fail\n");
+			return false;
+		}
+
+		rt_rule->rules = (uint64_t)calloc(3, sizeof(struct ipa_rt_rule_add_v2));
+		if(!rt_rule->rules) {
+			printf("fail\n");
+			return false;
+		}
+
+		rt_rule->commit = 1;
+		rt_rule->num_rules = NUM_RULES;
+		rt_rule->ip = IPA_IP_v4;
+		strlcpy(rt_rule->rt_tbl_name, "LAN", sizeof(rt_rule->rt_tbl_name));
+
+		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[0]);
+		rt_rule_entry->at_rear = 0;
+		rt_rule_entry->rule.dst = IPA_CLIENT_TEST2_CONS;
+//		rt_rule_entry->rule.hdr_hdl = hdr_entry->hdr_hdl; // gidons, there is no support for header insertion / removal yet.
+		rt_rule_entry->rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+		rt_rule_entry->rule.attrib.u.v4.dst_addr      = 0xC0A802FF;
+		rt_rule_entry->rule.attrib.u.v4.dst_addr_mask = 0xFFFFFFFF;
+		rt_rule_entry->rule.ttl_update = 1;
+
+		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[1]);
+		rt_rule_entry->at_rear = 0;
+		rt_rule_entry->rule.dst = IPA_CLIENT_TEST3_CONS;
+//		rt_rule_entry->rule.hdr_hdl = hdr_entry->hdr_hdl; // gidons, there is no support for header insertion / removal yet.
+		rt_rule_entry->rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+		rt_rule_entry->rule.attrib.u.v4.dst_addr      = 0xC0A802AA;
+		rt_rule_entry->rule.attrib.u.v4.dst_addr_mask = 0xFFFFFFFF;
+		rt_rule_entry->rule.ttl_update = 1;
+
+		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[2]);
+		rt_rule_entry->at_rear = 1;
+		rt_rule_entry->rule.ttl_update = 0;
+		rt_rule_entry->rule.dst = IPA_CLIENT_TEST4_CONS;
+
+		if (false == m_routing.AddRoutingRule(rt_rule))
+		{
+			printf("Routing rule addition failed!\n");
+			return false;
+		}
+
+		printf("rt rule hdl1=%x\n", rt_rule_entry->rt_rule_hdl);
+
+		free(rt_rule);
+
+		InitFilteringBlock();
+
+		return true;
+	}
+};
+
+/*--------------------------------------------------------------------------*/
+/* Test51: IPv4 - Tests routing hashable vs non hashable priorities			*/
+/*--------------------------------------------------------------------------*/
+class IpaRoutingBlockTest051 : public IpaRoutingBlockTestFixture
+{
+public:
+
+	IpaRoutingBlockTest051()
+	{
+		m_name = "IpaRoutingBlockTest051";
+		m_description =" \
+		Routing block test 051 - Destination address exact match hashable priority higher than non hashable \
+		both match the packet but only hashable should hit, second packet should get cache hit, \
+		Check if TTL is updated.\
+		2. Generate and commit Three routing rules: (DST & Mask Match). \
+			All DST_IP == (192.168.2.170 & 255.255.255.255)traffic goes to pipe IPA_CLIENT_TEST2_CONS \
+			All DST_IP == (192.168.2.170 & 255.255.255.255)traffic goes to pipe IPA_CLIENT_TEST3_CONS\
+			All other traffic goes to pipe IPA_CLIENT_TEST4_CONS \
+		3. Check if TTL is updated.";
+		m_IpaIPType = IPA_IP_v4;
+		m_minIPAHwType = IPA_HW_v5_5;
+		Register(*this);
+	}
+
+	bool Setup()
+	{
+		return IpaRoutingBlockTestFixture:: Setup(true);
+	}
+
+	bool AddRules()
+	{
+		struct ipa_ioc_add_rt_rule_v2 *rt_rule;
+		struct ipa_rt_rule_add_v2 *rt_rule_entry;
+		const int NUM_RULES = 3;
+
+		rt_rule = (struct ipa_ioc_add_rt_rule_v2 *)
+			calloc(1, sizeof(struct ipa_ioc_add_rt_rule_v2));
+
+		if(!rt_rule) {
+			printf("fail\n");
+			return false;
+		}
+
+		rt_rule->rules = (uint64_t)calloc(3, sizeof(struct ipa_rt_rule_add_v2));
+		if(!rt_rule->rules) {
+			printf("fail\n");
+			return false;
+		}
+
+		rt_rule->commit = 1;
+		rt_rule->num_rules = NUM_RULES;
+		rt_rule->ip = IPA_IP_v4;
+		strlcpy(rt_rule->rt_tbl_name, "LAN", sizeof(rt_rule->rt_tbl_name));
+
+		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[0]);
+		rt_rule_entry->at_rear = 1;
+		rt_rule_entry->rule.dst = IPA_CLIENT_TEST2_CONS;
+		rt_rule_entry->rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+		rt_rule_entry->rule.attrib.u.v4.dst_addr      = 0xC0A802AA; //192.168.02.170
+		rt_rule_entry->rule.attrib.u.v4.dst_addr_mask = 0xFFFFFFFF;
+		rt_rule_entry->rule.hashable = 1; // hashable
+		rt_rule_entry->rule.ttl_update = 1; // TTL Update
+
+		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[1]);
+		rt_rule_entry->at_rear = 1;
+		rt_rule_entry->rule.dst = IPA_CLIENT_TEST3_CONS;
+		rt_rule_entry->rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+		rt_rule_entry->rule.attrib.u.v4.dst_addr      = 0xC0A802AA; //192.168.02.170
+		rt_rule_entry->rule.attrib.u.v4.dst_addr_mask = 0xFFFFFFFF;
+		rt_rule_entry->rule.hashable = 0; // non hashable
+		rt_rule_entry->rule.ttl_update = 1; // TTL Update
+
+		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[2]);
+		rt_rule_entry->at_rear = 1;
+		rt_rule_entry->rule.ttl_update = 0; // TTL Update
+		rt_rule_entry->rule.dst = IPA_CLIENT_TEST4_CONS;
+
+		if (false == m_routing.AddRoutingRule(rt_rule))
+		{
+			printf("Routing rule addition failed!\n");
+			return false;
+		}
+
+		printf("rt rule hdl1=%x\n", rt_rule_entry->rt_rule_hdl);
+
+		free(rt_rule);
+
+		InitFilteringBlock();
+
+		return true;
+	}
+
+	bool Run()
+	{
+		bool res = false;
+		bool isSuccess = false;
+
+		// Add the relevant routing rules
+		res = AddRules();
+		if (false == res) {
+			printf("Failed adding routing rules.\n");
+			return false;
+		}
+
+		// Load input data (IP packet) from file
+		res = LoadFiles(IPA_IP_v4);
+		if (false == res) {
+			printf("Failed loading files.\n");
+			return false;
+		}
+
+		// Send first packet
+		m_sendBuffer[DST_ADDR_LSB_OFFSET_IPV4] = 0xAA;
+		m_sendBuffer[IPV4_TTL_OFFSET] = 5;
+		isSuccess = m_producer.SendData(m_sendBuffer, m_sendSize);
+		if (false == isSuccess)
+		{
+			printf("SendData failure.\n");
+			return false;
+		}
+
+		// Send second packet
+		m_sendBuffer2[DST_ADDR_LSB_OFFSET_IPV4] = 0xAA;
+		m_sendBuffer2[IPV4_TTL_OFFSET] = 4;
+		isSuccess = m_producer.SendData(m_sendBuffer2, m_sendSize2);
+		if (false == isSuccess)
+		{
+			printf("SendData failure.\n");
+			return false;
+		}
+
+		// Send third packet
+		m_sendBuffer3[IPV4_TTL_OFFSET] = 3;
+		isSuccess = m_producer.SendData(m_sendBuffer3, m_sendSize3);
+		if (false == isSuccess)
+		{
+			printf("SendData failure.\n");
+			return false;
+		}
+
+		// Receive packets from the channels and compare results
+		isSuccess = ReceivePacketsAndCompare();
+
+		return isSuccess;
+	} // Run()
+
+	bool ReceivePacketsAndCompare()
+	{
+		size_t receivedSize = 0;
+		size_t receivedSize2 = 0;
+		size_t receivedSize3 = 0;
+		bool isSuccess = true;
+		uint16_t csum = 0;
+
+		// Receive results
+		Byte *rxBuff1 = new Byte[0x400];
+		Byte *rxBuff2 = new Byte[0x400];
+		Byte *rxBuff3 = new Byte[0x400];
+
+		if (NULL == rxBuff1 || NULL == rxBuff2 || NULL == rxBuff3)
+		{
+			printf("Memory allocation error.\n");
+			return false;
+		}
+
+		receivedSize = m_consumer.ReceiveData(rxBuff1, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize, m_consumer.m_fromChannelName.c_str());
+
+		receivedSize2 = m_consumer.ReceiveData(rxBuff2, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize2, m_consumer2.m_fromChannelName.c_str());
+
+		receivedSize3 = m_defaultConsumer.ReceiveData(rxBuff3, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize3, m_defaultConsumer.m_fromChannelName.c_str());
+
+		/* Update TTL values. */
+		m_sendBuffer[IPV4_TTL_OFFSET] = 4;
+		m_sendBuffer2[IPV4_TTL_OFFSET] = 3;
+
+		/* Update Checksum.*/
+		csum = *((uint16_t *)(m_sendBuffer + IPV4_CSUM_OFFSET));
+		csum += 1;
+		*((uint16_t *)(m_sendBuffer+ IPV4_CSUM_OFFSET)) = csum;
+
+		csum = *((uint16_t *)(m_sendBuffer2 + IPV4_CSUM_OFFSET));
+		csum += 1;
+		*((uint16_t *)(m_sendBuffer2 + IPV4_CSUM_OFFSET)) = csum;
+
+		/* Compare results */
+		isSuccess &= CompareResultVsGolden_w_Status(m_sendBuffer,  m_sendSize,  rxBuff1, receivedSize);
+		isSuccess &= CompareResultVsGolden_w_Status(m_sendBuffer2, m_sendSize2, rxBuff2, receivedSize2);
+		isSuccess &= CompareResultVsGolden_w_Status(m_sendBuffer3, m_sendSize3, rxBuff3, receivedSize3);
+
+		isSuccess &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_0) ?
+			IsCacheMiss_v5_0(m_sendSize, receivedSize, rxBuff1) : IsCacheMiss(m_sendSize,receivedSize,rxBuff1);
+		isSuccess &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_0) ?
+			IsCacheHit_v5_0(m_sendSize2, receivedSize2, rxBuff2) : IsCacheHit(m_sendSize2,receivedSize2,rxBuff2);
+		isSuccess &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_0) ?
+			IsCacheMiss_v5_0(m_sendSize3, receivedSize3, rxBuff3) : IsCacheMiss(m_sendSize3,receivedSize3,rxBuff3);
+
+		isSuccess &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5(m_sendSize, receivedSize, rxBuff1) : true;
+		isSuccess &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5(m_sendSize2, receivedSize2, rxBuff2) : true;
+		isSuccess &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			!IsTTLUpdated_v5_5(m_sendSize3, receivedSize3, rxBuff3) : true;
+
+		size_t recievedBufferSize = receivedSize * 3;
+		size_t sentBufferSize = m_sendSize * 3;
+		char *recievedBuffer = new char[recievedBufferSize];
+		char *sentBuffer = new char[sentBufferSize];
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+
+		print_packets(receivedSize, m_sendSize, recievedBufferSize, sentBufferSize, rxBuff1, m_sendBuffer, recievedBuffer, sentBuffer);
+		print_packets(receivedSize2, m_sendSize2, recievedBufferSize, sentBufferSize, rxBuff2, m_sendBuffer2, recievedBuffer, sentBuffer);
+		print_packets(receivedSize3, m_sendSize3, recievedBufferSize, sentBufferSize, rxBuff3, m_sendBuffer3, recievedBuffer, sentBuffer);
+
+		delete[] recievedBuffer;
+		delete[] sentBuffer;
+
+		delete[] rxBuff1;
+		delete[] rxBuff2;
+		delete[] rxBuff3;
+
+		return isSuccess;
+	}
+};
+
+/*---------------------------------------------------------------------------*/
+/* Test52: IPv6 - Test TTL update by routing to destination address */
+/*---------------------------------------------------------------------------*/
+class IpaRoutingBlockTest052 : public IpaRoutingBlockTestFixture
+{
+public:
+	IpaRoutingBlockTest052()
+	{
+		m_name = "IpaRoutingBlockTest052";
+		m_description =" \
+		Routing block test 052 - IPv6 Destination address exact match and check if TTL is updated \
+		1. Generate and commit a single routing tables. \
+		2. Generate and commit Three routing rules: (DST & Mask Match). \
+			All DST_IP ==	0XFF020000 \
+							0x00000000 \
+							0x00000000 \
+							0X000000FF \
+		traffic goes to pipe IPA_CLIENT_TEST2_CONS \
+		All DST_IP ==	0XFF020000 \
+						0x00000000 \
+						0x00000000 \
+						0X000000FF \
+		traffic goes to pipe IPA_CLIENT_TEST3_CONS\
+		All other traffic goes to pipe IPA_CLIENT_TEST4_CONS \
+		3. Check if TTL is updated.";
+		m_IpaIPType = IPA_IP_v6;
+		m_minIPAHwType = IPA_HW_v5_5;
+		Register(*this);
+	}
+
+	bool Run()
+	{
+		bool res = false;
+		bool isSuccess = false;
+
+		// Add the relevant routing rules
+		res = AddRules();
+		if (false == res) {
+			printf("Failed adding routing rules.\n");
+			return false;
+		}
+
+		// Load input data (IP packet) from file
+		res = LoadFiles(IPA_IP_v6);
+		if (false == res) {
+			printf("Failed loading files.\n");
+			return false;
+		}
+
+		// Send first packet
+		m_sendBuffer[DST_ADDR_LSB_OFFSET_IPV6] = 0xFF;
+		m_sendBuffer[HOP_LIMIT_OFFSET_IPV6] = 5;
+		isSuccess = m_producer.SendData(m_sendBuffer, m_sendSize);
+		if (false == isSuccess)
+		{
+			printf("SendData failure.\n");
+			return false;
+		}
+
+		// Send second packet
+		m_sendBuffer2[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
+		m_sendBuffer2[HOP_LIMIT_OFFSET_IPV6] = 4;
+		isSuccess = m_producer.SendData(m_sendBuffer2, m_sendSize);
+		if (false == isSuccess)
+		{
+			printf("SendData failure.\n");
+			return false;
+		}
+
+		// Send third packet
+		m_sendBuffer3[HOP_LIMIT_OFFSET_IPV6] = 3;
+		isSuccess = m_producer.SendData(m_sendBuffer3, m_sendSize3);
+		if (false == isSuccess)
+		{
+			printf("SendData failure.\n");
+			return false;
+		}
+
+		// Receive packets from the channels and compare results
+		isSuccess = ReceivePacketsAndCompare();
+
+		return isSuccess;
+	} // Run()
+
+	bool ReceivePacketsAndCompare()
+	{
+		size_t receivedSize = 0;
+		size_t receivedSize2 = 0;
+		size_t receivedSize3 = 0;
+		bool pkt1_cmp_succ, pkt2_cmp_succ, pkt3_cmp_succ;
+
+		// Receive results
+		Byte *rxBuff1 = new Byte[0x400];
+		Byte *rxBuff2 = new Byte[0x400];
+		Byte *rxBuff3 = new Byte[0x400];
+
+		if (NULL == rxBuff1 || NULL == rxBuff2 || NULL == rxBuff3)
+		{
+			printf("Memory allocation error.\n");
+			return false;
+		}
+
+		memset(rxBuff1, 0, 0x400);
+		memset(rxBuff2, 0, 0x400);
+		memset(rxBuff3, 0, 0x400);
+
+		receivedSize = m_consumer.ReceiveData(rxBuff1, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize, m_consumer.m_fromChannelName.c_str());
+
+		receivedSize2 = m_consumer2.ReceiveData(rxBuff2, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize2, m_consumer2.m_fromChannelName.c_str());
+
+		receivedSize3 = m_defaultConsumer.ReceiveData(rxBuff3, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize3, m_defaultConsumer.m_fromChannelName.c_str());
+
+		/* Update TTL values. */
+		m_sendBuffer[HOP_LIMIT_OFFSET_IPV6] = 4;
+		m_sendBuffer2[HOP_LIMIT_OFFSET_IPV6] = 3;
+
+		/* Compare results */
+		pkt1_cmp_succ = CompareResultVsGolden(m_sendBuffer,  m_sendSize,  rxBuff1, receivedSize);
+		pkt2_cmp_succ = CompareResultVsGolden(m_sendBuffer2, m_sendSize2, rxBuff2, receivedSize2);
+		pkt3_cmp_succ = CompareResultVsGolden(m_sendBuffer3, m_sendSize3, rxBuff3, receivedSize3);
+
+		size_t recievedBufferSize =
+			MAX3(receivedSize, receivedSize2, receivedSize3) * 3;
+		size_t sentBufferSize =
+			MAX3(m_sendSize, m_sendSize2, m_sendSize3) * 3;
+		char *recievedBuffer = new char[recievedBufferSize];
+		char *sentBuffer = new char[sentBufferSize];
+
+		if (NULL == recievedBuffer || NULL == sentBuffer) {
+			printf("Memory allocation error\n");
+			return false;
+		}
+
+		size_t j;
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize; j++)
+		    snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer[j]);
+		for(j = 0; j < receivedSize; j++)
+		    snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff1[j]);
+		printf("Expected Value1(%zu)\n%s\n, Received Value1(%zu)\n%s\n-->Value1 %s\n",
+			m_sendSize,sentBuffer,receivedSize,recievedBuffer,
+			pkt1_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize2; j++)
+		    snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer2[j]);
+		for(j = 0; j < receivedSize2; j++)
+		    snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff2[j]);
+		printf("Expected Value2 (%zu)\n%s\n, Received Value2(%zu)\n%s\n-->Value2 %s\n",
+			m_sendSize2,sentBuffer,receivedSize2,recievedBuffer,
+			pkt2_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize3; j++)
+		    snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer3[j]);
+		for(j = 0; j < receivedSize3; j++)
+		    snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff3[j]);
+		printf("Expected Value3 (%zu)\n%s\n, Received Value3(%zu)\n%s\n-->Value3 %s\n",
+			m_sendSize3,sentBuffer,receivedSize3,recievedBuffer,
+			pkt3_cmp_succ?"Match":"no Match");
+
+		delete[] recievedBuffer;
+		delete[] sentBuffer;
+
+		delete[] rxBuff1;
+		delete[] rxBuff2;
+		delete[] rxBuff3;
+
+		return pkt1_cmp_succ && pkt2_cmp_succ && pkt3_cmp_succ;
+	}
+
+	bool AddRules()
+	{
+		struct ipa_ioc_add_rt_rule_v2 *rt_rule;
+		struct ipa_rt_rule_add_v2 *rt_rule_entry;
+		const int NUM_RULES = 3;
+
+		rt_rule = (struct ipa_ioc_add_rt_rule_v2 *)
+			calloc(1, sizeof(struct ipa_ioc_add_rt_rule_v2));
+
+		if(!rt_rule) {
+			printf("fail\n");
+			return false;
+		}
+
+		rt_rule->rules = (uint64_t)calloc(3, sizeof(struct ipa_rt_rule_add_v2));
+		if(!rt_rule->rules) {
+			printf("fail\n");
+			return false;
+		}
+
+		rt_rule->commit = 1;
+		rt_rule->num_rules = NUM_RULES;
+		rt_rule->ip = IPA_IP_v6;
+		strlcpy(rt_rule->rt_tbl_name, "LAN", sizeof(rt_rule->rt_tbl_name));
+
+		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[0]);
+		rt_rule_entry->at_rear = 0;
+		rt_rule_entry->rule.dst = IPA_CLIENT_TEST2_CONS;
+//		rt_rule_entry->rule.hdr_hdl = hdr_entry->hdr_hdl; // gidons, there is no support for header insertion / removal yet.
+		rt_rule_entry->rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr[0]      = 0XFF020000;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr[1]      = 0x00000000;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr[2]      = 0x00000000;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr[3]      = 0X000000FF;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[0] = 0xFFFFFFFF;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[1] = 0xFFFFFFFF;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[2] = 0xFFFFFFFF;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[3] = 0xFFFFFFFF;
+		rt_rule_entry->rule.ttl_update = 1; // TTL Update
+
+		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[1]);
+		rt_rule_entry->at_rear = 0;
+		rt_rule_entry->rule.dst = IPA_CLIENT_TEST3_CONS;
+//		rt_rule_entry->rule.hdr_hdl = hdr_entry->hdr_hdl; // gidons, there is no support for header insertion / removal yet.
+		rt_rule_entry->rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr[0]      = 0XFF020000;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr[1]      = 0x00000000;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr[2]      = 0x00000000;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr[3]      = 0X000000AA;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[0] = 0xFFFFFFFF;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[1] = 0xFFFFFFFF;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[2] = 0xFFFFFFFF;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[3] = 0xFFFFFFFF;
+		rt_rule_entry->rule.ttl_update = 1; // TTL Update
+
+		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[2]);
+		rt_rule_entry->at_rear = 1;
+		rt_rule_entry->rule.dst = IPA_CLIENT_TEST4_CONS;
+		rt_rule_entry->rule.ttl_update = 0; // TTL Update
+		if (false == m_routing.AddRoutingRule(rt_rule))
+		{
+			printf("Routing rule addition failed!\n");
+			return false;
+		}
+
+		printf("rt rule hdl1=%x\n", rt_rule_entry->rt_rule_hdl);
+
+		free(rt_rule);
+
+		InitFilteringBlock();
+
+		return true;
+	}
+};
+
+/*---------------------------------------------------------------------------------------*/
+/* Test53: IPv6 - Test TTL update by routing to destination address and check for status */
+/*---------------------------------------------------------------------------------------*/
+class IpaRoutingBlockTest053 : public IpaRoutingBlockTestFixture
+{
+public:
+	IpaRoutingBlockTest053()
+	{
+		m_name = "IpaRoutingBlockTest053";
+		m_description =" \
+		Routing block test 053 - IPv6 Destination address exact match and check if TTL is updated \
+		1. Generate and commit a single routing tables. \
+		2. Generate and commit Three routing rules: (DST & Mask Match). \
+			All DST_IP ==	0XFF020000 \
+							0x00000000 \
+							0x00000000 \
+							0X000000FF \
+		traffic goes to pipe IPA_CLIENT_TEST2_CONS \
+		All DST_IP ==	0XFF020000 \
+						0x00000000 \
+						0x00000000 \
+						0X000000FF \
+		traffic goes to pipe IPA_CLIENT_TEST3_CONS\
+		All other traffic goes to pipe IPA_CLIENT_TEST4_CONS \
+		3. Check if TTL is updated and also the status has TTL bit updated.";
+		m_IpaIPType = IPA_IP_v6;
+		m_minIPAHwType = IPA_HW_v5_5;
+		Register(*this);
+	}
+
+	bool Setup()
+	{
+		return IpaRoutingBlockTestFixture:: Setup(true);
+	}
+
+	bool Run()
+	{
+		bool res = false;
+		bool isSuccess = false;
+
+		// Add the relevant routing rules
+		res = AddRules();
+		if (false == res) {
+			printf("Failed adding routing rules.\n");
+			return false;
+		}
+
+		// Load input data (IP packet) from file
+		res = LoadFiles(IPA_IP_v6);
+		if (false == res) {
+			printf("Failed loading files.\n");
+			return false;
+		}
+
+		// Send first packet
+		m_sendBuffer[DST_ADDR_LSB_OFFSET_IPV6] = 0xFF;
+		m_sendBuffer[HOP_LIMIT_OFFSET_IPV6] = 5;
+		isSuccess = m_producer.SendData(m_sendBuffer, m_sendSize);
+		if (false == isSuccess)
+		{
+			printf("SendData failure.\n");
+			return false;
+		}
+
+		// Send second packet
+		m_sendBuffer2[DST_ADDR_LSB_OFFSET_IPV6] = 0xAA;
+		m_sendBuffer2[HOP_LIMIT_OFFSET_IPV6] = 4;
+		isSuccess = m_producer.SendData(m_sendBuffer2, m_sendSize);
+		if (false == isSuccess)
+		{
+			printf("SendData failure.\n");
+			return false;
+		}
+
+		// Send third packet
+		m_sendBuffer3[HOP_LIMIT_OFFSET_IPV6] = 3;
+		isSuccess = m_producer.SendData(m_sendBuffer3, m_sendSize3);
+		if (false == isSuccess)
+		{
+			printf("SendData failure.\n");
+			return false;
+		}
+
+		// Receive packets from the channels and compare results
+		isSuccess = ReceivePacketsAndCompare();
+
+		return isSuccess;
+	} // Run()
+
+	bool ReceivePacketsAndCompare()
+	{
+		size_t receivedSize = 0;
+		size_t receivedSize2 = 0;
+		size_t receivedSize3 = 0;
+		bool pkt1_cmp_succ, pkt2_cmp_succ, pkt3_cmp_succ;
+
+		// Receive results
+		Byte *rxBuff1 = new Byte[0x400];
+		Byte *rxBuff2 = new Byte[0x400];
+		Byte *rxBuff3 = new Byte[0x400];
+
+		if (NULL == rxBuff1 || NULL == rxBuff2 || NULL == rxBuff3)
+		{
+			printf("Memory allocation error.\n");
+			return false;
+		}
+
+		memset(rxBuff1, 0, 0x400);
+		memset(rxBuff2, 0, 0x400);
+		memset(rxBuff3, 0, 0x400);
+
+		receivedSize = m_consumer.ReceiveData(rxBuff1, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize, m_consumer.m_fromChannelName.c_str());
+
+		receivedSize2 = m_consumer2.ReceiveData(rxBuff2, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize2, m_consumer2.m_fromChannelName.c_str());
+
+		receivedSize3 = m_defaultConsumer.ReceiveData(rxBuff3, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize3, m_defaultConsumer.m_fromChannelName.c_str());
+
+		/* Update TTL values. */
+		m_sendBuffer[HOP_LIMIT_OFFSET_IPV6] = 4;
+		m_sendBuffer2[HOP_LIMIT_OFFSET_IPV6] = 3;
+
+		/* Compare results */
+		pkt1_cmp_succ = CompareResultVsGolden_w_Status(m_sendBuffer,  m_sendSize,  rxBuff1, receivedSize);
+		pkt2_cmp_succ = CompareResultVsGolden_w_Status(m_sendBuffer2, m_sendSize2, rxBuff2, receivedSize2);
+		pkt3_cmp_succ = CompareResultVsGolden_w_Status(m_sendBuffer3, m_sendSize3, rxBuff3, receivedSize3);
+
+		pkt1_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5(m_sendSize, receivedSize, rxBuff1) : true;
+		pkt2_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			IsTTLUpdated_v5_5(m_sendSize2, receivedSize2, rxBuff2) : true;
+		pkt3_cmp_succ &= (TestManager::GetInstance()->GetIPAHwType() >= IPA_HW_v5_5) ?
+			!IsTTLUpdated_v5_5(m_sendSize3, receivedSize3, rxBuff3) : true;
+
+		size_t recievedBufferSize =
+			MAX3(receivedSize, receivedSize2, receivedSize3) * 3;
+		size_t sentBufferSize =
+			MAX3(m_sendSize, m_sendSize2, m_sendSize3) * 3;
+		char *recievedBuffer = new char[recievedBufferSize];
+		char *sentBuffer = new char[sentBufferSize];
+
+		if (NULL == recievedBuffer || NULL == sentBuffer) {
+			printf("Memory allocation error\n");
+			return false;
+		}
+
+		size_t j;
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize; j++)
+		    snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer[j]);
+		for(j = 0; j < receivedSize; j++)
+		    snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff1[j]);
+		printf("Expected Value1(%zu)\n%s\n, Received Value1(%zu)\n%s\n-->Value1 %s\n",
+			m_sendSize,sentBuffer,receivedSize,recievedBuffer,
+			pkt1_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize2; j++)
+		    snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer2[j]);
+		for(j = 0; j < receivedSize2; j++)
+		    snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff2[j]);
+		printf("Expected Value2 (%zu)\n%s\n, Received Value2(%zu)\n%s\n-->Value2 %s\n",
+			m_sendSize2,sentBuffer,receivedSize2,recievedBuffer,
+			pkt2_cmp_succ?"Match":"no Match");
+
+		memset(recievedBuffer, 0, recievedBufferSize);
+		memset(sentBuffer, 0, sentBufferSize);
+		for(j = 0; j < m_sendSize3; j++)
+		    snprintf(&sentBuffer[3 * j], sentBufferSize - (3 * j + 1), " %02X", m_sendBuffer3[j]);
+		for(j = 0; j < receivedSize3; j++)
+		    snprintf(&recievedBuffer[3 * j], recievedBufferSize - (3 * j + 1), " %02X", rxBuff3[j]);
+		printf("Expected Value3 (%zu)\n%s\n, Received Value3(%zu)\n%s\n-->Value3 %s\n",
+			m_sendSize3,sentBuffer,receivedSize3,recievedBuffer,
+			pkt3_cmp_succ?"Match":"no Match");
+
+		delete[] recievedBuffer;
+		delete[] sentBuffer;
+
+		delete[] rxBuff1;
+		delete[] rxBuff2;
+		delete[] rxBuff3;
+
+		return pkt1_cmp_succ && pkt2_cmp_succ && pkt3_cmp_succ;
+	}
+
+	bool AddRules()
+	{
+		struct ipa_ioc_add_rt_rule_v2 *rt_rule;
+		struct ipa_rt_rule_add_v2 *rt_rule_entry;
+		const int NUM_RULES = 3;
+
+		rt_rule = (struct ipa_ioc_add_rt_rule_v2 *)
+			calloc(1, sizeof(struct ipa_ioc_add_rt_rule_v2));
+
+		if(!rt_rule) {
+			printf("fail\n");
+			return false;
+		}
+
+		rt_rule->rules = (uint64_t)calloc(3, sizeof(struct ipa_rt_rule_add_v2));
+		if(!rt_rule->rules) {
+			printf("fail\n");
+			return false;
+		}
+
+		rt_rule->commit = 1;
+		rt_rule->num_rules = NUM_RULES;
+		rt_rule->ip = IPA_IP_v6;
+		strlcpy(rt_rule->rt_tbl_name, "LAN", sizeof(rt_rule->rt_tbl_name));
+
+		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[0]);
+		rt_rule_entry->at_rear = 0;
+		rt_rule_entry->rule.dst = IPA_CLIENT_TEST2_CONS;
+//		rt_rule_entry->rule.hdr_hdl = hdr_entry->hdr_hdl; // gidons, there is no support for header insertion / removal yet.
+		rt_rule_entry->rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr[0]      = 0XFF020000;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr[1]      = 0x00000000;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr[2]      = 0x00000000;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr[3]      = 0X000000FF;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[0] = 0xFFFFFFFF;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[1] = 0xFFFFFFFF;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[2] = 0xFFFFFFFF;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[3] = 0xFFFFFFFF;
+		rt_rule_entry->rule.ttl_update = 1; // TTL Update
+
+		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[1]);
+		rt_rule_entry->at_rear = 0;
+		rt_rule_entry->rule.dst = IPA_CLIENT_TEST3_CONS;
+//		rt_rule_entry->rule.hdr_hdl = hdr_entry->hdr_hdl; // gidons, there is no support for header insertion / removal yet.
+		rt_rule_entry->rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr[0]      = 0XFF020000;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr[1]      = 0x00000000;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr[2]      = 0x00000000;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr[3]      = 0X000000AA;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[0] = 0xFFFFFFFF;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[1] = 0xFFFFFFFF;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[2] = 0xFFFFFFFF;
+		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[3] = 0xFFFFFFFF;
+		rt_rule_entry->rule.ttl_update = 1; // TTL Update
+
+		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[2]);
+		rt_rule_entry->at_rear = 1;
+		rt_rule_entry->rule.dst = IPA_CLIENT_TEST4_CONS;
+		rt_rule_entry->rule.ttl_update = 0; // TTL Update
+		if (false == m_routing.AddRoutingRule(rt_rule))
+		{
+			printf("Routing rule addition failed!\n");
+			return false;
+		}
+
+		printf("rt rule hdl1=%x\n", rt_rule_entry->rt_rule_hdl);
+
+		free(rt_rule);
+
+		InitFilteringBlock();
+
+		return true;
+	}
+};
+
+
 static class IpaRoutingBlockTest1 ipaRoutingBlockTest1;
 static class IpaRoutingBlockTest2 ipaRoutingBlockTest2;
 static class IpaRoutingBlockTest3 ipaRoutingBlockTest3;
@@ -5130,4 +6173,7 @@ static class IpaRoutingBlockTest031 ipaRoutingBlockTest031;
 
 static class IpaRoutingBlockTest040 ipaRoutingBlockTest040;
 
-
+static class IpaRoutingBlockTest050 ipaRoutingBlockTest050;
+static class IpaRoutingBlockTest051 ipaRoutingBlockTest051;
+static class IpaRoutingBlockTest052 ipaRoutingBlockTest052;
+static class IpaRoutingBlockTest053 ipaRoutingBlockTest053;

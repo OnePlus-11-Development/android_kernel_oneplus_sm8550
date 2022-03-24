@@ -189,3 +189,25 @@ bool RoutingDriverWrapper::PutRoutingTable(uint32_t routingTableHandle)
 	return true;
 }
 
+bool RoutingDriverWrapper::SetNatConntrackExcRoutingTable(uint32_t routingTableHandle, bool nat_or_conntrack)
+{
+	int retval = 0;
+
+	if (!DeviceNodeIsOpened())
+		return false;
+
+	if (nat_or_conntrack)
+		retval = ioctl(m_fd, IPA_IOC_SET_NAT_EXC_RT_TBL_IDX, routingTableHandle);
+	else
+		retval = ioctl(m_fd, IPA_IOC_SET_CONN_TRACK_EXC_RT_TBL_IDX, routingTableHandle);
+	
+	if (retval) {
+		printf("%s(), IPA_IOC_SET_CONN_TRACK_EXC_RT_TBL_IDX ioctl failed.\n", __FUNCTION__);
+		return false;
+	}
+
+	printf("%s(), %s ioctl issued to IPA routing block.\n", __FUNCTION__,(nat_or_conntrack) ?
+	"IPA_IOC_SET_NAT_EXC_RT_TBL_IDX" : "IPA_IOC_SET_CONN_TRACK_EXC_RT_TBL_IDX");
+	return true;
+}
+

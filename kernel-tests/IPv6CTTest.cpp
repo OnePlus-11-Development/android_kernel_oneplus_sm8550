@@ -114,7 +114,7 @@ public:
 		m_testSuiteName.push_back("IPv6CT");
 	}
 
-	static int SetupKernelModule(bool en_status = false)
+	static int SetupKernelModule(bool en_status = false, bool ct_suppress = false)
 	{
 		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
 		int retval;
@@ -157,6 +157,7 @@ public:
 
 		/* To ipa configurations - 1 pipes */
 		memset(&to_ipa_cfg[0], 0, sizeof(to_ipa_cfg[0]));
+		to_ipa_cfg[0].nat.nat_exc_suppress = ct_suppress;
 		prepare_channel_struct(&to_ipa_channels[0],
 			header.to_ipa_channels_num++,
 			IPA_CLIENT_TEST_PROD,
@@ -172,11 +173,11 @@ public:
 		return retval;
 	}
 
-	bool Setup()
+	bool Setup(bool en_status = false, bool ct_suppress = false)
 	{
 		bool bRetVal = true;
 
-		if (SetupKernelModule() != true)
+		if (SetupKernelModule(en_status,ct_suppress) != true)
 			return bRetVal;
 
 		m_producer.Open(INTERFACE0_TO_IPA_DATA_PATH, INTERFACE0_FROM_IPA_DATA_PATH);
@@ -1725,6 +1726,652 @@ public:
 	}
 };
 
+/*---------------------------------------------------------------------------------------------*/
+/* Test019: IPv6CT send outbound packet, suppression test  */
+/*---------------------------------------------------------------------------------------------*/
+class IpaIPV6CTBlockTest019 : public IpaIPv6CTBlockTestFixture
+{
+public:
+
+	IpaIPV6CTBlockTest019()
+	{
+		m_name = "IpaIPV6CTBlockTest019";
+		m_description =
+			"IPv6CT block test 019 - IPv6CT passes successfully one packet in outbound direction\n"
+			"1. Generate and commit three routing tables.\n"
+			"   Each table contains a single \"bypass\" rule (all data goes to output pipe 0, 1 and 2 (accordingly))\n"
+			"2. Generate and commit one outbound filtering rule: Destination IP Exactly Match.\n"
+			"3. Add IPv6CT rule for the packet which doesn't match\n"
+			"4. Expect NAT supporession to kick in and packet is routed correctly\n";
+		Register(*this);
+	}
+
+	virtual bool Setup()
+	{
+		/* we want statuses on this test */
+		return IpaIPv6CTBlockTestFixture::Setup(false, true);
+	}
+
+	virtual bool AddRoutingFilteringRules(enum ipa_flt_action flt_action, uint64_t dst_addr_msb, uint64_t dst_addr_lsb)
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+		const char bypass0[20] = "Bypass0";
+		const char bypass1[20] = "Bypass1";
+		const char bypass2[20] = "Bypass2";
+
+		if (!CreateThreeIPv6BypassRoutingTables(bypass0, bypass1, bypass2))
+		{
+			printf("CreateThreeBypassRoutingTables Failed\n");
+			return false;
+		}
+		printf("CreateThreeBypassRoutingTables completed successfully\n");
+
+		ipa_ioc_get_rt_tbl routing_table0;
+		routing_table0.ip = IPA_IP_v6;
+		strlcpy(routing_table0.name, bypass0, sizeof(routing_table0.name));
+		if (!m_routing.GetRoutingTable(&routing_table0))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table0=0x%pK) Failed.\n", &routing_table0);
+			return false;
+		}
+
+		/* Setup conntrack exception routing table. */
+		if (!m_routing.SetNatConntrackExcRoutingTable(routing_table0.hdl, false))
+		{
+			LOG_MSG_ERROR("m_routing.SetNatConntrackExcRoutingTable(routing_table0 hdl=%d) Failed.\n",
+				routing_table0.hdl);
+			return false;
+		}
+
+		ipa_ioc_get_rt_tbl routing_table1;
+		routing_table1.ip = IPA_IP_v6;
+		strlcpy(routing_table1.name, bypass1, sizeof(routing_table1.name));
+		if (!m_routing.GetRoutingTable(&routing_table1))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table1=0x%pK) Failed.\n", &routing_table1);
+			return false;
+		}
+
+		IPAFilteringTable FilterTable0;
+		ipa_flt_rule_add flt_rule_entry;
+		FilterTable0.Init(IPA_IP_v6, IPA_CLIENT_TEST_PROD, false, 1);
+
+		// Configuring Filtering Rule No.0
+		FilterTable0.GeneratePresetRule(1, flt_rule_entry);
+		flt_rule_entry.at_rear = true;
+		flt_rule_entry.flt_rule_hdl = -1; // return Value
+		flt_rule_entry.status = -1; // return value
+		flt_rule_entry.rule.action = flt_action;
+		flt_rule_entry.rule.rt_tbl_hdl = routing_table0.hdl; //put here the handle corresponding to Routing Rule 1
+		flt_rule_entry.rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[0] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[1] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[2] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[3] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[0] = GetHigh32(dst_addr_msb); // Filter DST_IP
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[1] = GetLow32(dst_addr_msb);
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[2] = GetHigh32(dst_addr_lsb);
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[3] = GetLow32(dst_addr_lsb);
+
+		printf("flt_rule_entry was set successfully, preparing for insertion....\n");
+
+		if (((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry)) ||
+			!m_filtering.AddFilteringRule(FilterTable0.GetFilteringTable()))
+		{
+			printf("%s::Error Adding Rule to Filter Table, aborting...\n", __FUNCTION__);
+			return false;
+		}
+		else
+		{
+			printf("flt rule hdl0=0x%x, status=0x%x\n",
+				FilterTable0.ReadRuleFromTable(0)->flt_rule_hdl, FilterTable0.ReadRuleFromTable(0)->status);
+		}
+
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return true;
+	}// AddRoutingFilteringRules()
+
+	virtual bool AddRoutingFilteringRules()
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+		bool result = AddRoutingFilteringRules(IPA_PASS_TO_SRC_NAT,
+			m_outbound_dst_addr_msb, m_outbound_dst_addr_lsb);
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return result;
+	}// AddRoutingFilteringRules()
+
+	virtual bool ModifyPackets()
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+		IpaIPv6CTBlockTestFixture::ModifyPackets(m_outbound_dst_addr_lsb, m_outbound_dst_addr_msb, m_outbound_dst_port,
+			m_outbound_src_addr_lsb, m_outbound_src_addr_msb, m_outbound_src_port+1);
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return true;
+	}// ModifyPackets()
+
+	virtual bool ReceivePacketsAndCompare()
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+		bool result = IpaIPv6CTBlockTestFixture::ReceivePacketsAndCompare(true);
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return result;
+	}
+};
+
+/*---------------------------------------------------------------------------------------------*/
+/* Test020: IPv6CT send inbound packet for NAT suppression test */
+/*---------------------------------------------------------------------------------------------*/
+class IpaIPV6CTBlockTest020 : public IpaIPv6CTBlockTestFixture
+{
+public:
+
+	IpaIPV6CTBlockTest020()
+	{
+		m_name = "IpaIPV6CTBlockTest020";
+		m_description =
+			"IPv6CT block test 020 - IPv6CT passes successfully one packet in inbound direction on NAT suppression\n"
+			"1. Generate and commit three routing tables.\n"
+			"   Each table contains a single \"bypass\" rule (all data goes to output pipe 0, 1 and 2 (accordingly))\n"
+			"2. Generate and commit one inbound filtering rule: Destination IP Exactly Match.\n"
+			"3. Add IPv6CT rule for the packet\n";
+		Register(*this);
+	}
+
+	virtual bool Setup()
+	{
+		/* we want statuses on this test */
+		return IpaIPv6CTBlockTestFixture::Setup(false, true);
+	}
+
+	virtual bool AddRoutingFilteringRules(enum ipa_flt_action flt_action, uint64_t dst_addr_msb, uint64_t dst_addr_lsb)
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+		const char bypass0[20] = "Bypass0";
+		const char bypass1[20] = "Bypass1";
+		const char bypass2[20] = "Bypass2";
+
+		if (!CreateThreeIPv6BypassRoutingTables(bypass0, bypass1, bypass2))
+		{
+			printf("CreateThreeBypassRoutingTables Failed\n");
+			return false;
+		}
+		printf("CreateThreeBypassRoutingTables completed successfully\n");
+
+		ipa_ioc_get_rt_tbl routing_table0;
+		routing_table0.ip = IPA_IP_v6;
+		strlcpy(routing_table0.name, bypass0, sizeof(routing_table0.name));
+		if (!m_routing.GetRoutingTable(&routing_table0))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table0=0x%pK) Failed.\n", &routing_table0);
+			return false;
+		}
+
+		/* Setup conntrack exception routing table. */
+		if (!m_routing.SetNatConntrackExcRoutingTable(routing_table0.hdl, false))
+		{
+			LOG_MSG_ERROR("m_routing.SetNatConntrackExcRoutingTable(routing_table0 hdl=%d) Failed.\n",
+				routing_table0.hdl);
+			return false;
+		}
+
+		ipa_ioc_get_rt_tbl routing_table1;
+		routing_table1.ip = IPA_IP_v6;
+		strlcpy(routing_table1.name, bypass1, sizeof(routing_table1.name));
+		if (!m_routing.GetRoutingTable(&routing_table1))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table1=0x%pK) Failed.\n", &routing_table1);
+			return false;
+		}
+
+		IPAFilteringTable FilterTable0;
+		ipa_flt_rule_add flt_rule_entry;
+		FilterTable0.Init(IPA_IP_v6, IPA_CLIENT_TEST_PROD, false, 1);
+
+		// Configuring Filtering Rule No.0
+		FilterTable0.GeneratePresetRule(1, flt_rule_entry);
+		flt_rule_entry.at_rear = true;
+		flt_rule_entry.flt_rule_hdl = -1; // return Value
+		flt_rule_entry.status = -1; // return value
+		flt_rule_entry.rule.action = flt_action;
+		flt_rule_entry.rule.rt_tbl_hdl = routing_table0.hdl; //put here the handle corresponding to Routing Rule 1
+		flt_rule_entry.rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[0] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[1] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[2] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[3] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[0] = GetHigh32(dst_addr_msb); // Filter DST_IP
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[1] = GetLow32(dst_addr_msb);
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[2] = GetHigh32(dst_addr_lsb);
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[3] = GetLow32(dst_addr_lsb);
+
+		printf("flt_rule_entry was set successfully, preparing for insertion....\n");
+
+		if (((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry)) ||
+			!m_filtering.AddFilteringRule(FilterTable0.GetFilteringTable()))
+		{
+			printf("%s::Error Adding Rule to Filter Table, aborting...\n", __FUNCTION__);
+			return false;
+		}
+		else
+		{
+			printf("flt rule hdl0=0x%x, status=0x%x\n",
+				FilterTable0.ReadRuleFromTable(0)->flt_rule_hdl, FilterTable0.ReadRuleFromTable(0)->status);
+		}
+
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return true;
+	}// AddRoutingFilteringRules()
+
+	virtual bool AddRoutingFilteringRules()
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+		bool result = AddRoutingFilteringRules(IPA_PASS_TO_DST_NAT,
+			m_outbound_src_addr_msb, m_outbound_src_addr_lsb);
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return result;
+	}// AddRoutingFilteringRules()
+
+	virtual bool ModifyPackets()
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+		IpaIPv6CTBlockTestFixture::ModifyPackets(m_outbound_src_addr_lsb, m_outbound_src_addr_msb, m_outbound_src_port,
+			m_outbound_dst_addr_lsb, m_outbound_dst_addr_msb, m_outbound_dst_port+1);
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return true;
+	}// ModifyPackets()
+
+	virtual bool ReceivePacketsAndCompare()
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+		bool result = IpaIPv6CTBlockTestFixture::ReceivePacketsAndCompare(true);
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return result;
+	}
+};
+
+/*---------------------------------------------------------------------------------------------*/
+/* Test021: IPv6CT send outbound packet, suppression test with status enabled  */
+/*---------------------------------------------------------------------------------------------*/
+class IpaIPV6CTBlockTest021 : public IpaIPv6CTBlockTestFixture
+{
+public:
+
+	IpaIPV6CTBlockTest021()
+	{
+		m_name = "IpaIPV6CTBlockTest021";
+		m_description =
+			"IPv6CT block test 021 - IPv6CT passes successfully one packet in outbound direction\n"
+			"1. Generate and commit three routing tables.\n"
+			"   Each table contains a single \"bypass\" rule (all data goes to output pipe 0, 1 and 2 (accordingly))\n"
+			"2. Generate and commit one outbound filtering rule: Destination IP Exactly Match.\n"
+			"3. Add IPv6CT rule for the packet which doesn't match\n"
+			"4. Expect NAT suppression to kick in and packet is routed correctly\n"
+			"5. Compare status and check if NAT suppression kicked in.\n";
+		Register(*this);
+	}
+
+	virtual bool Setup()
+	{
+		/* we want statuses on this test */
+		return IpaIPv6CTBlockTestFixture::Setup(true, true);
+	}
+
+	virtual bool AddRoutingFilteringRules(enum ipa_flt_action flt_action, uint64_t dst_addr_msb, uint64_t dst_addr_lsb)
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+		const char bypass0[20] = "Bypass0";
+		const char bypass1[20] = "Bypass1";
+		const char bypass2[20] = "Bypass2";
+
+		if (!CreateThreeIPv6BypassRoutingTables(bypass0, bypass1, bypass2))
+		{
+			printf("CreateThreeBypassRoutingTables Failed\n");
+			return false;
+		}
+		printf("CreateThreeBypassRoutingTables completed successfully\n");
+
+		ipa_ioc_get_rt_tbl routing_table0;
+		routing_table0.ip = IPA_IP_v6;
+		strlcpy(routing_table0.name, bypass0, sizeof(routing_table0.name));
+		if (!m_routing.GetRoutingTable(&routing_table0))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table0=0x%pK) Failed.\n", &routing_table0);
+			return false;
+		}
+
+		/* Setup conntrack exception routing table. */
+		if (!m_routing.SetNatConntrackExcRoutingTable(routing_table0.hdl, false))
+		{
+			LOG_MSG_ERROR("m_routing.SetNatConntrackExcRoutingTable(routing_table0 hdl=%d) Failed.\n",
+				routing_table0.hdl);
+			return false;
+		}
+
+		ipa_ioc_get_rt_tbl routing_table1;
+		routing_table1.ip = IPA_IP_v6;
+		strlcpy(routing_table1.name, bypass1, sizeof(routing_table1.name));
+		if (!m_routing.GetRoutingTable(&routing_table1))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table1=0x%pK) Failed.\n", &routing_table1);
+			return false;
+		}
+
+		IPAFilteringTable FilterTable0;
+		ipa_flt_rule_add flt_rule_entry;
+		FilterTable0.Init(IPA_IP_v6, IPA_CLIENT_TEST_PROD, false, 1);
+
+		// Configuring Filtering Rule No.0
+		FilterTable0.GeneratePresetRule(1, flt_rule_entry);
+		flt_rule_entry.at_rear = true;
+		flt_rule_entry.flt_rule_hdl = -1; // return Value
+		flt_rule_entry.status = -1; // return value
+		flt_rule_entry.rule.action = flt_action;
+		flt_rule_entry.rule.rt_tbl_hdl = routing_table0.hdl; //put here the handle corresponding to Routing Rule 1
+		flt_rule_entry.rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[0] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[1] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[2] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[3] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[0] = GetHigh32(dst_addr_msb); // Filter DST_IP
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[1] = GetLow32(dst_addr_msb);
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[2] = GetHigh32(dst_addr_lsb);
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[3] = GetLow32(dst_addr_lsb);
+
+		printf("flt_rule_entry was set successfully, preparing for insertion....\n");
+
+		if (((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry)) ||
+			!m_filtering.AddFilteringRule(FilterTable0.GetFilteringTable()))
+		{
+			printf("%s::Error Adding Rule to Filter Table, aborting...\n", __FUNCTION__);
+			return false;
+		}
+		else
+		{
+			printf("flt rule hdl0=0x%x, status=0x%x\n",
+				FilterTable0.ReadRuleFromTable(0)->flt_rule_hdl, FilterTable0.ReadRuleFromTable(0)->status);
+		}
+
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return true;
+	}// AddRoutingFilteringRules()
+
+	virtual bool AddRoutingFilteringRules()
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+		bool result = AddRoutingFilteringRules(IPA_PASS_TO_SRC_NAT,
+			m_outbound_dst_addr_msb, m_outbound_dst_addr_lsb);
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return result;
+	}// AddRoutingFilteringRules()
+
+	virtual bool ModifyPackets()
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+		IpaIPv6CTBlockTestFixture::ModifyPackets(m_outbound_dst_addr_lsb, m_outbound_dst_addr_msb, m_outbound_dst_port,
+			m_outbound_src_addr_lsb, m_outbound_src_addr_msb, m_outbound_src_port+1);
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return true;
+	}// ModifyPackets()
+
+	virtual bool ReceivePacketsAndCompare(bool packetPassExpected)
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+
+		// Receive results		
+		struct ipa3_hw_pkt_status_hw_v5_5 *status = NULL;
+		Byte rxBuff1[0x400];
+		size_t receivedSize = m_consumer.ReceiveData(rxBuff1, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize, m_consumer.m_fromChannelName.c_str());
+
+		bool isSuccess = true;
+		if (packetPassExpected)
+		{
+			// Compare results
+			if (!CompareResultVsGolden_w_Status(m_sendBuffer, m_sendSize, rxBuff1, receivedSize))
+			{
+				printf("Comparison of Buffer0 Failed!\n");
+				isSuccess = false;
+			}
+		}
+		else
+		{
+			if (receivedSize)
+			{
+				isSuccess = false;
+				printf("got data while expected packet to be blocked, failing\n");
+			}
+		}
+
+		status = (struct ipa3_hw_pkt_status_hw_v5_5 *)rxBuff1;
+		if (!status->nat_exc_suppress)
+		{
+			printf("NAT Suppression not hit!\n");
+			isSuccess = false;
+		}
+
+		char recievedBuffer[256] = {0};
+		char SentBuffer[256] = {0};
+		size_t j;
+
+		for (j = 0; j < m_sendSize; j++)
+		{
+			snprintf(&SentBuffer[3 * j], sizeof(SentBuffer)-(3 * j + 1), " %02X", m_sendBuffer[j]);
+		}
+
+		for (j = 0; j < receivedSize; j++)
+		{
+			snprintf(&recievedBuffer[3 * j], sizeof(recievedBuffer)-(3 * j + 1), " %02X", rxBuff1[j]);
+		}
+		printf("Expected Value1 (%zu)\n%s\n, Received Value1(%zu)\n%s\n",
+			m_sendSize, SentBuffer, receivedSize, recievedBuffer);
+
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return isSuccess;
+	}
+
+	virtual bool ReceivePacketsAndCompare()
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+		bool result = ReceivePacketsAndCompare(true);
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return result;
+	}
+};
+
+/*---------------------------------------------------------------------------------------------*/
+/* Test022: IPv6CT send inbound packet for NAT suppression test with status enabled */
+/*---------------------------------------------------------------------------------------------*/
+class IpaIPV6CTBlockTest022 : public IpaIPv6CTBlockTestFixture
+{
+public:
+
+	IpaIPV6CTBlockTest022()
+	{
+		m_name = "IpaIPV6CTBlockTest022";
+		m_description =
+			"IPv6CT block test 022 - IPv6CT passes successfully one packet in inbound direction on NAT suppression\n"
+			"1. Generate and commit three routing tables.\n"
+			"   Each table contains a single \"bypass\" rule (all data goes to output pipe 0, 1 and 2 (accordingly))\n"
+			"2. Generate and commit one inbound filtering rule: Destination IP Exactly Match.\n"
+			"3. Add IPv6CT rule for the packet\n"
+			"4. Send packet which doesn't match CT and expect NAT suppression to kick in.\n"
+			"5. Compare status and check if NAT suppression kicked in.\n";
+		Register(*this);
+	}
+
+	virtual bool Setup()
+	{
+		/* we want statuses on this test */
+		return IpaIPv6CTBlockTestFixture::Setup(true, true);
+	}
+
+	virtual bool AddRoutingFilteringRules(enum ipa_flt_action flt_action, uint64_t dst_addr_msb, uint64_t dst_addr_lsb)
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+		const char bypass0[20] = "Bypass0";
+		const char bypass1[20] = "Bypass1";
+		const char bypass2[20] = "Bypass2";
+
+		if (!CreateThreeIPv6BypassRoutingTables(bypass0, bypass1, bypass2))
+		{
+			printf("CreateThreeBypassRoutingTables Failed\n");
+			return false;
+		}
+		printf("CreateThreeBypassRoutingTables completed successfully\n");
+
+		ipa_ioc_get_rt_tbl routing_table0;
+		routing_table0.ip = IPA_IP_v6;
+		strlcpy(routing_table0.name, bypass0, sizeof(routing_table0.name));
+		if (!m_routing.GetRoutingTable(&routing_table0))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table0=0x%pK) Failed.\n", &routing_table0);
+			return false;
+		}
+
+		/* Setup conntrack exception routing table. */
+		if (!m_routing.SetNatConntrackExcRoutingTable(routing_table0.hdl, false))
+		{
+			LOG_MSG_ERROR("m_routing.SetNatConntrackExcRoutingTable(routing_table0 hdl=%d) Failed.\n",
+				routing_table0.hdl);
+			return false;
+		}
+
+		ipa_ioc_get_rt_tbl routing_table1;
+		routing_table1.ip = IPA_IP_v6;
+		strlcpy(routing_table1.name, bypass1, sizeof(routing_table1.name));
+		if (!m_routing.GetRoutingTable(&routing_table1))
+		{
+			printf("m_routing.GetRoutingTable(&routing_table1=0x%pK) Failed.\n", &routing_table1);
+			return false;
+		}
+
+		IPAFilteringTable FilterTable0;
+		ipa_flt_rule_add flt_rule_entry;
+		FilterTable0.Init(IPA_IP_v6, IPA_CLIENT_TEST_PROD, false, 1);
+
+		// Configuring Filtering Rule No.0
+		FilterTable0.GeneratePresetRule(1, flt_rule_entry);
+		flt_rule_entry.at_rear = true;
+		flt_rule_entry.flt_rule_hdl = -1; // return Value
+		flt_rule_entry.status = -1; // return value
+		flt_rule_entry.rule.action = flt_action;
+		flt_rule_entry.rule.rt_tbl_hdl = routing_table0.hdl; //put here the handle corresponding to Routing Rule 1
+		flt_rule_entry.rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[0] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[1] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[2] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[3] = 0xFFFFFFFF;// Exact Match
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[0] = GetHigh32(dst_addr_msb); // Filter DST_IP
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[1] = GetLow32(dst_addr_msb);
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[2] = GetHigh32(dst_addr_lsb);
+		flt_rule_entry.rule.attrib.u.v6.dst_addr[3] = GetLow32(dst_addr_lsb);
+
+		printf("flt_rule_entry was set successfully, preparing for insertion....\n");
+
+		if (((uint8_t)-1 == FilterTable0.AddRuleToTable(flt_rule_entry)) ||
+			!m_filtering.AddFilteringRule(FilterTable0.GetFilteringTable()))
+		{
+			printf("%s::Error Adding Rule to Filter Table, aborting...\n", __FUNCTION__);
+			return false;
+		}
+		else
+		{
+			printf("flt rule hdl0=0x%x, status=0x%x\n",
+				FilterTable0.ReadRuleFromTable(0)->flt_rule_hdl, FilterTable0.ReadRuleFromTable(0)->status);
+		}
+
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return true;
+	}// AddRoutingFilteringRules()
+
+	virtual bool AddRoutingFilteringRules()
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+		bool result = IpaIPv6CTBlockTestFixture::AddRoutingFilteringRules(IPA_PASS_TO_DST_NAT,
+			m_outbound_src_addr_msb, m_outbound_src_addr_lsb);
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return result;
+	}// AddRoutingFilteringRules()
+
+	virtual bool ModifyPackets()
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+		IpaIPv6CTBlockTestFixture::ModifyPackets(m_outbound_src_addr_lsb, m_outbound_src_addr_msb, m_outbound_src_port,
+			m_outbound_dst_addr_lsb, m_outbound_dst_addr_msb, m_outbound_dst_port+1);
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return true;
+	}// ModifyPackets()
+
+	virtual bool ReceivePacketsAndCompare(bool packetPassExpected)
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+
+		// Receive results		
+		struct ipa3_hw_pkt_status_hw_v5_5 *status = NULL;
+		Byte rxBuff1[0x400];
+		size_t receivedSize = m_consumer.ReceiveData(rxBuff1, 0x400);
+		printf("Received %zu bytes on %s.\n", receivedSize, m_consumer.m_fromChannelName.c_str());
+
+		bool isSuccess = true;
+		if (packetPassExpected)
+		{
+			// Compare results
+			if (!CompareResultVsGolden_w_Status(m_sendBuffer, m_sendSize, rxBuff1, receivedSize))
+			{
+				printf("Comparison of Buffer0 Failed!\n");
+				isSuccess = false;
+			}
+		}
+		else
+		{
+			if (receivedSize)
+			{
+				isSuccess = false;
+				printf("got data while expected packet to be blocked, failing\n");
+			}
+		}
+
+		status = (struct ipa3_hw_pkt_status_hw_v5_5 *)rxBuff1;
+		if (!status->nat_exc_suppress)
+		{
+			printf("NAT Suppression not hit!\n");
+			isSuccess = false;
+		}
+
+		char recievedBuffer[256] = {0};
+		char SentBuffer[256] = {0};
+		size_t j;
+
+		for (j = 0; j < m_sendSize; j++)
+		{
+			snprintf(&SentBuffer[3 * j], sizeof(SentBuffer)-(3 * j + 1), " %02X", m_sendBuffer[j]);
+		}
+
+		for (j = 0; j < receivedSize; j++)
+		{
+			snprintf(&recievedBuffer[3 * j], sizeof(recievedBuffer)-(3 * j + 1), " %02X", rxBuff1[j]);
+		}
+		printf("Expected Value1 (%zu)\n%s\n, Received Value1(%zu)\n%s\n",
+			m_sendSize, SentBuffer, receivedSize, recievedBuffer);
+
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return isSuccess;
+	}
+
+	virtual bool ReceivePacketsAndCompare()
+	{
+		printf("Entering %s, %s()\n", __FUNCTION__, __FILE__);
+		bool result = ReceivePacketsAndCompare(true);
+		printf("Leaving %s, %s()\n", __FUNCTION__, __FILE__);
+		return result;
+	}
+};
+
+
 // IPv6CT outbound packet test
 static class IpaIPV6CTBlockTest001 IpaIPV6CTBlockTest001;
 
@@ -1779,3 +2426,14 @@ static class IpaIPV6CTBlockTest017 IpaIPV6CTBlockTest017;
 // IPv6CT send inbound packet with rule in expansion table while the rule in the middle of the list was deleted
 static class IpaIPV6CTBlockTest018 IpaIPV6CTBlockTest018;
 
+// IPv6CT suppression test Outbound traffic
+static class IpaIPV6CTBlockTest019 IpaIPV6CTBlockTest019;
+
+// IPv6CT suppression test Inbound traffic
+static class IpaIPV6CTBlockTest020 IpaIPV6CTBlockTest020;
+
+// IPv6CT suppression test Outbound traffic with status
+static class IpaIPV6CTBlockTest021 IpaIPV6CTBlockTest021;
+
+// IPv6CT suppression test Inbound traffic with status
+static class IpaIPV6CTBlockTest022 IpaIPV6CTBlockTest022;

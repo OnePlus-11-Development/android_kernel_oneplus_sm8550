@@ -80,6 +80,7 @@ public:
 	bool Reset(enum ipa_ip_type ip);
 	bool GetRoutingTable(struct ipa_ioc_get_rt_tbl *routingTable);
 	bool PutRoutingTable(uint32_t routingTableHandle);
+	bool SetNatConntrackExcRoutingTable(uint32_t routingTableHandle, bool nat_or_conntrack);
 };
 
 #endif
