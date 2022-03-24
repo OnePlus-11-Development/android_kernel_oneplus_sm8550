@@ -1686,6 +1686,20 @@ end:
 	return rc;
 }
 
+static int _sde_connector_set_prop_dyn_transfer_time(struct sde_connector *c_conn, uint64_t val)
+{
+	int rc = 0;
+
+	if (!c_conn->ops.update_transfer_time)
+		return rc;
+
+	rc = c_conn->ops.update_transfer_time(c_conn->display, val);
+	if (rc)
+		SDE_ERROR_CONN(c_conn, "updating transfer time failed, val: %u, rc %d\n", val, rc);
+
+	return rc;
+}
+
 static int sde_connector_atomic_set_property(struct drm_connector *connector,
 		struct drm_connector_state *state,
 		struct drm_property *property,
@@ -1776,6 +1790,9 @@ static int sde_connector_atomic_set_property(struct drm_connector *connector,
 		if (rc)
 			SDE_ERROR_CONN(c_conn, "dynamic bit clock set failed, rc: %d", rc);
 
+		break;
+	case CONNECTOR_PROP_DYN_TRANSFER_TIME:
+		_sde_connector_set_prop_dyn_transfer_time(c_conn, val);
 		break;
 	default:
 		break;
@@ -2879,6 +2896,13 @@ static int sde_connector_populate_mode_info(struct drm_connector *conn,
 		sde_kms_info_add_keyint(info, "mdp_transfer_time_us",
 			mode_info.mdp_transfer_time_us);
 
+		if (mode_info.mdp_transfer_time_us_min && mode_info.mdp_transfer_time_us_max) {
+			sde_kms_info_add_keyint(info, "mdp_transfer_time_us_min",
+					mode_info.mdp_transfer_time_us_min);
+			sde_kms_info_add_keyint(info, "mdp_transfer_time_us_max",
+					mode_info.mdp_transfer_time_us_max);
+		}
+
 		sde_kms_info_add_keyint(info, "allowed_mode_switch",
 			mode_info.allowed_mode_switches);
 
@@ -3044,6 +3068,8 @@ static int _sde_connector_install_properties(struct drm_device *dev,
 			msm_property_install_range(&c_conn->property_info, "dyn_bit_clk",
 					0x0, 0, ~0, 0, CONNECTOR_PROP_DYN_BIT_CLK);
 
+		msm_property_install_range(&c_conn->property_info, "dyn_transfer_time",
+				 0x0, 0, 1000000, 0, CONNECTOR_PROP_DYN_TRANSFER_TIME);
 
 		mutex_lock(&c_conn->base.dev->mode_config.mutex);
 		sde_connector_fill_modes(&c_conn->base,

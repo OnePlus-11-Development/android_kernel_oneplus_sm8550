@@ -7311,6 +7311,46 @@ int dsi_display_get_avr_step_req_fps(void *display_dsi, u32 mode_fps)
 	return step;
 }
 
+int dsi_display_update_transfer_time(void *display, u32 transfer_time)
+{
+	struct dsi_display *disp = (struct dsi_display *)display;
+	int rc = 0, i = 0;
+	u32 transfer_time_min, transfer_time_max;
+	struct dsi_display_ctrl *ctrl;
+
+	if (!disp->panel || !disp->panel->cur_mode || !disp->panel->cur_mode->priv_info)
+		return -EINVAL;
+
+	transfer_time_min = disp->panel->cur_mode->priv_info->mdp_transfer_time_us_min;
+	transfer_time_max = disp->panel->cur_mode->priv_info->mdp_transfer_time_us_max;
+
+	if (!transfer_time_min || !transfer_time_max)
+		return 0;
+
+	if (transfer_time < transfer_time_min || transfer_time > transfer_time_max) {
+		DSI_ERR("invalid transfer time %u, min: %u, max: %u\n",
+			transfer_time, transfer_time_min, transfer_time_max);
+		return -EINVAL;
+	}
+
+	disp->panel->cur_mode->priv_info->mdp_transfer_time_us = transfer_time;
+	disp->panel->cur_mode->priv_info->dsi_transfer_time_us = transfer_time;
+
+	display_for_each_ctrl(i, disp) {
+		ctrl = &disp->ctrl[i];
+		rc = dsi_ctrl_update_host_config(ctrl->ctrl, &disp->config,
+				disp->panel->cur_mode, 0x0,
+				disp->dsi_clk_handle);
+		if (rc) {
+			DSI_ERR("[%s] failed to update ctrl config, rc=%d\n", disp->name, rc);
+			return rc;
+		}
+	}
+	atomic_set(&disp->clkrate_change_pending, 1);
+
+	return 0;
+}
+
 static bool dsi_display_match_timings(const struct dsi_display_mode *mode1,
 		struct dsi_display_mode *mode2, unsigned int match_flags)
 {

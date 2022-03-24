@@ -634,8 +634,9 @@ int dsi_conn_get_mode_info(struct drm_connector *connector,
 	mode_info->jitter_denom = dsi_mode->priv_info->panel_jitter_denom;
 	mode_info->dfps_maxfps = dsi_drm_get_dfps_maxfps(display);
 	mode_info->panel_mode_caps = dsi_mode->panel_mode_caps;
-	mode_info->mdp_transfer_time_us =
-		dsi_mode->priv_info->mdp_transfer_time_us;
+	mode_info->mdp_transfer_time_us = dsi_mode->priv_info->mdp_transfer_time_us;
+	mode_info->mdp_transfer_time_us_min = dsi_mode->priv_info->mdp_transfer_time_us_min;
+	mode_info->mdp_transfer_time_us_max = dsi_mode->priv_info->mdp_transfer_time_us_max;
 	mode_info->disable_rsc_solver = dsi_mode->priv_info->disable_rsc_solver;
 	mode_info->qsync_min_fps = dsi_mode->timing.qsync_min_fps;
 	mode_info->wd_jitter = dsi_mode->priv_info->wd_jitter;

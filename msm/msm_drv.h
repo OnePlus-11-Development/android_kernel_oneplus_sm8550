@@ -223,6 +223,7 @@ enum msm_mdp_conn_property {
 	CONNECTOR_PROP_DIMMING_CTRL,
 	CONNECTOR_PROP_DIMMING_MIN_BL,
 	CONNECTOR_PROP_EARLY_FENCE_LINE,
+	CONNECTOR_PROP_DYN_TRANSFER_TIME,
 
 	/* enum/bitmask properties */
 	CONNECTOR_PROP_TOPOLOGY_NAME,
@@ -790,6 +791,10 @@ struct msm_display_wd_jitter_config {
  * @panel_mode_caps   panel mode capabilities
  * @mdp_transfer_time_us   Specifies the mdp transfer time for command mode
  *                         panels in microseconds.
+ * @mdp_transfer_time_us_min   Specifies the minimum possible mdp transfer time
+ *                             for command mode panels in microseconds.
+ * @mdp_transfer_time_us_max   Specifies the maximum possible mdp transfer time
+ *                             for command mode panels in microseconds.
  * @allowed_mode_switches: bit mask to indicate supported mode switch.
  * @disable_rsc_solver: Dynamically disable RSC solver for the timing mode due to lower bitclk rate.
  * @dyn_clk_list: List of dynamic clock rates for RFI.
@@ -810,6 +815,8 @@ struct msm_mode_info {
 	bool wide_bus_en;
 	u32 panel_mode_caps;
 	u32 mdp_transfer_time_us;
+	u32 mdp_transfer_time_us_min;
+	u32 mdp_transfer_time_us_max;
 	u32 allowed_mode_switches;
 	bool disable_rsc_solver;
 	struct msm_dyn_clk_list dyn_clk_list;
