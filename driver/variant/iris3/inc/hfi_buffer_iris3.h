@@ -1165,7 +1165,8 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		AV1D_NUM_HW_PIC_BUF * (SIZE_AV1D_TILE_OFFSET + SIZE_AV1D_QM) + \
 		AV1D_NUM_FRAME_HEADERS * (SIZE_AV1D_FRAME_HEADER + \
 		2 * SIZE_AV1D_PROB_TABLE) + \
-		comv_size), VENUS_DMA_ALIGNMENT); \
+		comv_size + HDR10_HIST_EXTRADATA_SIZE + \
+		SIZE_AV1D_METADATA * AV1D_NUM_HW_PIC_BUF), VENUS_DMA_ALIGNMENT); \
 	} while (0)
 
 #define HFI_BUFFER_BITSTREAM_ENC(size, frame_width, frame_height, \
