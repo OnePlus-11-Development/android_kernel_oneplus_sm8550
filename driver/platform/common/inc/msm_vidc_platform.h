@@ -57,6 +57,12 @@ struct msm_platform_inst_capability {
 	u32 v4l2_id;
 	u32 hfi_id;
 	enum msm_vidc_inst_capability_flags flags;
+};
+
+struct msm_platform_inst_cap_dependency {
+	enum msm_vidc_inst_capability_type cap_id;
+	enum msm_vidc_domain_type domain;
+	enum msm_vidc_codec_type codec;
 	enum msm_vidc_inst_capability_type parents[MAX_CAP_PARENTS];
 	enum msm_vidc_inst_capability_type children[MAX_CAP_CHILDREN];
 	int (*adjust)(void *inst,
@@ -92,8 +98,10 @@ struct msm_vidc_ubwc_config_data {
 struct msm_vidc_platform_data {
 	struct msm_platform_core_capability *core_data;
 	u32 core_data_size;
-	struct msm_platform_inst_capability *instance_data;
-	u32 instance_data_size;
+	struct msm_platform_inst_capability *inst_cap_data;
+	u32 inst_cap_data_size;
+	struct msm_platform_inst_cap_dependency *inst_cap_dependency_data;
+	u32 inst_cap_dependency_data_size;
 	struct msm_vidc_csc_coeff csc_data;
 	struct msm_vidc_ubwc_config_data *ubwc_config;
 	struct msm_vidc_efuse_data *efuse_data;

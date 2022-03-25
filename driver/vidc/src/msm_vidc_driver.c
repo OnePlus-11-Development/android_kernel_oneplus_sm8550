@@ -4601,25 +4601,42 @@ static void update_inst_capability(struct msm_platform_inst_capability *in,
 			__func__, in, capability);
 		return;
 	}
-	if (in->cap_id < INST_CAP_MAX) {
-		capability->cap[in->cap_id].cap_id = in->cap_id;
-		capability->cap[in->cap_id].min = in->min;
-		capability->cap[in->cap_id].max = in->max;
-		capability->cap[in->cap_id].step_or_mask = in->step_or_mask;
-		capability->cap[in->cap_id].value = in->value;
-		capability->cap[in->cap_id].flags = in->flags;
-		capability->cap[in->cap_id].v4l2_id = in->v4l2_id;
-		capability->cap[in->cap_id].hfi_id = in->hfi_id;
-		memcpy(capability->cap[in->cap_id].parents, in->parents,
-			sizeof(capability->cap[in->cap_id].parents));
-		memcpy(capability->cap[in->cap_id].children, in->children,
-			sizeof(capability->cap[in->cap_id].children));
-		capability->cap[in->cap_id].adjust = in->adjust;
-		capability->cap[in->cap_id].set = in->set;
-	} else {
-		d_vpr_e("%s: invalid cap id %d\n",
-			__func__, in->cap_id);
+	if (in->cap_id >= INST_CAP_MAX) {
+		d_vpr_e("%s: invalid cap id %d\n", __func__, in->cap_id);
+		return;
 	}
+
+	capability->cap[in->cap_id].cap_id = in->cap_id;
+	capability->cap[in->cap_id].min = in->min;
+	capability->cap[in->cap_id].max = in->max;
+	capability->cap[in->cap_id].step_or_mask = in->step_or_mask;
+	capability->cap[in->cap_id].value = in->value;
+	capability->cap[in->cap_id].flags = in->flags;
+	capability->cap[in->cap_id].v4l2_id = in->v4l2_id;
+	capability->cap[in->cap_id].hfi_id = in->hfi_id;
+}
+
+static void update_inst_cap_dependency(
+	struct msm_platform_inst_cap_dependency *in,
+	struct msm_vidc_inst_capability *capability)
+{
+	if (!in || !capability) {
+		d_vpr_e("%s: invalid params %pK %pK\n",
+			__func__, in, capability);
+		return;
+	}
+	if (in->cap_id >= INST_CAP_MAX) {
+		d_vpr_e("%s: invalid cap id %d\n", __func__, in->cap_id);
+		return;
+	}
+
+	capability->cap[in->cap_id].cap_id = in->cap_id;
+	memcpy(capability->cap[in->cap_id].parents, in->parents,
+		sizeof(capability->cap[in->cap_id].parents));
+	memcpy(capability->cap[in->cap_id].children, in->children,
+		sizeof(capability->cap[in->cap_id].children));
+	capability->cap[in->cap_id].adjust = in->adjust;
+	capability->cap[in->cap_id].set = in->set;
 }
 
 int msm_vidc_deinit_instance_caps(struct msm_vidc_core *core)
@@ -4644,8 +4661,10 @@ int msm_vidc_init_instance_caps(struct msm_vidc_core *core)
 	u8 enc_valid_codecs, dec_valid_codecs;
 	u8 count_bits, enc_codec_count;
 	u8 codecs_count = 0;
-	int i, j, check_bit, num_platform_caps;
-	struct msm_platform_inst_capability *platform_data = NULL;
+	int i, j, check_bit;
+	int num_platform_cap_data, num_platform_cap_dependency_data;
+	struct msm_platform_inst_capability *platform_cap_data = NULL;
+	struct msm_platform_inst_cap_dependency *platform_cap_dependency_data = NULL;
 
 	if (!core || !core->platform || !core->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -4653,9 +4672,17 @@ int msm_vidc_init_instance_caps(struct msm_vidc_core *core)
 		goto error;
 	}
 
-	platform_data = core->platform->data.instance_data;
-	if (!platform_data) {
-		d_vpr_e("%s: platform instance data is NULL\n",
+	platform_cap_data = core->platform->data.inst_cap_data;
+	if (!platform_cap_data) {
+		d_vpr_e("%s: platform instance cap data is NULL\n",
+				__func__);
+			rc = -EINVAL;
+		goto error;
+	}
+
+	platform_cap_dependency_data = core->platform->data.inst_cap_dependency_data;
+	if (!platform_cap_dependency_data) {
+		d_vpr_e("%s: platform instance cap dependency data is NULL\n",
 				__func__);
 			rc = -EINVAL;
 		goto error;
@@ -4712,19 +4739,37 @@ int msm_vidc_init_instance_caps(struct msm_vidc_core *core)
 		}
 	}
 
-	num_platform_caps = core->platform->data.instance_data_size;
+	num_platform_cap_data = core->platform->data.inst_cap_data_size;
+	num_platform_cap_dependency_data = core->platform->data.inst_cap_dependency_data_size;
+	d_vpr_h("%s: num caps %d, dependency %d\n", __func__,
+		num_platform_cap_data, num_platform_cap_dependency_data);
 
-	d_vpr_h("%s: num caps %d\n", __func__, num_platform_caps);
 	/* loop over each platform capability */
-	for (i = 0; i < num_platform_caps; i++) {
+	for (i = 0; i < num_platform_cap_data; i++) {
 		/* select matching core codec and update it */
 		for (j = 0; j < codecs_count; j++) {
-			if ((platform_data[i].domain &
+			if ((platform_cap_data[i].domain &
 				core->inst_caps[j].domain) &&
-				(platform_data[i].codec &
+				(platform_cap_data[i].codec &
 				core->inst_caps[j].codec)) {
 				/* update core capability */
-				update_inst_capability(&platform_data[i],
+				update_inst_capability(&platform_cap_data[i],
+					&core->inst_caps[j]);
+			}
+		}
+	}
+
+	/* loop over each platform dependency capability */
+	for (i = 0; i < num_platform_cap_dependency_data; i++) {
+		/* select matching core codec and update it */
+		for (j = 0; j < codecs_count; j++) {
+			if ((platform_cap_dependency_data[i].domain &
+				core->inst_caps[j].domain) &&
+				(platform_cap_dependency_data[i].codec &
+				core->inst_caps[j].codec)) {
+				/* update core dependency capability */
+				update_inst_cap_dependency(
+					&platform_cap_dependency_data[i],
 					&core->inst_caps[j]);
 			}
 		}
