@@ -63,32 +63,6 @@ static bool is_priv_ctrl(u32 id)
 	return private;
 }
 
-static bool is_meta_ctrl(u32 id)
-{
-	return (id == V4L2_CID_MPEG_VIDC_METADATA_LTR_MARK_USE_DETAILS ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_SEQ_HEADER_NAL ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_DPB_LUMA_CHROMA_MISR ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_OPB_LUMA_CHROMA_MISR ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_INTERLACE ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_CONCEALED_MB_COUNT ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_HISTOGRAM_INFO ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_SEI_MASTERING_DISPLAY_COLOUR ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_SEI_CONTENT_LIGHT_LEVEL ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_HDR10PLUS ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_EVA_STATS ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_BUFFER_TAG ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_DPB_TAG_LIST ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_SUBFRAME_OUTPUT ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_ROI_INFO ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_TIMESTAMP ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_ENC_QP_METADATA ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_DEC_QP_METADATA ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_BITSTREAM_RESOLUTION ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_CROP_OFFSETS ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_MAX_NUM_REORDER_FRAMES ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_OUTBUF_FENCE);
-}
-
 static const char *const mpeg_video_rate_control[] = {
 	"VBR",
 	"CBR",
@@ -433,7 +407,7 @@ int msm_vidc_update_cap_value(struct msm_vidc_inst *inst, u32 cap_id,
 
 	prev_value = inst->capabilities->cap[cap_id].value;
 
-	if (is_meta_ctrl(inst->capabilities->cap[cap_id].v4l2_id)) {
+	if (is_meta_cap(cap_id)) {
 		/*
 		 * cumulative control value if client set same metadata
 		 * control multiple times.
@@ -831,10 +805,24 @@ int msm_vidc_ctrl_init(struct msm_vidc_inst *inst)
 			ctrl_cfg.max = capability->cap[idx].max;
 			ctrl_cfg.min = capability->cap[idx].min;
 			ctrl_cfg.ops = core->v4l2_ctrl_ops;
-			ctrl_cfg.type = (capability->cap[idx].flags &
-					CAP_FLAG_MENU) ?
-					V4L2_CTRL_TYPE_MENU :
-					V4L2_CTRL_TYPE_INTEGER;
+			if (capability->cap[idx].flags & CAP_FLAG_MENU)
+				ctrl_cfg.type = V4L2_CTRL_TYPE_MENU;
+			else if (capability->cap[idx].flags & CAP_FLAG_BITMASK)
+				ctrl_cfg.type = V4L2_CTRL_TYPE_BITMASK;
+			else
+				ctrl_cfg.type = V4L2_CTRL_TYPE_INTEGER;
+			/* allow all metadata modes from v4l2 side */
+			if (is_meta_cap(idx)) {
+				ctrl_cfg.max = V4L2_MPEG_VIDC_META_MAX - 1;
+				/* bitmask is expected to be enabled for meta controls */
+				if (ctrl_cfg.type != V4L2_CTRL_TYPE_BITMASK) {
+					i_vpr_e(inst,
+						"%s: missing bitmask for cap %s\n",
+						__func__, cap_name(idx));
+					rc = -EINVAL;
+					goto error;
+				}
+			}
 			if (ctrl_cfg.type == V4L2_CTRL_TYPE_MENU) {
 				ctrl_cfg.menu_skip_mask =
 					~(capability->cap[idx].step_or_mask);
@@ -873,8 +861,8 @@ int msm_vidc_ctrl_init(struct msm_vidc_inst *inst)
 			}
 		}
 		if (!ctrl) {
-			i_vpr_e(inst, "%s: invalid ctrl %#x\n", __func__,
-				capability->cap[idx].v4l2_id);
+			i_vpr_e(inst, "%s: invalid ctrl %#x cap %24s\n", __func__,
+				capability->cap[idx].v4l2_id, cap_name(idx));
 			rc = -EINVAL;
 			goto error;
 		}
@@ -1068,25 +1056,22 @@ static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
 
 		msm_vidc_allow_dcvs(inst);
 	}
-	if (is_meta_ctrl(ctrl->id)) {
-		if (cap_id == META_DPB_TAG_LIST) {
-			/*
-			 * To subscribe HFI_PROP_DPB_TAG_LIST
-			 * data in FBD, HFI_PROP_BUFFER_TAG data
-			 * must be delivered via FTB. Hence, update
-			 * META_OUTPUT_BUF_TAG to transfer on output port
-			 * when META_DPB_TAG_LIST is enbaled.
-			 */
-			if (is_meta_rx_out_enabled(inst, META_DPB_TAG_LIST)) {
-				inst->capabilities->cap[META_OUTPUT_BUF_TAG].value |=
-					V4L2_MPEG_VIDC_META_TX_OUTPUT | V4L2_MPEG_VIDC_META_ENABLE;
-			}
-		}
 
+	if (is_meta_cap(cap_id)) {
+		/* validate metadata control value against allowed settings */
+		if ((ctrl->val & inst->capabilities->cap[cap_id].max) != ctrl->val) {
+			i_vpr_e(inst,
+				"%s: allowed bits for cap %s is %#x, client set %#x\n",
+				__func__, cap_name(cap_id),
+				inst->capabilities->cap[cap_id].max,
+				ctrl->val);
+			return -EINVAL;
+		}
 		rc = msm_vidc_update_meta_port_settings(inst);
 		if (rc)
 			return rc;
 	}
+
 	rc = msm_vidc_update_buffer_count_if_needed(inst, ctrl);
 	if (rc)
 		return rc;

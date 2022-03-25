@@ -931,35 +931,6 @@ static int msm_vdec_subscribe_metadata(struct msm_vidc_inst *inst,
 	u32 payload[32] = {0};
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
-	static const u32 metadata_input_list[] = {
-		META_OUTBUF_FENCE,
-		/*
-		 * when fence enabled, client needs output buffer_tag
-		 * in input metadata buffer done.
-		 */
-		META_OUTPUT_BUF_TAG,
-	};
-	static const u32 metadata_output_list[] = {
-		META_BITSTREAM_RESOLUTION,
-		META_CROP_OFFSETS,
-		META_DPB_MISR,
-		META_OPB_MISR,
-		META_INTERLACE,
-		META_TIMESTAMP,
-		META_CONCEALED_MB_CNT,
-		META_HIST_INFO,
-		META_SEI_MASTERING_DISP,
-		META_SEI_CLL,
-		META_HDR10PLUS,
-		/*
-		 * client needs input buffer tag in output metadata buffer done.
-		 */
-		META_BUF_TAG,
-		META_DPB_TAG_LIST,
-		META_SUBFRAME_OUTPUT,
-		META_DEC_QP_METADATA,
-		META_MAX_NUM_REORDER_FRAMES,
-	};
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -970,20 +941,20 @@ static int msm_vdec_subscribe_metadata(struct msm_vidc_inst *inst,
 	capability = inst->capabilities;
 	payload[0] = HFI_MODE_METADATA;
 	if (port == INPUT_PORT) {
-		for (i = 0; i < ARRAY_SIZE(metadata_input_list); i++) {
-			if (is_meta_rx_inp_enabled(inst, metadata_input_list[i]) &&
-				msm_vidc_allow_metadata(inst, metadata_input_list[i])) {
-				payload[count + 1] =
-					capability->cap[metadata_input_list[i]].hfi_id;
+		for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+			if (is_meta_rx_inp_enabled(inst, i) &&
+				msm_vidc_allow_metadata_subscription(
+					inst, i, port)) {
+				payload[count + 1] = capability->cap[i].hfi_id;
 				count++;
 			}
 		}
 	} else if (port == OUTPUT_PORT) {
-		for (i = 0; i < ARRAY_SIZE(metadata_output_list); i++) {
-			if (is_meta_rx_out_enabled(inst, metadata_output_list[i]) &&
-				msm_vidc_allow_metadata(inst, metadata_output_list[i])) {
-				payload[count + 1] =
-					capability->cap[metadata_output_list[i]].hfi_id;
+		for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+			if (is_meta_rx_out_enabled(inst, i) &&
+				msm_vidc_allow_metadata_subscription(
+					inst, i, port)) {
+				payload[count + 1] = capability->cap[i].hfi_id;
 				count++;
 			}
 		}
@@ -1011,12 +982,6 @@ static int msm_vdec_set_delivery_mode_metadata(struct msm_vidc_inst *inst,
 	u32 payload[32] = {0};
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
-	static const u32 metadata_input_list[] = {
-		META_BUF_TAG,
-	};
-	static const u32 metadata_output_list[] = {
-		META_OUTPUT_BUF_TAG,
-	};
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -1028,19 +993,18 @@ static int msm_vdec_set_delivery_mode_metadata(struct msm_vidc_inst *inst,
 	payload[0] = HFI_MODE_METADATA;
 
 	if (port == INPUT_PORT) {
-		for (i = 0; i < ARRAY_SIZE(metadata_input_list); i++) {
-			if (is_meta_tx_inp_enabled(inst, metadata_input_list[i])) {
-				payload[count + 1] =
-					capability->cap[metadata_input_list[i]].hfi_id;
+		for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+			if (is_meta_tx_inp_enabled(inst, i)) {
+				payload[count + 1] = capability->cap[i].hfi_id;
 				count++;
 			}
 		}
 	} else if (port == OUTPUT_PORT) {
-		for (i = 0; i < ARRAY_SIZE(metadata_output_list); i++) {
-			if (is_meta_tx_out_enabled(inst, metadata_output_list[i])  &&
-				msm_vidc_allow_metadata(inst, metadata_output_list[i])) {
-				payload[count + 1] =
-					capability->cap[metadata_output_list[i]].hfi_id;
+		for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+			if (is_meta_tx_out_enabled(inst, i)  &&
+				msm_vidc_allow_metadata_delivery(
+					inst, i, port)) {
+				payload[count + 1] = capability->cap[i].hfi_id;
 				count++;
 			}
 		}

@@ -101,6 +101,14 @@ static inline is_internal_buffer(enum msm_vidc_buffer_type buffer_type)
 		buffer_type == MSM_VIDC_BUF_PARTIAL_DATA;
 }
 
+static inline bool is_meta_cap(u32 cap)
+{
+	if (cap > INST_CAP_NONE && cap < META_CAP_MAX)
+		return true;
+
+	return false;
+}
+
 static inline bool is_meta_rx_inp_enabled(struct msm_vidc_inst *inst, u32 cap)
 {
 	bool enabled = false;
@@ -148,59 +156,30 @@ static inline bool is_meta_tx_out_enabled(struct msm_vidc_inst *inst, u32 cap)
 static inline bool is_input_meta_enabled(struct msm_vidc_inst *inst)
 {
 	bool enabled = false;
+	u32 i;
 
-	if (is_decode_session(inst)) {
-		enabled = is_meta_tx_inp_enabled(inst, META_BUF_TAG) ||
-			is_meta_rx_inp_enabled(inst, META_BUF_TAG) ||
-			is_meta_tx_inp_enabled(inst, META_OUTBUF_FENCE) ||
-			is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE);
-	} else if (is_encode_session(inst)) {
-		enabled = is_meta_tx_inp_enabled(inst, META_SEQ_HDR_NAL) ||
-			is_meta_rx_inp_enabled(inst, META_SEQ_HDR_NAL) ||
-			is_meta_tx_inp_enabled(inst, META_EVA_STATS) ||
-			is_meta_rx_inp_enabled(inst, META_EVA_STATS) ||
-			is_meta_tx_inp_enabled(inst, META_BUF_TAG) ||
-			is_meta_rx_inp_enabled(inst, META_BUF_TAG) ||
-			is_meta_tx_inp_enabled(inst, META_ROI_INFO) ||
-			is_meta_rx_inp_enabled(inst, META_ROI_INFO);
+	for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+		if (is_meta_tx_inp_enabled(inst, i) ||
+			is_meta_rx_inp_enabled(inst, i)) {
+			enabled = true;
+			break;
+		}
 	}
+
 	return enabled;
 }
 
 static inline bool is_output_meta_enabled(struct msm_vidc_inst *inst)
 {
 	bool enabled = false;
+	u32 i;
 
-	if (is_decode_session(inst)) {
-		enabled = is_meta_tx_out_enabled(inst, META_BITSTREAM_RESOLUTION) ||
-			is_meta_rx_out_enabled(inst, META_BITSTREAM_RESOLUTION) ||
-			is_meta_tx_out_enabled(inst, META_CROP_OFFSETS) ||
-			is_meta_rx_out_enabled(inst, META_CROP_OFFSETS) ||
-			is_meta_tx_out_enabled(inst, META_DPB_MISR) ||
-			is_meta_rx_out_enabled(inst, META_DPB_MISR) ||
-			is_meta_tx_out_enabled(inst, META_OPB_MISR) ||
-			is_meta_rx_out_enabled(inst, META_OPB_MISR) ||
-			is_meta_tx_out_enabled(inst, META_INTERLACE) ||
-			is_meta_rx_out_enabled(inst, META_INTERLACE) ||
-			is_meta_tx_out_enabled(inst, META_CONCEALED_MB_CNT) ||
-			is_meta_rx_out_enabled(inst, META_CONCEALED_MB_CNT) ||
-			is_meta_tx_out_enabled(inst, META_SEI_MASTERING_DISP) ||
-			is_meta_rx_out_enabled(inst, META_SEI_MASTERING_DISP) ||
-			is_meta_tx_out_enabled(inst, META_SEI_CLL) ||
-			is_meta_rx_out_enabled(inst, META_SEI_CLL) ||
-			is_meta_tx_out_enabled(inst, META_BUF_TAG) ||
-			is_meta_rx_out_enabled(inst, META_BUF_TAG) ||
-			is_meta_tx_out_enabled(inst, META_DPB_TAG_LIST) ||
-			is_meta_rx_out_enabled(inst, META_DPB_TAG_LIST) ||
-			is_meta_tx_out_enabled(inst, META_SUBFRAME_OUTPUT) ||
-			is_meta_rx_out_enabled(inst, META_SUBFRAME_OUTPUT) ||
-			is_meta_tx_out_enabled(inst, META_MAX_NUM_REORDER_FRAMES) ||
-			is_meta_rx_out_enabled(inst, META_MAX_NUM_REORDER_FRAMES);
-	} else if (is_encode_session(inst)) {
-		enabled = is_meta_tx_out_enabled(inst, META_LTR_MARK_USE) ||
-			is_meta_rx_out_enabled(inst, META_LTR_MARK_USE) ||
-			is_meta_tx_out_enabled(inst, META_BUF_TAG) ||
-			is_meta_rx_out_enabled(inst, META_BUF_TAG);
+	for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+		if (is_meta_tx_out_enabled(inst, i) ||
+			is_meta_rx_out_enabled(inst, i)) {
+			enabled = true;
+			break;
+		}
 	}
 
 	return enabled;
@@ -454,7 +433,10 @@ struct msm_vidc_inst *get_inst(struct msm_vidc_core *core,
 void put_inst(struct msm_vidc_inst *inst);
 bool msm_vidc_allow_s_fmt(struct msm_vidc_inst *inst, u32 type);
 bool msm_vidc_allow_s_ctrl(struct msm_vidc_inst *inst, u32 id);
-bool msm_vidc_allow_metadata(struct msm_vidc_inst *inst, u32 cap_id);
+bool msm_vidc_allow_metadata_delivery(struct msm_vidc_inst *inst,
+	u32 cap_id, u32 port);
+bool msm_vidc_allow_metadata_subscription(struct msm_vidc_inst *inst,
+	u32 cap_id, u32 port);
 bool msm_vidc_allow_property(struct msm_vidc_inst *inst, u32 hfi_id);
 int msm_vidc_update_property_cap(struct msm_vidc_inst *inst, u32 hfi_id,
 	bool allow);
