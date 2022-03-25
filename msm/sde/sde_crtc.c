@@ -3814,14 +3814,8 @@ static void sde_crtc_atomic_begin(struct drm_crtc *crtc,
 }
 #endif
 
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-static void sde_crtc_atomic_flush(struct drm_crtc *crtc,
+static void sde_crtc_atomic_flush_common(struct drm_crtc *crtc,
 		struct drm_atomic_state *state)
-#else
-static void sde_crtc_atomic_flush(struct drm_crtc *crtc,
-		struct drm_crtc_state *old_crtc_state)
-#endif
 {
 	struct drm_encoder *encoder;
 	struct sde_crtc *sde_crtc;
@@ -3830,6 +3824,9 @@ static void sde_crtc_atomic_flush(struct drm_crtc *crtc,
 	struct msm_drm_private *priv;
 	struct sde_crtc_state *cstate;
 	struct sde_kms *sde_kms;
+	struct drm_connector *conn;
+	struct drm_connector_state *conn_state;
+	struct sde_connector *sde_conn = NULL;
 	int i;
 
 	if (!crtc || !crtc->dev || !crtc->dev->dev_private) {
@@ -3860,6 +3857,17 @@ static void sde_crtc_atomic_flush(struct drm_crtc *crtc,
 	cstate = to_sde_crtc_state(crtc->state);
 	dev = crtc->dev;
 	priv = dev->dev_private;
+
+	for_each_new_connector_in_state(state, conn, conn_state, i) {
+		if (!conn_state || conn_state->crtc != crtc)
+			continue;
+
+		sde_conn = to_sde_connector(conn_state->connector);
+	}
+
+	/* When doze is requested, switch first to normal mode */
+	if (sde_conn && sde_conn->lp_mode && sde_crtc_get_property(cstate, CRTC_PROP_CACHE_STATE))
+		sde_crtc_static_img_control(crtc, CACHE_STATE_NORMAL, false);
 
 	if ((sde_crtc->cache_state == CACHE_STATE_NORMAL) &&
 			sde_crtc_get_property(cstate, CRTC_PROP_CACHE_STATE))
@@ -3927,6 +3935,20 @@ static void sde_crtc_atomic_flush(struct drm_crtc *crtc,
 	/* Kickoff will be scheduled by outer layer */
 	SDE_ATRACE_END("sde_crtc_atomic_flush");
 }
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+static void sde_crtc_atomic_flush(struct drm_crtc *crtc,
+		struct drm_atomic_state *state)
+{
+	return sde_crtc_atomic_flush_common(crtc, state);
+}
+#else
+static void sde_crtc_atomic_flush(struct drm_crtc *crtc,
+		struct drm_crtc_state *old_crtc_state)
+{
+	return sde_crtc_atomic_flush_common(crtc, old_crtc_state->state);
+}
+#endif
 
 /**
  * sde_crtc_destroy_state - state destroy hook
