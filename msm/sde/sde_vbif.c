@@ -49,6 +49,9 @@ static bool _sde_vbif_setup_clk_supported(struct sde_kms *sde_kms, enum sde_clk_
 	bool supported = false;
 	bool has_split_vbif = test_bit(SDE_FEATURE_VBIF_CLK_SPLIT, sde_kms->catalog->features);
 
+	if (!SDE_CLK_CTRL_VALID(clk_ctrl))
+		return false;
+
 	if ((has_split_vbif && VBIF_CLK_CLIENT(clk_ctrl).ops.setup_clk_force_ctrl) ||
 			(!has_split_vbif && sde_kms->hw_mdp->ops.setup_clk_force_ctrl))
 		supported = true;

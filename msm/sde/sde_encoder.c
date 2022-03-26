@@ -227,13 +227,8 @@ static void _sde_encoder_control_fal10_veto(struct drm_encoder *drm_enc, bool ve
 	struct sde_kms *sde_kms = sde_encoder_get_kms(drm_enc);
 	struct sde_encoder_virt *sde_enc = to_sde_encoder_virt(drm_enc);
 
-	if (sde_kms->catalog && !sde_kms->catalog->uidle_cfg.uidle_rev)
+	if (!sde_kms || !sde_kms->hw_uidle || !sde_kms->hw_uidle->ops.uidle_fal10_override)
 		return;
-
-	if (!sde_kms->hw_uidle || !sde_kms->hw_uidle->ops.uidle_fal10_override) {
-		SDE_ERROR("invalid args\n");
-		return;
-	}
 
 	/*
 	 * clone mode is the only scenario where we want to enable software override
@@ -4165,6 +4160,9 @@ static void sde_encoder_early_wakeup_work_handler(struct kthread_work *work)
 	struct sde_encoder_virt *sde_enc = container_of(work,
 			struct sde_encoder_virt, early_wakeup_work);
 	struct sde_kms *sde_kms = to_sde_kms(ddev_to_msm_kms(sde_enc->base.dev));
+
+	if (!sde_kms)
+		return;
 
 	sde_vm_lock(sde_kms);
 	if (!sde_vm_owns_hw(sde_kms)) {
