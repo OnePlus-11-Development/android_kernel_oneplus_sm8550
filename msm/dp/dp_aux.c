@@ -636,7 +636,7 @@ static void dp_aux_deinit(struct dp_aux *dp_aux)
 	aux->enabled = false;
 }
 
-static int dp_aux_register(struct dp_aux *dp_aux)
+static int dp_aux_register(struct dp_aux *dp_aux, struct drm_device *drm_dev)
 {
 	struct dp_aux_private *aux;
 	int ret = 0;
@@ -652,6 +652,9 @@ static int dp_aux_register(struct dp_aux *dp_aux)
 	aux->drm_aux.name = "sde_dp_aux";
 	aux->drm_aux.dev = aux->dev;
 	aux->drm_aux.transfer = dp_aux_transfer;
+#if (KERNEL_VERSION(5, 15, 0) <= LINUX_VERSION_CODE)
+	aux->drm_aux.drm_dev = drm_dev;
+#endif
 	atomic_set(&aux->aborted, 1);
 	ret = drm_dp_aux_register(&aux->drm_aux);
 	if (ret) {

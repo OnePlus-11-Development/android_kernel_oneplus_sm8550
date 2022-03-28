@@ -2057,7 +2057,7 @@ static int dp_init_sub_modules(struct dp_display_private *dp)
 		goto error_aux;
 	}
 
-	rc = dp->aux->drm_aux_register(dp->aux);
+	rc = dp->aux->drm_aux_register(dp->aux, dp->dp_display.drm_dev);
 	if (rc) {
 		DP_ERR("DRM DP AUX register failed\n");
 		goto error_pll;
