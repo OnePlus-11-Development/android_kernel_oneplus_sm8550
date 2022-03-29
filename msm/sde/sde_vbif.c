@@ -564,11 +564,12 @@ bool sde_vbif_get_xin_status(struct sde_kms *sde_kms,
 
 	mutex_lock(&vbif->mutex);
 	SDE_EVT32_VERBOSE(vbif->idx, params->xin_id);
+	/* check xin client halt status - true if vbif is idle */
 	status = vbif->ops.get_xin_halt_status(vbif, params->xin_id);
 	if (status) {
+		/* check if client's clk is active - true if clk is active */
 		rc = _sde_vbif_get_clk_ctrl_status(sde_kms, params->clk_ctrl, &status);
-		if (rc)
-			status = false;
+		status = (rc < 0) ? false : !status;
 	}
 	mutex_unlock(&vbif->mutex);
 
