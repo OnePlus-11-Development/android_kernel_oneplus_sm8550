@@ -2037,7 +2037,7 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_2_0 = {
 		.compatible = "qcom,adreno-gpu-gen7-2-0",
 		.chipid = 0x43050a00,
 		.features = ADRENO_APRIV | ADRENO_IOCOHERENT | ADRENO_IFPC |
-				ADRENO_CONTENT_PROTECTION,
+				ADRENO_CONTENT_PROTECTION | ADRENO_ACD,
 		.gpudev = &adreno_gen7_hwsched_gpudev.base,
 		.perfcounters = &adreno_gen7_2_0_perfcounters,
 		.gmem_base = 0x1000000,
