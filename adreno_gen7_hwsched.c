@@ -928,7 +928,7 @@ static void scale_gmu_frequency(struct adreno_device *adreno_dev, int buslevel)
 	 * a higher frequency
 	 */
 	if (pwr->ddr_table[buslevel] >= gmu->perf_ddr_bw)
-		freq = gmu->freqs[1];
+		freq = gmu->freqs[GMU_MAX_PWRLEVELS - 1];
 
 	if (prev_freq == freq)
 		return;
