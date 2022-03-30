@@ -464,12 +464,9 @@ _get_gpu_core(struct platform_device *pdev, u32 *chipid)
 					adreno_gpulist[i]->compatible)) {
 			/*
 			 * We matched compat string, set chipid based on
-			 * dtsi, then gpulist, else fail.
+			 * dtsi, else fail.
 			 */
-			if (adreno_get_chipid(pdev, chipid))
-				*chipid = adreno_gpulist[i]->chipid;
-
-			if (*chipid)
+			if (!adreno_get_chipid(pdev, chipid))
 				return adreno_gpulist[i];
 
 			dev_crit(&pdev->dev,

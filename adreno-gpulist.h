@@ -1904,7 +1904,6 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_0_0 = {
 		DEFINE_ADRENO_REV(ADRENO_REV_GEN7_0_0,
 				UINT_MAX, UINT_MAX, UINT_MAX, 0),
 		.compatible = "qcom,adreno-gpu-gen7-0-0",
-		.chipid = 0x07030000,
 		.features = ADRENO_APRIV | ADRENO_IOCOHERENT |
 				ADRENO_CONTENT_PROTECTION | ADRENO_IFPC |
 				ADRENO_ACD | ADRENO_L3_VOTE | ADRENO_BCL |
@@ -1937,7 +1936,6 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_0_1 = {
 		DEFINE_ADRENO_REV(ADRENO_REV_GEN7_0_1,
 				UINT_MAX, UINT_MAX, UINT_MAX, ANY_ID),
 		.compatible = "qcom,adreno-gpu-gen7-0-1",
-		.chipid = 0x07030001,
 		.features = ADRENO_APRIV | ADRENO_IOCOHERENT |
 				ADRENO_CONTENT_PROTECTION | ADRENO_IFPC |
 				ADRENO_ACD | ADRENO_L3_VOTE | ADRENO_BCL |
@@ -2035,7 +2033,6 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_2_0 = {
 		DEFINE_ADRENO_REV(ADRENO_REV_GEN7_2_0,
 				UINT_MAX, UINT_MAX, UINT_MAX, ANY_ID),
 		.compatible = "qcom,adreno-gpu-gen7-2-0",
-		.chipid = 0x43050a00,
 		.features = ADRENO_APRIV | ADRENO_IOCOHERENT | ADRENO_IFPC |
 				ADRENO_CONTENT_PROTECTION | ADRENO_ACD,
 		.gpudev = &adreno_gen7_hwsched_gpudev.base,
