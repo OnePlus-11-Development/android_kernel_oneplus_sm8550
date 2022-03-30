@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk/qcom.h>
@@ -632,7 +633,7 @@ static void a5xx_spin_idle_debug(struct adreno_device *adreno_dev,
 
 	dev_err(device->dev, " hwfault=%8.8X\n", hwfault);
 
-	kgsl_device_snapshot(device, NULL, false);
+	kgsl_device_snapshot(device, NULL, NULL, false);
 }
 
 static int _gpmu_send_init_cmds(struct adreno_device *adreno_dev)

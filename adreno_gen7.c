@@ -611,7 +611,7 @@ void gen7_spin_idle_debug(struct adreno_device *adreno_dev,
 
 	dev_err(device->dev, " hwfault=%8.8X\n", hwfault);
 
-	kgsl_device_snapshot(device, NULL, false);
+	kgsl_device_snapshot(device, NULL, NULL, false);
 }
 
 /*
@@ -1612,6 +1612,7 @@ const struct gen7_gpudev adreno_gen7_hwsched_gpudev = {
 		.send_recurring_cmdobj = gen7_hwsched_send_recurring_cmdobj,
 		.perfcounter_remove = gen7_perfcounter_remove,
 		.set_isdb_breakpoint_registers = gen7_set_isdb_breakpoint_registers,
+		.reset_and_snapshot = gen7_hwsched_reset_and_snapshot,
 	},
 	.hfi_probe = gen7_hwsched_hfi_probe,
 	.hfi_remove = gen7_hwsched_hfi_remove,
