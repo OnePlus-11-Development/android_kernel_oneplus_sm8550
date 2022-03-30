@@ -480,9 +480,9 @@ int msm_vidc_check_session_supported(struct msm_vidc_inst *inst);
 int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst);
 int msm_vidc_check_core_mbpf(struct msm_vidc_inst *inst);
 int msm_vidc_check_scaling_supported(struct msm_vidc_inst *inst);
-int msm_vidc_update_timestamp(struct msm_vidc_inst *inst, u64 timestamp);
+int msm_vidc_update_timestamp_rate(struct msm_vidc_inst *inst, u64 timestamp);
 int msm_vidc_set_auto_framerate(struct msm_vidc_inst *inst, u64 timestamp);
-int msm_vidc_calc_window_avg_framerate(struct msm_vidc_inst *inst);
+int msm_vidc_get_timestamp_rate(struct msm_vidc_inst *inst);
 int msm_vidc_flush_ts(struct msm_vidc_inst *inst);
 int msm_vidc_ts_reorder_insert_timestamp(struct msm_vidc_inst *inst, u64 timestamp);
 int msm_vidc_ts_reorder_remove_timestamp(struct msm_vidc_inst *inst, u64 timestamp);
@@ -502,5 +502,7 @@ int msm_vidc_create_input_metadata_buffer(struct msm_vidc_inst *inst, int buf_fd
 int msm_vidc_update_input_meta_buffer_index(struct msm_vidc_inst *inst, struct vb2_buffer *vb2);
 int msm_vidc_update_input_rate(struct msm_vidc_inst *inst, u64 time_us);
 int msm_vidc_get_input_rate(struct msm_vidc_inst *inst);
+int msm_vidc_get_frame_rate(struct msm_vidc_inst *inst);
+int msm_vidc_get_operating_rate(struct msm_vidc_inst *inst);
 #endif // _MSM_VIDC_DRIVER_H_
 
