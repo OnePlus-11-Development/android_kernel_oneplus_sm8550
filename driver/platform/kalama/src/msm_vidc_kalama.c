@@ -13,6 +13,7 @@
 #include "msm_vidc_core.h"
 #include "msm_vidc_control.h"
 #include "hfi_property.h"
+#include "msm_vidc_iris3.h"
 
 #define DEFAULT_VIDEO_CONCEAL_COLOR_BLACK 0x8020010
 #define MAX_LTR_FRAME_COUNT     2
@@ -652,9 +653,9 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		V4L2_CID_MPEG_VIDC_CONTENT_ADAPTIVE_CODING,
 		HFI_PROP_CONTENT_ADAPTIVE_CODING,
 		CAP_FLAG_OUTPUT_PORT,
-		{BITRATE_MODE, MIN_QUALITY},
+		{BITRATE_MODE, LAYER_ENABLE, LAYER_TYPE},
 		{0},
-		msm_vidc_adjust_cac,
+		msm_vidc_adjust_brs,
 		msm_vidc_set_vbr_related_properties},
 
 	{BITRATE_BOOST, ENC, H264|HEVC,
@@ -662,9 +663,9 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		V4L2_CID_MPEG_VIDC_QUALITY_BITRATE_BOOST,
 		HFI_PROP_BITRATE_BOOST,
 		CAP_FLAG_OUTPUT_PORT,
-		{BITRATE_MODE, MIN_QUALITY},
+		{BITRATE_MODE},
 		{0},
-		msm_vidc_adjust_bitrate_boost,
+		msm_vidc_adjust_bitrate_boost_iris3,
 		msm_vidc_set_vbr_related_properties},
 
 	{MIN_QUALITY, ENC, H264,
@@ -673,7 +674,7 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		HFI_PROP_MAINTAIN_MIN_QUALITY,
 		CAP_FLAG_OUTPUT_PORT,
 		{BITRATE_MODE, ENH_LAYER_COUNT, META_ROI_INFO},
-		{CONTENT_ADAPTIVE_CODING, BITRATE_BOOST, BLUR_TYPES},
+		{BLUR_TYPES},
 		msm_vidc_adjust_min_quality,
 		msm_vidc_set_vbr_related_properties},
 
@@ -684,7 +685,7 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		CAP_FLAG_OUTPUT_PORT,
 		{BITRATE_MODE, PIX_FMTS, ENH_LAYER_COUNT,
 			META_ROI_INFO},
-		{CONTENT_ADAPTIVE_CODING, BITRATE_BOOST, BLUR_TYPES},
+		{BLUR_TYPES},
 		msm_vidc_adjust_min_quality,
 		msm_vidc_set_vbr_related_properties},
 
@@ -861,14 +862,25 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		V4L2_MPEG_VIDEO_H264_HIERARCHICAL_CODING_P,
 		V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING_TYPE,
 		HFI_PROP_LAYER_ENCODING_TYPE,
-		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		{0}, {CONTENT_ADAPTIVE_CODING}},
 
 	{LAYER_ENABLE, ENC, H264,
 		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING,
 		HFI_PROP_LAYER_ENCODING_TYPE,
-		CAP_FLAG_OUTPUT_PORT},
+		CAP_FLAG_OUTPUT_PORT,
+		{0}, {CONTENT_ADAPTIVE_CODING}},
+
+	{LAYER_ENABLE, ENC, HEVC,
+		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,
+		1, V4L2_MPEG_MSM_VIDC_DISABLE,
+		0,
+		0,
+		CAP_FLAG_OUTPUT_PORT,
+		{0},
+		{CONTENT_ADAPTIVE_CODING}},
 
 	{ENH_LAYER_COUNT, ENC, HEVC,
 		0, 5, 1, 0,

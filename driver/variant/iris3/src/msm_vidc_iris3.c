@@ -1137,6 +1137,69 @@ exit:
 	return 0;
 }
 
+int msm_vidc_adjust_bitrate_boost_iris3(void* instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst_capability* capability = NULL;
+	s32 adjusted_value;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	s32 rc_type = -1;
+	u32 width, height, frame_rate;
+	struct v4l2_format *f;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val :
+		capability->cap[BITRATE_BOOST].value;
+
+	if (inst->bufq[OUTPUT_PORT].vb2q->streaming)
+		return 0;
+
+	if (msm_vidc_get_parent_value(inst, BITRATE_BOOST,
+		BITRATE_MODE, &rc_type, __func__))
+		return -EINVAL;
+
+	/*
+	 * Bitrate Boost are supported only for VBR rc type.
+	 * Hence, do not adjust or set to firmware for non VBR rc's
+	 */
+	if (rc_type != HFI_RC_VBR_CFR) {
+		adjusted_value = 0;
+		goto adjust;
+	}
+
+	frame_rate = inst->capabilities->cap[FRAME_RATE].value >> 16;
+	f= &inst->fmts[OUTPUT_PORT];
+	width = f->fmt.pix_mp.width;
+	height = f->fmt.pix_mp.height;
+
+	/*
+	 * honor client set bitrate boost
+	 * if client did not set, keep max bitrate boost upto 4k@60fps
+	 * and remove bitrate boost after 4k@60fps
+	*/
+	if (capability->cap[BITRATE_BOOST].flags & CAP_FLAG_CLIENT_SET) {
+		/* accept client set bitrate boost value as is */
+	} else {
+		if (res_is_less_than_or_equal_to(width, height, 3840, 2160) &&
+			frame_rate <= 60)
+			adjusted_value = MAX_BITRATE_BOOST;
+		else
+			adjusted_value = 0;
+	}
+
+adjust:
+	msm_vidc_update_cap_value(inst, BITRATE_BOOST, adjusted_value, __func__);
+
+	return 0;
+}
+
+
+
 static struct msm_vidc_venus_ops iris3_ops = {
 	.boot_firmware = __boot_firmware_iris3,
 	.interrupt_init = __interrupt_init_iris3,

@@ -43,7 +43,7 @@ int msm_vidc_adjust_hevc_p_frame_qp(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_hevc_b_frame_qp(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_blur_type(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_blur_resolution(void *instance, struct v4l2_ctrl *ctrl);
-int msm_vidc_adjust_cac(void *instance, struct v4l2_ctrl *ctrl);
+int msm_vidc_adjust_brs(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_bitrate_boost(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_min_quality(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl);
