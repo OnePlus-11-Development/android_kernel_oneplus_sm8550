@@ -1760,6 +1760,9 @@ int msm_venc_enum_fmt(struct msm_vidc_inst *inst, struct v4l2_fmtdesc *f)
 			if (codecs & BIT(i)) {
 				if (idx >= ARRAY_SIZE(array))
 					break;
+				/* v4l2-compliance does not support private codecs */
+				if ((codecs & BIT(i)) == MSM_VIDC_HEIC)
+					continue;
 				array[idx] = codecs & BIT(i);
 				idx++;
 			}
