@@ -1316,6 +1316,8 @@ bool msm_vidc_allow_s_ctrl(struct msm_vidc_inst *inst, u32 id)
 			case V4L2_CID_MPEG_VIDC_PRIORITY:
 			case V4L2_CID_MPEG_VIDC_LOWLATENCY_REQUEST:
 			case V4L2_CID_MPEG_VIDC_INPUT_METADATA_FD:
+			case V4L2_CID_MPEG_VIDC_FRAME_RATE:
+			case V4L2_CID_MPEG_VIDC_OPERATING_RATE:
 				allow = true;
 				break;
 			default:
