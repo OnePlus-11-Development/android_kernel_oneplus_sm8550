@@ -97,9 +97,11 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{SECURE_MBPF,                    "SECURE_MBPF"                },
 	{MBPS,                           "MBPS"                       },
 	{POWER_SAVE_MBPS,                "POWER_SAVE_MBPS"            },
+	{CHECK_MBPS,                     "CHECK_MPBS"                 },
 	{FRAME_RATE,                     "FRAME_RATE"                 },
 	{OPERATING_RATE,                 "OPERATING_RATE"             },
 	{INPUT_RATE,                     "INPUT_RATE"                 },
+	{TIMESTAMP_RATE,                 "TIMESTAMP_RATE"             },
 	{SCALE_FACTOR,                   "SCALE_FACTOR"               },
 	{MB_CYCLES_VSP,                  "MB_CYCLES_VSP"              },
 	{MB_CYCLES_VPP,                  "MB_CYCLES_VPP"              },
@@ -2181,14 +2183,13 @@ int msm_vidc_get_fps(struct msm_vidc_inst *inst)
 		return -EINVAL;
 	}
 
-	frame_rate = inst->capabilities->cap[FRAME_RATE].value;
-	operating_rate = inst->capabilities->cap[OPERATING_RATE].value;
+	frame_rate = msm_vidc_get_frame_rate(inst);
+	operating_rate = msm_vidc_get_operating_rate(inst);
 
 	if (operating_rate > frame_rate)
-		fps = (operating_rate >> 16) ?
-			(operating_rate >> 16) : 1;
+		fps = operating_rate ? operating_rate : 1;
 	else
-		fps = frame_rate >> 16;
+		fps = frame_rate;
 
 	return fps;
 }
@@ -2331,7 +2332,7 @@ int msm_vidc_set_auto_framerate(struct msm_vidc_inst *inst, u64 timestamp)
 			!inst->capabilities->cap[TIME_DELTA_BASED_RC].value)
 		goto exit;
 
-	rc = msm_vidc_update_timestamp(inst, timestamp);
+	rc = msm_vidc_update_timestamp_rate(inst, timestamp);
 	if (rc)
 		goto exit;
 
@@ -2371,32 +2372,6 @@ int msm_vidc_set_auto_framerate(struct msm_vidc_inst *inst, u64 timestamp)
 	}
 exit:
 	return rc;
-}
-
-int msm_vidc_calc_window_avg_framerate(struct msm_vidc_inst *inst)
-{
-	struct msm_vidc_timestamp *ts;
-	struct msm_vidc_timestamp *prev = NULL;
-	u32 counter = 0;
-	u64 ts_ms = 0;
-
-	if (!inst) {
-		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
-
-	list_for_each_entry(ts, &inst->timestamps.list, sort.list) {
-		if (prev) {
-			if (ts->sort.val == prev->sort.val)
-				continue;
-
-			ts_ms += div_u64(ts->sort.val - prev->sort.val, 1000000);
-			counter++;
-		}
-		prev = ts;
-	}
-
-	return ts_ms ? (1000 * counter) / ts_ms : 0;
 }
 
 int msm_vidc_update_input_rate(struct msm_vidc_inst *inst, u64 time_us)
@@ -2450,6 +2425,36 @@ int msm_vidc_get_input_rate(struct msm_vidc_inst *inst)
 	}
 
 	return inst->capabilities->cap[INPUT_RATE].value >> 16;
+}
+
+int msm_vidc_get_timestamp_rate(struct msm_vidc_inst *inst)
+{
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: Invalid params\n", __func__);
+		return 0;
+	}
+
+	return inst->capabilities->cap[TIMESTAMP_RATE].value >> 16;
+}
+
+int msm_vidc_get_frame_rate(struct msm_vidc_inst *inst)
+{
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: Invalid params\n", __func__);
+		return 0;
+	}
+
+	return inst->capabilities->cap[FRAME_RATE].value >> 16;
+}
+
+int msm_vidc_get_operating_rate(struct msm_vidc_inst *inst)
+{
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: Invalid params\n", __func__);
+		return 0;
+	}
+
+	return inst->capabilities->cap[OPERATING_RATE].value >> 16;
 }
 
 static int msm_vidc_insert_sort(struct list_head *head,
@@ -2532,11 +2537,14 @@ int msm_vidc_flush_ts(struct msm_vidc_inst *inst)
 	return 0;
 }
 
-int msm_vidc_update_timestamp(struct msm_vidc_inst *inst, u64 timestamp)
+int msm_vidc_update_timestamp_rate(struct msm_vidc_inst *inst, u64 timestamp)
 {
-	struct msm_vidc_timestamp *ts;
+	struct msm_vidc_timestamp *ts, *prev;
 	int rc = 0;
 	u32 window_size = 0;
+	u32 timestamp_rate = 0;
+	u64 ts_ms = 0;
+	u32 counter = 0;
 
 	if (!inst) {
 		d_vpr_e("%s: Invalid params\n", __func__);
@@ -2573,6 +2581,21 @@ int msm_vidc_update_timestamp(struct msm_vidc_inst *inst, u64 timestamp)
 		list_del(&ts->sort.list);
 		msm_memory_pool_free(inst, ts);
 	}
+
+	/* Calculate timestamp rate */
+	list_for_each_entry(ts, &inst->timestamps.list, sort.list) {
+		if (prev) {
+			if (ts->sort.val == prev->sort.val)
+				continue;
+			ts_ms += div_u64(ts->sort.val - prev->sort.val, 1000000);
+			counter++;
+		}
+		prev = ts;
+	}
+	if (ts_ms)
+		timestamp_rate = (u32)div_u64((u64)counter * 1000, ts_ms);
+
+	msm_vidc_update_cap_value(inst, TIMESTAMP_RATE, timestamp_rate << 16, __func__);
 
 	return 0;
 }
@@ -5825,11 +5848,17 @@ int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst)
 	u64 curr_time_ns;
 	int rc = 0;
 
-	if (!inst || !inst->core) {
+	if (!inst || !inst->core || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 	core = inst->core;
+
+	if (!inst->capabilities->cap[CHECK_MBPS].value) {
+		i_vpr_h(inst, "%s: skip mbps check\n", __func__);
+		return 0;
+	}
+
 	curr_time_ns = ktime_get_ns();
 
 	core_lock(core, __func__);

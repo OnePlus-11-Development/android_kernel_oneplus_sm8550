@@ -904,7 +904,7 @@ static int handle_output_buffer(struct msm_vidc_inst *inst,
 	}
 
 	if (!is_image_session(inst) && is_decode_session(inst) && buf->data_size)
-		msm_vidc_update_timestamp(inst, buf->timestamp);
+		msm_vidc_update_timestamp_rate(inst, buf->timestamp);
 
 	/* update output buffer timestamp, if ts_reorder is enabled */
 	if (is_ts_reorder_allowed(inst) && buf->data_size)

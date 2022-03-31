@@ -240,6 +240,10 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 	{MBPS, DEC, VP9, 36, 4423680, 1, 4423680},
 	/* ((4096 * 2304) / 256) * 60 fps */
 	{POWER_SAVE_MBPS, ENC, CODECS_ALL, 0, 2211840, 1, 2211840},
+	/* Enable check mbps for encoder */
+	{CHECK_MBPS, ENC, CODECS_ALL, 0, 1, 1, 1},
+	/* Disable check mbps for encoder */
+	{CHECK_MBPS, DEC, CODECS_ALL, 0, 1, 1, 0},
 
 	{FRAME_RATE, ENC, CODECS_ALL,
 		(MINIMUM_FPS << 16), (MAXIMUM_FPS << 16),
@@ -295,6 +299,10 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		msm_vidc_adjust_operating_rate},
 
 	{INPUT_RATE, ENC|DEC, CODECS_ALL,
+		(MINIMUM_FPS << 16), INT_MAX,
+		1, (DEFAULT_FPS << 16)},
+
+	{TIMESTAMP_RATE, ENC|DEC, CODECS_ALL,
 		(MINIMUM_FPS << 16), INT_MAX,
 		1, (DEFAULT_FPS << 16)},
 
