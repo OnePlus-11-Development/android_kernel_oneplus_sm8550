@@ -1106,10 +1106,16 @@ int msm_vidc_decide_quality_mode_iris3(struct msm_vidc_inst* inst)
 	if (!is_encode_session(inst))
 		return 0;
 
-	/* image session always runs at quality mode */
-	if (is_image_session(inst)) {
+	/* image session or lossless encode always runs at quality mode */
+	if (is_image_session(inst) || capability->cap[LOSSLESS].value) {
 		mode = MSM_VIDC_MAX_QUALITY_MODE;
-		goto exit;
+		goto decision_done;
+	}
+
+	/* for least complexity, make LP for all resolution */
+	if (!capability->cap[COMPLEXITY].value) {
+		mode = MSM_VIDC_POWER_SAVE_MODE;
+		goto decision_done;
 	}
 
 	mbpf = msm_vidc_get_mbs_per_frame(inst);
@@ -1118,20 +1124,15 @@ int msm_vidc_decide_quality_mode_iris3(struct msm_vidc_inst* inst)
 	max_hq_mbpf = core->capabilities[MAX_MBPF_HQ].value;;
 	max_hq_mbps = core->capabilities[MAX_MBPS_HQ].value;;
 
-	/* NRT session to have max quality unless client configures least complexity */
 	if (!is_realtime_session(inst) && mbpf <= max_hq_mbpf) {
 		mode = MSM_VIDC_MAX_QUALITY_MODE;
-		if (!capability->cap[COMPLEXITY].value)
-			mode = MSM_VIDC_POWER_SAVE_MODE;
-		goto exit;
+		goto decision_done;
 	}
 
-	/* Power saving always disabled for CQ and LOSSLESS RC modes. */
-	if (capability->cap[LOSSLESS].value ||
-		(mbpf <= max_hq_mbpf && mbps <= max_hq_mbps))
+	if (mbpf <= max_hq_mbpf && mbps <= max_hq_mbps)
 		mode = MSM_VIDC_MAX_QUALITY_MODE;
 
-exit:
+decision_done:
 	msm_vidc_update_cap_value(inst, QUALITY_MODE, mode, __func__);
 
 	return 0;
