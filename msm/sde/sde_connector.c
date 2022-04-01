@@ -3461,3 +3461,20 @@ int sde_connector_event_notify(struct drm_connector *connector, uint32_t type,
 
 	return ret;
 }
+
+bool sde_connector_is_line_insertion_supported(struct sde_connector *sde_conn)
+{
+	struct dsi_display *display = NULL;
+
+	if (!sde_conn)
+		return false;
+
+	if (sde_conn->connector_type != DRM_MODE_CONNECTOR_DSI)
+		return false;
+
+	display = (struct dsi_display *)sde_conn->display;
+	if (!display || !display->panel)
+		return false;
+
+	return display->panel->host_config.line_insertion_enable;
+}
