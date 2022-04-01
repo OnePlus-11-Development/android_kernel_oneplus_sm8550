@@ -2677,6 +2677,54 @@ update_and_exit:
 	return 0;
 }
 
+int msm_vidc_adjust_preprocess(void *instance, struct v4l2_ctrl *ctrl)
+{
+	s32 adjusted_value;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	s32 brs = -1, eva_status = -1;
+	u32 width, height, frame_rate, operating_rate, max_fps;
+	struct v4l2_format *f;
+
+	if (!inst || !inst->capabilities || !inst->core) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	adjusted_value = inst->capabilities->cap[REQUEST_PREPROCESS].value;
+
+	if (msm_vidc_get_parent_value(inst, REQUEST_PREPROCESS, CONTENT_ADAPTIVE_CODING,
+		&brs, __func__) ||
+		msm_vidc_get_parent_value(inst, REQUEST_PREPROCESS, META_EVA_STATS,
+                &eva_status, __func__))
+		return -EINVAL;
+
+	width = inst->crop.width;
+	height = inst->crop.height;
+	frame_rate = msm_vidc_get_frame_rate(inst);;
+	operating_rate = msm_vidc_get_operating_rate(inst);;
+
+	max_fps = max(frame_rate, operating_rate);
+	f= &inst->fmts[OUTPUT_PORT];
+
+	/*
+	 * enable preprocess if
+	 * client did not enable EVA metadata statistics and
+	 * BRS enabled and upto 4k @ 60 fps
+	 */
+	if (!is_meta_tx_inp_enabled(inst, META_EVA_STATS) &&
+		brs == V4L2_MPEG_MSM_VIDC_ENABLE &&
+		res_is_less_than_or_equal_to(width, height, 3840, 2160) &&
+		max_fps <= 60)
+		adjusted_value = 1;
+	else
+		adjusted_value = 0;
+
+	msm_vidc_update_cap_value(inst, REQUEST_PREPROCESS,
+		adjusted_value, __func__);
+
+	return 0;
+}
+
 int msm_vidc_adjust_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl)
 {
 	struct msm_vidc_inst_capability *capability;
@@ -3769,6 +3817,27 @@ int msm_vidc_set_flip(void *instance,
 			if (rc)
 				return rc;
 		}
+	}
+
+	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_U32_ENUM,
+		&hfi_value, sizeof(u32), __func__);
+	if (rc)
+		return rc;
+
+	return rc;
+}
+
+int msm_vidc_set_preprocess(void *instance,
+        enum msm_vidc_inst_capability_type cap_id)
+{
+	int rc = 0;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+	u32 hfi_value;
+
+	d_vpr_e("%s: \n", __func__);
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
 	}
 
 	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_U32_ENUM,

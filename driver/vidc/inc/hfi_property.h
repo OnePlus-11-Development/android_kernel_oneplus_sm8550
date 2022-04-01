@@ -553,6 +553,8 @@ enum hfi_saliency_type {
 
 #define HFI_PROP_FENCE                                          0x0300018B
 
+#define HFI_PROP_REQUEST_PREPROCESS                             0x0300018E
+
 #define HFI_PROP_END                                            0x03FFFFFF
 
 #define HFI_SESSION_ERROR_BEGIN                                 0x04000000

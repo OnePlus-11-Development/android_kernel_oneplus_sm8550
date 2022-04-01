@@ -194,6 +194,7 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{MIN_QUALITY,                    "MIN_QUALITY"                },
 	{CONTENT_ADAPTIVE_CODING,        "CONTENT_ADAPTIVE_CODING"    },
 	{BLUR_TYPES,                     "BLUR_TYPES"                 },
+	{REQUEST_PREPROCESS,             "REQUEST_PREPROCESS"         },
 	{MIN_FRAME_QP,                   "MIN_FRAME_QP"               },
 	{MAX_FRAME_QP,                   "MAX_FRAME_QP"               },
 	{I_FRAME_QP,                     "I_FRAME_QP"                 },

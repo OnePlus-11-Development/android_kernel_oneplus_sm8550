@@ -290,6 +290,11 @@ enum msm_vidc_matrix_coefficients {
 	MSM_VIDC_MATRIX_COEFF_BT2100                         = 14,
 };
 
+enum msm_vidc_preprocess_type {
+	MSM_VIDC_PREPROCESS_NONE = BIT(0),
+	MSM_VIDC_PREPROCESS_TYPE0 = BIT(1),
+};
+
 enum msm_vidc_core_capability_type {
 	CORE_CAP_NONE = 0,
 	ENC_CODECS,
@@ -492,6 +497,7 @@ enum msm_vidc_inst_capability_type {
 	MIN_QUALITY,
 	CONTENT_ADAPTIVE_CODING,
 	BLUR_TYPES,
+	REQUEST_PREPROCESS,
 	/* place all intermittent(having both parent and child) enums before this line */
 
 	MIN_FRAME_QP,

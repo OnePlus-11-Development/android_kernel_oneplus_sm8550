@@ -687,9 +687,22 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		HFI_PROP_CONTENT_ADAPTIVE_CODING,
 		CAP_FLAG_OUTPUT_PORT,
 		{BITRATE_MODE, LAYER_ENABLE, LAYER_TYPE},
-		{0},
+		{REQUEST_PREPROCESS},
 		msm_vidc_adjust_brs,
 		msm_vidc_set_vbr_related_properties},
+
+	{REQUEST_PREPROCESS, ENC, H264|HEVC,
+		MSM_VIDC_PREPROCESS_NONE,
+		MSM_VIDC_PREPROCESS_TYPE0,
+		BIT(MSM_VIDC_PREPROCESS_NONE) |
+		BIT(MSM_VIDC_PREPROCESS_TYPE0),
+		MSM_VIDC_PREPROCESS_NONE,
+		0, HFI_PROP_REQUEST_PREPROCESS,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
+		{CONTENT_ADAPTIVE_CODING, META_EVA_STATS},
+		{0},
+		msm_vidc_adjust_preprocess,
+		msm_vidc_set_preprocess},
 
 	{BITRATE_BOOST, ENC, H264|HEVC,
 		0, MAX_BITRATE_BOOST, 25, MAX_BITRATE_BOOST,
@@ -1824,7 +1837,7 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		HFI_PROP_EVA_STAT_INFO,
 		CAP_FLAG_BITMASK,
 		{0},
-		{ENH_LAYER_COUNT}},
+		{ENH_LAYER_COUNT, REQUEST_PREPROCESS}},
 
 	{META_BUF_TAG, ENC, CODECS_ALL,
 		V4L2_MPEG_VIDC_META_DISABLE,
