@@ -588,8 +588,7 @@ static int get_driver_buffer_flags(struct msm_vidc_inst *inst, u32 hfi_flags)
 	} else if (inst->hfi_frame_info.picture_type & HFI_PICTURE_B) {
 		driver_flags |= MSM_VIDC_BUF_FLAG_BFRAME;
 	} else if (inst->hfi_frame_info.picture_type & HFI_PICTURE_I) {
-		if (inst->codec == MSM_VIDC_VP9 || inst->codec == MSM_VIDC_AV1)
-			driver_flags |= MSM_VIDC_BUF_FLAG_KEYFRAME;
+		driver_flags |= MSM_VIDC_BUF_FLAG_KEYFRAME;
 	} else if (inst->hfi_frame_info.picture_type & HFI_PICTURE_CRA) {
 		driver_flags |= MSM_VIDC_BUF_FLAG_KEYFRAME;
 	} else if (inst->hfi_frame_info.picture_type & HFI_PICTURE_BLA) {
