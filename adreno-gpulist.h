@@ -2056,6 +2056,7 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_2_0 = {
 	.hang_detect_cycles = 0xcfffff,
 	.protected_regs = gen7_0_0_protected_regs,
 	.highest_bank_bit = 16,
+	.gmu_hub_clk_freq = 200000000,
 	.gen7_snapshot_block_list = &gen7_2_0_snapshot_block_list,
 };
 
