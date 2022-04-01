@@ -96,16 +96,18 @@ msm_drm-$(CONFIG_MSM_SDE_ROTATOR) += ../rotator/sde_rotator_dev.o \
 				     ../rotator/sde_rotator_r1.o \
 				     ../rotator/sde_rotator_r3.o
 
+ifeq ($(CONFIG_MSM_SDE_ROTATOR), y)
 msm_drm-$(CONFIG_SYNC_FILE) += ../rotator/sde_rotator_sync.o
+
+msm_drm-$(CONFIG_DEBUG_FS) += ../rotator/sde_rotator_debug.o \
+			      ../rotator/sde_rotator_r1_debug.o \
+			      ../rotator/sde_rotator_r3_debug.o
+endif
 
 msm_drm-$(CONFIG_DRM_SDE_VM) += sde/sde_vm_common.o \
 				sde/sde_vm_primary.o \
 				sde/sde_vm_trusted.o \
 				sde/sde_vm_msgq.o
-
-msm_drm-$(CONFIG_DEBUG_FS) += ../rotator/sde_rotator_debug.o \
-			      ../rotator/sde_rotator_r1_debug.o \
-			      ../rotator/sde_rotator_r3_debug.o
 
 msm_drm-$(CONFIG_DRM_MSM_DP) += dp/dp_altmode.o \
 				dp/dp_parser.o \
