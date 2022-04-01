@@ -1215,6 +1215,8 @@ int gen7_hwsched_probe(struct platform_device *pdev,
 	if (ADRENO_FEATURE(adreno_dev, ADRENO_LPAC))
 		adreno_dev->lpac_enabled = true;
 
+	kgsl_mmu_set_feature(device, KGSL_MMU_PAGEFAULT_TERMINATE);
+
 	return adreno_hwsched_init(adreno_dev, &gen7_hwsched_ops);
 }
 
