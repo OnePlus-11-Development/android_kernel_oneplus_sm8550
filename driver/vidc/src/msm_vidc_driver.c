@@ -2421,6 +2421,23 @@ int msm_vidc_update_input_rate(struct msm_vidc_inst *inst, u64 time_us)
 	return 0;
 }
 
+int msm_vidc_flush_input_timer(struct msm_vidc_inst *inst)
+{
+	struct msm_vidc_input_timer *input_timer, *dummy_timer;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	i_vpr_l(inst, "%s: flush input_timer list\n", __func__);
+	list_for_each_entry_safe(input_timer, dummy_timer, &inst->input_timer_list, list) {
+		list_del_init(&input_timer->list);
+		msm_memory_pool_free(inst, input_timer);
+	}
+	return 0;
+}
+
 int msm_vidc_get_input_rate(struct msm_vidc_inst *inst)
 {
 	if (!inst || !inst->capabilities) {
@@ -4392,9 +4409,13 @@ int msm_vidc_session_streamoff(struct msm_vidc_inst *inst,
 	if(rc)
 		goto error;
 
-	/* discard pending input port settings change if any */
-	if (port == INPUT_PORT)
+	if (port == INPUT_PORT) {
+		/* discard pending input port settings change if any */
 		msm_vidc_discard_pending_ipsc(inst);
+
+		/* flush input timer list */
+		msm_vidc_flush_input_timer(inst);
+	}
 
 	if (port == OUTPUT_PORT) {
 		/* discard pending opsc if any*/
@@ -5377,6 +5398,7 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 	struct msm_vidc_buffer *buf, *dummy;
 	struct msm_vidc_timestamp *ts, *dummy_ts;
 	struct msm_memory_dmabuf *dbuf, *dummy_dbuf;
+	struct msm_vidc_input_timer *timer, *dummy_timer;
 	struct response_work *work, *dummy_work = NULL;
 	struct msm_vidc_inst_cap_entry *entry, *dummy_entry;
 	struct msm_vidc_fence *fence, *dummy_fence;
@@ -5459,6 +5481,12 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 			__func__, ts->sort.val);
 		list_del(&ts->sort.list);
 		msm_memory_pool_free(inst, ts);
+	}
+
+	list_for_each_entry_safe(timer, dummy_timer, &inst->input_timer_list, list) {
+		i_vpr_e(inst, "%s: removing input_timer %lld\n",
+			__func__, timer->time_us);
+		msm_memory_pool_free(inst, timer);
 	}
 
 	list_for_each_entry_safe(dbuf, dummy_dbuf, &inst->dmabuf_tracker, list) {
