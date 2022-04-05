@@ -2054,10 +2054,6 @@ int msm_vdec_qbuf(struct msm_vidc_inst *inst, struct vb2_buffer *vb2)
 		}
 	}
 
-	if (inst->firmware_priority != (inst->priority_level +
-					inst->capabilities->cap[PRIORITY].value * 2))
-		msm_vidc_set_session_priority(inst, PRIORITY);
-
 	/* batch decoder output & meta buffer only */
 	if (inst->decode_batch.enable && vb2->type == OUTPUT_MPLANE)
 		rc = msm_vdec_qbuf_batch(inst, vb2);
@@ -2566,38 +2562,12 @@ set_default:
 	q16_rate = (u32)input_rate << 16;
 	msm_vidc_update_cap_value(inst, is_frame_rate ? FRAME_RATE : OPERATING_RATE,
 		q16_rate, __func__);
-	if (is_realtime_session(inst) &&
-		((s_parm->type == INPUT_MPLANE && inst->bufq[INPUT_PORT].vb2q->streaming) ||
-		(s_parm->type == OUTPUT_MPLANE && inst->bufq[OUTPUT_PORT].vb2q->streaming))) {
-		rc = msm_vidc_check_core_mbps(inst);
-		if (rc) {
-			i_vpr_e(inst, "%s: unsupported load\n", __func__);
-			goto reset_rate;
-		}
-		rc = input_rate > max_rate;
-		if (rc) {
-			i_vpr_e(inst, "%s: unsupported rate %llu, max %u\n", __func__,
-				input_rate, max_rate);
-			rc = -ENOMEM;
-			goto reset_rate;
-		}
-	}
-	inst->priority_level = MSM_VIDC_PRIORITY_HIGH;
 
 	if (is_frame_rate)
 		capability->cap[FRAME_RATE].flags |= CAP_FLAG_CLIENT_SET;
 	else
 		capability->cap[OPERATING_RATE].flags |= CAP_FLAG_CLIENT_SET;
 
-	return 0;
-
-reset_rate:
-	if (rc) {
-		i_vpr_e(inst, "%s: setting rate %llu failed, reset to %u\n", __func__,
-			input_rate, default_rate);
-		msm_vidc_update_cap_value(inst, is_frame_rate ? FRAME_RATE : OPERATING_RATE,
-			default_rate << 16, __func__);
-	}
 exit:
 	return rc;
 }
@@ -2852,8 +2822,6 @@ int msm_vdec_inst_init(struct msm_vidc_inst *inst)
 	inst->buffers.output_meta.extra_count = 0;
 	inst->buffers.output_meta.actual_count = 0;
 	inst->buffers.output_meta.size = 0;
-
-	inst->priority_level = MSM_VIDC_PRIORITY_LOW;
 
 	rc = msm_vdec_codec_change(inst,
 			inst->fmts[INPUT_PORT].fmt.pix_mp.pixelformat);

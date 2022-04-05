@@ -2709,9 +2709,7 @@ int msm_vidc_adjust_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl)
 
 int msm_vidc_adjust_session_priority(void *instance, struct v4l2_ctrl *ctrl)
 {
-	int rc = 0;
 	int adjusted_value;
-	bool rate_by_client;
 	struct msm_vidc_inst_capability *capability;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
 
@@ -2723,54 +2721,9 @@ int msm_vidc_adjust_session_priority(void *instance, struct v4l2_ctrl *ctrl)
 	adjusted_value = ctrl ? ctrl->val :
 		capability->cap[PRIORITY].value;
 
-	if (capability->cap[FRAME_RATE].flags & CAP_FLAG_CLIENT_SET ||
-		capability->cap[OPERATING_RATE].flags & CAP_FLAG_CLIENT_SET) {
-		rate_by_client = true;
-		inst->priority_level = MSM_VIDC_PRIORITY_HIGH;
-	} else {
-		rate_by_client = false;
-		inst->priority_level = MSM_VIDC_PRIORITY_LOW;
-	}
-
-	/*
-	 * For RT, check for resource feasability.
-	 * For NRT, sessions with rate set by client takes higher order
-	 * among NRT sessions. They are constraint RT or low priority RT.
-	 */
-	if (adjusted_value == 0) {
-		rc = msm_vidc_check_core_mbps(inst);
-		if (rc) {
-			i_vpr_e(inst, "%s: unsupported load\n", __func__);
-			goto exit;
-		}
-		rc = capability->cap[FRAME_RATE].value > capability->cap[FRAME_RATE].max;
-		if (rc) {
-			i_vpr_e(inst, "%s: unsupported FRAME_RATE %u, max %u\n", __func__,
-				capability->cap[FRAME_RATE].value >> 16,
-				capability->cap[FRAME_RATE].max >> 16);
-			rc = -ENOMEM;
-			goto exit;
-		}
-		rc = capability->cap[OPERATING_RATE].value > capability->cap[OPERATING_RATE].max;
-		if (rc) {
-			i_vpr_e(inst, "%s: unsupported OPERATING_RATE %u, max %u\n", __func__,
-				capability->cap[OPERATING_RATE].value >> 16,
-				capability->cap[OPERATING_RATE].max >> 16);
-			rc = -ENOMEM;
-			goto exit;
-		}
-
-		rc = msm_vidc_check_core_mbpf(inst);
-		if (rc) {
-			i_vpr_e(inst, "%s: unsupported load\n", __func__);
-			goto exit;
-		}
-	}
-
 	msm_vidc_update_cap_value(inst, PRIORITY, adjusted_value, __func__);
 
-exit:
-	return rc;
+	return 0;
 }
 
 int msm_vidc_adjust_roi_info(void *instance, struct v4l2_ctrl *ctrl)
@@ -2805,68 +2758,51 @@ int msm_vidc_adjust_roi_info(void *instance, struct v4l2_ctrl *ctrl)
 	return 0;
 }
 
-int msm_vidc_adjust_frame_rate(void *instance, struct v4l2_ctrl *ctrl)
+int msm_vidc_adjust_dec_frame_rate(void *instance, struct v4l2_ctrl *ctrl)
 {
-	int rc = 0;
 	struct msm_vidc_inst_capability *capability;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
-	u32 adjusted_value;
+	u32 adjusted_value = 0;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
-	capability = inst->capabilities;
 
-	adjusted_value = ctrl ? ctrl->val : capability->cap[FRAME_RATE].value;
-
-	if (is_realtime_session(inst)) {
-		rc = msm_vidc_check_core_mbps(inst);
-		if (rc) {
-			i_vpr_e(inst, "%s: unsupported load\n", __func__);
-			return rc;
-		}
+	if (is_encode_session(inst)) {
+		d_vpr_e("%s: adjust framerate invalid for enc\n", __func__);
+		return -EINVAL;
 	}
 
-	inst->priority_level = MSM_VIDC_PRIORITY_HIGH;
-	capability->cap[FRAME_RATE].flags |= CAP_FLAG_CLIENT_SET;
-
+	capability = inst->capabilities;
+	adjusted_value = ctrl ? ctrl->val : capability->cap[FRAME_RATE].value;
 	msm_vidc_update_cap_value(inst, FRAME_RATE, adjusted_value, __func__);
 
 	return 0;
 }
 
-int msm_vidc_adjust_operating_rate(void *instance, struct v4l2_ctrl *ctrl)
+int msm_vidc_adjust_dec_operating_rate(void *instance, struct v4l2_ctrl *ctrl)
 {
-	int rc = 0;
 	struct msm_vidc_inst_capability *capability;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
-	u32 adjusted_value;
+	u32 adjusted_value = 0;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
-	capability = inst->capabilities;
 
-	adjusted_value = ctrl ? ctrl->val : capability->cap[OPERATING_RATE].value;
-
-	if (is_realtime_session(inst)) {
-		rc = msm_vidc_check_core_mbps(inst);
-		if (rc) {
-			i_vpr_e(inst, "%s: unsupported load\n", __func__);
-			return rc;
-		}
+	if (is_encode_session(inst)) {
+		d_vpr_e("%s: adjust operating rate invalid for enc\n", __func__);
+		return -EINVAL;
 	}
 
-	inst->priority_level = MSM_VIDC_PRIORITY_HIGH;
-	capability->cap[OPERATING_RATE].flags |= CAP_FLAG_CLIENT_SET;
-
+	capability = inst->capabilities;
+	adjusted_value = ctrl ? ctrl->val : capability->cap[OPERATING_RATE].value;
 	msm_vidc_update_cap_value(inst, OPERATING_RATE, adjusted_value, __func__);
 
 	return 0;
 }
-
 
 int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst)
 {
@@ -3795,14 +3731,12 @@ int msm_vidc_set_session_priority(void *instance,
 		return -EINVAL;
 	}
 
-	hfi_value = (inst->capabilities->cap[cap_id].value * 2) + inst->priority_level;
+	hfi_value = inst->capabilities->cap[cap_id].value;
 
 	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_U32,
 		&hfi_value, sizeof(u32), __func__);
 	if (rc)
 		return rc;
-
-	inst->firmware_priority = hfi_value;
 
 	return rc;
 }

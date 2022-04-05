@@ -884,10 +884,6 @@ int msm_venc_qbuf(struct msm_vidc_inst *inst, struct vb2_buffer *vb2)
 		return -EINVAL;
 	}
 
-	if (inst->firmware_priority != (inst->priority_level +
-		inst->capabilities->cap[PRIORITY].value * 2))
-		msm_vidc_set_session_priority(inst, PRIORITY);
-
 	rc = msm_vidc_queue_buffer_single(inst, vb2);
 	if (rc)
 		return rc;
@@ -1637,7 +1633,6 @@ int msm_venc_s_param(struct msm_vidc_inst *inst,
 			goto reset_rate;
 		}
 	}
-	inst->priority_level = MSM_VIDC_PRIORITY_HIGH;
 
 	if (is_frame_rate)
 		capability->cap[FRAME_RATE].flags |= CAP_FLAG_CLIENT_SET;
@@ -1900,8 +1895,6 @@ int msm_venc_inst_init(struct msm_vidc_inst *inst)
 	inst->buffers.input_meta.extra_count = 0;
 	inst->buffers.input_meta.actual_count = 0;
 	inst->buffers.input_meta.size = 0;
-
-	inst->priority_level = MSM_VIDC_PRIORITY_LOW;
 
 	inst->hfi_rc_type = HFI_RC_VBR_CFR;
 	inst->hfi_layer_type = HFI_HIER_P_SLIDING_WINDOW;

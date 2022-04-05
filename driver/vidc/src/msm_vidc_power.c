@@ -510,17 +510,17 @@ int msm_vidc_scale_power(struct msm_vidc_inst *inst, bool scale_buses)
 		 */
 		timestamp_rate = msm_vidc_get_timestamp_rate(inst);
 		input_rate = msm_vidc_get_input_rate(inst);
-		if (timestamp_rate > (fps + fps / 8)) {
+		if (timestamp_rate > (fps + fps / 8))
 			fps = timestamp_rate;
-			inst->priority_level = MSM_VIDC_PRIORITY_LOW;
-		}
+
 		if (input_rate > fps) {
 			fps = input_rate;
 			/*
-			 * add 6.25% more fps to increase power to make firmware
-			 * processing little faster than client queuing rate
+			 * add 6.25% more fps for NRT session to increase power to make
+			 * firmware processing little faster than client queuing rate
 			 */
-			fps = fps + fps / 16;
+			if (!is_realtime_session(inst))
+				fps = fps + fps / 16;
 		}
 	}
 	inst->max_rate = fps;

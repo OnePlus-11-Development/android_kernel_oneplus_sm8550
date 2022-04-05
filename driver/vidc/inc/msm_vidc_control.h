@@ -52,8 +52,8 @@ int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst);
 int msm_vidc_adjust_session_priority(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_roi_info(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_all_intra(void *instance, struct v4l2_ctrl *ctrl);
-int msm_vidc_adjust_frame_rate(void *instance, struct v4l2_ctrl *ctrl);
-int msm_vidc_adjust_operating_rate(void *instance, struct v4l2_ctrl *ctrl);
+int msm_vidc_adjust_dec_frame_rate(void *instance, struct v4l2_ctrl *ctrl);
+int msm_vidc_adjust_dec_operating_rate(void *instance, struct v4l2_ctrl *ctrl);
 
 int msm_vidc_set_header_mode(void *instance,
 	enum msm_vidc_inst_capability_type cap_id);
@@ -108,8 +108,6 @@ int msm_vidc_set_stage(void *instance,
 int msm_vidc_set_pipe(void *instance,
 	enum msm_vidc_inst_capability_type cap_id);
 int msm_vidc_set_csc_custom_matrix(void *instance,
-	enum msm_vidc_inst_capability_type cap_id);
-int msm_vidc_set_session_priority(void* instance,
 	enum msm_vidc_inst_capability_type cap_id);
 int msm_vidc_set_ir_period(void *instance,
 	enum msm_vidc_inst_capability_type cap_id);

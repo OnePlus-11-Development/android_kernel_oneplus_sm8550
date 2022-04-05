@@ -161,8 +161,6 @@ struct msm_vidc_inst {
 	struct msm_vidc_inst_capability   *capabilities;
 	struct completion                  completions[MAX_SIGNAL];
 	struct msm_vidc_fence_context      fence_context;
-	enum priority_level                priority_level;
-	u32                                firmware_priority;
 	bool                               active;
 	u64                                last_qbuf_time_ns;
 	bool                               vb2q_init;

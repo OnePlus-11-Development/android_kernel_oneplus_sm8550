@@ -237,7 +237,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		CAP_FLAG_OUTPUT_PORT |
 		CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED,
 		{0}, {0},
-		msm_vidc_adjust_frame_rate},
+		msm_vidc_adjust_dec_frame_rate},
 
 	{FRAME_RATE, DEC, VP9,
 		(MINIMUM_FPS << 16), (MAXIMUM_OVERRIDE_VP9_FPS << 16),
@@ -247,7 +247,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		CAP_FLAG_OUTPUT_PORT |
 		CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED,
 		{0}, {0},
-		msm_vidc_adjust_frame_rate},
+		msm_vidc_adjust_dec_frame_rate},
 
 	{OPERATING_RATE, ENC, CODECS_ALL,
 		(MINIMUM_FPS << 16), (MAXIMUM_FPS << 16),
@@ -261,7 +261,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		CAP_FLAG_OUTPUT_PORT |
 		CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED,
 		{0}, {0},
-		msm_vidc_adjust_operating_rate},
+		msm_vidc_adjust_dec_operating_rate},
 
 	{OPERATING_RATE, DEC, VP9,
 		(MINIMUM_FPS << 16), (MAXIMUM_OVERRIDE_VP9_FPS << 16),
@@ -271,7 +271,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		CAP_FLAG_OUTPUT_PORT |
 		CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED,
 		{0}, {0},
-		msm_vidc_adjust_operating_rate},
+		msm_vidc_adjust_dec_operating_rate},
 
 	{INPUT_RATE, ENC|DEC, CODECS_ALL,
 		(MINIMUM_FPS << 16), INT_MAX,
@@ -1865,12 +1865,6 @@ static struct msm_vidc_ubwc_config_data ubwc_config_waipio[] = {
 	UBWC_CONFIG(8, 32, 16, 0, 1, 1, 1),
 };
 
-/* Default bus bandwidth for non_real time session based on priority */
-static u32 bus_bw_nrt[] = {
-	15000000,
-	11000000,
-};
-
 static const struct msm_vidc_platform_data waipio_data = {
 	.core_data = core_data_waipio,
 	.core_data_size = ARRAY_SIZE(core_data_waipio),
@@ -1880,7 +1874,6 @@ static const struct msm_vidc_platform_data waipio_data = {
 	.csc_data.vpe_csc_custom_matrix_coeff = vpe_csc_custom_matrix_coeff,
 	.csc_data.vpe_csc_custom_limit_coeff = vpe_csc_custom_limit_coeff,
 	.ubwc_config = ubwc_config_waipio,
-	.bus_bw_nrt = bus_bw_nrt,
 };
 
 static int msm_vidc_init_data(struct msm_vidc_core *core)

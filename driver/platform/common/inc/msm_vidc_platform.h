@@ -96,7 +96,6 @@ struct msm_vidc_platform_data {
 	u32 instance_data_size;
 	struct msm_vidc_csc_coeff csc_data;
 	struct msm_vidc_ubwc_config_data *ubwc_config;
-	u32 *bus_bw_nrt;
 	struct msm_vidc_efuse_data *efuse_data;
 	unsigned int efuse_data_size;
 	unsigned int sku_version;
