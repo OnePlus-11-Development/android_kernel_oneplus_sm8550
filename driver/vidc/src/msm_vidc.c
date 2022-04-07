@@ -350,10 +350,13 @@ int msm_vidc_s_param(void *instance, struct v4l2_streamparm *param)
 		param->type != V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
 		return -EINVAL;
 
-	if (is_decode_session(inst))
-		rc = msm_vdec_s_param(instance, param);
-	else if (is_encode_session(inst))
+	if (is_encode_session(inst)) {
 		rc = msm_venc_s_param(instance, param);
+	} else {
+		i_vpr_e(inst, "%s: invalid domain %#x\n",
+			__func__, inst->domain);
+		return -EINVAL;
+	}
 
 	return rc;
 }
@@ -373,10 +376,13 @@ int msm_vidc_g_param(void *instance, struct v4l2_streamparm *param)
 		param->type != V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
 		return -EINVAL;
 
-	if (is_decode_session(inst))
-		rc = msm_vdec_g_param(instance, param);
-	else if (is_encode_session(inst))
+	if (is_encode_session(inst)) {
 		rc = msm_venc_g_param(instance, param);
+	} else {
+		i_vpr_e(inst, "%s: invalid domain %#x\n",
+			__func__, inst->domain);
+		return -EINVAL;
+	}
 
 	return rc;
 }
