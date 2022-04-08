@@ -44,6 +44,8 @@
 	(DP_INTR_MST_DP0_VCPF_SENT | DP_INTR_MST_DP1_VCPF_SENT)
 
 #define DP_INTR_MASK5		(DP_INTERRUPT_STATUS5 << 2)
+#define DP_TPG_PATTERN_MAX	9
+#define DP_TPG_PATTERN_DEFAULT	8
 
 #define dp_catalog_fill_io(x) { \
 	catalog->io.x = parser->get_io(parser, #x); \
@@ -1417,8 +1419,7 @@ static void dp_catalog_ctrl_usb_reset(struct dp_catalog_ctrl *ctrl, bool flip)
 	wmb();
 }
 
-static void dp_catalog_panel_tpg_cfg(struct dp_catalog_panel *panel,
-	bool enable)
+static void dp_catalog_panel_tpg_cfg(struct dp_catalog_panel *panel, u32 pattern)
 {
 	struct dp_catalog_private *catalog;
 	struct dp_io_data *io_data;
@@ -1441,7 +1442,7 @@ static void dp_catalog_panel_tpg_cfg(struct dp_catalog_panel *panel,
 	else if (panel->stream_id == DP_STREAM_1)
 		io_data = catalog->io.dp_p1;
 
-	if (!enable) {
+	if (!pattern) {
 		dp_write(MMSS_DP_TPG_MAIN_CONTROL, 0x0);
 		dp_write(MMSS_DP_BIST_ENABLE, 0x0);
 		reg = dp_read(MMSS_DP_TIMING_ENGINE_EN);
@@ -1450,6 +1451,9 @@ static void dp_catalog_panel_tpg_cfg(struct dp_catalog_panel *panel,
 		wmb(); /* ensure Timing generator is turned off */
 		return;
 	}
+
+	if (pattern > DP_TPG_PATTERN_MAX)
+		pattern = DP_TPG_PATTERN_DEFAULT;
 
 	dp_write(MMSS_DP_INTF_HSYNC_CTL,
 			panel->hsync_ctl);
@@ -1472,7 +1476,7 @@ static void dp_catalog_panel_tpg_cfg(struct dp_catalog_panel *panel,
 	dp_write(MMSS_DP_INTF_POLARITY_CTL, 0);
 	wmb(); /* ensure TPG registers are programmed */
 
-	dp_write(MMSS_DP_TPG_MAIN_CONTROL, 0x100);
+	dp_write(MMSS_DP_TPG_MAIN_CONTROL, (1 << pattern));
 	dp_write(MMSS_DP_TPG_VIDEO_CONFIG, 0x5);
 	wmb(); /* ensure TPG config is programmed */
 	dp_write(MMSS_DP_BIST_ENABLE, 0x1);
