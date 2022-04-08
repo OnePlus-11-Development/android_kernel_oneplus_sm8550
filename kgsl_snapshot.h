@@ -58,6 +58,7 @@ struct kgsl_snapshot_section_header {
 #define KGSL_SNAPSHOT_SECTION_GMU          0x1601
 #define KGSL_SNAPSHOT_SECTION_GMU_MEMORY   0x1701
 #define KGSL_SNAPSHOT_SECTION_SIDE_DEBUGBUS 0x1801
+#define KGSL_SNAPSHOT_SECTION_TRACE_BUFFER 0x1901
 
 #define KGSL_SNAPSHOT_SECTION_END          0xFFFF
 
@@ -306,6 +307,36 @@ struct kgsl_snapshot_shader_v2 {
 	int pipe_id; /* Pipe id */
 	int location; /* Location value */
 	u32 size;  /* Number of dwords in the dump */
+} __packed;
+
+#define TRACE_BUF_NUM_SIG 4
+
+/**
+ * enum trace_buffer_source - Bits to identify the source block of trace buffer information
+ * GX_DBGC : Signals captured from GX block
+ * CX_DBGC : Signals captured from CX block
+ */
+enum trace_buffer_source {
+	GX_DBGC = 1,
+	CX_DBGC = 2,
+};
+
+/**
+ * kgsl_snapshot_trace_buffer: Header Information for the tracebuffer in snapshot.
+ */
+struct kgsl_snapshot_trace_buffer {
+	/** @dbgc_ctrl: Identify source for trace */
+	__u16 dbgc_ctrl;
+	/** @dbgc_ctrl: Identify source for trace */
+	__u16 segment;
+	/** @granularity: The total number of segments in each packet */
+	__u16 granularity;
+	/** @ping_blk: Signal block */
+	__u16 ping_blk[TRACE_BUF_NUM_SIG];
+	/** @ping_idx: Signal Index */
+	__u16 ping_idx[TRACE_BUF_NUM_SIG];
+	/** @size: Number of bytes in the dump */
+	__u32 size;
 } __packed;
 
 #define SNAPSHOT_GPU_OBJECT_SHADER  1

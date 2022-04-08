@@ -714,6 +714,9 @@
 #define GEN7_DBGC_PERF_ATB_DRAIN_CMD                0x64a
 #define GEN7_DBGC_ECO_CNTL                          0x650
 #define GEN7_DBGC_AHB_DBG_CNTL                      0x651
+#define GEN7_DBGC_TRACE_BUFFER_STATUS               0x699
+#define GEN7_DBGC_DBG_TRACE_BUFFER_RD_ADDR          0x69b
+#define GEN7_DBGC_DBG_TRACE_BUFFER_RD_DATA          0x69c
 
 /* VSC registers */
 #define GEN7_VSC_PERFCTR_VSC_SEL_0          0xcd8
@@ -1220,5 +1223,17 @@
 
 /* GPU CX_MISC registers */
 #define GEN7_GPU_CX_MISC_TCM_RET_CNTL		0x39
+
+/* QDSS register offsets */
+#define QDSS_AOSS_APB_TMC_RSZ 0x04
+#define QDSS_AOSS_APB_TMC_RRD 0x10
+#define QDSS_AOSS_APB_TMC_RRP 0x14
+#define QDSS_AOSS_APB_TMC_RWP 0x18
+#define QDSS_AOSS_APB_TMC_CTRL 0x20
+#define QDSS_AOSS_APB_TMC_MODE 0x28
+#define QDSS_AOSS_APB_TMC_FFCR 0x304
+#define QDSS_AOSS_APB_TMC_LAR 0xfb0
+#define QDSS_AOSS_APB_ETR_CTRL 0x20
+#define QDSS_AOSS_APB_ETR1_CTRL 0x7020
 
 #endif /* _GEN7_REG_H */
