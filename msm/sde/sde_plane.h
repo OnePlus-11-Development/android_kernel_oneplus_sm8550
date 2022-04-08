@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -112,6 +113,8 @@ enum sde_plane_sclcheck_state {
  * @cdp_cfg:	CDP configuration
  * @cont_splash_populated: State was populated as part of cont. splash
  * @ubwc_stats_roi: cached roi for ubwc stats
+ * @line_insertion_cfg: line insertion configuration
+ * @lineinsertion_feature:	panel line insertion feature
  */
 struct sde_plane_state {
 	struct drm_plane_state base;
@@ -147,6 +150,8 @@ struct sde_plane_state {
 	bool cont_splash_populated;
 
 	struct sde_drm_ubwc_stats_roi ubwc_stats_roi;
+	struct sde_hw_pipe_line_insertion_cfg line_insertion_cfg;
+	bool lineinsertion_feature;
 };
 
 /**

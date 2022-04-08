@@ -1820,6 +1820,8 @@ static void sde_sspp_set_features(struct sde_mdss_cfg *sde_cfg,
 
 		sblk->maxlinewidth = sde_cfg->max_sspp_linewidth;
 
+		if (sde_cfg->has_line_insertion)
+			set_bit(SDE_SSPP_LINE_INSERTION, &sspp->features);
 		sblk->smart_dma_priority =
 			PROP_VALUE_ACCESS(props->values, SSPP_SMART_DMA, i);
 		if (sblk->smart_dma_priority && sde_cfg->smart_dma_rev)
@@ -5161,6 +5163,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		sde_cfg->demura_supported[SSPP_DMA1][1] = 1;
 		sde_cfg->demura_supported[SSPP_DMA3][0] = 0;
 		sde_cfg->demura_supported[SSPP_DMA3][1] = 1;
+		sde_cfg->has_line_insertion = true;
 	} else {
 		SDE_ERROR("unsupported chipset id:%X\n", hw_rev);
 		sde_cfg->perf.min_prefill_lines = 0xffff;

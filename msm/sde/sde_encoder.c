@@ -1069,6 +1069,32 @@ static int _sde_encoder_atomic_check_reserve(struct drm_encoder *drm_enc,
 	return ret;
 }
 
+bool sde_encoder_is_line_insertion_supported(struct drm_encoder *drm_enc)
+{
+	struct sde_connector *sde_conn = NULL;
+	struct sde_kms *sde_kms = NULL;
+	struct drm_connector *conn = NULL;
+
+	if (!drm_enc) {
+		SDE_ERROR("invalid drm encoder\n");
+		return false;
+	}
+
+	sde_kms = sde_encoder_get_kms(drm_enc);
+	if (!sde_kms)
+		return false;
+
+	conn = sde_encoder_get_connector(sde_kms->dev, drm_enc);
+	if (!conn || !conn->state)
+		return false;
+
+	sde_conn = to_sde_connector(conn);
+	if (!sde_conn)
+		return false;
+
+	return sde_connector_is_line_insertion_supported(sde_conn);
+}
+
 static void _sde_encoder_get_qsync_fps_callback(struct drm_encoder *drm_enc,
 			u32 *qsync_fps, struct drm_connector_state *conn_state)
 {
