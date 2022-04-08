@@ -1630,6 +1630,7 @@ const struct gen7_gpudev adreno_gen7_hwsched_gpudev = {
 		.send_recurring_cmdobj = gen7_hwsched_send_recurring_cmdobj,
 		.perfcounter_remove = gen7_perfcounter_remove,
 		.set_isdb_breakpoint_registers = gen7_set_isdb_breakpoint_registers,
+		.context_destroy = gen7_hwsched_context_destroy,
 	},
 	.hfi_probe = gen7_hwsched_hfi_probe,
 	.hfi_remove = gen7_hwsched_hfi_remove,

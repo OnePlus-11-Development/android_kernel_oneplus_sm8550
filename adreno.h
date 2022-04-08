@@ -880,6 +880,10 @@ struct adreno_gpudev {
 	 * @set_isdb_breakpoint_registers - Program isdb registers to issue break command
 	 */
 	void (*set_isdb_breakpoint_registers)(struct adreno_device *adreno_dev);
+	/**
+	 * @context_destroy: Target specific function called during context destruction
+	 */
+	void (*context_destroy)(struct adreno_device *adreno_dev, struct adreno_context *drawctxt);
 };
 
 /**
