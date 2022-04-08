@@ -1221,7 +1221,6 @@ struct ipa3_sys_context {
 	struct work_struct repl_work;
 	void (*repl_hdlr)(struct ipa3_sys_context *sys);
 	struct ipa3_repl_ctx *repl;
-	struct ipa3_page_repl_ctx *page_recycle_repl;
 	u32 pkt_sent;
 	struct napi_struct *napi_obj;
 	struct list_head pending_pkts[GSI_VEID_MAX];
@@ -1241,7 +1240,6 @@ struct ipa3_sys_context {
 	bool ext_ioctl_v2;
 	bool common_buff_pool;
 	struct ipa3_sys_context *common_sys;
-	struct tasklet_struct tasklet_find_freepage;
 	atomic_t page_avilable;
 	u32 napi_sort_page_thrshld_cnt;
 
@@ -1257,8 +1255,10 @@ struct ipa3_sys_context {
 	struct workqueue_struct *repl_wq;
 	struct ipa3_status_stats *status_stat;
 	u32 pm_hdl;
+	struct ipa3_page_repl_ctx *page_recycle_repl;
 	struct workqueue_struct *freepage_wq;
 	struct delayed_work freepage_work;
+	struct tasklet_struct tasklet_find_freepage;
 	/* ordering is important - other immutable fields go below */
 };
 
