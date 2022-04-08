@@ -859,9 +859,7 @@ int msm_vidc_ctrl_init(struct msm_vidc_inst *inst)
 				ctrl_cfg.type = V4L2_CTRL_TYPE_BITMASK;
 			else
 				ctrl_cfg.type = V4L2_CTRL_TYPE_INTEGER;
-			/* allow all metadata modes from v4l2 side */
 			if (is_meta_cap(idx)) {
-				ctrl_cfg.max = V4L2_MPEG_VIDC_META_MAX - 1;
 				/* bitmask is expected to be enabled for meta controls */
 				if (ctrl_cfg.type != V4L2_CTRL_TYPE_BITMASK) {
 					i_vpr_e(inst,
@@ -1117,15 +1115,6 @@ static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
 		msm_vidc_update_cap_value(inst, LAYER_ENABLE, enable, __func__);
 	}
 	if (is_meta_cap(cap_id)) {
-		/* validate metadata control value against allowed settings */
-		if ((ctrl->val & inst->capabilities->cap[cap_id].max) != ctrl->val) {
-			i_vpr_e(inst,
-				"%s: allowed bits for cap %s is %#x, client set %#x\n",
-				__func__, cap_name(cap_id),
-				inst->capabilities->cap[cap_id].max,
-				ctrl->val);
-			return -EINVAL;
-		}
 		rc = msm_vidc_update_meta_port_settings(inst);
 		if (rc)
 			return rc;
