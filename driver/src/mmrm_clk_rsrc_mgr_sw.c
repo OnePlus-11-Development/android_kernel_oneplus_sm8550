@@ -1113,7 +1113,7 @@ int mmrm_init_sw_clk_mgr(void *driver_data)
 	}
 
 	/* update the peak current threshold */
-	sinfo->peak_cur_data.threshold = cres->threshold;
+	sinfo->peak_cur_data.threshold = cres->peak_threshold;
 	sinfo->peak_cur_data.aggreg_val = 0;
 	sinfo->peak_cur_data.aggreg_level = 0;
 	sinfo->throttle_clients_data_length = cres->throttle_clients_data_length;
