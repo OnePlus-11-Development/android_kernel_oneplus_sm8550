@@ -498,6 +498,7 @@ enum msm_vidc_inst_capability_type {
 	CONTENT_ADAPTIVE_CODING,
 	BLUR_TYPES,
 	REQUEST_PREPROCESS,
+	SLICE_MODE,
 	/* place all intermittent(having both parent and child) enums before this line */
 
 	MIN_FRAME_QP,
@@ -515,7 +516,6 @@ enum msm_vidc_inst_capability_type {
 	LTR_COUNT,
 	IR_PERIOD,
 	BITRATE_BOOST,
-	SLICE_MODE,
 	BLUR_RESOLUTION,
 	OUTPUT_ORDER,
 	INPUT_BUF_HOST_MAX_COUNT,

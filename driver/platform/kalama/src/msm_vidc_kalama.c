@@ -1412,7 +1412,8 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		V4L2_CID_MPEG_VIDEO_MULTI_SLICE_MODE,
 		0,
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU,
-		{BITRATE_MODE, ALL_INTRA}, {0},
+		{BITRATE_MODE, ALL_INTRA},
+		{STAGE},
 		msm_vidc_adjust_slice_count, msm_vidc_set_slice_count},
 
 	{SLICE_MAX_BYTES, ENC, H264|HEVC|HEIC,
@@ -1553,7 +1554,7 @@ static struct msm_platform_inst_capability instance_data_kalama[] = {
 		0,
 		HFI_PROP_STAGE,
 		CAP_FLAG_NONE,
-		{LOWLATENCY_MODE}, {0},
+		{LOWLATENCY_MODE, SLICE_MODE}, {0},
 		NULL, msm_vidc_set_stage},
 
 	{PIPE, DEC|ENC, CODECS_ALL,
