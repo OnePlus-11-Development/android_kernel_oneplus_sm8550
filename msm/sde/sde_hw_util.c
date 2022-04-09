@@ -66,6 +66,8 @@ static u32 sde_hw_util_log_mask = SDE_DBG_MASK_NONE;
 #define QSEED4_DEFAULT_PRELOAD_V 0x2
 #define QSEED4_DEFAULT_PRELOAD_H 0x4
 
+#define QSEED5_DEFAULT_DE_LPF_BLEND 0x3FF00000
+
 typedef void (*scaler_lut_type)(struct sde_hw_blk_reg_map *,
 		struct sde_hw_scaler3_cfg *, u32);
 
@@ -154,6 +156,7 @@ void sde_set_scaler_v2(struct sde_hw_scaler3_cfg *cfg,
 	cfg->de.thr_low = scale_v2->de.thr_low;
 	cfg->de.thr_high = scale_v2->de.thr_high;
 	cfg->de.blend = scale_v2->de_blend;
+	cfg->de_lpf_flags = scale_v2->de_lpf_flags;
 	cfg->de_lpf_h = scale_v2->de_lpf_h;
 	cfg->de_lpf_l = scale_v2->de_lpf_l;
 	cfg->de_lpf_m = scale_v2->de_lpf_m;
@@ -437,11 +440,16 @@ void sde_hw_setup_scaler3(struct sde_hw_blk_reg_map *c,
 
 	SDE_REG_WRITE(c, QSEED3_DST_SIZE + scaler_offset, dst);
 
-	if (de_lpf && (scaler3_cfg->de_lpf_flags & SDE_DYN_EXP_DISABLE)) {
-		de_lpf_blend = (scaler3_cfg->de_lpf_h & 0x3FF) |
-			((scaler3_cfg->de_lpf_l & 0x3FF) << 10) |
-			((scaler3_cfg->de_lpf_m & 0x3FF) << 20);
-		SDE_REG_WRITE(c, QSEED3_DE_LPF_BLEND, de_lpf_blend);
+	if (de_lpf) {
+		if (scaler3_cfg->de_lpf_flags & SDE_DE_LPF_BLEND_FLAG_EN) {
+			de_lpf_blend = (scaler3_cfg->de_lpf_l & 0x3FF) |
+				((scaler3_cfg->de_lpf_m & 0x3FF) << 10) |
+				((scaler3_cfg->de_lpf_h & 0x3FF) << 20);
+			SDE_REG_WRITE(c, QSEED3_DE_LPF_BLEND, de_lpf_blend);
+		} else {
+			SDE_REG_WRITE(c, QSEED3_DE_LPF_BLEND,
+						QSEED5_DEFAULT_DE_LPF_BLEND);
+		}
 	}
 
 end:
