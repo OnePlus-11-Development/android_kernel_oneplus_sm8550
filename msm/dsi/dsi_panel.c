@@ -1787,6 +1787,9 @@ static int dsi_panel_parse_panel_mode(struct dsi_panel *panel)
 					"qcom,poms-align-panel-vsync");
 	panel->panel_mode = panel_mode;
 	panel->panel_mode_switch_enabled = panel_mode_switch_enabled;
+
+	panel->panel_ack_disabled = utils->read_bool(utils->data,
+					"qcom,panel-ack-disabled");
 error:
 	return rc;
 }

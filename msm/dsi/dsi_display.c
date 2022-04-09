@@ -66,7 +66,8 @@ static bool is_sim_panel(struct dsi_display *display)
 	if (!display || !display->panel)
 		return false;
 
-	return display->panel->te_using_watchdog_timer;
+	return (display->panel->te_using_watchdog_timer ||
+			display->panel->panel_ack_disabled);
 }
 
 static void dsi_display_mask_ctrl_error_interrupts(struct dsi_display *display,
