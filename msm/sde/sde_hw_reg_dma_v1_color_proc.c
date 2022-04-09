@@ -5608,7 +5608,7 @@ static bool __reg_dmav1_valid_hfc_en_cfg(struct drm_msm_dem_cfg *dcfg,
 		return false;
 	}
 
-	h = hw_cfg->panel_height;
+	h = hw_cfg->num_ds_enabled ? hw_cfg->panel_height : hw_cfg->displayv;
 	w = hw_cfg->panel_width;
 	temp = hw_cfg->panel_width / 2;
 	if (dcfg->pentile) {
