@@ -2870,8 +2870,7 @@ static void _sde_plane_sspp_setup_sys_cache(struct sde_plane *psde,
 		cfg->flags |= SYS_CACHE_NO_ALLOC;
 		cfg->type = SDE_SYS_CACHE_DISP;
 
-	} else if ((sc_cfg[fb_cache_type].has_sys_cache)
-			&& (fb_cache_flag & MSM_FB_CACHE_WRITE_EN)) {
+	} else if ((sc_cfg[fb_cache_type].has_sys_cache) && fb_cache_flag) {
 		cfg->rd_en = true;
 		cfg->rd_scid = sc_cfg[fb_cache_type].llcc_scid;
 		cfg->rd_noallocate = true;
