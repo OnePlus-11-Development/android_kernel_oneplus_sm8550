@@ -1095,9 +1095,9 @@ static struct drm_gem_object *_msm_gem_new(struct drm_device *dev,
 	}
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-	mutex_lock(&dev->struct_mutex);
+	mutex_lock(&priv->mm_lock);
 	list_add_tail(&msm_obj->mm_list, &priv->inactive_list);
-	mutex_unlock(&dev->struct_mutex);
+	mutex_unlock(&priv->mm_lock);
 #endif
 
 	return obj;
@@ -1203,9 +1203,9 @@ struct drm_gem_object *msm_gem_import(struct drm_device *dev,
 	mutex_unlock(&msm_obj->lock);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-	mutex_lock(&dev->struct_mutex);
+	mutex_lock(&priv->mm_lock);
 	list_add_tail(&msm_obj->mm_list, &priv->inactive_list);
-	mutex_unlock(&dev->struct_mutex);
+	mutex_unlock(&priv->mm_lock);
 #endif
 
 	return obj;
