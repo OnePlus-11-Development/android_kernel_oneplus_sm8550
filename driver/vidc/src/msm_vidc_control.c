@@ -275,6 +275,45 @@ static int add_node(
 	return 0;
 }
 
+static int swap_node(struct msm_vidc_inst_cap *rcap,
+	struct list_head *src_list, bool src_lookup[INST_CAP_MAX],
+	struct list_head *dest_list, bool dest_lookup[INST_CAP_MAX])
+{
+	struct msm_vidc_inst_cap_entry *entry, *temp;
+	bool found = false;
+
+	/* cap must be available in src and not present in dest */
+	if (!src_lookup[rcap->cap_id] || dest_lookup[rcap->cap_id]) {
+		d_vpr_e("%s: not found in src or already found in dest for cap %s\n",
+			__func__, cap_name(rcap->cap_id));
+		return -EINVAL;
+	}
+
+	/* check if entry present in src_list */
+	list_for_each_entry_safe(entry, temp, src_list, list) {
+		if (entry->cap_id == rcap->cap_id) {
+			found = true;
+			break;
+		}
+	}
+
+	if (!found) {
+		d_vpr_e("%s: cap %s not found in src list\n",
+			__func__, cap_name(rcap->cap_id));
+		return -EINVAL;
+	}
+
+	/* remove from src_list */
+	list_del_init(&entry->list);
+	src_lookup[rcap->cap_id] = false;
+
+	/* add it to dest_list */
+	list_add_tail(&entry->list, dest_list);
+	dest_lookup[rcap->cap_id] = true;
+
+	return 0;
+}
+
 static int msm_vidc_packetize_control(struct msm_vidc_inst *inst,
 	enum msm_vidc_inst_capability_type cap_id, u32 payload_type,
 	void *hfi_val, u32 payload_size, const char *func)
@@ -2899,6 +2938,10 @@ int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst)
 			rc = add_node(&root_list, rcap, root_visited);
 			if (rc)
 				goto error;
+		} else {
+			rc = add_node(&opt_list, rcap, opt_visited);
+			if (rc)
+				goto error;
 		}
 	}
 
@@ -2921,22 +2964,19 @@ int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst)
 				continue;
 
 			/**
-			 * if child node is already part of root or optional list
+			 * if child node is already part of root list
 			 * then no need to add it again.
 			 */
-			if (root_visited[cap->cap_id] || opt_visited[cap->cap_id])
+			if (root_visited[cap->cap_id])
 				continue;
 
 			/**
 			 * if child node's all parents are already present in root list
-			 * then add it to root list else add it to optional list.
+			 * then add it to root list else remains in optional list.
 			 */
 			if (is_all_parents_visited(cap, root_visited)) {
-				rc = add_node(&root_list, cap, root_visited);
-				if (rc)
-					goto error;
-			} else {
-				rc = add_node(&opt_list, cap, opt_visited);
+				rc = swap_node(cap,
+						&opt_list, opt_visited, &root_list, root_visited);
 				if (rc)
 					goto error;
 			}
@@ -2955,6 +2995,7 @@ int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst)
 	list_for_each_entry_safe(entry, temp, &opt_list, list) {
 		/* initially remove entry from opt list */
 		list_del_init(&entry->list);
+		opt_visited[entry->cap_id] = false;
 		tmp_count--;
 		cap = &capability->cap[entry->cap_id];
 
@@ -2968,6 +3009,7 @@ int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst)
 			tmp_count_total--;
 		} else {
 			list_add_tail(&entry->list, &opt_list);
+			opt_visited[entry->cap_id] = true;
 		}
 
 		/* detect loop */

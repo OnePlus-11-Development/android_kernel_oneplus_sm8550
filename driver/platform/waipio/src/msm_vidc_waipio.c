@@ -516,7 +516,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		{BLUR_RESOLUTION},
 		msm_vidc_adjust_blur_type_iris2, msm_vidc_set_u32_enum},
 
-	{BLUR_RESOLUTION, ENC, CODECS_ALL,
+	{BLUR_RESOLUTION, ENC, H264|HEVC,
 		0, S32_MAX, 1, 0,
 		V4L2_CID_MPEG_VIDC_VIDEO_BLUR_RESOLUTION,
 		HFI_PROP_BLUR_RESOLUTION,
@@ -1289,7 +1289,7 @@ static struct msm_platform_inst_capability instance_data_waipio[] = {
 		-6, 6, 1, 0,
 		V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2},
 
-	{SLICE_MODE, ENC, H264|HEVC|HEIC,
+	{SLICE_MODE, ENC, H264|HEVC,
 		V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_SINGLE,
 		V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_MAX_BYTES,
 		BIT(V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_SINGLE) |
