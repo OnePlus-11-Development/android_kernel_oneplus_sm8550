@@ -3495,6 +3495,7 @@ static void _sde_plane_atomic_disable(struct drm_plane *plane,
 			pstate->multirect_mode);
 
 	pstate->pending = true;
+	pstate->static_cache_state = CACHE_STATE_DISABLED;
 
 	if (is_sde_plane_virtual(plane))
 		multirect_index = SDE_SSPP_RECT_1;
@@ -4349,6 +4350,8 @@ int sde_plane_helper_reset_custom_properties(struct drm_plane *plane,
 
 	psde = to_sde_plane(plane);
 	pstate = to_sde_plane_state(plane_state);
+
+	pstate->static_cache_state = CACHE_STATE_DISABLED;
 
 	for (prop_idx = 0; prop_idx < PLANE_PROP_COUNT; prop_idx++) {
 		uint64_t val = pstate->property_values[prop_idx].value;
