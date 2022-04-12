@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -86,9 +87,16 @@
 #define MMSS_DP_AUDIO_TIMING_RBR_48		(0x00000094)
 #define MMSS_DP_AUDIO_TIMING_HBR_48		(0x00000098)
 
+#define DP_MISR40_CTRL				(0x000000D0)
+#define DP_MISR40_TX0				(0x000000D4)
+#define DP_MISR40_TX1				(0x000000DC)
+#define DP_MISR40_TX2				(0x000000E4)
+#define DP_MISR40_TX3				(0x000000EC)
 #define MMSS_DP_PSR_CRC_RG			(0x00000154)
 #define MMSS_DP_PSR_CRC_B			(0x00000158)
 
+#define MMSS_DP1_CRC_RG				(0x00000164)
+#define MMSS_DP1_CRC_B				(0x00000168)
 #define DP_COMPRESSION_MODE_CTRL		(0x00000180)
 #define DP_PPS_HB_0_3				(0x00000184)
 #define DP_PPS_PB_0_3				(0x00000188)
@@ -384,6 +392,12 @@
 #define DP_PHY_AUX_INTERRUPT_STATUS_V420	(0x00D8)
 #define DP_PHY_AUX_INTERRUPT_STATUS_V600        (0x00E0)
 #define DP_PHY_SPARE0_V420			(0x00C8)
+#define DP_PHY_MISR_CTRL			(0x00C0)
+#define DP_PHY_MISR_STATUS			(0x010C)
+#define DP_PHY_MISR_TX0				(0x0110)
+#define DP_PHY_MISR_TX1				(0x0130)
+#define DP_PHY_MISR_TX2				(0x0150)
+#define DP_PHY_MISR_TX3				(0x0170)
 #define TXn_TX_DRV_LVL_V420			(0x0014)
 #define TXn_TRANSCEIVER_BIAS_EN_V420		(0x0054)
 #define TXn_HIGHZ_DRVR_EN_V420			(0x0058)
