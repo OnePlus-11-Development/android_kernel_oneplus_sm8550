@@ -56,12 +56,14 @@ enum mmrm_vm_api_msg_id {
 	MMRM_VM_REQUEST_SETVALUE_INRANGE,
 	MMRM_VM_REQUEST_GETVALUE,
 	MMRM_VM_REQUEST_DEREGISTER,
+	MMRM_VM_REQUEST_NOOP, // this is for debug purpose,calculating msgq roundtrip time
 
 	MMRM_VM_RESPONSE_REGISTER = MMRM_VM_REQUEST_REGISTER | 0x800,
 	MMRM_VM_RESPONSE_SETVALUE,
 	MMRM_VM_RESPONSE_SETVALUE_INRANGE,
 	MMRM_VM_RESPONSE_GETVALUE,
 	MMRM_VM_RESPONSE_DEREGISTER,
+	MMRM_VM_RESPONSE_NOOP, // this is for debug purpose,calculating msgq roundtrip time
 	MMRM_VM_RESPONSE_INVALID_PKT,
 };
 
@@ -92,6 +94,14 @@ struct mmrm_vm_register_request {
  * @client: client registered handle
  */
 struct mmrm_vm_deregister_request {
+	u32 client_id;
+};
+
+/**
+ * struct mmrm_vm_noop_request -- noop request parameters
+ * @client: 32 bits value transfered
+ */
+struct mmrm_vm_noop_request {
 	u32 client_id;
 };
 
@@ -141,6 +151,7 @@ struct mmrm_vm_api_request_msg {
 		struct mmrm_vm_setvalue_request setval;
 		struct mmrm_vm_setvalue_inrange_request setval_range;
 		struct mmrm_vm_getvalue_request getval;
+		struct mmrm_vm_noop_request lptest;
 	} data;
 };
 
@@ -157,6 +168,14 @@ struct mmrm_vm_register_response {
  * @ret_code: indicates if the mmrm_client_deregister is successful
  */
 struct mmrm_vm_deregister_response {
+	int ret_code;
+};
+
+/**
+ * struct mmrm_vm_noop_response -- noop request's response message
+ * @ret_code: return inetger
+ */
+struct mmrm_vm_noop_response {
 	int ret_code;
 };
 
@@ -197,6 +216,7 @@ struct mmrm_vm_api_response_msg {
 		struct mmrm_vm_setvalue_response setval;
 		struct mmrm_vm_setvalue_inrange_response setval_range;
 		struct mmrm_vm_getvalue_response getval;
+		struct mmrm_vm_noop_response lptest;
 	} data;
 };
 
@@ -208,6 +228,7 @@ struct mmrm_vm_api_response_msg {
 struct mmrm_vm_request_msg_pkt {
 	struct mmrm_vm_msg_hdr hdr;
 	struct mmrm_vm_api_request_msg msg;
+	u64 start_time_ns;
 };
 
 /**
