@@ -12036,7 +12036,7 @@ int ipa3_get_smmu_params(struct ipa_smmu_in_params *in,
 
 	switch (in->smmu_client) {
 	case IPA_SMMU_WLAN_CLIENT:
-		if (ipa_get_wdi_version() == IPA_WDI_3 ||
+		if (ipa_get_wdi_version() >= IPA_WDI_3 ||
 			IPA_WDI2_OVER_GSI())
 			is_smmu_enable =
 				!(ipa3_ctx->s1_bypass_arr[IPA_SMMU_CB_AP] ||
