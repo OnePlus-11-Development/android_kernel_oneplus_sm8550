@@ -13,6 +13,8 @@
 #include <linux/suspend.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include <linux/ktime.h>
+
 
 #include "mmrm_vm_fe.h"
 #include "mmrm_vm_interface.h"
@@ -49,6 +51,8 @@ int mmrm_fe_append_work_list(struct mmrm_vm_msg_q *msg_q, int msg_sz)
 	mutex_unlock(&fe_data->msg_send_lock);
 
 	d_mpr_w("%s: seq no:%d\n", __func__, msg_pkt->msg.hd.seq_no);
+
+	msg_pkt->start_time_ns = ktime_get_ns();
 
 	mmrm_vm_fe_request_send(drv_vm_fe, msg_pkt, msg_sz);
 
@@ -291,3 +295,26 @@ skip_mmrm:
 	return false;
 }
 EXPORT_SYMBOL(mmrm_client_check_scaling_supported);
+
+int mmrm_client_msgq_roundtrip_measure(u32 val)
+{
+	int rc = 0;
+	struct mmrm_vm_api_request_msg *api_msg;
+	struct mmrm_vm_noop_request *reg_data;
+	struct mmrm_vm_msg_q *msg_q;
+
+	size_t msg_size = sizeof(api_msg->hd) + sizeof(*reg_data);
+
+	msg_q = get_msg_work();
+	api_msg = &msg_q->m_req->msg;
+	reg_data = &api_msg->data.lptest;
+
+	api_msg->hd.cmd_id = MMRM_VM_REQUEST_NOOP;
+	reg_data->client_id = val;
+
+	rc = mmrm_fe_append_work_list(msg_q, msg_size);
+
+	release_msg_work(msg_q);
+
+	return rc;
+}

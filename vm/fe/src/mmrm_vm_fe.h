@@ -22,6 +22,12 @@ struct mmrm_vm_fe_clk_src_set {
 	u32 count;
 };
 
+struct mmrm_vm_fe_msgq_rt_stats {
+	u64 register_total_us;
+	u64 looptest_total_us;
+	u32 count;
+};
+
 struct mmrm_vm_fe_priv {
 	struct device *dev;
 
@@ -34,6 +40,8 @@ struct mmrm_vm_fe_priv {
 	struct mutex msg_send_lock;
 	int  seq_no;
 	bool is_clk_scaling_supported;
+
+	struct mmrm_vm_fe_msgq_rt_stats msgq_rt_stats;
 };
 
 struct mmrm_vm_fe_pkt {

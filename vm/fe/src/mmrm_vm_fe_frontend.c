@@ -6,6 +6,8 @@
 #include <linux/of.h>
 #include <linux/limits.h>
 
+#include <linux/timekeeping.h>
+
 #include "mmrm_vm_fe.h"
 #include "mmrm_vm_interface.h"
 #include "mmrm_vm_msgq.h"
@@ -18,7 +20,7 @@ void mmrm_vm_fe_recv(struct mmrm_vm_driver_data *mmrm_vm, void *data, size_t siz
 	struct mmrm_vm_api_response_msg *msg = data;
 	struct mmrm_vm_msg_q *node, *temp;
 	int rc = -1;
-	u64 kt2;
+	u64 kt2, interval;
 	struct mmrm_vm_fe_priv *fe_data = mmrm_vm->vm_pvt_data;
 
 	mutex_lock(&fe_data->resp_works_lock);
@@ -40,7 +42,7 @@ void mmrm_vm_fe_recv(struct mmrm_vm_driver_data *mmrm_vm, void *data, size_t siz
 	switch (msg->hd.cmd_id) {
 	case	MMRM_VM_RESPONSE_REGISTER:
 		node->m_resp->msg.data.reg.client_id = msg->data.reg.client_id;
-		d_mpr_e("%s: client_id:%u\n", __func__, msg->data.reg.client_id);
+		d_mpr_w("%s: client_id:%u\n", __func__, msg->data.reg.client_id);
 		break;
 	case	MMRM_VM_RESPONSE_SETVALUE:
 		node->m_resp->msg.data.setval.val = msg->data.setval.val;
@@ -54,13 +56,24 @@ void mmrm_vm_fe_recv(struct mmrm_vm_driver_data *mmrm_vm, void *data, size_t siz
 	case	MMRM_VM_RESPONSE_DEREGISTER:
 		node->m_resp->msg.data.dereg.ret_code = msg->data.dereg.ret_code;
 		break;
+	case	MMRM_VM_RESPONSE_NOOP:
+		kt2 = ktime_get_ns();
+		interval = kt2 - node->m_req->start_time_ns;
+		d_mpr_w("%s: looptest start:%lu end:%lu interval:%luns\n",
+			__func__,
+			node->m_req->start_time_ns, kt2,
+			interval);
+		fe_data->msgq_rt_stats.looptest_total_us += interval;
+		break;
+	case	MMRM_VM_RESPONSE_INVALID_PKT:
+		d_mpr_e("%s: invalid request code\n");
+		break;
 	default:
 		d_mpr_e("wrong response\n");
 		break;
 	};
 
 	complete(&node->complete);
-	kt2 = ktime_get_ns();
 }
 
 int mmrm_vm_fe_request_send(struct mmrm_vm_driver_data *mmrm_vm,

@@ -53,12 +53,54 @@ ssize_t msgq_send_trigger_store(struct device *dev, struct device_attribute *att
 	return ret ? ret : count;
 }
 
+extern int mmrm_client_msgq_roundtrip_measure(u32 val);
+
+ssize_t msgq_rt_test_store(struct device *dev, struct device_attribute *attr,
+	const char *buf, size_t count)
+{
+	int ret;
+	long sz, n;
+	struct mmrm_vm_fe_priv *fe_data;
+	struct mmrm_vm_fe_msgq_rt_stats *trip_time;
+
+	if (IS_ERR_OR_NULL(drv_vm_fe)) {
+		return -1;
+	}
+	ret = kstrtol(buf, 10, &sz);
+
+	if (ret) {
+		dev_err(dev, "invalid user input\n");
+		return -1;
+	}
+	if (sz) {
+		d_mpr_w("%s: loop count:%d\n", __func__, sz);
+
+		fe_data = drv_vm_fe->vm_pvt_data;
+		trip_time = &fe_data->msgq_rt_stats;
+		trip_time->looptest_total_us = 0;
+
+		n = sz;
+		while (n-- > 0) {
+			ret = mmrm_client_msgq_roundtrip_measure(0);
+			if (ret) {
+				d_mpr_e("%s:send msgq failed\n", __func__);
+				break;
+			};
+		}
+		if (n <= 0)
+			d_mpr_w("%s: aver: %d\n", __func__, trip_time->looptest_total_us / sz);
+	}
+	return ret ? ret : count;
+}
+
 static DEVICE_ATTR_RO(dump_clk_info);
 static DEVICE_ATTR_WO(msgq_send_trigger);
+static DEVICE_ATTR_WO(msgq_rt_test);
 
 static struct attribute *mmrm_vm_fe_fs_attrs[] = {
 	&dev_attr_dump_clk_info.attr,
 	&dev_attr_msgq_send_trigger.attr,
+	&dev_attr_msgq_rt_test.attr,
 	NULL,
 };
 
