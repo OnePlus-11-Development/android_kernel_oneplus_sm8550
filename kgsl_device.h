@@ -83,6 +83,7 @@ struct kgsl_context;
 struct kgsl_power_stats;
 struct kgsl_event;
 struct kgsl_snapshot;
+struct kgsl_sync_fence;
 
 struct kgsl_functable {
 	/* Mandatory functions - these functions must be implemented
@@ -169,6 +170,8 @@ struct kgsl_functable {
 		struct kgsl_context *context);
 	/** set_isdb_breakpoint_registers: Program isdb registers to issue break command */
 	void (*set_isdb_breakpoint_registers)(struct kgsl_device *device);
+	/** @create_hw_fence: Create a hardware fence */
+	void (*create_hw_fence)(struct kgsl_device *device, struct kgsl_sync_fence *kfence);
 };
 
 struct kgsl_ioctl {
