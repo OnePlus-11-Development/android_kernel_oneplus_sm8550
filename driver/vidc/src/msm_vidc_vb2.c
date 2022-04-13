@@ -121,10 +121,10 @@ int msm_vidc_queue_setup(struct vb2_queue *q,
 	if (port < 0)
 		return -EINVAL;
 
-	if (*num_planes) {
+	if (*num_planes && (port == INPUT_PORT || port == OUTPUT_PORT)) {
 		f = &inst->fmts[port];
 		if (*num_planes != f->fmt.pix_mp.num_planes) {
-			i_vpr_i(inst, "%s: requested num_planes %d not supported\n",
+			i_vpr_e(inst, "%s: requested num_planes %d not supported %d\n",
 			__func__, *num_planes, f->fmt.pix_mp.num_planes);
 			return -EINVAL;
 		}
