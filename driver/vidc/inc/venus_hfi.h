@@ -59,6 +59,7 @@ int venus_hfi_trigger_ssr(struct msm_vidc_core *core, u32 type,
 	u32 client_id, u32 addr);
 int venus_hfi_trigger_stability(struct msm_vidc_inst *inst, u32 type,
 	u32 client_id, u32 val);
+int venus_hfi_reserve_hardware(struct msm_vidc_inst *inst, u32 duration);
 int venus_hfi_scale_clocks(struct msm_vidc_inst* inst, u64 freq);
 int venus_hfi_scale_buses(struct msm_vidc_inst* inst, u64 bw_ddr, u64 bw_llcc);
 int venus_hfi_set_ir_period(struct msm_vidc_inst *inst, u32 ir_type,

@@ -2922,6 +2922,53 @@ unlock:
 	return rc;
 }
 
+int venus_hfi_reserve_hardware(struct msm_vidc_inst *inst, u32 duration)
+{
+	struct msm_vidc_core *core;
+	enum hfi_reserve_type payload;
+	int rc = 0;
+
+	if (!inst || !inst->core || !inst->packet) {
+		d_vpr_e("%s: Invalid params\n", __func__);
+		return -EINVAL;
+	}
+	core = inst->core;
+	core_lock(core, __func__);
+
+	if (!__valdiate_session(core, inst, __func__)) {
+		rc = -EINVAL;
+		goto unlock;
+	}
+
+	if (duration)
+		payload = HFI_RESERVE_START;
+	else
+		payload = HFI_RESERVE_STOP;
+
+	rc = hfi_create_header(inst->packet, inst->packet_size,
+		inst->session_id, core->header_id++);
+	if (rc)
+		goto unlock;
+
+	rc = hfi_create_packet(inst->packet, inst->packet_size,
+		HFI_CMD_RESERVE,
+		HFI_HOST_FLAGS_NONE,
+		HFI_PAYLOAD_U32_ENUM,
+		HFI_PORT_NONE,
+		core->packet_id++,
+		&payload, sizeof(u32));
+	if (rc)
+		goto unlock;
+
+	rc = __iface_cmdq_write(core, inst->packet);
+	if (rc)
+		goto unlock;
+
+unlock:
+	core_unlock(core, __func__);
+	return rc;
+}
+
 int venus_hfi_session_open(struct msm_vidc_inst *inst)
 {
 	int rc = 0;

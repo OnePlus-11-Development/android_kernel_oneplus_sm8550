@@ -1106,6 +1106,13 @@ static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
 		if (rc)
 			return rc;
 	}
+
+	if (ctrl->id == V4L2_CID_MPEG_VIDC_CRITICAL_PRIORITY) {
+		inst->decode_batch.enable = msm_vidc_allow_decode_batch(inst);
+		msm_vidc_allow_dcvs(inst);
+		msm_vidc_update_cap_value(inst, PRIORITY, 0, __func__);
+	}
+
 	if (ctrl->id == V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER) {
 		u32 enable;
 
@@ -3940,6 +3947,9 @@ int msm_vidc_set_session_priority(void *instance,
 	}
 
 	hfi_value = inst->capabilities->cap[cap_id].value;
+	if (!is_critical_priority_session(inst))
+		hfi_value = inst->capabilities->cap[cap_id].value +
+			inst->capabilities->cap[FIRMWARE_PRIORITY_OFFSET].value;
 
 	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_U32,
 		&hfi_value, sizeof(u32), __func__);
@@ -4196,6 +4206,41 @@ int msm_vidc_set_csc_custom_matrix(void *instance,
 		HFI_PROP_CSC_LIMIT, &csc_limit_payload[0],
 		ARRAY_SIZE(csc_limit_payload) * sizeof(s32),
 		csc_limit_payload[0], csc_limit_payload[1]);
+	if (rc)
+		return rc;
+
+	return rc;
+}
+
+int msm_vidc_set_reserve_duration(void *instance,
+	enum msm_vidc_inst_capability_type cap_id)
+{
+	int rc = 0;
+	u32 hfi_value = 0;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	/* reserve hardware only when input port is streaming*/
+	if (!inst->bufq[INPUT_PORT].vb2q->streaming)
+		return 0;
+
+	if (!(inst->capabilities->cap[cap_id].flags & CAP_FLAG_CLIENT_SET))
+		return 0;
+
+	inst->capabilities->cap[cap_id].flags &= (~CAP_FLAG_CLIENT_SET);
+
+	if (!is_critical_priority_session(inst)) {
+		i_vpr_h(inst, "%s: reserve duration allowed only for critical session\n", __func__);
+		return 0;
+	}
+
+	hfi_value = inst->capabilities->cap[cap_id].value;
+
+	rc = venus_hfi_reserve_hardware(inst, hfi_value);
 	if (rc)
 		return rc;
 

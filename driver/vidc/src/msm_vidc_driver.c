@@ -177,6 +177,9 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{SEQ_CHANGE_AT_SYNC_FRAME,       "SEQ_CHANGE_AT_SYNC_FRAME"   },
 	{QUALITY_MODE,                   "QUALITY_MODE"               },
 	{PRIORITY,                       "PRIORITY"                   },
+	{FIRMWARE_PRIORITY_OFFSET,       "FIRMWARE_PRIORITY_OFFSET"   },
+	{CRITICAL_PRIORITY,              "CRITICAL_PRIORITY"          },
+	{RESERVE_DURATION,               "RESERVE_DURATION"           },
 	{DPB_LIST,                       "DPB_LIST"                   },
 	{FILM_GRAIN,                     "FILM_GRAIN"                 },
 	{SUPER_BLOCK,                    "SUPER_BLOCK"                },
@@ -1376,6 +1379,7 @@ bool msm_vidc_allow_s_ctrl(struct msm_vidc_inst *inst, u32 id)
 			case V4L2_CID_MPEG_VIDC_PRIORITY:
 			case V4L2_CID_MPEG_VIDC_INPUT_METADATA_FD:
 			case V4L2_CID_MPEG_VIDC_INTRA_REFRESH_PERIOD:
+			case V4L2_CID_MPEG_VIDC_RESERVE_DURATION:
 				allow = true;
 				break;
 			default:
@@ -3083,6 +3087,12 @@ void msm_vidc_allow_dcvs(struct msm_vidc_inst *inst)
 	allow = is_realtime_session(inst);
 	if (!allow) {
 		i_vpr_h(inst, "%s: non-realtime session\n", __func__);
+		goto exit;
+	}
+
+	allow = !is_critical_priority_session(inst);
+	if (!allow) {
+		i_vpr_h(inst, "%s: critical priority session\n", __func__);
 		goto exit;
 	}
 
@@ -5940,6 +5950,7 @@ bool msm_vidc_ignore_session_load(struct msm_vidc_inst *inst) {
 int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst)
 {
 	u32 mbps = 0, total_mbps = 0, enc_mbps = 0;
+	u32 critical_mbps = 0;
 	struct msm_vidc_core *core;
 	struct msm_vidc_inst *instance;
 
@@ -5957,6 +5968,20 @@ int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst)
 			is_image_session(inst));
 		return 0;
 	}
+
+	core_lock(core, __func__);
+	list_for_each_entry(instance, &core->instances, list) {
+		if (is_critical_priority_session(instance))
+			critical_mbps += msm_vidc_get_inst_load(instance);
+	}
+	core_unlock(core, __func__);
+
+	if (critical_mbps > core->capabilities[MAX_MBPS].value) {
+		i_vpr_e(inst, "%s: Hardware overloaded with critical sessions. needed %u, max %u",
+			__func__, critical_mbps, core->capabilities[MAX_MBPS].value);
+		return -ENOMEM;
+	}
+
 	core_lock(core, __func__);
 	list_for_each_entry(instance, &core->instances, list) {
 		/* ignore invalid/error session */
@@ -6014,6 +6039,7 @@ int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst)
 int msm_vidc_check_core_mbpf(struct msm_vidc_inst *inst)
 {
 	u32 video_mbpf = 0, image_mbpf = 0, video_rt_mbpf = 0;
+	u32 critical_mbpf = 0;
 	struct msm_vidc_core *core;
 	struct msm_vidc_inst *instance;
 
@@ -6022,6 +6048,19 @@ int msm_vidc_check_core_mbpf(struct msm_vidc_inst *inst)
 		return -EINVAL;
 	}
 	core = inst->core;
+
+	core_lock(core, __func__);
+	list_for_each_entry(instance, &core->instances, list) {
+		if (is_critical_priority_session(instance))
+			critical_mbpf += msm_vidc_get_mbs_per_frame(instance);
+	}
+	core_unlock(core, __func__);
+
+	if (critical_mbpf > core->capabilities[MAX_MBPF].value) {
+		i_vpr_e(inst, "%s: Hardware overloaded with critical sessions. needed %u, max %u",
+			__func__, critical_mbpf, core->capabilities[MAX_MBPF].value);
+		return -ENOMEM;
+	}
 
 	core_lock(core, __func__);
 	list_for_each_entry(instance, &core->instances, list) {

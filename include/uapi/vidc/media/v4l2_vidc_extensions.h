@@ -255,6 +255,11 @@ enum v4l2_h264_encode_delivery_mode {
 	V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_SLICE_BASED = 1,
 };
 
+#define V4L2_CID_MPEG_VIDC_CRITICAL_PRIORITY                                 \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x3E)
+#define V4L2_CID_MPEG_VIDC_RESERVE_DURATION                                  \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x3F)
+
 /* add new controls above this line */
 /* Deprecate below controls once availble in gki and gsi bionic header */
 #ifndef V4L2_CID_MPEG_VIDEO_BASELAYER_PRIORITY_ID

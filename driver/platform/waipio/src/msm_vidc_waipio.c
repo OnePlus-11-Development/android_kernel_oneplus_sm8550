@@ -1292,6 +1292,19 @@ static struct msm_platform_inst_capability instance_cap_data_waipio[] = {
 		HFI_PROP_SESSION_PRIORITY,
 		CAP_FLAG_DYNAMIC_ALLOWED},
 
+	{FIRMWARE_PRIORITY_OFFSET, DEC | ENC, CODECS_ALL,
+		1, 1, 1, 1},
+
+	{CRITICAL_PRIORITY, ENC, CODECS_ALL,
+		0, 1, 1, 0,
+		V4L2_CID_MPEG_VIDC_CRITICAL_PRIORITY},
+
+	{RESERVE_DURATION, ENC, CODECS_ALL,
+		0, INT_MAX, 1, 0,
+		V4L2_CID_MPEG_VIDC_RESERVE_DURATION,
+		HFI_CMD_RESERVE,
+		CAP_FLAG_DYNAMIC_ALLOWED},
+
 	{ENC_IP_CR, ENC, CODECS_ALL,
 		0, S32_MAX, 1, 0,
 		V4L2_CID_MPEG_VIDC_ENC_INPUT_COMPRESSION_RATIO,
@@ -2057,6 +2070,24 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_waip
 		{0},
 		msm_vidc_adjust_session_priority,
 		msm_vidc_set_session_priority},
+
+	{FIRMWARE_PRIORITY_OFFSET, DEC | ENC, CODECS_ALL,
+		{0},
+		{0},
+		NULL,
+		NULL},
+
+	{CRITICAL_PRIORITY, ENC, CODECS_ALL,
+		{0},
+		{0},
+		NULL,
+		NULL},
+
+	{RESERVE_DURATION, ENC, CODECS_ALL,
+		{0},
+		{0},
+		NULL,
+		msm_vidc_set_reserve_duration},
 
 	{DPB_LIST, DEC, CODECS_ALL,
 		{0},

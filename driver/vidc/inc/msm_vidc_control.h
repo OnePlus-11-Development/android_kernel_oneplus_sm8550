@@ -119,6 +119,8 @@ int msm_vidc_set_level(void *instance,
 	enum msm_vidc_inst_capability_type cap_id);
 int msm_vidc_set_preprocess(void *instance,
 	enum msm_vidc_inst_capability_type cap_id);
+int msm_vidc_set_reserve_duration(void *instance,
+	enum msm_vidc_inst_capability_type cap_id);
 int msm_vidc_set_u32_enum(void *instance,
 	enum msm_vidc_inst_capability_type cap_id);
 int msm_vidc_set_q16(void *instance,

@@ -293,6 +293,11 @@ static inline bool is_realtime_session(struct msm_vidc_inst *inst)
 	return inst->capabilities->cap[PRIORITY].value == 0 ? true : false;
 }
 
+static inline bool is_critical_priority_session(struct msm_vidc_inst *inst)
+{
+	return !!(inst->capabilities->cap[CRITICAL_PRIORITY].value);
+}
+
 static inline bool is_lowlatency_session(struct msm_vidc_inst *inst)
 {
 	return !!(inst->capabilities->cap[LOWLATENCY_MODE].value);
