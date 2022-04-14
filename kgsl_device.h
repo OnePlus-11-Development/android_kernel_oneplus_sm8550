@@ -165,6 +165,8 @@ struct kgsl_functable {
 	/** @dequeue_recurring_cmd: Dequeue recurring commands from GMU */
 	int (*dequeue_recurring_cmd)(struct kgsl_device *device,
 		struct kgsl_context *context);
+	/** set_isdb_breakpoint_registers: Program isdb registers to issue break command */
+	void (*set_isdb_breakpoint_registers)(struct kgsl_device *device);
 };
 
 struct kgsl_ioctl {

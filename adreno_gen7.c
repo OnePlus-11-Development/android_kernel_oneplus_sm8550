@@ -1494,6 +1494,59 @@ static int gen7_setproperty(struct kgsl_device_private *dev_priv,
 	return 0;
 }
 
+static void gen7_set_isdb_breakpoint_registers(struct adreno_device *adreno_dev)
+{
+	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
+	struct clk *clk;
+	int ret;
+
+	if (!device->set_isdb_breakpoint || device->ftbl->is_hwcg_on(device)
+			|| device->qdss_gfx_virt == NULL || !device->force_panic)
+		goto err;
+
+	clk = clk_get(&device->pdev->dev, "apb_pclk");
+
+	if (IS_ERR(clk)) {
+		dev_err(device->dev, "Unable to get QDSS clock\n");
+		goto err;
+	}
+
+	ret = clk_prepare_enable(clk);
+
+	if (ret) {
+		dev_err(device->dev, "QDSS Clock enable error: %d\n", ret);
+		clk_put(clk);
+		goto err;
+	}
+
+	/* Issue break command for eight SPs */
+	isdb_write(device->qdss_gfx_virt, 0x0000);
+	isdb_write(device->qdss_gfx_virt, 0x1000);
+	isdb_write(device->qdss_gfx_virt, 0x2000);
+	isdb_write(device->qdss_gfx_virt, 0x3000);
+	isdb_write(device->qdss_gfx_virt, 0x4000);
+	isdb_write(device->qdss_gfx_virt, 0x5000);
+	isdb_write(device->qdss_gfx_virt, 0x6000);
+	isdb_write(device->qdss_gfx_virt, 0x7000);
+
+	/* gen7_2_0 has additional SPs */
+	if (adreno_is_gen7_2_0(adreno_dev)) {
+		isdb_write(device->qdss_gfx_virt, 0x8000);
+		isdb_write(device->qdss_gfx_virt, 0x9000);
+		isdb_write(device->qdss_gfx_virt, 0xa000);
+		isdb_write(device->qdss_gfx_virt, 0xb000);
+	}
+
+	clk_disable_unprepare(clk);
+	clk_put(clk);
+
+	return;
+
+err:
+	/* Do not force kernel panic if isdb writes did not go through */
+	device->force_panic = false;
+}
+
 const struct gen7_gpudev adreno_gen7_hwsched_gpudev = {
 	.base = {
 		.reg_offsets = gen7_register_offsets,
@@ -1513,6 +1566,7 @@ const struct gen7_gpudev adreno_gen7_hwsched_gpudev = {
 		.gx_is_on = gen7_gmu_gx_is_on,
 		.send_recurring_cmdobj = gen7_hwsched_send_recurring_cmdobj,
 		.perfcounter_remove = gen7_perfcounter_remove,
+		.set_isdb_breakpoint_registers = gen7_set_isdb_breakpoint_registers,
 	},
 	.hfi_probe = gen7_hwsched_hfi_probe,
 	.hfi_remove = gen7_hwsched_hfi_remove,
@@ -1541,6 +1595,7 @@ const struct gen7_gpudev adreno_gen7_gmu_gpudev = {
 		.add_to_va_minidump = gen7_gmu_add_to_minidump,
 		.gx_is_on = gen7_gmu_gx_is_on,
 		.perfcounter_remove = gen7_perfcounter_remove,
+		.set_isdb_breakpoint_registers = gen7_set_isdb_breakpoint_registers,
 	},
 	.hfi_probe = gen7_gmu_hfi_probe,
 	.handle_watchdog = gen7_gmu_handle_watchdog,

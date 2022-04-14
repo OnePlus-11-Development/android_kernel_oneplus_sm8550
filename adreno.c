@@ -3102,6 +3102,17 @@ static int adreno_dequeue_recurring_cmd(struct kgsl_device *device,
 	return ret;
 }
 
+static void adreno_set_isdb_breakpoint_registers(struct kgsl_device *device)
+{
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	const struct adreno_gpudev *gpudev  = ADRENO_GPU_DEVICE(adreno_dev);
+
+	if (gpudev->set_isdb_breakpoint_registers)
+		gpudev->set_isdb_breakpoint_registers(adreno_dev);
+
+	return;
+}
+
 static void adreno_drawctxt_sched(struct kgsl_device *device,
 		struct kgsl_context *context)
 {
@@ -3268,6 +3279,7 @@ static const struct kgsl_functable adreno_functable = {
 	.deassert_gbif_halt = adreno_deassert_gbif_halt,
 	.queue_recurring_cmd = adreno_queue_recurring_cmd,
 	.dequeue_recurring_cmd = adreno_dequeue_recurring_cmd,
+	.set_isdb_breakpoint_registers = adreno_set_isdb_breakpoint_registers,
 };
 
 static const struct component_master_ops adreno_ops = {

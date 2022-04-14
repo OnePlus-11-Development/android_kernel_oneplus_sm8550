@@ -865,6 +865,10 @@ struct adreno_gpudev {
 	 */
 	int (*perfcounter_remove)(struct adreno_device *adreno_dev,
 			struct adreno_perfcount_register *reg, u32 groupid);
+	/**
+	 * @set_isdb_breakpoint_registers - Program isdb registers to issue break command
+	 */
+	void (*set_isdb_breakpoint_registers)(struct adreno_device *adreno_dev);
 };
 
 /**
