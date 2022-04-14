@@ -7435,6 +7435,7 @@ void __sde_crtc_static_cache_read_work(struct kthread_work *work)
 	struct sde_hw_ctl *ctl = sde_crtc->mixers[0].hw_ctl;
 	struct drm_encoder *enc, *drm_enc = NULL;
 	struct drm_plane *plane;
+	struct sde_encoder_kickoff_params params = { 0 };
 
 	if (sde_crtc->cache_state != CACHE_STATE_FRAME_WRITE)
 		return;
@@ -7462,7 +7463,9 @@ void __sde_crtc_static_cache_read_work(struct kthread_work *work)
 	drm_atomic_crtc_for_each_plane(plane, crtc)
 		sde_plane_ctl_flush(plane, ctl, true);
 
-	/* kickoff encoder and wait for VBLANK */
+	/* Enable clocks and IRQ and wait for VBLANK */
+	params.affected_displays = _sde_crtc_get_displays_affected(crtc, crtc->state);
+	sde_encoder_prepare_for_kickoff(drm_enc, &params);
 	sde_encoder_kickoff(drm_enc, false);
 	sde_encoder_wait_for_event(drm_enc, MSM_ENC_VBLANK);
 
@@ -7500,6 +7503,8 @@ void sde_crtc_static_cache_read_kickoff(struct drm_crtc *crtc)
 	kthread_queue_delayed_work(&disp_thread->worker,
 			&sde_crtc->static_cache_read_work,
 			msecs_to_jiffies(msecs_fps));
+
+	SDE_EVT32(DRMID(crtc), sde_crtc->cache_state, msecs_fps);
 }
 
 void sde_crtc_cancel_delayed_work(struct drm_crtc *crtc)
