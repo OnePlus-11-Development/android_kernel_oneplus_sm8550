@@ -207,6 +207,63 @@ static int msm_vdec_set_linear_stride_scanline(struct msm_vidc_inst *inst)
 	return rc;
 }
 
+static int msm_vdec_set_ubwc_stride_scanline(struct msm_vidc_inst *inst)
+{
+	int rc = 0;
+	u32 stride_y, scanline_y, stride_uv, scanline_uv;
+	u32 meta_stride_y, meta_scanline_y, meta_stride_uv, meta_scanline_uv;
+	u32 payload[4];
+	struct v4l2_format *f;
+	u32 pix_fmt, width, height;
+
+	f = &inst->fmts[OUTPUT_PORT];
+	pix_fmt = f->fmt.pix_mp.pixelformat;
+	width = f->fmt.pix_mp.width;
+	height = f->fmt.pix_mp.height;
+
+	if (inst->codec != MSM_VIDC_AV1 ||
+		(pix_fmt != V4L2_PIX_FMT_VIDC_NV12C &&
+		pix_fmt != V4L2_PIX_FMT_VIDC_TP10C))
+		return 0;
+
+	stride_y = VIDEO_Y_STRIDE_BYTES(pix_fmt, width);
+	scanline_y = VIDEO_Y_SCANLINES(pix_fmt, height);
+	stride_uv = VIDEO_UV_STRIDE_BYTES(pix_fmt, width);
+	scanline_uv = VIDEO_UV_SCANLINES(pix_fmt, height);
+
+	meta_stride_y = VIDEO_Y_META_STRIDE(pix_fmt, width);
+	meta_scanline_y = VIDEO_Y_META_SCANLINES(pix_fmt, height);
+	meta_stride_uv = VIDEO_UV_META_STRIDE(pix_fmt, width);
+	meta_scanline_uv = VIDEO_UV_META_SCANLINES(pix_fmt, height);
+
+	payload[0] = stride_y << 16 | scanline_y;
+	payload[1] = stride_uv << 16 | scanline_uv;
+	payload[2] = meta_stride_y << 16 | meta_scanline_y;
+	payload[3] = meta_stride_uv << 16 | meta_scanline_uv;
+
+	i_vpr_h(inst, "%s: stride_y: %d scanline_y: %d "
+		"stride_uv: %d scanline_uv: %d "
+		"meta_stride_y: %d meta_scanline_y: %d "
+		"meta_stride_uv: %d, meta_scanline_uv: %d",
+		__func__,
+		stride_y, scanline_y, stride_uv, scanline_uv,
+		meta_stride_y, meta_scanline_y,
+		meta_stride_uv, meta_scanline_uv);
+	rc = venus_hfi_session_property(inst,
+			HFI_PROP_UBWC_STRIDE_SCANLINE,
+			HFI_HOST_FLAGS_NONE,
+			get_hfi_port(inst, OUTPUT_PORT),
+			HFI_PAYLOAD_U32_ARRAY,
+			&payload[0],
+			sizeof(u32) * 4);
+	if (rc) {
+		i_vpr_e(inst, "%s: set property failed\n", __func__);
+		return rc;
+	}
+
+	return rc;
+}
+
 static int msm_vdec_set_crop_offsets(struct msm_vidc_inst *inst,
 	enum msm_vidc_port_type port)
 {
@@ -684,6 +741,10 @@ static int msm_vdec_set_output_properties(struct msm_vidc_inst *inst)
 		return rc;
 
 	rc = msm_vdec_set_linear_stride_scanline(inst);
+	if (rc)
+		return rc;
+
+	rc = msm_vdec_set_ubwc_stride_scanline(inst);
 	if (rc)
 		return rc;
 
