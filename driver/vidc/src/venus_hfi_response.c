@@ -78,7 +78,7 @@ static void print_sfr_message(struct msm_vidc_core *core)
 		if (p == NULL)
 			vsfr->rg_data[vsfr_size - 1] = '\0';
 
-		d_vpr_e("SFR Message from FW: %s\n", vsfr->rg_data);
+		d_vpr_e(FMT_STRING_MSG_SFR, vsfr->rg_data);
 	}
 }
 

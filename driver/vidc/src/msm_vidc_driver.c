@@ -1251,10 +1251,10 @@ int msm_vidc_change_inst_state(struct msm_vidc_inst *inst,
 	}
 
 	if (request_state == MSM_VIDC_ERROR)
-		i_vpr_e(inst, "%s: state changed to %s from %s\n",
+		i_vpr_e(inst, FMT_STRING_STATE_CHANGE,
 		   func, state_name(request_state), state_name(inst->state));
 	else
-		i_vpr_h(inst, "%s: state changed to %s from %s\n",
+		i_vpr_h(inst, FMT_STRING_STATE_CHANGE,
 		   func, state_name(request_state), state_name(inst->state));
 
 	trace_msm_vidc_common_state_change(inst, func, state_name(inst->state),
@@ -5100,7 +5100,7 @@ int msm_vidc_smmu_fault_handler(struct iommu_domain *domain,
 		}
 	}
 
-	d_vpr_e("%s: faulting address: %lx\n", __func__, iova);
+	d_vpr_e(FMT_STRING_FAULT_HANDLER, __func__, iova);
 
 	core->smmu_fault_handled = true;
 

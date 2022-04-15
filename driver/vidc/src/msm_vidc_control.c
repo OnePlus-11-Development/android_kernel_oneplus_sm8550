@@ -321,23 +321,21 @@ static int msm_vidc_packetize_control(struct msm_vidc_inst *inst,
 	int rc = 0;
 	u64 payload = 0;
 
+	if (payload_size > sizeof(u32)) {
+		i_vpr_e(inst, "%s: payload size is more than u32 for cap[%d] %s\n",
+			func, cap_id, cap_name(cap_id));
+		return -EINVAL;
+	}
+
 	if (payload_size == sizeof(u32))
 		payload = *(u32 *)hfi_val;
-	else if (payload_size == sizeof(u64))
-		payload = *(u64 *)hfi_val;
 	else if (payload_size == sizeof(u8))
 		payload = *(u8 *)hfi_val;
 	else if (payload_size == sizeof(u16))
 		payload = *(u16 *)hfi_val;
 
-	if (payload_size <= sizeof(u64))
-		i_vpr_h(inst,
-			"set cap: name: %24s, cap value: %#10x, hfi: %#10x\n",
-			cap_name(cap_id), inst->capabilities->cap[cap_id].value, payload);
-	else
-		i_vpr_h(inst,
-			"set cap: name: %24s, hfi payload size %d\n",
-			cap_name(cap_id), payload_size);
+	i_vpr_h(inst, FMT_STRING_SET_CAP,
+		cap_name(cap_id), inst->capabilities->cap[cap_id].value, payload);
 
 	rc = venus_hfi_session_property(inst,
 		inst->capabilities->cap[cap_id].hfi_id,
@@ -1150,7 +1148,7 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	capability = inst->capabilities;
 
-	i_vpr_h(inst, "%s: state %s, name %s, id 0x%x value %d\n",
+	i_vpr_h(inst, FMT_STRING_SET_CTRL,
 		__func__, state_name(inst->state), ctrl->name, ctrl->id, ctrl->val);
 
 	if (!msm_vidc_allow_s_ctrl(inst, ctrl->id))
