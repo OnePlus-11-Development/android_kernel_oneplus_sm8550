@@ -55,6 +55,7 @@ struct msm_vidc_cap_name {
 	char *name;
 };
 
+/* do not modify the cap names as it is used in test scripts */
 static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{INST_CAP_NONE,                  "INST_CAP_NONE"              },
 	{META_SEQ_HDR_NAL,               "META_SEQ_HDR_NAL"           },
@@ -307,6 +308,7 @@ struct msm_vidc_inst_state_name {
 	char *name;
 };
 
+/* do not modify the state names as it is used in test scripts */
 static const struct msm_vidc_inst_state_name inst_state_name_arr[] = {
 	{MSM_VIDC_OPEN,                  "OPEN"                       },
 	{MSM_VIDC_START_INPUT,           "START_INPUT"                },
