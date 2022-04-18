@@ -278,6 +278,19 @@ err_exit:
 }
 EXPORT_SYMBOL(mmrm_client_get_value);
 
+int mmrm_client_get_clk_count(void)
+{
+	struct mmrm_sw_clk_mgr_info *sinfo;
+
+	if (drv_data == (void *) -EPROBE_DEFER)
+		return 0;
+
+	sinfo = &(drv_data->clk_mgr->data.sw_info);
+
+	return sinfo->tot_clk_clients;
+}
+EXPORT_SYMBOL(mmrm_client_get_clk_count);
+
 static int sysfs_get_param(const char *buf, u32 *param)
 {
 	int base;
