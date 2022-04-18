@@ -22,6 +22,8 @@
 #include "venus_hfi_response.h"
 #include "msm_vidc.h"
 
+extern const char video_banner[];
+
 #define MSM_VIDC_DRV_NAME "msm_vidc_driver"
 #define MSM_VIDC_BUS_NAME "platform:msm_vidc_bus"
 
@@ -348,10 +350,13 @@ int msm_vidc_s_param(void *instance, struct v4l2_streamparm *param)
 		param->type != V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
 		return -EINVAL;
 
-	if (is_decode_session(inst))
-		rc = msm_vdec_s_param(instance, param);
-	else if (is_encode_session(inst))
+	if (is_encode_session(inst)) {
 		rc = msm_venc_s_param(instance, param);
+	} else {
+		i_vpr_e(inst, "%s: invalid domain %#x\n",
+			__func__, inst->domain);
+		return -EINVAL;
+	}
 
 	return rc;
 }
@@ -371,10 +376,13 @@ int msm_vidc_g_param(void *instance, struct v4l2_streamparm *param)
 		param->type != V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
 		return -EINVAL;
 
-	if (is_decode_session(inst))
-		rc = msm_vdec_g_param(instance, param);
-	else if (is_encode_session(inst))
+	if (is_encode_session(inst)) {
 		rc = msm_venc_g_param(instance, param);
+	} else {
+		i_vpr_e(inst, "%s: invalid domain %#x\n",
+			__func__, inst->domain);
+		return -EINVAL;
+	}
 
 	return rc;
 }
@@ -474,6 +482,35 @@ exit:
 }
 EXPORT_SYMBOL(msm_vidc_create_bufs);
 
+int msm_vidc_prepare_buf(void *instance, struct media_device *mdev,
+	struct v4l2_buffer *b)
+{
+	int rc = 0;
+	struct msm_vidc_inst *inst = instance;
+	struct vb2_queue *q;
+
+	if (!inst || !inst->core || !b || !valid_v4l2_buffer(b, inst)) {
+		d_vpr_e("%s: invalid params %pK %pK\n", __func__, inst, b);
+		return -EINVAL;
+	}
+
+	q = msm_vidc_get_vb2q(inst, b->type, __func__);
+	if (!q) {
+		rc = -EINVAL;
+		goto exit;
+	}
+
+	rc = vb2_prepare_buf(q, mdev, b);
+	if (rc) {
+		i_vpr_e(inst, "%s: failed with %d\n", __func__, rc);
+		goto exit;
+	}
+
+exit:
+	return rc;
+}
+EXPORT_SYMBOL(msm_vidc_prepare_buf);
+
 int msm_vidc_qbuf(void *instance, struct media_device *mdev,
 		struct v4l2_buffer *b)
 {
@@ -542,14 +579,6 @@ int msm_vidc_streamon(void *instance, enum v4l2_buf_type type)
 		return -EINVAL;
 	}
 
-	if (!msm_vidc_allow_streamon(inst, type)) {
-		rc = -EBUSY;
-		goto exit;
-	}
-	rc = msm_vidc_state_change_streamon(inst, type);
-	if (rc)
-		goto exit;
-
 	port = v4l2_type_to_driver_port(inst, type, __func__);
 	if (port < 0) {
 		rc = -EINVAL;
@@ -560,7 +589,6 @@ int msm_vidc_streamon(void *instance, enum v4l2_buf_type type)
 	if (rc) {
 		i_vpr_e(inst, "%s: vb2_streamon(%d) failed, %d\n",
 			__func__, type, rc);
-		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
 		goto exit;
 	}
 
@@ -574,26 +602,11 @@ int msm_vidc_streamoff(void *instance, enum v4l2_buf_type type)
 	int rc = 0;
 	struct msm_vidc_inst *inst = instance;
 	int port;
-	enum msm_vidc_allow allow;
 
 	if (!inst) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
-
-	allow = msm_vidc_allow_streamoff(inst, type);
-	if (allow == MSM_VIDC_DISALLOW) {
-		rc = -EBUSY;
-		goto exit;
-	} else if (allow == MSM_VIDC_IGNORE) {
-		goto exit;
-	} else if (allow != MSM_VIDC_ALLOW) {
-		rc = -EINVAL;
-		goto exit;
-	}
-	rc = msm_vidc_state_change_streamoff(inst, type);
-	if (rc)
-		goto exit;
 
 	port = v4l2_type_to_driver_port(inst, type, __func__);
 	if (port < 0) {
@@ -605,7 +618,6 @@ int msm_vidc_streamoff(void *instance, enum v4l2_buf_type type)
 	if (rc) {
 		i_vpr_e(inst, "%s: vb2_streamoff(%d) failed, %d\n",
 			__func__, type, rc);
-		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
 		goto exit;
 	}
 
@@ -688,13 +700,16 @@ int msm_vidc_enum_framesizes(void *instance, struct v4l2_frmsizeenum *fsize)
 	if (fsize->index)
 		return -EINVAL;
 
-	/* validate pixel format */
-	codec = v4l2_codec_to_driver(fsize->pixel_format, __func__);
-	if (!codec) {
-		colorfmt = v4l2_colorformat_to_driver(fsize->pixel_format, __func__);
-		if (colorfmt == MSM_VIDC_FMT_NONE) {
-			i_vpr_e(inst, "%s: unsupported pix fmt %#x\n", __func__, fsize->pixel_format);
-			return -EINVAL;
+	if (fsize->pixel_format != V4L2_META_FMT_VIDC) {
+		/* validate pixel format */
+		codec = v4l2_codec_to_driver(fsize->pixel_format, __func__);
+		if (!codec) {
+			colorfmt = v4l2_colorformat_to_driver(fsize->pixel_format, __func__);
+			if (colorfmt == MSM_VIDC_FMT_NONE) {
+				i_vpr_e(inst, "%s: unsupported pix fmt %#x\n",
+					__func__, fsize->pixel_format);
+				return -EINVAL;
+			}
 		}
 	}
 
@@ -743,11 +758,14 @@ int msm_vidc_enum_frameintervals(void *instance, struct v4l2_frmivalenum *fival)
 	if (fival->index)
 		return -EINVAL;
 
-	/* validate pixel format */
-	colorfmt = v4l2_colorformat_to_driver(fival->pixel_format, __func__);
-	if (colorfmt == MSM_VIDC_FMT_NONE) {
-		i_vpr_e(inst, "%s: unsupported pix fmt %#x\n", __func__, fival->pixel_format);
-		return -EINVAL;
+	if (fival->pixel_format != V4L2_META_FMT_VIDC) {
+		/* validate pixel format */
+		colorfmt = v4l2_colorformat_to_driver(fival->pixel_format, __func__);
+		if (colorfmt == MSM_VIDC_FMT_NONE) {
+			i_vpr_e(inst, "%s: unsupported pix fmt %#x\n",
+				__func__, fival->pixel_format);
+			return -EINVAL;
+		}
 	}
 
 	/* validate resolution */
@@ -841,7 +859,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	struct msm_vidc_core *core;
 	int i = 0;
 
-	d_vpr_h("%s()\n", __func__);
+	d_vpr_h("%s: %s\n", __func__, video_banner);
 	core = vidc_core;
 	if (!core) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -908,6 +926,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	INIT_LIST_HEAD(&inst->buffers.dpb.list);
 	INIT_LIST_HEAD(&inst->buffers.persist.list);
 	INIT_LIST_HEAD(&inst->buffers.vpss.list);
+	INIT_LIST_HEAD(&inst->buffers.partial_data.list);
 	INIT_LIST_HEAD(&inst->allocations.bin.list);
 	INIT_LIST_HEAD(&inst->allocations.arp.list);
 	INIT_LIST_HEAD(&inst->allocations.comv.list);
@@ -916,6 +935,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	INIT_LIST_HEAD(&inst->allocations.dpb.list);
 	INIT_LIST_HEAD(&inst->allocations.persist.list);
 	INIT_LIST_HEAD(&inst->allocations.vpss.list);
+	INIT_LIST_HEAD(&inst->allocations.partial_data.list);
 	INIT_LIST_HEAD(&inst->mappings.input.list);
 	INIT_LIST_HEAD(&inst->mappings.input_meta.list);
 	INIT_LIST_HEAD(&inst->mappings.output.list);
@@ -928,10 +948,12 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	INIT_LIST_HEAD(&inst->mappings.dpb.list);
 	INIT_LIST_HEAD(&inst->mappings.persist.list);
 	INIT_LIST_HEAD(&inst->mappings.vpss.list);
+	INIT_LIST_HEAD(&inst->mappings.partial_data.list);
 	INIT_LIST_HEAD(&inst->children_list);
 	INIT_LIST_HEAD(&inst->firmware_list);
 	INIT_LIST_HEAD(&inst->enc_input_crs);
 	INIT_LIST_HEAD(&inst->dmabuf_tracker);
+	INIT_LIST_HEAD(&inst->input_timer_list);
 	INIT_LIST_HEAD(&inst->pending_pkts);
 	INIT_LIST_HEAD(&inst->fence_list);
 	for (i = 0; i < MAX_SIGNAL; i++)

@@ -181,7 +181,8 @@ u32 msm_vidc_internal_buffer_count(struct msm_vidc_inst *inst,
 	if (is_decode_session(inst)) {
 		if (buffer_type == MSM_VIDC_BUF_BIN ||
 			buffer_type == MSM_VIDC_BUF_LINE ||
-			buffer_type == MSM_VIDC_BUF_PERSIST) {
+			buffer_type == MSM_VIDC_BUF_PERSIST ||
+			buffer_type == MSM_VIDC_BUF_PARTIAL_DATA) {
 			count = 1;
 		} else if (buffer_type == MSM_VIDC_BUF_COMV ||
 			buffer_type == MSM_VIDC_BUF_NON_COMV) {
@@ -281,12 +282,12 @@ u32 msm_vidc_decoder_output_size(struct msm_vidc_inst *inst)
 
 u32 msm_vidc_decoder_input_meta_size(struct msm_vidc_inst *inst)
 {
-	return ALIGN(16 * 1024, SZ_4K);
+	return MSM_VIDC_METADATA_SIZE;
 }
 
 u32 msm_vidc_decoder_output_meta_size(struct msm_vidc_inst *inst)
 {
-	return ALIGN(16 * 1024, SZ_4K);
+	return MSM_VIDC_METADATA_SIZE;
 }
 
 u32 msm_vidc_encoder_input_size(struct msm_vidc_inst *inst)
@@ -377,7 +378,7 @@ u32 msm_vidc_encoder_input_meta_size(struct msm_vidc_inst *inst)
 		return 0;
 	}
 
-	size = ALIGN(16 * 1024, SZ_4K);
+	size = MSM_VIDC_METADATA_SIZE;
 
 	if (inst->capabilities->cap[META_ROI_INFO].value) {
 		lcu_size = 16;
@@ -396,5 +397,5 @@ u32 msm_vidc_encoder_input_meta_size(struct msm_vidc_inst *inst)
 
 u32 msm_vidc_encoder_output_meta_size(struct msm_vidc_inst *inst)
 {
-	return ALIGN(16 * 1024, SZ_4K);
+	return MSM_VIDC_METADATA_SIZE;
 }

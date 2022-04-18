@@ -1054,8 +1054,7 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 			num_vpp_pipes) \
 	do \
 	{ \
-		HFI_U32 vpssLBSize, ibcBufSize, opbwr1BufSize, \
-			opbwr8, opbwr10, ibc8, ibc10; \
+		HFI_U32 vpssLBSize, opbwr1BufSize, opbwr8, opbwr10; \
 		_size = HFI_ALIGN(SIZE_AV1D_LB_FE_TOP_DATA(frame_width, frame_height), \
 				VENUS_DMA_ALIGNMENT) + \
 			HFI_ALIGN(SIZE_AV1D_LB_FE_TOP_CTRL(frame_width, frame_height), \
@@ -1086,13 +1085,14 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 			SIZE_VPSS_LB(vpssLBSize, frame_width, frame_height, num_vpp_pipes); \
 			_size = HFI_ALIGN((_size + vpssLBSize), VENUS_DMA_ALIGNMENT); \
 		} \
-		else \
-		{ \
-			SIZE_AV1D_IBC_NV12_UBWC(ibc8, frame_width, frame_height); \
-			SIZE_AV1D_IBC_TP10_UBWC(ibc10, frame_width, frame_height); \
-			ibcBufSize = MAX(ibc8, ibc10); \
-			_size = HFI_ALIGN((_size + ibcBufSize), VENUS_DMA_ALIGNMENT); \
-		} \
+	} while (0)
+
+#define HFI_BUFFER_IBC_AV1D(_size, frame_width, frame_height) \
+	do { \
+		HFI_U32 ibc8, ibc10; \
+		SIZE_AV1D_IBC_NV12_UBWC(ibc8, frame_width, frame_height); \
+		SIZE_AV1D_IBC_TP10_UBWC(ibc10, frame_width, frame_height); \
+		_size = HFI_ALIGN(MAX(ibc8, ibc10), VENUS_DMA_ALIGNMENT); \
 	} while (0)
 
 #define AV1_CABAC_HDR_RATIO_HD_TOT 2
@@ -1165,7 +1165,8 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		AV1D_NUM_HW_PIC_BUF * (SIZE_AV1D_TILE_OFFSET + SIZE_AV1D_QM) + \
 		AV1D_NUM_FRAME_HEADERS * (SIZE_AV1D_FRAME_HEADER + \
 		2 * SIZE_AV1D_PROB_TABLE) + \
-		comv_size), VENUS_DMA_ALIGNMENT); \
+		comv_size + HDR10_HIST_EXTRADATA_SIZE + \
+		SIZE_AV1D_METADATA * AV1D_NUM_HW_PIC_BUF), VENUS_DMA_ALIGNMENT); \
 	} while (0)
 
 #define HFI_BUFFER_BITSTREAM_ENC(size, frame_width, frame_height, \

@@ -1029,6 +1029,10 @@ int msm_vidc_decide_work_mode_iris3(struct msm_vidc_inst* inst)
 			(inst->capabilities->cap[LOWLATENCY_MODE].value)) {
 			work_mode = MSM_VIDC_STAGE_1;
 		}
+		if (inst->capabilities->cap[SLICE_MODE].value ==
+			V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_MAX_BYTES) {
+			work_mode = MSM_VIDC_STAGE_1;
+		}
 		if (inst->capabilities->cap[LOSSLESS].value)
 			work_mode = MSM_VIDC_STAGE_2;
 
@@ -1106,10 +1110,16 @@ int msm_vidc_decide_quality_mode_iris3(struct msm_vidc_inst* inst)
 	if (!is_encode_session(inst))
 		return 0;
 
-	/* image session always runs at quality mode */
-	if (is_image_session(inst)) {
+	/* image session or lossless encode always runs at quality mode */
+	if (is_image_session(inst) || capability->cap[LOSSLESS].value) {
 		mode = MSM_VIDC_MAX_QUALITY_MODE;
-		goto exit;
+		goto decision_done;
+	}
+
+	/* for least complexity, make LP for all resolution */
+	if (!capability->cap[COMPLEXITY].value) {
+		mode = MSM_VIDC_POWER_SAVE_MODE;
+		goto decision_done;
 	}
 
 	mbpf = msm_vidc_get_mbs_per_frame(inst);
@@ -1118,24 +1128,82 @@ int msm_vidc_decide_quality_mode_iris3(struct msm_vidc_inst* inst)
 	max_hq_mbpf = core->capabilities[MAX_MBPF_HQ].value;;
 	max_hq_mbps = core->capabilities[MAX_MBPS_HQ].value;;
 
-	/* NRT session to have max quality unless client configures least complexity */
 	if (!is_realtime_session(inst) && mbpf <= max_hq_mbpf) {
 		mode = MSM_VIDC_MAX_QUALITY_MODE;
-		if (!capability->cap[COMPLEXITY].value)
-			mode = MSM_VIDC_POWER_SAVE_MODE;
-		goto exit;
+		goto decision_done;
 	}
 
-	/* Power saving always disabled for CQ and LOSSLESS RC modes. */
-	if (capability->cap[LOSSLESS].value ||
-		(mbpf <= max_hq_mbpf && mbps <= max_hq_mbps))
+	if (mbpf <= max_hq_mbpf && mbps <= max_hq_mbps)
 		mode = MSM_VIDC_MAX_QUALITY_MODE;
 
-exit:
+decision_done:
 	msm_vidc_update_cap_value(inst, QUALITY_MODE, mode, __func__);
 
 	return 0;
 }
+
+int msm_vidc_adjust_bitrate_boost_iris3(void* instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst_capability* capability = NULL;
+	s32 adjusted_value;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	s32 rc_type = -1;
+	u32 width, height, frame_rate;
+	struct v4l2_format *f;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val :
+		capability->cap[BITRATE_BOOST].value;
+
+	if (inst->bufq[OUTPUT_PORT].vb2q->streaming)
+		return 0;
+
+	if (msm_vidc_get_parent_value(inst, BITRATE_BOOST,
+		BITRATE_MODE, &rc_type, __func__))
+		return -EINVAL;
+
+	/*
+	 * Bitrate Boost are supported only for VBR rc type.
+	 * Hence, do not adjust or set to firmware for non VBR rc's
+	 */
+	if (rc_type != HFI_RC_VBR_CFR) {
+		adjusted_value = 0;
+		goto adjust;
+	}
+
+	frame_rate = inst->capabilities->cap[FRAME_RATE].value >> 16;
+	f= &inst->fmts[OUTPUT_PORT];
+	width = f->fmt.pix_mp.width;
+	height = f->fmt.pix_mp.height;
+
+	/*
+	 * honor client set bitrate boost
+	 * if client did not set, keep max bitrate boost upto 4k@60fps
+	 * and remove bitrate boost after 4k@60fps
+	*/
+	if (capability->cap[BITRATE_BOOST].flags & CAP_FLAG_CLIENT_SET) {
+		/* accept client set bitrate boost value as is */
+	} else {
+		if (res_is_less_than_or_equal_to(width, height, 3840, 2160) &&
+			frame_rate <= 60)
+			adjusted_value = MAX_BITRATE_BOOST;
+		else
+			adjusted_value = 0;
+	}
+
+adjust:
+	msm_vidc_update_cap_value(inst, BITRATE_BOOST, adjusted_value, __func__);
+
+	return 0;
+}
+
+
 
 static struct msm_vidc_venus_ops iris3_ops = {
 	.boot_firmware = __boot_firmware_iris3,

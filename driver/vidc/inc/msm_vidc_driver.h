@@ -8,6 +8,7 @@
 
 #include <linux/workqueue.h>
 #include <linux/iommu.h>
+#include <media/v4l2_vidc_extensions.h>
 #include "msm_vidc_internal.h"
 #include "msm_vidc_core.h"
 #include "msm_vidc_inst.h"
@@ -96,47 +97,91 @@ static inline is_internal_buffer(enum msm_vidc_buffer_type buffer_type)
 		buffer_type == MSM_VIDC_BUF_LINE ||
 		buffer_type == MSM_VIDC_BUF_DPB ||
 		buffer_type == MSM_VIDC_BUF_PERSIST ||
-		buffer_type == MSM_VIDC_BUF_VPSS;
+		buffer_type == MSM_VIDC_BUF_VPSS ||
+		buffer_type == MSM_VIDC_BUF_PARTIAL_DATA;
+}
+
+static inline bool is_meta_cap(u32 cap)
+{
+	if (cap > INST_CAP_NONE && cap < META_CAP_MAX)
+		return true;
+
+	return false;
+}
+
+static inline bool is_meta_rx_inp_enabled(struct msm_vidc_inst *inst, u32 cap)
+{
+	bool enabled = false;
+
+	if (inst->capabilities->cap[cap].value & V4L2_MPEG_VIDC_META_ENABLE &&
+		inst->capabilities->cap[cap].value & V4L2_MPEG_VIDC_META_RX_INPUT)
+		enabled = true;
+
+	return enabled;
+}
+
+static inline bool is_meta_rx_out_enabled(struct msm_vidc_inst *inst, u32 cap)
+{
+	bool enabled = false;
+
+	if (inst->capabilities->cap[cap].value & V4L2_MPEG_VIDC_META_ENABLE &&
+		inst->capabilities->cap[cap].value & V4L2_MPEG_VIDC_META_RX_OUTPUT)
+		enabled = true;
+
+	return enabled;
+}
+
+static inline bool is_meta_tx_inp_enabled(struct msm_vidc_inst *inst, u32 cap)
+{
+	bool enabled = false;
+
+	if (inst->capabilities->cap[cap].value & V4L2_MPEG_VIDC_META_ENABLE &&
+		inst->capabilities->cap[cap].value & V4L2_MPEG_VIDC_META_TX_INPUT)
+		enabled = true;
+
+	return enabled;
+}
+
+static inline bool is_meta_tx_out_enabled(struct msm_vidc_inst *inst, u32 cap)
+{
+	bool enabled = false;
+
+	if (inst->capabilities->cap[cap].value & V4L2_MPEG_VIDC_META_ENABLE &&
+		inst->capabilities->cap[cap].value & V4L2_MPEG_VIDC_META_TX_OUTPUT)
+		enabled = true;
+
+	return enabled;
 }
 
 static inline bool is_input_meta_enabled(struct msm_vidc_inst *inst)
 {
 	bool enabled = false;
+	u32 i;
 
-	if (is_decode_session(inst)) {
-		enabled = inst->capabilities->cap[META_BUF_TAG].value ?
-			true : false;
-	} else if (is_encode_session(inst)) {
-		enabled = (inst->capabilities->cap[META_SEQ_HDR_NAL].value ||
-			inst->capabilities->cap[META_EVA_STATS].value ||
-			inst->capabilities->cap[META_BUF_TAG].value ||
-			inst->capabilities->cap[META_ROI_INFO].value);
+	for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+		if (is_meta_tx_inp_enabled(inst, i) ||
+			is_meta_rx_inp_enabled(inst, i)) {
+			enabled = true;
+			break;
+		}
 	}
+
 	return enabled;
 }
 
 static inline bool is_output_meta_enabled(struct msm_vidc_inst *inst)
 {
 	bool enabled = false;
+	u32 i;
 
-	if (is_decode_session(inst)) {
-		enabled = (inst->capabilities->cap[META_BITSTREAM_RESOLUTION].value ||
-			inst->capabilities->cap[META_CROP_OFFSETS].value ||
-			inst->capabilities->cap[META_DPB_MISR].value ||
-			inst->capabilities->cap[META_OPB_MISR].value ||
-			inst->capabilities->cap[META_INTERLACE].value ||
-			inst->capabilities->cap[META_CONCEALED_MB_CNT].value ||
-			inst->capabilities->cap[META_HIST_INFO].value ||
-			inst->capabilities->cap[META_SEI_MASTERING_DISP].value ||
-			inst->capabilities->cap[META_SEI_CLL].value ||
-			inst->capabilities->cap[META_BUF_TAG].value ||
-			inst->capabilities->cap[META_DPB_TAG_LIST].value ||
-			inst->capabilities->cap[META_SUBFRAME_OUTPUT].value ||
-			inst->capabilities->cap[META_MAX_NUM_REORDER_FRAMES].value);
-	} else if (is_encode_session(inst)) {
-		enabled = (inst->capabilities->cap[META_LTR_MARK_USE].value ||
-			inst->capabilities->cap[META_BUF_TAG].value);
+	for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+		if (is_meta_tx_out_enabled(inst, i) ||
+			is_meta_rx_out_enabled(inst, i)) {
+			enabled = true;
+			break;
+		}
 	}
+
 	return enabled;
 }
 
@@ -388,7 +433,10 @@ struct msm_vidc_inst *get_inst(struct msm_vidc_core *core,
 void put_inst(struct msm_vidc_inst *inst);
 bool msm_vidc_allow_s_fmt(struct msm_vidc_inst *inst, u32 type);
 bool msm_vidc_allow_s_ctrl(struct msm_vidc_inst *inst, u32 id);
-bool msm_vidc_allow_metadata(struct msm_vidc_inst *inst, u32 cap_id);
+bool msm_vidc_allow_metadata_delivery(struct msm_vidc_inst *inst,
+	u32 cap_id, u32 port);
+bool msm_vidc_allow_metadata_subscription(struct msm_vidc_inst *inst,
+	u32 cap_id, u32 port);
 bool msm_vidc_allow_property(struct msm_vidc_inst *inst, u32 hfi_id);
 int msm_vidc_update_property_cap(struct msm_vidc_inst *inst, u32 hfi_id,
 	bool allow);
@@ -432,9 +480,9 @@ int msm_vidc_check_session_supported(struct msm_vidc_inst *inst);
 int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst);
 int msm_vidc_check_core_mbpf(struct msm_vidc_inst *inst);
 int msm_vidc_check_scaling_supported(struct msm_vidc_inst *inst);
-int msm_vidc_update_timestamp(struct msm_vidc_inst *inst, u64 timestamp);
+int msm_vidc_update_timestamp_rate(struct msm_vidc_inst *inst, u64 timestamp);
 int msm_vidc_set_auto_framerate(struct msm_vidc_inst *inst, u64 timestamp);
-int msm_vidc_calc_window_avg_framerate(struct msm_vidc_inst *inst);
+int msm_vidc_get_timestamp_rate(struct msm_vidc_inst *inst);
 int msm_vidc_flush_ts(struct msm_vidc_inst *inst);
 int msm_vidc_ts_reorder_insert_timestamp(struct msm_vidc_inst *inst, u64 timestamp);
 int msm_vidc_ts_reorder_remove_timestamp(struct msm_vidc_inst *inst, u64 timestamp);
@@ -450,7 +498,11 @@ bool res_is_less_than(u32 width, u32 height,
 bool res_is_less_than_or_equal_to(u32 width, u32 height,
 	u32 ref_width, u32 ref_height);
 int msm_vidc_get_properties(struct msm_vidc_inst *inst);
-int msm_vidc_create_input_metadata_buffer(struct msm_vidc_inst *inst, u32 buf_fd);
+int msm_vidc_create_input_metadata_buffer(struct msm_vidc_inst *inst, int buf_fd);
 int msm_vidc_update_input_meta_buffer_index(struct msm_vidc_inst *inst, struct vb2_buffer *vb2);
+int msm_vidc_update_input_rate(struct msm_vidc_inst *inst, u64 time_us);
+int msm_vidc_get_input_rate(struct msm_vidc_inst *inst);
+int msm_vidc_get_frame_rate(struct msm_vidc_inst *inst);
+int msm_vidc_get_operating_rate(struct msm_vidc_inst *inst);
 #endif // _MSM_VIDC_DRIVER_H_
 

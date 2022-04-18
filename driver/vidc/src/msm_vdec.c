@@ -86,6 +86,7 @@ static const u32 msm_vdec_internal_buffer_type[] = {
 	MSM_VIDC_BUF_COMV,
 	MSM_VIDC_BUF_NON_COMV,
 	MSM_VIDC_BUF_LINE,
+	MSM_VIDC_BUF_PARTIAL_DATA,
 };
 
 struct msm_vdec_prop_type_handle {
@@ -105,6 +106,12 @@ static int msm_vdec_codec_change(struct msm_vidc_inst *inst, u32 v4l2_codec)
 		v4l2_pixelfmt_name(v4l2_codec));
 
 	inst->codec = v4l2_codec_to_driver(v4l2_codec, __func__);
+	if (!inst->codec) {
+		i_vpr_e(inst, "%s: invalid codec %#x\n", __func__, v4l2_codec);
+		rc = -EINVAL;
+		goto exit;
+	}
+
 	inst->fmts[INPUT_PORT].fmt.pix_mp.pixelformat = v4l2_codec;
 	rc = msm_vidc_update_debug_str(inst);
 	if (rc)
@@ -124,11 +131,11 @@ static int msm_vdec_codec_change(struct msm_vidc_inst *inst, u32 v4l2_codec)
 
 	rc = msm_vidc_update_buffer_count(inst, INPUT_PORT);
 	if (rc)
-		return rc;
+		goto exit;
 
 	rc = msm_vidc_update_buffer_count(inst, OUTPUT_PORT);
 	if (rc)
-		return rc;
+		goto exit;
 
 exit:
 	return rc;
@@ -930,35 +937,6 @@ static int msm_vdec_subscribe_metadata(struct msm_vidc_inst *inst,
 	u32 payload[32] = {0};
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
-	static const u32 metadata_input_list[] = {
-		INPUT_META_OUTBUF_FENCE,
-		/*
-		 * when fence enabled, client needs output buffer_tag
-		 * in input metadata buffer done.
-		 */
-		META_OUTPUT_BUF_TAG,
-	};
-	static const u32 metadata_output_list[] = {
-		META_BITSTREAM_RESOLUTION,
-		META_CROP_OFFSETS,
-		META_DPB_MISR,
-		META_OPB_MISR,
-		META_INTERLACE,
-		META_TIMESTAMP,
-		META_CONCEALED_MB_CNT,
-		META_HIST_INFO,
-		META_SEI_MASTERING_DISP,
-		META_SEI_CLL,
-		META_HDR10PLUS,
-		/*
-		 * client needs input buffer tag in output metadata buffer done.
-		 */
-		META_BUF_TAG,
-		META_DPB_TAG_LIST,
-		META_SUBFRAME_OUTPUT,
-		META_DEC_QP_METADATA,
-		META_MAX_NUM_REORDER_FRAMES,
-	};
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -969,20 +947,20 @@ static int msm_vdec_subscribe_metadata(struct msm_vidc_inst *inst,
 	capability = inst->capabilities;
 	payload[0] = HFI_MODE_METADATA;
 	if (port == INPUT_PORT) {
-		for (i = 0; i < ARRAY_SIZE(metadata_input_list); i++) {
-			if (capability->cap[metadata_input_list[i]].value &&
-				msm_vidc_allow_metadata(inst, metadata_input_list[i])) {
-				payload[count + 1] =
-					capability->cap[metadata_input_list[i]].hfi_id;
+		for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+			if (is_meta_rx_inp_enabled(inst, i) &&
+				msm_vidc_allow_metadata_subscription(
+					inst, i, port)) {
+				payload[count + 1] = capability->cap[i].hfi_id;
 				count++;
 			}
 		}
 	} else if (port == OUTPUT_PORT) {
-		for (i = 0; i < ARRAY_SIZE(metadata_output_list); i++) {
-			if (capability->cap[metadata_output_list[i]].value &&
-				msm_vidc_allow_metadata(inst, metadata_output_list[i])) {
-				payload[count + 1] =
-					capability->cap[metadata_output_list[i]].hfi_id;
+		for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+			if (is_meta_rx_out_enabled(inst, i) &&
+				msm_vidc_allow_metadata_subscription(
+					inst, i, port)) {
+				payload[count + 1] = capability->cap[i].hfi_id;
 				count++;
 			}
 		}
@@ -1010,12 +988,6 @@ static int msm_vdec_set_delivery_mode_metadata(struct msm_vidc_inst *inst,
 	u32 payload[32] = {0};
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
-	static const u32 metadata_input_list[] = {
-		META_BUF_TAG,
-	};
-	static const u32 metadata_output_list[] = {
-		META_OUTPUT_BUF_TAG,
-	};
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -1027,19 +999,18 @@ static int msm_vdec_set_delivery_mode_metadata(struct msm_vidc_inst *inst,
 	payload[0] = HFI_MODE_METADATA;
 
 	if (port == INPUT_PORT) {
-		for (i = 0; i < ARRAY_SIZE(metadata_input_list); i++) {
-			if (capability->cap[metadata_input_list[i]].value) {
-				payload[count + 1] =
-					capability->cap[metadata_input_list[i]].hfi_id;
+		for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+			if (is_meta_tx_inp_enabled(inst, i)) {
+				payload[count + 1] = capability->cap[i].hfi_id;
 				count++;
 			}
 		}
 	} else if (port == OUTPUT_PORT) {
-		for (i = 0; i < ARRAY_SIZE(metadata_output_list); i++) {
-			if (capability->cap[metadata_output_list[i]].value  &&
-				msm_vidc_allow_metadata(inst, metadata_output_list[i])) {
-				payload[count + 1] =
-					capability->cap[metadata_output_list[i]].hfi_id;
+		for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+			if (is_meta_tx_out_enabled(inst, i)  &&
+				msm_vidc_allow_metadata_delivery(
+					inst, i, port)) {
+				payload[count + 1] = capability->cap[i].hfi_id;
 				count++;
 			}
 		}
@@ -1068,7 +1039,7 @@ static int msm_vdec_set_delivery_mode_property(struct msm_vidc_inst *inst,
 	u32 i, count = 0;
 	struct msm_vidc_inst_capability *capability;
 	static const u32 property_output_list[] = {
-		INPUT_META_OUTBUF_FENCE,
+		META_OUTBUF_FENCE,
 	};
 	static const u32 property_input_list[] = {};
 
@@ -1091,6 +1062,20 @@ static int msm_vdec_set_delivery_mode_property(struct msm_vidc_inst *inst,
 		}
 	} else if (port == OUTPUT_PORT) {
 		for (i = 0; i < ARRAY_SIZE(property_output_list); i++) {
+			if (property_output_list[i] == META_OUTBUF_FENCE &&
+				is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE)) {
+				/*
+				 * if output buffer fence enabled via
+				 * META_OUTBUF_FENCE, then driver will send
+				 * fence id via HFI_PROP_FENCE to firmware.
+				 * So enable HFI_PROP_FENCE property as
+				 * delivery mode property.
+				 */
+				payload[count + 1] =
+					capability->cap[property_output_list[i]].hfi_id;
+				count++;
+				continue;
+			}
 			if (capability->cap[property_output_list[i]].value) {
 				payload[count + 1] =
 					capability->cap[property_output_list[i]].hfi_id;
@@ -1447,6 +1432,10 @@ int msm_vdec_streamon_input(struct msm_vidc_inst *inst)
 	}
 
 	rc = msm_vdec_subscribe_property(inst, INPUT_PORT);
+	if (rc)
+		return rc;
+
+	rc = msm_vdec_subscribe_metadata(inst, INPUT_PORT);
 	if (rc)
 		return rc;
 
@@ -2054,7 +2043,7 @@ int msm_vdec_qbuf(struct msm_vidc_inst *inst, struct vb2_buffer *vb2)
 	}
 
 	if (vb2->type == OUTPUT_META_PLANE) {
-		if (inst->capabilities->cap[META_DPB_TAG_LIST].value) {
+		if (is_meta_rx_out_enabled(inst, META_DPB_TAG_LIST)) {
 			/*
 			 * vb2 is not allowing client to pass data in output meta plane.
 			 * adjust the bytesused as client will send buffer tag metadata
@@ -2064,10 +2053,6 @@ int msm_vdec_qbuf(struct msm_vidc_inst *inst, struct vb2_buffer *vb2)
 				vb2->planes[0].bytesused = 1024;
 		}
 	}
-
-	if (inst->firmware_priority != (inst->priority_level +
-					inst->capabilities->cap[PRIORITY].value * 2))
-		msm_vidc_set_session_priority(inst, PRIORITY);
 
 	/* batch decoder output & meta buffer only */
 	if (inst->decode_batch.enable && vb2->type == OUTPUT_MPLANE)
@@ -2245,6 +2230,12 @@ int msm_vdec_try_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 			f->fmt.pix_mp.height = inst->fmts[INPUT_PORT].fmt.pix_mp.height;
 			f->fmt.pix_mp.width = inst->fmts[INPUT_PORT].fmt.pix_mp.width;
 		}
+	} else if (f->type == INPUT_META_PLANE) {
+		f->fmt.meta.dataformat = inst->fmts[INPUT_META_PORT].fmt.meta.dataformat;
+		f->fmt.meta.buffersize = inst->fmts[INPUT_META_PORT].fmt.meta.buffersize;
+	} else if (f->type == OUTPUT_META_PLANE) {
+		f->fmt.meta.dataformat = inst->fmts[OUTPUT_META_PORT].fmt.meta.dataformat;
+		f->fmt.meta.buffersize = inst->fmts[OUTPUT_META_PORT].fmt.meta.buffersize;
 	} else {
 		i_vpr_e(inst, "%s: invalid type %d\n", __func__, f->type);
 		return -EINVAL;
@@ -2359,23 +2350,15 @@ int msm_vdec_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 		fmt = &inst->fmts[INPUT_META_PORT];
 		fmt->type = INPUT_META_PLANE;
 		fmt->fmt.meta.dataformat = V4L2_META_FMT_VIDC;
-		if (is_input_meta_enabled(inst)) {
-			fmt->fmt.meta.buffersize = call_session_op(core,
-				buffer_size, inst, MSM_VIDC_BUF_INPUT_META);
-			inst->buffers.input_meta.min_count =
-					inst->buffers.input.min_count;
-			inst->buffers.input_meta.extra_count =
-					inst->buffers.input.extra_count;
-			inst->buffers.input_meta.actual_count =
-					inst->buffers.input.actual_count;
-			inst->buffers.input_meta.size = fmt->fmt.meta.buffersize;
-		} else {
-			fmt->fmt.meta.buffersize = 0;
-			inst->buffers.input_meta.min_count = 0;
-			inst->buffers.input_meta.extra_count = 0;
-			inst->buffers.input_meta.actual_count = 0;
-			inst->buffers.input_meta.size = 0;
-		}
+		fmt->fmt.meta.buffersize = call_session_op(core,
+			buffer_size, inst, MSM_VIDC_BUF_INPUT_META);
+		inst->buffers.input_meta.min_count =
+				inst->buffers.input.min_count;
+		inst->buffers.input_meta.extra_count =
+				inst->buffers.input.extra_count;
+		inst->buffers.input_meta.actual_count =
+				inst->buffers.input.actual_count;
+		inst->buffers.input_meta.size = fmt->fmt.meta.buffersize;
 		i_vpr_h(inst,
 			"%s: type: INPUT_META, size %u min_count %d extra_count %d\n",
 			__func__, fmt->fmt.meta.buffersize,
@@ -2437,23 +2420,15 @@ int msm_vdec_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 		fmt = &inst->fmts[OUTPUT_META_PORT];
 		fmt->type = OUTPUT_META_PLANE;
 		fmt->fmt.meta.dataformat = V4L2_META_FMT_VIDC;
-		if (is_output_meta_enabled(inst)) {
-			fmt->fmt.meta.buffersize = call_session_op(core,
-				buffer_size, inst, MSM_VIDC_BUF_OUTPUT_META);
-			inst->buffers.output_meta.min_count =
-					inst->buffers.output.min_count;
-			inst->buffers.output_meta.extra_count =
-					inst->buffers.output.extra_count;
-			inst->buffers.output_meta.actual_count =
-					inst->buffers.output.actual_count;
-			inst->buffers.output_meta.size = fmt->fmt.meta.buffersize;
-		} else {
-			fmt->fmt.meta.buffersize = 0;
-			inst->buffers.output_meta.min_count = 0;
-			inst->buffers.output_meta.extra_count = 0;
-			inst->buffers.output_meta.actual_count = 0;
-			inst->buffers.output_meta.size = 0;
-		}
+		fmt->fmt.meta.buffersize = call_session_op(core,
+			buffer_size, inst, MSM_VIDC_BUF_OUTPUT_META);
+		inst->buffers.output_meta.min_count =
+				inst->buffers.output.min_count;
+		inst->buffers.output_meta.extra_count =
+				inst->buffers.output.extra_count;
+		inst->buffers.output_meta.actual_count =
+				inst->buffers.output.actual_count;
+		inst->buffers.output_meta.size = fmt->fmt.meta.buffersize;
 		i_vpr_h(inst,
 			"%s: type: OUTPUT_META, size %u min_count %d extra_count %d\n",
 			__func__, fmt->fmt.meta.buffersize,
@@ -2530,126 +2505,6 @@ int msm_vdec_g_selection(struct msm_vidc_inst* inst, struct v4l2_selection* s)
 	i_vpr_h(inst, "%s: target %d, r [%d, %d, %d, %d]\n",
 		__func__, s->target, s->r.top, s->r.left,
 		s->r.width, s->r.height);
-	return 0;
-}
-
-int msm_vdec_s_param(struct msm_vidc_inst *inst,
-		struct v4l2_streamparm *s_parm)
-{
-	int rc = 0;
-	struct msm_vidc_inst_capability *capability = NULL;
-	struct v4l2_fract *timeperframe = NULL;
-	u32 q16_rate, max_rate, default_rate;
-	u64 us_per_frame = 0, input_rate = 0;
-	bool is_frame_rate = false;
-
-	if (!inst || !s_parm) {
-		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
-	capability = inst->capabilities;
-
-	if (s_parm->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
-		timeperframe = &s_parm->parm.output.timeperframe;
-		max_rate = capability->cap[FRAME_RATE].max >> 16;
-		default_rate = capability->cap[FRAME_RATE].value >> 16;
-		is_frame_rate = true;
-	} else {
-		timeperframe = &s_parm->parm.capture.timeperframe;
-		max_rate = capability->cap[OPERATING_RATE].max >> 16;
-		default_rate = capability->cap[OPERATING_RATE].value >> 16;
-	}
-
-	if (!timeperframe->denominator || !timeperframe->numerator) {
-		i_vpr_e(inst, "%s: type %s, invalid rate\n", __func__,
-			v4l2_type_name(s_parm->type));
-		input_rate = default_rate;
-		goto set_default;
-	}
-
-	us_per_frame = timeperframe->numerator * (u64)USEC_PER_SEC;
-	do_div(us_per_frame, timeperframe->denominator);
-
-	if (!us_per_frame) {
-		i_vpr_e(inst, "%s: us_per_frame is zero\n", __func__);
-		rc = -EINVAL;
-		goto exit;
-	}
-
-	input_rate = (u64)USEC_PER_SEC;
-	do_div(input_rate, us_per_frame);
-
-set_default:
-	i_vpr_h(inst, "%s: type %s, %s value %llu\n",
-		__func__, v4l2_type_name(s_parm->type),
-		is_frame_rate ? "frame rate" : "operating rate", input_rate);
-
-	q16_rate = (u32)input_rate << 16;
-	msm_vidc_update_cap_value(inst, is_frame_rate ? FRAME_RATE : OPERATING_RATE,
-		q16_rate, __func__);
-	if (is_realtime_session(inst) &&
-		((s_parm->type == INPUT_MPLANE && inst->bufq[INPUT_PORT].vb2q->streaming) ||
-		(s_parm->type == OUTPUT_MPLANE && inst->bufq[OUTPUT_PORT].vb2q->streaming))) {
-		rc = msm_vidc_check_core_mbps(inst);
-		if (rc) {
-			i_vpr_e(inst, "%s: unsupported load\n", __func__);
-			goto reset_rate;
-		}
-		rc = input_rate > max_rate;
-		if (rc) {
-			i_vpr_e(inst, "%s: unsupported rate %llu, max %u\n", __func__,
-				input_rate, max_rate);
-			rc = -ENOMEM;
-			goto reset_rate;
-		}
-	}
-	inst->priority_level = MSM_VIDC_PRIORITY_HIGH;
-
-	if (is_frame_rate)
-		capability->cap[FRAME_RATE].flags |= CAP_FLAG_CLIENT_SET;
-	else
-		capability->cap[OPERATING_RATE].flags |= CAP_FLAG_CLIENT_SET;
-
-	return 0;
-
-reset_rate:
-	if (rc) {
-		i_vpr_e(inst, "%s: setting rate %llu failed, reset to %u\n", __func__,
-			input_rate, default_rate);
-		msm_vidc_update_cap_value(inst, is_frame_rate ? FRAME_RATE : OPERATING_RATE,
-			default_rate << 16, __func__);
-	}
-exit:
-	return rc;
-}
-
-int msm_vdec_g_param(struct msm_vidc_inst *inst,
-		struct v4l2_streamparm *s_parm)
-{
-	struct msm_vidc_inst_capability *capability = NULL;
-	struct v4l2_fract *timeperframe = NULL;
-
-	if (!inst || !s_parm) {
-		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
-	capability = inst->capabilities;
-
-	if (s_parm->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
-		timeperframe = &s_parm->parm.output.timeperframe;
-		timeperframe->numerator = 1;
-		timeperframe->denominator =
-			capability->cap[FRAME_RATE].value >> 16;
-	} else {
-		timeperframe = &s_parm->parm.capture.timeperframe;
-		timeperframe->numerator = 1;
-		timeperframe->denominator =
-			capability->cap[OPERATING_RATE].value >> 16;
-	}
-
-	i_vpr_h(inst, "%s: type %u, num %u denom %u\n",
-		__func__, s_parm->type, timeperframe->numerator,
-		timeperframe->denominator);
 	return 0;
 }
 
@@ -2830,7 +2685,7 @@ int msm_vdec_inst_init(struct msm_vidc_inst *inst)
 	f = &inst->fmts[INPUT_META_PORT];
 	f->type = INPUT_META_PLANE;
 	f->fmt.meta.dataformat = V4L2_META_FMT_VIDC;
-	f->fmt.meta.buffersize = 0;
+	f->fmt.meta.buffersize = MSM_VIDC_METADATA_SIZE;
 	inst->buffers.input_meta.min_count = 0;
 	inst->buffers.input_meta.extra_count = 0;
 	inst->buffers.input_meta.actual_count = 0;
@@ -2868,13 +2723,11 @@ int msm_vdec_inst_init(struct msm_vidc_inst *inst)
 	f = &inst->fmts[OUTPUT_META_PORT];
 	f->type = OUTPUT_META_PLANE;
 	f->fmt.meta.dataformat = V4L2_META_FMT_VIDC;
-	f->fmt.meta.buffersize = 0;
+	f->fmt.meta.buffersize = MSM_VIDC_METADATA_SIZE;
 	inst->buffers.output_meta.min_count = 0;
 	inst->buffers.output_meta.extra_count = 0;
 	inst->buffers.output_meta.actual_count = 0;
 	inst->buffers.output_meta.size = 0;
-
-	inst->priority_level = MSM_VIDC_PRIORITY_LOW;
 
 	rc = msm_vdec_codec_change(inst,
 			inst->fmts[INPUT_PORT].fmt.pix_mp.pixelformat);

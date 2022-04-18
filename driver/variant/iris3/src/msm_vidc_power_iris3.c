@@ -21,9 +21,7 @@ u64 msm_vidc_calc_freq_iris3(struct msm_vidc_inst *inst, u32 data_size)
 	u32 mbs_per_second;
 	u32 operating_rate, vsp_factor_num = 1, vsp_factor_den = 1;
 	u32 base_cycles = 0;
-	u32 fps;
-	u32 prio_val;
-	u32 buf_timetamps_fps, mbpf;
+	u32 fps, mbpf;
 
 	if (!inst || !inst->core || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -36,28 +34,8 @@ u64 msm_vidc_calc_freq_iris3(struct msm_vidc_inst *inst, u32 data_size)
 		return freq;
 	}
 
-	if (!is_realtime_session(inst)) {
-		prio_val = inst->capabilities->cap[PRIORITY].value;
-		if (!prio_val || prio_val > core->dt->allowed_clks_tbl_size)
-			prio_val = core->dt->allowed_clks_tbl_size;
-
-		return core->dt->allowed_clks_tbl[prio_val-1].clock_rate;
-	}
-
 	mbpf = msm_vidc_get_mbs_per_frame(inst);
-	fps = msm_vidc_get_fps(inst);
-
-	buf_timetamps_fps = msm_vidc_calc_window_avg_framerate(inst);
-
-	/*
-	 * when buffer detected fps is more than client set value by 10%,
-	 * utilize buffer detected fps to scale clock.
-	 */
-	if (div_u64(fps * 11, 10) < buf_timetamps_fps) {
-		fps = buf_timetamps_fps;
-		inst->priority_level = MSM_VIDC_PRIORITY_LOW;
-	}
-
+	fps = inst->max_rate;
 	mbs_per_second = mbpf * fps;
 
 	/*

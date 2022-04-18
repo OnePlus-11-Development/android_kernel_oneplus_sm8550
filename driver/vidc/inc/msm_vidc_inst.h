@@ -38,6 +38,7 @@ struct msm_vidc_allocations_info {
 	struct msm_vidc_allocations     dpb;
 	struct msm_vidc_allocations     persist;
 	struct msm_vidc_allocations     vpss;
+	struct msm_vidc_allocations     partial_data;
 };
 
 struct msm_vidc_mappings_info {
@@ -53,6 +54,7 @@ struct msm_vidc_mappings_info {
 	struct msm_vidc_mappings        dpb;
 	struct msm_vidc_mappings        persist;
 	struct msm_vidc_mappings        vpss;
+	struct msm_vidc_mappings        partial_data;
 };
 
 struct msm_vidc_buffers_info {
@@ -70,6 +72,7 @@ struct msm_vidc_buffers_info {
 	struct msm_vidc_buffers        dpb;
 	struct msm_vidc_buffers        persist;
 	struct msm_vidc_buffers        vpss;
+	struct msm_vidc_buffers        partial_data;
 };
 
 enum msm_vidc_inst_state {
@@ -142,6 +145,7 @@ struct msm_vidc_inst {
 	struct list_head                   response_works; /* list of struct response_work */
 	struct list_head                   enc_input_crs;
 	struct list_head                   dmabuf_tracker; /* list of struct msm_memory_dmabuf */
+	struct list_head                   input_timer_list; /* list of struct msm_vidc_input_timer */
 	struct list_head                   caps_list;
 	struct list_head                   children_list; /* struct msm_vidc_inst_cap_entry */
 	struct list_head                   firmware_list; /* struct msm_vidc_inst_cap_entry */
@@ -157,8 +161,6 @@ struct msm_vidc_inst {
 	struct msm_vidc_inst_capability   *capabilities;
 	struct completion                  completions[MAX_SIGNAL];
 	struct msm_vidc_fence_context      fence_context;
-	enum priority_level                priority_level;
-	u32                                firmware_priority;
 	bool                               active;
 	u64                                last_qbuf_time_ns;
 	bool                               vb2q_init;
@@ -166,6 +168,8 @@ struct msm_vidc_inst {
 	u32                                dpb_list_payload[MAX_DPB_LIST_ARRAY_SIZE];
 	u32                                max_map_output_count;
 	u32                                auto_framerate;
+	u32                                max_rate;
 	bool                               has_bframe;
+	bool                               ir_enabled;
 };
 #endif // _MSM_VIDC_INST_H_

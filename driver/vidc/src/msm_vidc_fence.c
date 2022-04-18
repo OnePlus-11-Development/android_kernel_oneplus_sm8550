@@ -106,8 +106,10 @@ int msm_vidc_create_fence_fd(struct msm_vidc_inst *inst,
 		goto err_sync_file;
 	}
 	fd_install(fence->fd, fence->sync_file->file);
-	i_vpr_l(inst, "%s: created fd %d for fence %s id: %llu\n", __func__,
-		fence->fd, fence->name, fence->dma_fence.seqno);
+
+	i_vpr_l(inst, "%s: created fd %d for fence %s\n", __func__,
+		fence->fd, fence->name);
+	return rc;
 
 err_sync_file:
 	put_unused_fd(fence->fd);

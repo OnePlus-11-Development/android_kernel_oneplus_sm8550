@@ -78,7 +78,7 @@ static void print_sfr_message(struct msm_vidc_core *core)
 		if (p == NULL)
 			vsfr->rg_data[vsfr_size - 1] = '\0';
 
-		d_vpr_e("SFR Message from FW: %s\n", vsfr->rg_data);
+		d_vpr_e(FMT_STRING_MSG_SFR, vsfr->rg_data);
 	}
 }
 
@@ -169,7 +169,8 @@ bool is_valid_hfi_buffer_type(struct msm_vidc_inst *inst,
 	    buffer_type != HFI_BUFFER_LINE &&
 	    buffer_type != HFI_BUFFER_DPB &&
 	    buffer_type != HFI_BUFFER_PERSIST &&
-	    buffer_type != HFI_BUFFER_VPSS) {
+	    buffer_type != HFI_BUFFER_VPSS &&
+	    buffer_type != HFI_BUFFER_PARTIAL_DATA) {
 		i_vpr_e(inst, "%s: invalid buffer type %#x\n",
 			func, buffer_type);
 		return false;
@@ -587,8 +588,7 @@ static int get_driver_buffer_flags(struct msm_vidc_inst *inst, u32 hfi_flags)
 	} else if (inst->hfi_frame_info.picture_type & HFI_PICTURE_B) {
 		driver_flags |= MSM_VIDC_BUF_FLAG_BFRAME;
 	} else if (inst->hfi_frame_info.picture_type & HFI_PICTURE_I) {
-		if (inst->codec == MSM_VIDC_VP9 || inst->codec == MSM_VIDC_AV1)
-			driver_flags |= MSM_VIDC_BUF_FLAG_KEYFRAME;
+		driver_flags |= MSM_VIDC_BUF_FLAG_KEYFRAME;
 	} else if (inst->hfi_frame_info.picture_type & HFI_PICTURE_CRA) {
 		driver_flags |= MSM_VIDC_BUF_FLAG_KEYFRAME;
 	} else if (inst->hfi_frame_info.picture_type & HFI_PICTURE_BLA) {
@@ -903,7 +903,7 @@ static int handle_output_buffer(struct msm_vidc_inst *inst,
 	}
 
 	if (!is_image_session(inst) && is_decode_session(inst) && buf->data_size)
-		msm_vidc_update_timestamp(inst, buf->timestamp);
+		msm_vidc_update_timestamp_rate(inst, buf->timestamp);
 
 	/* update output buffer timestamp, if ts_reorder is enabled */
 	if (is_ts_reorder_allowed(inst) && buf->data_size)
@@ -1062,6 +1062,14 @@ static int msm_vidc_check_meta_buffers(struct msm_vidc_inst *inst)
 	};
 
 	for (i = 0; i < ARRAY_SIZE(buffer_type); i++) {
+		/*
+		 * skip input meta buffers check as meta buffers were
+		 * already delivered if output fence enabled.
+		 */
+		if (is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE)) {
+			if (buffer_type[i] == MSM_VIDC_BUF_INPUT)
+				continue;
+		}
 		buffers = msm_vidc_get_buffers(inst, buffer_type[i], __func__);
 		if (!buffers)
 			return -EINVAL;
@@ -1115,7 +1123,13 @@ static int handle_dequeue_buffers(struct msm_vidc_inst *inst)
 						"vb2 done already", inst, buf);
 				} else {
 					buf->attr |= MSM_VIDC_ATTR_BUFFER_DONE;
-					msm_vidc_buffer_done(inst, buf);
+					rc = msm_vidc_buffer_done(inst, buf);
+					if (rc) {
+						print_vidc_buffer(VIDC_HIGH, "err ",
+							"vb2 done failed", inst, buf);
+						/* ignore the error */
+						rc = 0;
+					}
 				}
 				msm_vidc_put_driver_buf(inst, buf);
 			}
@@ -1217,6 +1231,7 @@ static int handle_session_buffer(struct msm_vidc_inst *inst,
 		{HFI_BUFFER_NON_COMV,       handle_release_internal_buffer    },
 		{HFI_BUFFER_LINE,           handle_release_internal_buffer    },
 		{HFI_BUFFER_PERSIST,        handle_release_internal_buffer    },
+		{HFI_BUFFER_PARTIAL_DATA,   handle_release_internal_buffer    },
 	};
 	static const struct msm_vidc_hfi_buffer_handle dec_output_hfi_handle[] = {
 		{HFI_BUFFER_METADATA,       handle_output_metadata_buffer     },
@@ -1415,41 +1430,18 @@ static int handle_dpb_list_property(struct msm_vidc_inst *inst,
 	return 0;
 }
 
-static int handle_session_property(struct msm_vidc_inst *inst,
-	struct hfi_packet *pkt)
+static int handle_property_with_payload(struct msm_vidc_inst *inst,
+	struct hfi_packet *pkt, u32 port)
 {
 	int rc = 0;
-	u32 port;
 	u32 *payload_ptr = NULL;
 	u32 fence_id = 0;
 
-	if (!inst || !inst->capabilities) {
-		d_vpr_e("%s: Invalid params\n", __func__);
-		return -EINVAL;
-	}
-
-	i_vpr_l(inst, "%s: property type %#x\n", __func__, pkt->type);
-
-	port = vidc_port_from_hfi(inst, pkt->port);
-	if (port >= MAX_PORT) {
+	payload_ptr = (u32 *)((u8 *)pkt + sizeof(struct hfi_packet));
+	if (!payload_ptr) {
 		i_vpr_e(inst,
-				"%s: invalid port: %d for property %#x\n",
-				__func__, pkt->port, pkt->type);
+			"%s: payload_ptr cannot be null\n", __func__);
 		return -EINVAL;
-	}
-
-	if (pkt->payload_info != HFI_PAYLOAD_NONE) {
-		if (!check_for_packet_payload(inst, pkt, __func__))
-			return 0;
-
-		payload_ptr = (u32 *)((u8 *)pkt + sizeof(struct hfi_packet));
-	}
-
-	if (pkt->flags & HFI_FW_FLAGS_INFORMATION) {
-		i_vpr_h(inst,
-			"%s: information flag received for property %#x packet\n",
-			__func__, pkt->type);
-		return 0;
 	}
 
 	switch (pkt->type) {
@@ -1495,16 +1487,6 @@ static int handle_session_property(struct msm_vidc_inst *inst,
 		if (inst->hfi_frame_info.picture_type & HFI_PICTURE_B)
 			inst->has_bframe = true;
 		break;
-	case HFI_PROP_NO_OUTPUT:
-		if (port != INPUT_PORT) {
-			i_vpr_e(inst,
-				"%s: invalid port: %d for property %#x\n",
-				__func__, pkt->port, pkt->type);
-			break;
-		}
-		i_vpr_h(inst, "received no_output property\n");
-		inst->hfi_frame_info.no_output = 1;
-		break;
 	case HFI_PROP_WORST_COMPRESSION_RATIO:
 		inst->hfi_frame_info.cr = payload_ptr[0];
 		break;
@@ -1535,36 +1517,28 @@ static int handle_session_property(struct msm_vidc_inst *inst,
 		}
 		break;
 	case HFI_PROP_QUALITY_MODE:
-		if (payload_ptr &&
-			inst->capabilities->cap[QUALITY_MODE].value !=  payload_ptr[0])
+		if (inst->capabilities->cap[QUALITY_MODE].value !=  payload_ptr[0])
 			i_vpr_e(inst,
 				"%s: fw quality mode(%d) not matching the capability value(%d)\n",
 				__func__,  payload_ptr[0],
 				inst->capabilities->cap[QUALITY_MODE].value);
 		break;
 	case HFI_PROP_STAGE:
-		if (payload_ptr &&
-			inst->capabilities->cap[STAGE].value !=  payload_ptr[0])
+		if (inst->capabilities->cap[STAGE].value !=  payload_ptr[0])
 			i_vpr_e(inst,
 				"%s: fw stage mode(%d) not matching the capability value(%d)\n",
 				__func__,  payload_ptr[0], inst->capabilities->cap[STAGE].value);
 		break;
 	case HFI_PROP_PIPE:
-		if (payload_ptr &&
-			inst->capabilities->cap[PIPE].value !=  payload_ptr[0])
+		if (inst->capabilities->cap[PIPE].value !=  payload_ptr[0])
 			i_vpr_e(inst,
 				"%s: fw pipe mode(%d) not matching the capability value(%d)\n",
 				__func__,  payload_ptr[0], inst->capabilities->cap[PIPE].value);
 		break;
 	case HFI_PROP_FENCE:
-		if (inst->capabilities->cap[INPUT_META_OUTBUF_FENCE].value) {
-			if (payload_ptr) {
-				fence_id = payload_ptr[0];
-				rc = msm_vidc_fence_signal(inst, fence_id);
-			} else {
-				i_vpr_e(inst, "%s: fence payload is null\n", __func__);
-				rc = -EINVAL;
-			}
+		if (is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE)) {
+			fence_id = payload_ptr[0];
+			rc = msm_vidc_fence_signal(inst, fence_id);
 		} else {
 			i_vpr_e(inst, "%s: fence is not enabled for this session\n",
 				__func__);
@@ -1574,6 +1548,70 @@ static int handle_session_property(struct msm_vidc_inst *inst,
 		i_vpr_e(inst, "%s: invalid property %#x\n",
 			__func__, pkt->type);
 		break;
+	}
+
+	return rc;
+}
+
+static int handle_property_without_payload(struct msm_vidc_inst *inst,
+	struct hfi_packet *pkt, u32 port)
+{
+	switch (pkt->type) {
+	case HFI_PROP_NO_OUTPUT:
+		if (port != INPUT_PORT) {
+			i_vpr_e(inst,
+				"%s: invalid port: %d for property %#x\n",
+				__func__, pkt->port, pkt->type);
+			break;
+		}
+		i_vpr_h(inst, "received no_output property\n");
+		inst->hfi_frame_info.no_output = 1;
+		break;
+	default:
+		i_vpr_e(inst, "%s: invalid property %#x\n",
+			__func__, pkt->type);
+		break;
+	}
+
+	return 0;
+}
+
+static int handle_session_property(struct msm_vidc_inst *inst,
+	struct hfi_packet *pkt)
+{
+	int rc = 0;
+	u32 port;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: Invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	i_vpr_l(inst, "%s: property type %#x\n", __func__, pkt->type);
+
+	port = vidc_port_from_hfi(inst, pkt->port);
+	if (port >= MAX_PORT) {
+		i_vpr_e(inst,
+			"%s: invalid port: %d for property %#x\n",
+			__func__, pkt->port, pkt->type);
+		return -EINVAL;
+	}
+
+	if (pkt->flags & HFI_FW_FLAGS_INFORMATION) {
+		i_vpr_h(inst,
+			"%s: information flag received for property %#x packet\n",
+			__func__, pkt->type);
+		return 0;
+	}
+
+	if (check_for_packet_payload(inst, pkt, __func__)) {
+		rc = handle_property_with_payload(inst, pkt, port);
+		if (rc)
+			return rc;
+	} else {
+		rc = handle_property_without_payload(inst, pkt, port);
+		if (rc)
+			return rc;
 	}
 
 	return rc;
@@ -1709,12 +1747,12 @@ static int __handle_session_response(struct msm_vidc_inst *inst,
 		}
 	}
 
-	memset(&inst->hfi_frame_info, 0, sizeof(struct msm_vidc_hfi_frame_info));
 	if (dequeue) {
 		rc = handle_dequeue_buffers(inst);
 		if (rc)
 			return rc;
 	}
+	memset(&inst->hfi_frame_info, 0, sizeof(struct msm_vidc_hfi_frame_info));
 
 	return rc;
 }

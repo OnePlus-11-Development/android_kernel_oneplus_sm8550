@@ -121,10 +121,10 @@ int msm_vidc_queue_setup(struct vb2_queue *q,
 	if (port < 0)
 		return -EINVAL;
 
-	if (*num_planes) {
+	if (*num_planes && (port == INPUT_PORT || port == OUTPUT_PORT)) {
 		f = &inst->fmts[port];
 		if (*num_planes != f->fmt.pix_mp.num_planes) {
-			i_vpr_i(inst, "%s: requested num_planes %d not supported\n",
+			i_vpr_e(inst, "%s: requested num_planes %d not supported %d\n",
 			__func__, *num_planes, f->fmt.pix_mp.num_planes);
 			return -EINVAL;
 		}
@@ -198,28 +198,48 @@ int msm_vidc_start_streaming(struct vb2_queue *q, unsigned int count)
 		return -EINVAL;
 	}
 	inst = q->drv_priv;
+	inst = get_inst_ref(g_core, inst);
 	if (!inst || !inst->core || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
+
+	inst_lock(inst, __func__);
+	if (is_session_error(inst)) {
+		i_vpr_e(inst, "%s: inst in error state\n", __func__);
+		rc = -EBUSY;
+		goto unlock;
+	}
+
+	if (!msm_vidc_allow_streamon(inst, q->type)) {
+		rc = -EBUSY;
+		goto unlock;
+	}
+
+	rc = msm_vidc_state_change_streamon(inst, q->type);
+	if (rc)
+		goto unlock;
 
 	if (q->type == INPUT_META_PLANE &&
 		inst->capabilities->cap[INPUT_META_VIA_REQUEST].value) {
 		i_vpr_e(inst,
 			"%s: invalid input meta port start when request enabled\n",
 			__func__);
-		return -EINVAL;
+		rc = -EINVAL;
+		goto unlock;
 	}
 
 	if (q->type == INPUT_META_PLANE || q->type == OUTPUT_META_PLANE) {
 		i_vpr_h(inst, "%s: nothing to start on %s\n",
 			__func__, v4l2_type_name(q->type));
-		return 0;
+		rc = 0;
+		goto unlock;
 	}
 	if (!is_decode_session(inst) && !is_encode_session(inst)) {
 		i_vpr_e(inst, "%s: invalid session %d\n",
 			__func__, inst->domain);
-		return -EINVAL;
+		rc = -EINVAL;
+		goto unlock;
 	}
 	i_vpr_h(inst, "Streamon: %s\n", v4l2_type_name(q->type));
 
@@ -227,30 +247,30 @@ int msm_vidc_start_streaming(struct vb2_queue *q, unsigned int count)
 		inst->once_per_session_set = true;
 		rc = msm_vidc_prepare_dependency_list(inst);
 		if (rc)
-			return rc;
+			goto unlock;
 
 		rc = msm_vidc_session_set_codec(inst);
 		if (rc)
-			return rc;
+			goto unlock;
 
 		rc = msm_vidc_session_set_secure_mode(inst);
 		if (rc)
-			return rc;
+			goto unlock;
 
 		if (is_encode_session(inst)) {
 			rc = msm_vidc_alloc_and_queue_session_internal_buffers(inst,
 				MSM_VIDC_BUF_ARP);
 			if (rc)
-				goto error;
+				goto unlock;
 		} else if(is_decode_session(inst)) {
 			rc = msm_vidc_session_set_default_header(inst);
 			if (rc)
-				return rc;
+				goto unlock;
 
 			rc = msm_vidc_alloc_and_queue_session_internal_buffers(inst,
 				MSM_VIDC_BUF_PERSIST);
 			if (rc)
-				goto error;
+				goto unlock;
 		}
 	}
 
@@ -266,32 +286,32 @@ int msm_vidc_start_streaming(struct vb2_queue *q, unsigned int count)
 		else if (is_encode_session(inst))
 			rc = msm_venc_streamon_input(inst);
 		else
-			goto error;
+			goto unlock;
 	} else if (q->type == OUTPUT_MPLANE) {
 		if (is_decode_session(inst))
 			rc = msm_vdec_streamon_output(inst);
 		else if (is_encode_session(inst))
 			rc = msm_venc_streamon_output(inst);
 		else
-			goto error;
+			goto unlock;
 	} else {
 		i_vpr_e(inst, "%s: invalid type %d\n", __func__, q->type);
-		goto error;
+		goto unlock;
 	}
 	if (rc)
-		goto error;
+		goto unlock;
 
 	/* print final buffer counts & size details */
 	msm_vidc_print_buffer_info(inst);
 
 	buf_type = v4l2_type_to_driver(q->type, __func__);
 	if (!buf_type)
-		goto error;
+		goto unlock;
 
 	/* queue pending buffers */
 	rc = msm_vidc_queue_deferred_buffers(inst, buf_type);
 	if (rc)
-		goto error;
+		goto unlock;
 
 	/* initialize statistics timer(one time) */
 	if (!inst->stats.time_ms)
@@ -300,47 +320,73 @@ int msm_vidc_start_streaming(struct vb2_queue *q, unsigned int count)
 	/* schedule to print buffer statistics */
 	rc = schedule_stats_work(inst);
 	if (rc)
-		goto error;
+		goto unlock;
 
 	if ((q->type == INPUT_MPLANE && inst->bufq[OUTPUT_PORT].vb2q->streaming) ||
 		(q->type == OUTPUT_MPLANE && inst->bufq[INPUT_PORT].vb2q->streaming)) {
 		rc = msm_vidc_get_properties(inst);
 		if (rc)
-			goto error;
+			goto unlock;
 	}
 
 	i_vpr_h(inst, "Streamon: %s successful\n", v4l2_type_name(q->type));
 
+unlock:
+	if (rc) {
+		i_vpr_e(inst, "Streamon: %s failed\n", v4l2_type_name(q->type));
+		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
+	}
+	inst_unlock(inst, __func__);
+	put_inst(inst);
 	return rc;
-
-error:
-	i_vpr_e(inst, "Streamon: %s failed\n", v4l2_type_name(q->type));
-	return -EINVAL;
 }
 
 void msm_vidc_stop_streaming(struct vb2_queue *q)
 {
 	int rc = 0;
 	struct msm_vidc_inst *inst;
+	enum msm_vidc_allow allow;
 
 	if (!q || !q->drv_priv) {
 		d_vpr_e("%s: invalid input, q = %pK\n", __func__, q);
 		return;
 	}
 	inst = q->drv_priv;
+	inst = get_inst_ref(g_core, inst);
 	if (!inst || !inst->core) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return;
 	}
+
+	inst_lock(inst, __func__);
 	if (q->type == INPUT_META_PLANE || q->type == OUTPUT_META_PLANE) {
 		i_vpr_h(inst, "%s: nothing to stop on %s\n",
 			__func__, v4l2_type_name(q->type));
-		return;
+		rc = 0;
+		goto unlock;
 	}
+
+	allow = msm_vidc_allow_streamoff(inst, q->type);
+	if (allow == MSM_VIDC_DISALLOW) {
+		rc = -EBUSY;
+		goto unlock;
+	} else if (allow == MSM_VIDC_IGNORE) {
+		rc = 0;
+		goto unlock;
+	} else if (allow != MSM_VIDC_ALLOW) {
+		rc = -EINVAL;
+		goto unlock;
+	}
+
+	rc = msm_vidc_state_change_streamoff(inst, q->type);
+	if (rc)
+		goto unlock;
+
 	if (!is_decode_session(inst) && !is_encode_session(inst)) {
 		i_vpr_e(inst, "%s: invalid session %d\n",
 			__func__, inst->domain);
-		return;
+		rc = -EINVAL;
+		goto unlock;
 	}
 	i_vpr_h(inst, "Streamoff: %s\n", v4l2_type_name(q->type));
 
@@ -356,20 +402,25 @@ void msm_vidc_stop_streaming(struct vb2_queue *q)
 			rc = msm_venc_streamoff_output(inst);
 	} else {
 		i_vpr_e(inst, "%s: invalid type %d\n", __func__, q->type);
-		goto error;
+		rc = -EINVAL;
+		goto unlock;
 	}
 	if (rc)
-		goto error;
+		goto unlock;
 
 	/* Input port streamoff - flush timestamps list*/
 	if (q->type == INPUT_MPLANE)
 		msm_vidc_flush_ts(inst);
 
 	i_vpr_h(inst, "Streamoff: %s successful\n", v4l2_type_name(q->type));
-	return;
 
-error:
-	i_vpr_e(inst, "Streamoff: %s failed\n", v4l2_type_name(q->type));
+unlock:
+	if (rc) {
+		i_vpr_e(inst, "Streamoff: %s failed\n", v4l2_type_name(q->type));
+		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
+	}
+	inst_unlock(inst, __func__);
+	put_inst(inst);
 	return;
 }
 
@@ -378,6 +429,7 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 	int rc = 0;
 	struct msm_vidc_inst *inst;
 	u64 timestamp_us = 0;
+	u64 ktime_ns = ktime_get_ns();
 
 	inst = vb2_get_drv_priv(vb2->vb2_queue);
 	if (!inst) {
@@ -410,7 +462,14 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 		timestamp_us = div_u64(vb2->timestamp, 1000);
 		msm_vidc_set_auto_framerate(inst, timestamp_us);
 	}
-	inst->last_qbuf_time_ns = ktime_get_ns();
+	inst->last_qbuf_time_ns = ktime_ns;
+
+	if (is_decode_session(inst) && vb2->type == INPUT_MPLANE) {
+		rc = msm_vidc_update_input_rate(inst, div_u64(ktime_ns, 1000));
+		if (rc)
+			goto unlock;
+	}
+
 	/*
 	 * As part of every qbuf initalise request to true.
 	 * If there are any dynamic controls associated with qbuf,

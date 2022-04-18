@@ -66,8 +66,18 @@
 #define V4L2_CID_MPEG_VIDC_LOWLATENCY_REQUEST   (V4L2_CID_MPEG_VIDC_BASE + 0x3)
 /* FIXme: */
 #define V4L2_CID_MPEG_VIDC_CODEC_CONFIG         (V4L2_CID_MPEG_VIDC_BASE + 0x4)
+#define V4L2_CID_MPEG_VIDC_FRAME_RATE           (V4L2_CID_MPEG_VIDC_BASE + 0x5)
+#define V4L2_CID_MPEG_VIDC_OPERATING_RATE       (V4L2_CID_MPEG_VIDC_BASE + 0x6)
+
 /* Encoder Intra refresh period */
 #define V4L2_CID_MPEG_VIDC_INTRA_REFRESH_PERIOD (V4L2_CID_MPEG_VIDC_BASE + 0xB)
+/* Encoder Intra refresh type */
+#define V4L2_CID_MPEG_VIDEO_VIDC_INTRA_REFRESH_TYPE                           \
+	(V4L2_CID_MPEG_VIDC_BASE + 0xC)
+enum v4l2_mpeg_vidc_ir_type {
+	V4L2_MPEG_VIDEO_VIDC_INTRA_REFRESH_RANDOM = 0x0,
+	V4L2_MPEG_VIDEO_VIDC_INTRA_REFRESH_CYCLIC = 0x1,
+};
 #define V4L2_CID_MPEG_VIDC_TIME_DELTA_BASED_RC  (V4L2_CID_MPEG_VIDC_BASE + 0xD)
 /* Encoder quality controls */
 #define V4L2_CID_MPEG_VIDC_CONTENT_ADAPTIVE_CODING                            \
@@ -89,6 +99,16 @@ enum v4l2_mpeg_vidc_blur_types {
 	(V4L2_CID_MPEG_VIDC_BASE + 0x12)
 
 /* various Metadata - encoder & decoder */
+enum v4l2_mpeg_vidc_metadata_bits {
+	V4L2_MPEG_VIDC_META_DISABLE          = 0x0,
+	V4L2_MPEG_VIDC_META_ENABLE           = 0x1,
+	V4L2_MPEG_VIDC_META_TX_INPUT         = 0x2,
+	V4L2_MPEG_VIDC_META_TX_OUTPUT        = 0x4,
+	V4L2_MPEG_VIDC_META_RX_INPUT         = 0x8,
+	V4L2_MPEG_VIDC_META_RX_OUTPUT        = 0x10,
+	V4L2_MPEG_VIDC_META_MAX              = 0x20,
+};
+
 #define V4L2_CID_MPEG_VIDC_METADATA_LTR_MARK_USE_DETAILS                      \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x13)
 #define V4L2_CID_MPEG_VIDC_METADATA_SEQ_HEADER_NAL                            \
@@ -127,6 +147,8 @@ enum v4l2_mpeg_vidc_blur_types {
 	(V4L2_CID_MPEG_VIDC_BASE + 0x24)
 #define V4L2_CID_MPEG_VIDC_METADATA_CROP_OFFSETS                              \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x25)
+#define V4L2_CID_MPEG_VIDC_METADATA_SALIENCY_INFO                             \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x26)
 
 /* Encoder Super frame control */
 #define V4L2_CID_MPEG_VIDC_SUPERFRAME           (V4L2_CID_MPEG_VIDC_BASE + 0x28)
@@ -201,7 +223,7 @@ enum v4l2_mpeg_video_av1_tier {
 #define V4L2_CID_MPEG_VIDC_INPUT_METADATA_VIA_REQUEST_ENABLE                 \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x37)
 /* Enables Output buffer fence id via input metadata */
-#define V4L2_CID_MPEG_VIDC_INPUT_METADATA_OUTBUF_FENCE                       \
+#define V4L2_CID_MPEG_VIDC_METADATA_OUTBUF_FENCE                             \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x38)
 /* Control to set fence id to driver in order get corresponding fence fd */
 #define V4L2_CID_MPEG_VIDC_SW_FENCE_ID                                       \
@@ -212,6 +234,8 @@ enum v4l2_mpeg_video_av1_tier {
  */
 #define V4L2_CID_MPEG_VIDC_SW_FENCE_FD                                       \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x3A)
+#define V4L2_CID_MPEG_VIDC_METADATA_PICTURE_TYPE                             \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x3B)
 
 /* add new controls above this line */
 /* Deprecate below controls once availble in gki and gsi bionic header */
@@ -309,6 +333,12 @@ enum v4l2_mpeg_vidc_metapayload_header_flags {
 	METADATA_FLAGS_TOP_FIELD        = (1 << 0),
 	METADATA_FLAGS_BOTTOM_FIELD     = (1 << 1),
 };
+
+enum saliency_roi_info {
+	METADATA_SALIENCY_NONE,
+	METADATA_SALIENCY_TYPE0,
+};
+
 struct msm_vidc_metabuf_header {
 	__u32 count;
 	__u32 size;
@@ -334,6 +364,7 @@ enum v4l2_mpeg_vidc_metadata {
 	METADATA_TIMESTAMP                    = 0x0300015c,
 	METADATA_CONCEALED_MB_COUNT           = 0x0300015f,
 	METADATA_HISTOGRAM_INFO               = 0x03000161,
+	METADATA_PICTURE_TYPE                 = 0x03000162,
 	METADATA_SEI_MASTERING_DISPLAY_COLOUR = 0x03000163,
 	METADATA_SEI_CONTENT_LIGHT_LEVEL      = 0x03000164,
 	METADATA_HDR10PLUS                    = 0x03000165,
@@ -345,6 +376,7 @@ enum v4l2_mpeg_vidc_metadata {
 	METADATA_ROI_INFO                     = 0x03000173,
 	METADATA_DPB_TAG_LIST                 = 0x03000179,
 	METADATA_MAX_NUM_REORDER_FRAMES       = 0x03000127,
+	METADATA_SALIENCY_INFO                = 0x0300018A,
 	METADATA_FENCE                        = 0x0300018B,
 };
 enum meta_interlace_info {
@@ -381,7 +413,10 @@ enum meta_interlace_info {
 struct v4l2_event_vidc_metadata {
 	__u32                                type;
 	__s32                                fd;
-	__u8                                 reserved[56];
+	__u32                                index;
+	__u32                                bytesused;
+	__u32                                offset;
+	__u8                                 reserved[44];
 };
 /* vendor events end */
 

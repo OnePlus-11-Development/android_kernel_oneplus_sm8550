@@ -76,6 +76,7 @@ u32 get_hfi_port_from_buffer_type(struct msm_vidc_inst *inst,
 		case MSM_VIDC_BUF_COMV:
 		case MSM_VIDC_BUF_NON_COMV:
 		case MSM_VIDC_BUF_LINE:
+		case MSM_VIDC_BUF_PARTIAL_DATA:
 			hfi_port = HFI_PORT_BITSTREAM;
 			break;
 		case MSM_VIDC_BUF_OUTPUT:
@@ -156,6 +157,8 @@ u32 hfi_buf_type_from_driver(enum msm_vidc_domain_type domain,
 		return HFI_BUFFER_PERSIST;
 	case MSM_VIDC_BUF_VPSS:
 		return HFI_BUFFER_VPSS;
+	case MSM_VIDC_BUF_PARTIAL_DATA:
+		return HFI_BUFFER_PARTIAL_DATA;
 	default:
 		d_vpr_e("invalid buffer type %d\n",
 			buffer_type);
@@ -204,6 +207,8 @@ u32 hfi_buf_type_to_driver(enum msm_vidc_domain_type domain,
 		return MSM_VIDC_BUF_PERSIST;
 	case HFI_BUFFER_VPSS:
 		return MSM_VIDC_BUF_VPSS;
+	case HFI_BUFFER_PARTIAL_DATA:
+		return MSM_VIDC_BUF_PARTIAL_DATA;
 	default:
 		d_vpr_e("invalid buffer type %d\n",
 			buffer_type);

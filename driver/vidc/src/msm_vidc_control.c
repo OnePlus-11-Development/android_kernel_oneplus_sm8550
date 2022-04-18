@@ -63,29 +63,6 @@ static bool is_priv_ctrl(u32 id)
 	return private;
 }
 
-static bool is_meta_ctrl(u32 id)
-{
-	return (id == V4L2_CID_MPEG_VIDC_METADATA_LTR_MARK_USE_DETAILS ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_SEQ_HEADER_NAL ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_DPB_LUMA_CHROMA_MISR ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_OPB_LUMA_CHROMA_MISR ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_INTERLACE ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_CONCEALED_MB_COUNT ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_HISTOGRAM_INFO ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_SEI_MASTERING_DISPLAY_COLOUR ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_SEI_CONTENT_LIGHT_LEVEL ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_HDR10PLUS ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_EVA_STATS ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_BUFFER_TAG ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_DPB_TAG_LIST ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_SUBFRAME_OUTPUT ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_ROI_INFO ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_TIMESTAMP ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_ENC_QP_METADATA ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_BITSTREAM_RESOLUTION ||
-		id == V4L2_CID_MPEG_VIDC_METADATA_CROP_OFFSETS);
-}
-
 static const char *const mpeg_video_rate_control[] = {
 	"VBR",
 	"CBR",
@@ -167,7 +144,13 @@ static const char * const av1_tier[] = {
 	NULL,
 };
 
-static u32 msm_vidc_get_port_info(struct msm_vidc_inst *inst,
+static const char *const mpeg_video_vidc_ir_type[] = {
+	"Random",
+	"Cyclic",
+	NULL,
+};
+
+u32 msm_vidc_get_port_info(struct msm_vidc_inst *inst,
 	enum msm_vidc_inst_capability_type cap_id)
 {
 	struct msm_vidc_inst_capability *capability = inst->capabilities;
@@ -208,6 +191,8 @@ static const char * const * msm_vidc_get_qmenu_type(
 		return av1_level;
 	case V4L2_CID_MPEG_VIDEO_AV1_TIER:
 		return av1_tier;
+	case V4L2_CID_MPEG_VIDEO_VIDC_INTRA_REFRESH_TYPE:
+		return mpeg_video_vidc_ir_type;
 	default:
 		i_vpr_e(inst, "%s: No available qmenu for ctrl %#x\n",
 			__func__, control_id);
@@ -290,6 +275,45 @@ static int add_node(
 	return 0;
 }
 
+static int swap_node(struct msm_vidc_inst_cap *rcap,
+	struct list_head *src_list, bool src_lookup[INST_CAP_MAX],
+	struct list_head *dest_list, bool dest_lookup[INST_CAP_MAX])
+{
+	struct msm_vidc_inst_cap_entry *entry, *temp;
+	bool found = false;
+
+	/* cap must be available in src and not present in dest */
+	if (!src_lookup[rcap->cap_id] || dest_lookup[rcap->cap_id]) {
+		d_vpr_e("%s: not found in src or already found in dest for cap %s\n",
+			__func__, cap_name(rcap->cap_id));
+		return -EINVAL;
+	}
+
+	/* check if entry present in src_list */
+	list_for_each_entry_safe(entry, temp, src_list, list) {
+		if (entry->cap_id == rcap->cap_id) {
+			found = true;
+			break;
+		}
+	}
+
+	if (!found) {
+		d_vpr_e("%s: cap %s not found in src list\n",
+			__func__, cap_name(rcap->cap_id));
+		return -EINVAL;
+	}
+
+	/* remove from src_list */
+	list_del_init(&entry->list);
+	src_lookup[rcap->cap_id] = false;
+
+	/* add it to dest_list */
+	list_add_tail(&entry->list, dest_list);
+	dest_lookup[rcap->cap_id] = true;
+
+	return 0;
+}
+
 static int msm_vidc_packetize_control(struct msm_vidc_inst *inst,
 	enum msm_vidc_inst_capability_type cap_id, u32 payload_type,
 	void *hfi_val, u32 payload_size, const char *func)
@@ -297,23 +321,21 @@ static int msm_vidc_packetize_control(struct msm_vidc_inst *inst,
 	int rc = 0;
 	u64 payload = 0;
 
+	if (payload_size > sizeof(u32)) {
+		i_vpr_e(inst, "%s: payload size is more than u32 for cap[%d] %s\n",
+			func, cap_id, cap_name(cap_id));
+		return -EINVAL;
+	}
+
 	if (payload_size == sizeof(u32))
 		payload = *(u32 *)hfi_val;
-	else if (payload_size == sizeof(u64))
-		payload = *(u64 *)hfi_val;
 	else if (payload_size == sizeof(u8))
 		payload = *(u8 *)hfi_val;
 	else if (payload_size == sizeof(u16))
 		payload = *(u16 *)hfi_val;
 
-	if (payload_size <= sizeof(u64))
-		i_vpr_h(inst,
-			"set cap: name: %24s, cap value: %#10x, hfi: %#10x\n",
-			cap_name(cap_id), inst->capabilities->cap[cap_id].value, payload);
-	else
-		i_vpr_h(inst,
-			"set cap: name: %24s, hfi payload size %d\n",
-			cap_name(cap_id), payload_size);
+	i_vpr_h(inst, FMT_STRING_SET_CAP,
+		cap_name(cap_id), inst->capabilities->cap[cap_id].value, payload);
 
 	rc = venus_hfi_session_property(inst,
 		inst->capabilities->cap[cap_id].hfi_id,
@@ -420,18 +442,42 @@ static bool is_parent_available(struct msm_vidc_inst *inst,
 int msm_vidc_update_cap_value(struct msm_vidc_inst *inst, u32 cap_id,
 	s32 adjusted_val, const char *func)
 {
+	int prev_value = 0;
+	bool is_updated = false;
+
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	if (inst->capabilities->cap[cap_id].value != adjusted_val)
+	prev_value = inst->capabilities->cap[cap_id].value;
+
+	if (is_meta_cap(cap_id)) {
+		/*
+		 * cumulative control value if client set same metadata
+		 * control multiple times.
+		 */
+		if (adjusted_val & V4L2_MPEG_VIDC_META_ENABLE) {
+			/* enable metadata */
+			inst->capabilities->cap[cap_id].value |= adjusted_val;
+		} else {
+			/* disable metadata */
+			inst->capabilities->cap[cap_id].value &= ~adjusted_val;
+		}
+		if (prev_value != (prev_value | adjusted_val))
+			is_updated = true;
+	} else {
+		inst->capabilities->cap[cap_id].value = adjusted_val;
+		if (prev_value != adjusted_val)
+			is_updated = true;
+	}
+
+	if (is_updated) {
 		i_vpr_h(inst,
 			"%s: updated database: name: %s, value: %#x -> %#x\n",
 			func, cap_name(cap_id),
-			inst->capabilities->cap[cap_id].value, adjusted_val);
-
-	inst->capabilities->cap[cap_id].value = adjusted_val;
+			prev_value, adjusted_val);
+	}
 
 	return 0;
 }
@@ -706,7 +752,8 @@ void msm_vidc_add_volatile_flag(struct v4l2_ctrl *ctrl)
 {
 	if (ctrl->id == V4L2_CID_MIN_BUFFERS_FOR_OUTPUT ||
 		ctrl->id == V4L2_CID_MIN_BUFFERS_FOR_CAPTURE ||
-		ctrl->id == V4L2_CID_MPEG_VIDC_AV1D_FILM_GRAIN_PRESENT)
+		ctrl->id == V4L2_CID_MPEG_VIDC_AV1D_FILM_GRAIN_PRESENT ||
+		ctrl->id == V4L2_CID_MPEG_VIDC_SW_FENCE_FD)
 		ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
 }
 
@@ -804,10 +851,22 @@ int msm_vidc_ctrl_init(struct msm_vidc_inst *inst)
 			ctrl_cfg.max = capability->cap[idx].max;
 			ctrl_cfg.min = capability->cap[idx].min;
 			ctrl_cfg.ops = core->v4l2_ctrl_ops;
-			ctrl_cfg.type = (capability->cap[idx].flags &
-					CAP_FLAG_MENU) ?
-					V4L2_CTRL_TYPE_MENU :
-					V4L2_CTRL_TYPE_INTEGER;
+			if (capability->cap[idx].flags & CAP_FLAG_MENU)
+				ctrl_cfg.type = V4L2_CTRL_TYPE_MENU;
+			else if (capability->cap[idx].flags & CAP_FLAG_BITMASK)
+				ctrl_cfg.type = V4L2_CTRL_TYPE_BITMASK;
+			else
+				ctrl_cfg.type = V4L2_CTRL_TYPE_INTEGER;
+			if (is_meta_cap(idx)) {
+				/* bitmask is expected to be enabled for meta controls */
+				if (ctrl_cfg.type != V4L2_CTRL_TYPE_BITMASK) {
+					i_vpr_e(inst,
+						"%s: missing bitmask for cap %s\n",
+						__func__, cap_name(idx));
+					rc = -EINVAL;
+					goto error;
+				}
+			}
 			if (ctrl_cfg.type == V4L2_CTRL_TYPE_MENU) {
 				ctrl_cfg.menu_skip_mask =
 					~(capability->cap[idx].step_or_mask);
@@ -846,8 +905,8 @@ int msm_vidc_ctrl_init(struct msm_vidc_inst *inst)
 			}
 		}
 		if (!ctrl) {
-			i_vpr_e(inst, "%s: invalid ctrl %#x\n", __func__,
-				capability->cap[idx].v4l2_id);
+			i_vpr_e(inst, "%s: invalid ctrl %#x cap %24s\n", __func__,
+				capability->cap[idx].v4l2_id, cap_name(idx));
 			rc = -EINVAL;
 			goto error;
 		}
@@ -1025,6 +1084,7 @@ static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
 		if (rc)
 			return rc;
 	}
+
 	if (ctrl->id == V4L2_CID_MPEG_VIDC_PRIORITY) {
 		rc = msm_vidc_adjust_session_priority(inst, ctrl);
 		if (rc)
@@ -1041,23 +1101,23 @@ static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
 
 		msm_vidc_allow_dcvs(inst);
 	}
-	if (is_meta_ctrl(ctrl->id)) {
-		if (cap_id == META_DPB_TAG_LIST) {
-			/*
-			 * To subscribe HFI_PROP_DPB_TAG_LIST
-			 * data in FBD, HFI_PROP_BUFFER_TAG data
-			 * must be delivered via FTB. Hence, update
-			 * META_OUTPUT_BUF_TAG when META_DPB_TAG_LIST
-			 * is updated.
-			 */
-			msm_vidc_update_cap_value(inst, META_OUTPUT_BUF_TAG,
-				ctrl->val, __func__);
-		}
+	if (ctrl->id == V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER) {
+		u32 enable;
 
+		/* enable LAYER_ENABLE cap if HEVC_HIER enh layers > 0 */
+		if (ctrl->val > 0)
+			enable = 1;
+		else
+			enable = 0;
+
+		msm_vidc_update_cap_value(inst, LAYER_ENABLE, enable, __func__);
+	}
+	if (is_meta_cap(cap_id)) {
 		rc = msm_vidc_update_meta_port_settings(inst);
 		if (rc)
 			return rc;
 	}
+
 	rc = msm_vidc_update_buffer_count_if_needed(inst, ctrl);
 	if (rc)
 		return rc;
@@ -1088,7 +1148,7 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	capability = inst->capabilities;
 
-	i_vpr_h(inst, "%s: state %s, name %s, id 0x%x value %d\n",
+	i_vpr_h(inst, FMT_STRING_SET_CTRL,
 		__func__, state_name(inst->state), ctrl->name, ctrl->id, ctrl->val);
 
 	if (!msm_vidc_allow_s_ctrl(inst, ctrl->id))
@@ -1102,6 +1162,12 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 	}
 
 	if (ctrl->id == V4L2_CID_MPEG_VIDC_INPUT_METADATA_FD) {
+		if (ctrl->val == INVALID_FD || ctrl->val == INT_MAX) {
+			i_vpr_e(inst,
+				"%s: client configured invalid input metadata fd %d\n",
+				__func__, ctrl->val);
+			return 0;
+		}
 		if (!capability->cap[INPUT_META_VIA_REQUEST].value) {
 			i_vpr_e(inst,
 				"%s: input metadata not enabled via request\n", __func__);
@@ -1381,10 +1447,11 @@ int msm_vidc_adjust_mark_ltr(void *instance, struct v4l2_ctrl *ctrl)
 	return 0;
 }
 
-int msm_vidc_adjust_ir_random(void *instance, struct v4l2_ctrl *ctrl)
+int msm_vidc_adjust_ir_period(void *instance, struct v4l2_ctrl *ctrl)
 {
 	struct msm_vidc_inst_capability *capability;
-	s32 adjusted_value, all_intra = 0;
+	s32 adjusted_value, all_intra = 0, roi_enable = 0,
+		pix_fmts = MSM_VIDC_FMT_NONE;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
 
 	if (!inst || !inst->capabilities) {
@@ -1393,30 +1460,54 @@ int msm_vidc_adjust_ir_random(void *instance, struct v4l2_ctrl *ctrl)
 	}
 	capability = inst->capabilities;
 
-	adjusted_value = ctrl ? ctrl->val : capability->cap[IR_RANDOM].value;
+	adjusted_value = ctrl ? ctrl->val : capability->cap[IR_PERIOD].value;
 
-	if (msm_vidc_get_parent_value(inst, IR_RANDOM, ALL_INTRA,
-		&all_intra, __func__))
+	if (msm_vidc_get_parent_value(inst, IR_PERIOD, ALL_INTRA,
+		&all_intra, __func__) ||
+		msm_vidc_get_parent_value(inst, IR_PERIOD, META_ROI_INFO,
+		&roi_enable, __func__))
 		return -EINVAL;
 
 	if (all_intra) {
 		adjusted_value = 0;
-		i_vpr_h(inst, "%s: IR unsupported, all intra: %d\n",
+		i_vpr_h(inst, "%s: intra refresh unsupported, all intra: %d\n",
 			__func__, all_intra);
 		goto exit;
+	}
+
+	if (roi_enable) {
+		i_vpr_h(inst,
+			"%s: intra refresh unsupported with roi metadata\n",
+			__func__);
+		adjusted_value = 0;
+		goto exit;
+	}
+
+	if (inst->codec == MSM_VIDC_HEVC) {
+		if (msm_vidc_get_parent_value(inst, IR_PERIOD,
+			PIX_FMTS, &pix_fmts, __func__))
+			return -EINVAL;
+
+		if (is_10bit_colorformat(pix_fmts)) {
+			i_vpr_h(inst,
+				"%s: intra refresh is supported only for 8 bit\n",
+				__func__);
+			adjusted_value = 0;
+			goto exit;
+		}
 	}
 
 	/*
 	 * BITRATE_MODE dependency is NOT common across all chipsets.
 	 * Hence, do not return error if not specified as one of the parent.
 	 */
-	if (is_parent_available(inst, IR_RANDOM, BITRATE_MODE, __func__) &&
+	if (is_parent_available(inst, IR_PERIOD, BITRATE_MODE, __func__) &&
 		inst->hfi_rc_type != HFI_RC_CBR_CFR &&
 		inst->hfi_rc_type != HFI_RC_CBR_VFR)
 		adjusted_value = 0;
 
 exit:
-	msm_vidc_update_cap_value(inst, IR_RANDOM,
+	msm_vidc_update_cap_value(inst, IR_PERIOD,
 		adjusted_value, __func__);
 
 	return 0;
@@ -1748,7 +1839,7 @@ static int msm_vidc_adjust_static_layer_count_and_type(struct msm_vidc_inst *ins
 		goto exit;
 	}
 
-	if (!inst->capabilities->cap[META_EVA_STATS].value &&
+	if (!is_meta_tx_inp_enabled(inst, META_EVA_STATS) &&
 		hb_requested && (layer_count > 1)) {
 		layer_count = 1;
 		i_vpr_h(inst,
@@ -2393,12 +2484,13 @@ int msm_vidc_adjust_blur_resolution(void *instance, struct v4l2_ctrl *ctrl)
 	return 0;
 }
 
-int msm_vidc_adjust_cac(void *instance, struct v4l2_ctrl *ctrl)
+int msm_vidc_adjust_brs(void *instance, struct v4l2_ctrl *ctrl)
 {
 	struct msm_vidc_inst_capability *capability;
 	s32 adjusted_value;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
-	s32 min_quality = -1, rc_type = -1;
+	s32 rc_type = -1, layer_enabled = -1, layer_type = -1;
+	bool hp_requested = false;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -2413,22 +2505,36 @@ int msm_vidc_adjust_cac(void *instance, struct v4l2_ctrl *ctrl)
 		return 0;
 
 	if (msm_vidc_get_parent_value(inst, CONTENT_ADAPTIVE_CODING,
-		MIN_QUALITY, &min_quality, __func__) ||
+		BITRATE_MODE, &rc_type, __func__) ||
 		msm_vidc_get_parent_value(inst, CONTENT_ADAPTIVE_CODING,
-		BITRATE_MODE, &rc_type, __func__))
+		LAYER_ENABLE, &layer_enabled, __func__) ||
+		msm_vidc_get_parent_value(inst, CONTENT_ADAPTIVE_CODING,
+		LAYER_TYPE, &layer_type, __func__))
 		return -EINVAL;
 
 	/*
-	 * CAC is supported only for VBR rc type.
-	 * Hence, do not adjust or set to firmware for non VBR rc's
+	 * -BRS is supported only for VBR rc type.
+	 *  Hence, do not adjust or set to firmware for non VBR rc's
+	 * -If HP is enabled then BRS is not allowed.
 	 */
 	if (rc_type != HFI_RC_VBR_CFR) {
 		adjusted_value = 0;
 		goto adjust;
 	}
 
-	if (min_quality) {
-		adjusted_value = 1;
+	if (inst->codec == MSM_VIDC_H264) {
+		layer_type = V4L2_MPEG_VIDEO_H264_HIERARCHICAL_CODING_P;
+	} else if (inst->codec == MSM_VIDC_HEVC) {
+		layer_type = V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_P;
+	}
+	hp_requested = (inst->capabilities->cap[LAYER_TYPE].value == layer_type);
+
+	/*
+	 * Disable BRS in case of HP encoding
+	 * Hence set adjust value to 0.
+	 */
+	if (layer_enabled == 1 && hp_requested) {
+		adjusted_value = 0;
 		goto adjust;
 	}
 
@@ -2571,7 +2677,7 @@ int msm_vidc_adjust_min_quality(void *instance, struct v4l2_ctrl *ctrl)
 		goto update_and_exit;
 	}
 
-	if (roi_enable) {
+	if (is_meta_tx_inp_enabled(inst, META_ROI_INFO)) {
 		i_vpr_h(inst,
 			"%s: min quality not supported with roi metadata\n",
 			__func__);
@@ -2579,7 +2685,7 @@ int msm_vidc_adjust_min_quality(void *instance, struct v4l2_ctrl *ctrl)
 		goto update_and_exit;
 	}
 
-	if (enh_layer_count && inst->hfi_layer_type != HFI_HIER_B) {
+	if (enh_layer_count > 0 && inst->hfi_layer_type != HFI_HIER_B) {
 		i_vpr_h(inst,
 			"%s: min quality not supported for HP encoding\n",
 			__func__);
@@ -2592,6 +2698,54 @@ int msm_vidc_adjust_min_quality(void *instance, struct v4l2_ctrl *ctrl)
 
 update_and_exit:
 	msm_vidc_update_cap_value(inst, MIN_QUALITY,
+		adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_preprocess(void *instance, struct v4l2_ctrl *ctrl)
+{
+	s32 adjusted_value;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	s32 brs = -1, eva_status = -1;
+	u32 width, height, frame_rate, operating_rate, max_fps;
+	struct v4l2_format *f;
+
+	if (!inst || !inst->capabilities || !inst->core) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	adjusted_value = inst->capabilities->cap[REQUEST_PREPROCESS].value;
+
+	if (msm_vidc_get_parent_value(inst, REQUEST_PREPROCESS, CONTENT_ADAPTIVE_CODING,
+		&brs, __func__) ||
+		msm_vidc_get_parent_value(inst, REQUEST_PREPROCESS, META_EVA_STATS,
+                &eva_status, __func__))
+		return -EINVAL;
+
+	width = inst->crop.width;
+	height = inst->crop.height;
+	frame_rate = msm_vidc_get_frame_rate(inst);;
+	operating_rate = msm_vidc_get_operating_rate(inst);;
+
+	max_fps = max(frame_rate, operating_rate);
+	f= &inst->fmts[OUTPUT_PORT];
+
+	/*
+	 * enable preprocess if
+	 * client did not enable EVA metadata statistics and
+	 * BRS enabled and upto 4k @ 60 fps
+	 */
+	if (!is_meta_tx_inp_enabled(inst, META_EVA_STATS) &&
+		brs == V4L2_MPEG_MSM_VIDC_ENABLE &&
+		res_is_less_than_or_equal_to(width, height, 3840, 2160) &&
+		max_fps <= 60)
+		adjusted_value = 1;
+	else
+		adjusted_value = 0;
+
+	msm_vidc_update_cap_value(inst, REQUEST_PREPROCESS,
 		adjusted_value, __func__);
 
 	return 0;
@@ -2629,9 +2783,7 @@ int msm_vidc_adjust_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl)
 
 int msm_vidc_adjust_session_priority(void *instance, struct v4l2_ctrl *ctrl)
 {
-	int rc = 0;
 	int adjusted_value;
-	bool rate_by_client;
 	struct msm_vidc_inst_capability *capability;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
 
@@ -2643,54 +2795,9 @@ int msm_vidc_adjust_session_priority(void *instance, struct v4l2_ctrl *ctrl)
 	adjusted_value = ctrl ? ctrl->val :
 		capability->cap[PRIORITY].value;
 
-	if (capability->cap[FRAME_RATE].flags & CAP_FLAG_CLIENT_SET ||
-		capability->cap[OPERATING_RATE].flags & CAP_FLAG_CLIENT_SET) {
-		rate_by_client = true;
-		inst->priority_level = MSM_VIDC_PRIORITY_HIGH;
-	} else {
-		rate_by_client = false;
-		inst->priority_level = MSM_VIDC_PRIORITY_LOW;
-	}
-
-	/*
-	 * For RT, check for resource feasability.
-	 * For NRT, sessions with rate set by client takes higher order
-	 * among NRT sessions. They are constraint RT or low priority RT.
-	 */
-	if (adjusted_value == 0) {
-		rc = msm_vidc_check_core_mbps(inst);
-		if (rc) {
-			i_vpr_e(inst, "%s: unsupported load\n", __func__);
-			goto exit;
-		}
-		rc = capability->cap[FRAME_RATE].value > capability->cap[FRAME_RATE].max;
-		if (rc) {
-			i_vpr_e(inst, "%s: unsupported FRAME_RATE %u, max %u\n", __func__,
-				capability->cap[FRAME_RATE].value >> 16,
-				capability->cap[FRAME_RATE].max >> 16);
-			rc = -ENOMEM;
-			goto exit;
-		}
-		rc = capability->cap[OPERATING_RATE].value > capability->cap[OPERATING_RATE].max;
-		if (rc) {
-			i_vpr_e(inst, "%s: unsupported OPERATING_RATE %u, max %u\n", __func__,
-				capability->cap[OPERATING_RATE].value >> 16,
-				capability->cap[OPERATING_RATE].max >> 16);
-			rc = -ENOMEM;
-			goto exit;
-		}
-
-		rc = msm_vidc_check_core_mbpf(inst);
-		if (rc) {
-			i_vpr_e(inst, "%s: unsupported load\n", __func__);
-			goto exit;
-		}
-	}
-
 	msm_vidc_update_cap_value(inst, PRIORITY, adjusted_value, __func__);
 
-exit:
-	return rc;
+	return 0;
 }
 
 int msm_vidc_adjust_roi_info(void *instance, struct v4l2_ctrl *ctrl)
@@ -2721,6 +2828,52 @@ int msm_vidc_adjust_roi_info(void *instance, struct v4l2_ctrl *ctrl)
 
 	msm_vidc_update_cap_value(inst, META_ROI_INFO,
 		adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_dec_frame_rate(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst_capability *capability;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	u32 adjusted_value = 0;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	if (is_encode_session(inst)) {
+		d_vpr_e("%s: adjust framerate invalid for enc\n", __func__);
+		return -EINVAL;
+	}
+
+	capability = inst->capabilities;
+	adjusted_value = ctrl ? ctrl->val : capability->cap[FRAME_RATE].value;
+	msm_vidc_update_cap_value(inst, FRAME_RATE, adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_dec_operating_rate(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst_capability *capability;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	u32 adjusted_value = 0;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	if (is_encode_session(inst)) {
+		d_vpr_e("%s: adjust operating rate invalid for enc\n", __func__);
+		return -EINVAL;
+	}
+
+	capability = inst->capabilities;
+	adjusted_value = ctrl ? ctrl->val : capability->cap[OPERATING_RATE].value;
+	msm_vidc_update_cap_value(inst, OPERATING_RATE, adjusted_value, __func__);
 
 	return 0;
 }
@@ -2772,6 +2925,10 @@ int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst)
 			rc = add_node(&root_list, rcap, root_visited);
 			if (rc)
 				goto error;
+		} else {
+			rc = add_node(&opt_list, rcap, opt_visited);
+			if (rc)
+				goto error;
 		}
 	}
 
@@ -2794,22 +2951,19 @@ int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst)
 				continue;
 
 			/**
-			 * if child node is already part of root or optional list
+			 * if child node is already part of root list
 			 * then no need to add it again.
 			 */
-			if (root_visited[cap->cap_id] || opt_visited[cap->cap_id])
+			if (root_visited[cap->cap_id])
 				continue;
 
 			/**
 			 * if child node's all parents are already present in root list
-			 * then add it to root list else add it to optional list.
+			 * then add it to root list else remains in optional list.
 			 */
 			if (is_all_parents_visited(cap, root_visited)) {
-				rc = add_node(&root_list, cap, root_visited);
-				if (rc)
-					goto error;
-			} else {
-				rc = add_node(&opt_list, cap, opt_visited);
+				rc = swap_node(cap,
+						&opt_list, opt_visited, &root_list, root_visited);
 				if (rc)
 					goto error;
 			}
@@ -2828,6 +2982,7 @@ int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst)
 	list_for_each_entry_safe(entry, temp, &opt_list, list) {
 		/* initially remove entry from opt list */
 		list_del_init(&entry->list);
+		opt_visited[entry->cap_id] = false;
 		tmp_count--;
 		cap = &capability->cap[entry->cap_id];
 
@@ -2841,6 +2996,7 @@ int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst)
 			tmp_count_total--;
 		} else {
 			list_add_tail(&entry->list, &opt_list);
+			opt_visited[entry->cap_id] = true;
 		}
 
 		/* detect loop */
@@ -2921,7 +3077,7 @@ int msm_vidc_set_header_mode(void *instance,
 {
 	int rc = 0;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
-	int header_mode, prepend_sps_pps, hdr_metadata;
+	int header_mode, prepend_sps_pps;
 	u32 hfi_value = 0;
 	struct msm_vidc_inst_capability *capability;
 
@@ -2933,7 +3089,6 @@ int msm_vidc_set_header_mode(void *instance,
 
 	header_mode = capability->cap[cap_id].value;
 	prepend_sps_pps = capability->cap[PREPEND_SPSPPS_TO_IDR].value;
-	hdr_metadata = capability->cap[META_SEQ_HDR_NAL].value;
 
 	/* prioritize PREPEND_SPSPPS_TO_IDR mode over other header modes */
 	if (prepend_sps_pps)
@@ -2943,7 +3098,7 @@ int msm_vidc_set_header_mode(void *instance,
 	else
 		hfi_value = HFI_SEQ_HEADER_SEPERATE_FRAME;
 
-	if (hdr_metadata)
+	if (is_meta_rx_inp_enabled(inst, META_SEQ_HDR_NAL))
 		hfi_value |= HFI_SEQ_HEADER_METADATA;
 
 	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_U32_ENUM,
@@ -3653,14 +3808,12 @@ int msm_vidc_set_session_priority(void *instance,
 		return -EINVAL;
 	}
 
-	hfi_value = (inst->capabilities->cap[cap_id].value * 2) + inst->priority_level;
+	hfi_value = inst->capabilities->cap[cap_id].value;
 
 	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_U32,
 		&hfi_value, sizeof(u32), __func__);
 	if (rc)
 		return rc;
-
-	inst->firmware_priority = hfi_value;
 
 	return rc;
 }
@@ -3693,6 +3846,27 @@ int msm_vidc_set_flip(void *instance,
 			if (rc)
 				return rc;
 		}
+	}
+
+	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_U32_ENUM,
+		&hfi_value, sizeof(u32), __func__);
+	if (rc)
+		return rc;
+
+	return rc;
+}
+
+int msm_vidc_set_preprocess(void *instance,
+        enum msm_vidc_inst_capability_type cap_id)
+{
+	int rc = 0;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+	u32 hfi_value;
+
+	d_vpr_e("%s: \n", __func__);
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
 	}
 
 	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_U32_ENUM,
@@ -3917,6 +4091,48 @@ int msm_vidc_set_level(void *instance,
 		&hfi_value, sizeof(u32), __func__);
 	if (rc)
 		return rc;
+
+	return rc;
+}
+
+int msm_vidc_set_ir_period(void *instance,
+	enum msm_vidc_inst_capability_type cap_id)
+{
+	int rc = 0;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+	u32 ir_type = 0;
+	struct msm_vidc_core *core;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	core = inst->core;
+
+	if (inst->capabilities->cap[IR_TYPE].value ==
+	    V4L2_MPEG_VIDEO_VIDC_INTRA_REFRESH_RANDOM) {
+		if (inst->bufq[OUTPUT_PORT].vb2q->streaming) {
+			i_vpr_h(inst, "%s: dynamic random intra refresh not allowed\n",
+				__func__);
+			return 0;
+		}
+		ir_type = HFI_PROP_IR_RANDOM_PERIOD;
+	} else if (inst->capabilities->cap[IR_TYPE].value ==
+		   V4L2_MPEG_VIDEO_VIDC_INTRA_REFRESH_CYCLIC) {
+		ir_type = HFI_PROP_IR_CYCLIC_PERIOD;
+	} else {
+		i_vpr_e(inst, "%s: invalid ir_type %d\n",
+			__func__, inst->capabilities->cap[IR_TYPE]);
+		return -EINVAL;
+	}
+
+	rc = venus_hfi_set_ir_period(inst, ir_type, cap_id);
+	if (rc) {
+		i_vpr_e(inst, "%s: failed to set ir period %d\n",
+			__func__, inst->capabilities->cap[IR_PERIOD].value);
+		return rc;
+	}
 
 	return rc;
 }

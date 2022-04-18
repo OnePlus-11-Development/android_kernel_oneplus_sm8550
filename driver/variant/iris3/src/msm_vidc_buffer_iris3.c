@@ -165,11 +165,9 @@ static u32 msm_vidc_decoder_line_size_iris3(struct msm_vidc_inst *inst)
 		is_opb = false;
 	/*
 	 * assume worst case, since color format is unknown at this
-	 * time. The exception is AV1D, where line buffer size is larger
-	 * in DPB-only mode.
+	 * time.
 	 */
-	if (inst->codec != MSM_VIDC_AV1)
-		is_opb = true;
+	is_opb = true;
 
 	if (inst->decode_vpp_delay.enable)
 		vpp_delay = inst->decode_vpp_delay.size;
@@ -193,6 +191,28 @@ static u32 msm_vidc_decoder_line_size_iris3(struct msm_vidc_inst *inst)
 	else if (inst->codec == MSM_VIDC_AV1)
 		HFI_BUFFER_LINE_AV1D(size, width, height, is_opb,
 			num_vpp_pipes);
+	i_vpr_l(inst, "%s: size %d\n", __func__, size);
+	return size;
+}
+
+static u32 msm_vidc_decoder_partial_data_size_iris3(struct msm_vidc_inst *inst)
+{
+	u32 size = 0;
+	u32 width, height;
+	struct v4l2_format *f;
+
+	if (!inst) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return size;
+	}
+
+	f = &inst->fmts[INPUT_PORT];
+	width = f->fmt.pix_mp.width;
+	height = f->fmt.pix_mp.height;
+
+	if (inst->codec == MSM_VIDC_AV1)
+		HFI_BUFFER_IBC_AV1D(size, width, height);
+
 	i_vpr_l(inst, "%s: size %d\n", __func__, size);
 	return size;
 }
@@ -543,6 +563,7 @@ int msm_buffer_size_iris3(struct msm_vidc_inst *inst,
 		{MSM_VIDC_BUF_LINE,            msm_vidc_decoder_line_size_iris3         },
 		{MSM_VIDC_BUF_PERSIST,         msm_vidc_decoder_persist_size_iris3      },
 		{MSM_VIDC_BUF_DPB,             msm_vidc_decoder_dpb_size_iris3          },
+		{MSM_VIDC_BUF_PARTIAL_DATA,    msm_vidc_decoder_partial_data_size_iris3 },
 	};
 	static const struct msm_vidc_buf_type_handle enc_buf_type_handle[] = {
 		{MSM_VIDC_BUF_INPUT,           msm_vidc_encoder_input_size              },
@@ -675,6 +696,7 @@ int msm_buffer_min_count_iris3(struct msm_vidc_inst *inst,
 	case MSM_VIDC_BUF_PERSIST:
 	case MSM_VIDC_BUF_ARP:
 	case MSM_VIDC_BUF_VPSS:
+	case MSM_VIDC_BUF_PARTIAL_DATA:
 		count = msm_vidc_internal_buffer_count(inst, buffer_type);
 		break;
 	case MSM_VIDC_BUF_DPB:

@@ -17,10 +17,14 @@
 #include "msm_vidc_platform.h"
 #include "msm_vidc_core.h"
 #include "venus_hfi.h"
+#include "video_generated_h"
 
 #define BASE_DEVICE_NUMBER 32
 
 struct msm_vidc_core *g_core;
+
+const char video_banner[] = "Video-Banner: (" VIDEO_COMPILE_BY "@"
+	VIDEO_COMPILE_HOST ") (" VIDEO_COMPILE_TIME ")";
 
 static int msm_vidc_deinit_irq(struct msm_vidc_core *core)
 {
@@ -180,10 +184,8 @@ static int msm_vidc_register_video_device(struct msm_vidc_core *core,
 	core->vdev[index].type = type;
 	core->vdev[index].vdev.v4l2_dev = &core->v4l2_dev;
 	core->vdev[index].vdev.device_caps =
-		V4L2_CAP_VIDEO_CAPTURE_MPLANE |
-		V4L2_CAP_VIDEO_OUTPUT_MPLANE |
+		V4L2_CAP_VIDEO_M2M_MPLANE |
 		V4L2_CAP_META_CAPTURE |
-		V4L2_CAP_META_OUTPUT |
 		V4L2_CAP_STREAMING;
 	rc = video_register_device(&core->vdev[index].vdev,
 					VFL_TYPE_VIDEO, nr);
@@ -697,7 +699,7 @@ static int __init msm_vidc_init(void)
 {
 	int rc = 0;
 
-	d_vpr_h("%s()\n", __func__);
+	d_vpr_h("%s: %s\n", __func__, video_banner);
 
 	rc = platform_driver_register(&msm_vidc_driver);
 	if (rc) {

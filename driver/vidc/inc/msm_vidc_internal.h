@@ -66,6 +66,7 @@
 #define DCVS_WINDOW 16
 #define ENC_FPS_WINDOW 3
 #define DEC_FPS_WINDOW 10
+#define INPUT_TIMER_LIST_SIZE 30
 
 #define INPUT_MPLANE V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE
 #define OUTPUT_MPLANE V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE
@@ -133,6 +134,8 @@
   */
 #define MAX_DPB_LIST_ARRAY_SIZE (16 * 4)
 #define MAX_DPB_LIST_PAYLOAD_SIZE (16 * 4 * 4)
+/* Default metadata size */
+#define MSM_VIDC_METADATA_SIZE ALIGN(16 * 1024, SZ_4K)
 
 enum msm_vidc_domain_type {
 	MSM_VIDC_ENCODER           = BIT(0),
@@ -145,11 +148,6 @@ enum msm_vidc_codec_type {
 	MSM_VIDC_VP9               = BIT(2),
 	MSM_VIDC_HEIC              = BIT(3),
 	MSM_VIDC_AV1               = BIT(4),
-};
-
-enum priority_level {
-	MSM_VIDC_PRIORITY_HIGH     = 0,
-	MSM_VIDC_PRIORITY_LOW      = 1,
 };
 
 enum msm_vidc_colorformat_type {
@@ -178,6 +176,7 @@ enum msm_vidc_buffer_type {
 	MSM_VIDC_BUF_DPB                   = 12,
 	MSM_VIDC_BUF_PERSIST               = 13,
 	MSM_VIDC_BUF_VPSS                  = 14,
+	MSM_VIDC_BUF_PARTIAL_DATA          = 15,
 };
 
 /* always match with v4l2 flags V4L2_BUF_FLAG_* */
@@ -291,6 +290,11 @@ enum msm_vidc_matrix_coefficients {
 	MSM_VIDC_MATRIX_COEFF_BT2100                         = 14,
 };
 
+enum msm_vidc_preprocess_type {
+	MSM_VIDC_PREPROCESS_NONE = BIT(0),
+	MSM_VIDC_PREPROCESS_TYPE0 = BIT(1),
+};
+
 enum msm_vidc_core_capability_type {
 	CORE_CAP_NONE = 0,
 	ENC_CODECS,
@@ -350,6 +354,35 @@ enum msm_vidc_core_capability_type {
  */
 enum msm_vidc_inst_capability_type {
 	INST_CAP_NONE = 0,
+	/* place all metadata after this line
+	 * (Between INST_CAP_NONE and META_CAP_MAX)
+	 */
+	META_SEQ_HDR_NAL,
+	META_BITSTREAM_RESOLUTION,
+	META_CROP_OFFSETS,
+	META_DPB_MISR,
+	META_OPB_MISR,
+	META_INTERLACE,
+	META_OUTBUF_FENCE,
+	META_LTR_MARK_USE,
+	META_TIMESTAMP,
+	META_CONCEALED_MB_CNT,
+	META_HIST_INFO,
+	META_PICTURE_TYPE,
+	META_SEI_MASTERING_DISP,
+	META_SEI_CLL,
+	META_HDR10PLUS,
+	META_BUF_TAG,
+	META_DPB_TAG_LIST,
+	META_SUBFRAME_OUTPUT,
+	META_ENC_QP_METADATA,
+	META_DEC_QP_METADATA,
+	META_MAX_NUM_REORDER_FRAMES,
+	META_EVA_STATS,
+	META_ROI_INFO,
+	META_SALIENCY_INFO,
+	META_CAP_MAX,
+	/* end of metadata caps */
 	FRAME_WIDTH,
 	LOSSLESS_FRAME_WIDTH,
 	SECURE_FRAME_WIDTH,
@@ -366,8 +399,11 @@ enum msm_vidc_inst_capability_type {
 	SECURE_MBPF,
 	MBPS,
 	POWER_SAVE_MBPS,
+	CHECK_MBPS,
 	FRAME_RATE,
 	OPERATING_RATE,
+	INPUT_RATE,
+	TIMESTAMP_RATE,
 	SCALE_FACTOR,
 	MB_CYCLES_VSP,
 	MB_CYCLES_VPP,
@@ -375,7 +411,6 @@ enum msm_vidc_inst_capability_type {
 	MB_CYCLES_FW,
 	MB_CYCLES_FW_VPP,
 	SECURE_MODE,
-	INPUT_META_OUTBUF_FENCE,
 	FENCE_ID,
 	FENCE_FD,
 	TS_REORDER,
@@ -386,7 +421,6 @@ enum msm_vidc_inst_capability_type {
 	SUPER_FRAME,
 	HEADER_MODE,
 	PREPEND_SPSPPS_TO_IDR,
-	META_SEQ_HDR_NAL,
 	WITHOUT_STARTCODE,
 	NAL_LENGTH_FIELD,
 	REQUEST_I_FRAME,
@@ -400,6 +434,7 @@ enum msm_vidc_inst_capability_type {
 	USE_LTR,
 	MARK_LTR,
 	BASELAYER_PRIORITY,
+	IR_TYPE,
 	AU_DELIMITER,
 	GRID,
 	I_FRAME_MIN_QP,
@@ -448,32 +483,11 @@ enum msm_vidc_inst_capability_type {
 	DRAP,
 	INPUT_METADATA_FD,
 	INPUT_META_VIA_REQUEST,
-	META_BITSTREAM_RESOLUTION,
-	META_CROP_OFFSETS,
-	META_DPB_MISR,
-	META_OPB_MISR,
-	META_INTERLACE,
 	ENC_IP_CR,
-	META_LTR_MARK_USE,
-	META_TIMESTAMP,
-	META_CONCEALED_MB_CNT,
-	META_HIST_INFO,
-	META_SEI_MASTERING_DISP,
-	META_SEI_CLL,
-	META_HDR10PLUS,
-	META_EVA_STATS,
-	META_BUF_TAG,
-	META_DPB_TAG_LIST,
-	META_OUTPUT_BUF_TAG,
-	META_SUBFRAME_OUTPUT,
-	META_ENC_QP_METADATA,
-	META_DEC_QP_METADATA,
 	COMPLEXITY,
-	META_MAX_NUM_REORDER_FRAMES,
 	/* place all root(no parent) enums before this line */
 
 	PROFILE,
-	META_ROI_INFO,
 	ENH_LAYER_COUNT,
 	BIT_RATE,
 	LOWLATENCY_MODE,
@@ -483,6 +497,8 @@ enum msm_vidc_inst_capability_type {
 	MIN_QUALITY,
 	CONTENT_ADAPTIVE_CODING,
 	BLUR_TYPES,
+	REQUEST_PREPROCESS,
+	SLICE_MODE,
 	/* place all intermittent(having both parent and child) enums before this line */
 
 	MIN_FRAME_QP,
@@ -498,15 +514,13 @@ enum msm_vidc_inst_capability_type {
 	TRANSFORM_8X8,
 	STAGE,
 	LTR_COUNT,
-	IR_RANDOM,
+	IR_PERIOD,
 	BITRATE_BOOST,
-	SLICE_MODE,
 	BLUR_RESOLUTION,
 	OUTPUT_ORDER,
 	INPUT_BUF_HOST_MAX_COUNT,
 	OUTPUT_BUF_HOST_MAX_COUNT,
 	/* place all leaf(no child) enums before this line */
-
 	INST_CAP_MAX,
 };
 
@@ -517,6 +531,7 @@ enum msm_vidc_inst_capability_flags {
 	CAP_FLAG_INPUT_PORT              = BIT(2),
 	CAP_FLAG_OUTPUT_PORT             = BIT(3),
 	CAP_FLAG_CLIENT_SET              = BIT(4),
+	CAP_FLAG_BITMASK                 = BIT(5),
 };
 
 struct msm_vidc_inst_cap {
@@ -879,7 +894,7 @@ struct msm_vidc_buffers {
 
 struct msm_vidc_sort {
 	struct list_head       list;
-	u64                    val;
+	s64                    val;
 };
 
 struct msm_vidc_timestamp {
@@ -891,6 +906,11 @@ struct msm_vidc_timestamps {
 	struct list_head       list;
 	u32                    count;
 	u64                    rank;
+};
+
+struct msm_vidc_input_timer {
+	struct list_head       list;
+	u64                    time_us;
 };
 
 enum msm_vidc_allow {

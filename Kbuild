@@ -8,12 +8,6 @@ LINUXINCLUDE    += -include $(VIDEO_ROOT)/config/waipio_video.h \
                    -I$(VIDEO_ROOT)/driver/platform/waipio/inc
 endif
 
-ifeq ($(CONFIG_ARCH_DIWALI), y)
-include $(VIDEO_ROOT)/config/diwali_video.conf
-LINUXINCLUDE    += -include $(VIDEO_ROOT)/config/diwali_video.h \
-                   -I$(VIDEO_ROOT)/driver/platform/diwali/inc
-endif
-
 ifeq ($(CONFIG_ARCH_KALAMA), y)
 include $(VIDEO_ROOT)/config/kalama_video.conf
 LINUXINCLUDE    += -include $(VIDEO_ROOT)/config/kalama_video.h \
@@ -22,6 +16,7 @@ endif
 
 
 LINUXINCLUDE    += -I$(VIDEO_ROOT)/driver/vidc/inc \
+                   -I$(VIDEO_ROOT)/driver/platform/common/inc \
                    -I$(VIDEO_ROOT)/include/uapi/vidc
 
 USERINCLUDE     += -I$(VIDEO_ROOT)/include/uapi/vidc/media \
@@ -35,10 +30,6 @@ endif
 
 ifeq ($(CONFIG_MSM_VIDC_KALAMA), y)
 msm_video-objs += driver/platform/kalama/src/msm_vidc_kalama.o
-endif
-
-ifeq ($(CONFIG_MSM_VIDC_DIWALI), y)
-msm_video-objs += driver/platform/diwali/src/msm_vidc_diwali.o
 endif
 
 ifeq ($(CONFIG_MSM_VIDC_IRIS2), y)
@@ -66,10 +57,10 @@ msm_video-objs += driver/vidc/src/msm_vidc_v4l2.o \
                   driver/vidc/src/msm_vidc_power.o \
                   driver/vidc/src/msm_vidc_probe.o \
                   driver/vidc/src/msm_vidc_dt.o \
-                  driver/vidc/src/msm_vidc_platform.o \
                   driver/vidc/src/msm_vidc_debug.o \
                   driver/vidc/src/msm_vidc_memory.o \
                   driver/vidc/src/msm_vidc_fence.o \
                   driver/vidc/src/venus_hfi.o \
                   driver/vidc/src/hfi_packet.o \
-                  driver/vidc/src/venus_hfi_response.o
+                  driver/vidc/src/venus_hfi_response.o \
+                  driver/platform/common/src/msm_vidc_platform.o

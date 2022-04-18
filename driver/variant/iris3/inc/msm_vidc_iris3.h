@@ -12,12 +12,17 @@
 #if defined(CONFIG_MSM_VIDC_IRIS3)
 int msm_vidc_init_iris3(struct msm_vidc_core *core);
 int msm_vidc_deinit_iris3(struct msm_vidc_core *core);
+int msm_vidc_adjust_bitrate_boost_iris3(void *instance, struct v4l2_ctrl *ctrl);
 #else
 static inline int msm_vidc_init_iris3(struct msm_vidc_core *core)
 {
 	return -EINVAL;
 }
 static inline int msm_vidc_deinit_iris3(struct msm_vidc_core *core)
+{
+	return -EINVAL;
+}
+static inline int msm_vidc_adjust_bitrate_boost_iris3(void *instance, struct v4l2_ctrl *ctrl)
 {
 	return -EINVAL;
 }

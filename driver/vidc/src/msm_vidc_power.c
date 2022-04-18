@@ -45,34 +45,44 @@ u64 msm_vidc_max_freq(struct msm_vidc_inst *inst)
 
 int msm_vidc_get_mbps(struct msm_vidc_inst *inst)
 {
-	u32 mbpf, fps;
+	u32 mbpf, fps, input_rate;
 
 	mbpf = msm_vidc_get_mbs_per_frame(inst);
 	fps = msm_vidc_get_fps(inst);
+	input_rate = msm_vidc_get_input_rate(inst);
 
-	return mbpf * fps;
+	return mbpf * max(fps, input_rate);
 }
 
 int msm_vidc_get_inst_load(struct msm_vidc_inst *inst)
 {
 	int load = 0;
+	u32 mbpf, fps;
+	u32 frame_rate, operating_rate, input_rate, timestamp_rate;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	/*
-	 * NRT sessions - clock scaling is based on OPP table.
-	 *              - No load based rejection.
-	 * RT sessions  - clock scaling and session admission based on load.
-	 */
+	/* return zero load for thumbnail and NRT session */
 	if (is_thumbnail_session(inst) || !is_realtime_session(inst))
-		load = 0;
-	else
-		load = msm_vidc_get_mbps(inst);
+		return load;
 
-	return load;
+	/* calculate load for RT session */
+	mbpf = msm_vidc_get_mbs_per_frame(inst);
+	frame_rate = msm_vidc_get_frame_rate(inst);
+	operating_rate = msm_vidc_get_operating_rate(inst);
+	fps = max(frame_rate, operating_rate);
+
+	if (is_decode_session(inst)) {
+		input_rate = msm_vidc_get_input_rate(inst);
+		timestamp_rate = msm_vidc_get_timestamp_rate(inst);
+		fps = max(fps, input_rate);
+		fps = max(fps, timestamp_rate);
+	}
+
+	return load = mbpf * fps;
 }
 
 static int fill_dynamic_stats(struct msm_vidc_inst *inst,
@@ -133,12 +143,7 @@ static int msm_vidc_set_buses(struct msm_vidc_inst* inst)
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
-
 	core = inst->core;
-	if (!core || !core->platform || !core->platform->data.bus_bw_nrt) {
-		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
 
 	mutex_lock(&core->lock);
 	curr_time_ns = ktime_get_ns();
@@ -152,11 +157,6 @@ static int msm_vidc_set_buses(struct msm_vidc_inst* inst)
 		if (temp->power.power_mode == VIDC_POWER_TURBO) {
 			total_bw_ddr = total_bw_llcc = INT_MAX;
 			break;
-		}
-
-		if (!is_realtime_session(inst)) {
-			temp->power.ddr_bw = core->platform->data.bus_bw_nrt[0];
-			temp->power.sys_cache_bw = core->platform->data.bus_bw_nrt[0];
 		}
 
 		total_bw_ddr += temp->power.ddr_bw;
@@ -188,7 +188,8 @@ int msm_vidc_scale_buses(struct msm_vidc_inst *inst)
 	struct vidc_bus_vote_data *vote_data;
 	struct v4l2_format *out_f;
 	struct v4l2_format *inp_f;
-	int codec = 0, frame_rate, buf_ts_fps;
+	int codec = 0;
+	u32 operating_rate, frame_rate;
 
 	if (!inst || !inst->core || !inst->capabilities) {
 		d_vpr_e("%s: invalid params: %pK\n", __func__, inst);
@@ -223,7 +224,6 @@ int msm_vidc_scale_buses(struct msm_vidc_inst *inst)
 		break;
 	}
 
-	frame_rate = inst->capabilities->cap[FRAME_RATE].value;
 	vote_data->codec = inst->codec;
 	vote_data->input_width = inp_f->fmt.pix_mp.width;
 	vote_data->input_height = inp_f->fmt.pix_mp.height;
@@ -231,13 +231,7 @@ int msm_vidc_scale_buses(struct msm_vidc_inst *inst)
 	vote_data->output_height = out_f->fmt.pix_mp.height;
 	vote_data->lcu_size = (codec == V4L2_PIX_FMT_HEVC ||
 			codec == V4L2_PIX_FMT_VP9) ? 32 : 16;
-	vote_data->fps = msm_vidc_get_fps(inst);
-	buf_ts_fps = msm_vidc_calc_window_avg_framerate(inst);
-	if (buf_ts_fps > vote_data->fps) {
-		i_vpr_l(inst, "%s: bitstream: fps %d, client rate %u\n", __func__,
-			buf_ts_fps, vote_data->fps);
-		vote_data->fps = buf_ts_fps;
-	}
+	vote_data->fps = inst->max_rate;
 
 	if (inst->domain == MSM_VIDC_ENCODER) {
 		vote_data->domain = MSM_VIDC_ENCODER;
@@ -245,12 +239,13 @@ int msm_vidc_scale_buses(struct msm_vidc_inst *inst)
 		vote_data->rotation = inst->capabilities->cap[ROTATION].value;
 		vote_data->b_frames_enabled =
 			inst->capabilities->cap[B_FRAME].value > 0;
-		/* scale bitrate if operating rate is larger than fps */
-		if (vote_data->fps > (frame_rate >> 16) &&
-			(frame_rate >> 16)) {
-			vote_data->bitrate = vote_data->bitrate /
-				(frame_rate >> 16) * vote_data->fps;
-		}
+
+		/* scale bitrate if operating rate is larger than frame rate */
+		frame_rate = msm_vidc_get_frame_rate(inst);
+		operating_rate = msm_vidc_get_frame_rate(inst);
+		if (frame_rate && operating_rate && operating_rate > frame_rate)
+			vote_data->bitrate = (vote_data->bitrate / frame_rate) * operating_rate;
+
 		vote_data->num_formats = 1;
 		vote_data->color_formats[0] = v4l2_colorformat_to_driver(
 			inst->fmts[INPUT_PORT].fmt.pix_mp.pixelformat, __func__);
@@ -486,6 +481,8 @@ int msm_vidc_scale_power(struct msm_vidc_inst *inst, bool scale_buses)
 	struct msm_vidc_core *core;
 	struct msm_vidc_buffer *vbuf;
 	u32 data_size = 0;
+	u32 fps;
+	u32 frame_rate, operating_rate, timestamp_rate, input_rate;
 
 	if (!inst || !inst->core) {
 		d_vpr_e("%s: invalid params %pK\n", __func__, inst);
@@ -503,6 +500,31 @@ int msm_vidc_scale_power(struct msm_vidc_inst *inst, bool scale_buses)
 		data_size = max(data_size, vbuf->data_size);
 	inst->max_input_data_size = data_size;
 
+	frame_rate = msm_vidc_get_frame_rate(inst);
+	operating_rate = msm_vidc_get_operating_rate(inst);
+	fps = max(frame_rate, operating_rate);
+	if (is_decode_session(inst)) {
+		/*
+		 * when buffer detected fps is more than client set value by 12.5%,
+		 * utilize buffer detected fps to scale clock.
+		 */
+		timestamp_rate = msm_vidc_get_timestamp_rate(inst);
+		input_rate = msm_vidc_get_input_rate(inst);
+		if (timestamp_rate > (fps + fps / 8))
+			fps = timestamp_rate;
+
+		if (input_rate > fps) {
+			fps = input_rate;
+			/*
+			 * add 6.25% more fps for NRT session to increase power to make
+			 * firmware processing little faster than client queuing rate
+			 */
+			if (!is_realtime_session(inst))
+				fps = fps + fps / 16;
+		}
+	}
+	inst->max_rate = fps;
+
 	/* no pending inputs - skip scale power */
 	if (!inst->max_input_data_size)
 		return 0;
@@ -516,10 +538,11 @@ int msm_vidc_scale_power(struct msm_vidc_inst *inst, bool scale_buses)
 	}
 
 	i_vpr_hp(inst,
-		"power: inst: clk %lld ddr %d llcc %d dcvs flags %#x, core: clk %lld ddr %lld llcc %lld\n",
+		"power: inst: clk %lld ddr %d llcc %d dcvs flags %#x fps %u (%u %u %u %u) core: clk %lld ddr %lld llcc %lld\n",
 		inst->power.curr_freq, inst->power.ddr_bw,
 		inst->power.sys_cache_bw, inst->power.dcvs_flags,
-		core->power.clk_freq, core->power.bw_ddr,
+		inst->max_rate, frame_rate, operating_rate, timestamp_rate,
+		input_rate, core->power.clk_freq, core->power.bw_ddr,
 		core->power.bw_llcc);
 
 	trace_msm_vidc_perf_power_scale(inst, core->power.clk_freq,

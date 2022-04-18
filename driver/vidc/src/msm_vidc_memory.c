@@ -592,6 +592,7 @@ static const struct msm_vidc_type_size_name buftype_size_name_arr[] = {
 	{MSM_MEM_POOL_DMABUF,     sizeof(struct msm_memory_dmabuf),   "MSM_MEM_POOL_DMABUF"     },
 	{MSM_MEM_POOL_PACKET,     sizeof(struct hfi_pending_packet) + MSM_MEM_POOL_PACKET_SIZE,
 		"MSM_MEM_POOL_PACKET"},
+	{MSM_MEM_POOL_BUF_TIMER,  sizeof(struct msm_vidc_input_timer), "MSM_MEM_POOL_BUF_TIMER" },
 };
 
 int msm_memory_pools_init(struct msm_vidc_inst *inst)
