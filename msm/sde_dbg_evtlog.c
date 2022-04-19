@@ -217,7 +217,7 @@ u32 sde_evtlog_count(struct sde_dbg_evtlog *evtlog)
 			last_dump += SDE_EVTLOG_ENTRY;
 	}
 
-	if ((last_dump - first) > SDE_EVTLOG_PRINT_ENTRY)
+	if ((last_dump - first) > SDE_EVTLOG_ENTRY)
 		return SDE_EVTLOG_ENTRY;
 
 	return last_dump - first;

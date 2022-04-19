@@ -499,6 +499,8 @@ struct dsi_split_link_config {
  *			 cmd it points to the line after TE.
  * @dma_sched_window:	 Determines the width of the window during the
  *			 DSI command will be sent by the HW.
+ * @vpadding:			 panel stacking height.
+ * @line_insertion_enable: line insertion support enable.
  */
 struct dsi_host_common_cfg {
 	enum dsi_pixel_format dst_format;
@@ -526,6 +528,8 @@ struct dsi_host_common_cfg {
 	u32 byte_intf_clk_div;
 	u32 dma_sched_line;
 	u32 dma_sched_window;
+	u32 vpadding;
+	bool line_insertion_enable;
 };
 
 /**
@@ -613,6 +617,10 @@ struct dsi_host_config {
  * @panel_prefill_lines:  Panel prefill lines for RSC
  * @mdp_transfer_time_us:   Specifies the mdp transfer time for command mode
  *                          panels in microseconds.
+ * @mdp_transfer_time_us_min:   Specifies the minimum possible mdp transfer time
+ *                              for command mode panels in microseconds.
+ * @mdp_transfer_time_us_max:   Specifies the maximum possible mdp transfer time
+ *                              for command mode panels in microseconds.
  * @dsi_transfer_time_us: Specifies the dsi transfer time for cmd panels.
  * @qsync_min_fps:        Qsync min fps value for the mode
  * @clk_rate_hz:          DSI bit clock per lane in hz.
@@ -640,6 +648,8 @@ struct dsi_display_mode_priv_info {
 	u32 panel_jitter_denom;
 	u32 panel_prefill_lines;
 	u32 mdp_transfer_time_us;
+	u32 mdp_transfer_time_us_min;
+	u32 mdp_transfer_time_us_max;
 	u32 dsi_transfer_time_us;
 	u32 qsync_min_fps;
 	u64 clk_rate_hz;

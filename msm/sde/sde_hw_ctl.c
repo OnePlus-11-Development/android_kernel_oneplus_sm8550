@@ -1003,6 +1003,8 @@ static int sde_hw_ctl_intf_cfg_v1(struct sde_hw_ctl *ctx,
 
 	if (cfg->intf_count > 1)
 		intf_master = BIT(cfg->intf_master - INTF_0);
+	else if (cfg->intf_count == 1)
+		intf_master = BIT(cfg->intf[0] - INTF_0);
 
 	for (i = 0; i < cfg->wb_count; i++) {
 		if (cfg->wb[i])

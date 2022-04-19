@@ -1095,9 +1095,9 @@ static struct drm_gem_object *_msm_gem_new(struct drm_device *dev,
 	}
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-	mutex_lock(&dev->struct_mutex);
+	mutex_lock(&priv->mm_lock);
 	list_add_tail(&msm_obj->mm_list, &priv->inactive_list);
-	mutex_unlock(&dev->struct_mutex);
+	mutex_unlock(&priv->mm_lock);
 #endif
 
 	return obj;
@@ -1171,7 +1171,6 @@ struct drm_gem_object *msm_gem_import(struct drm_device *dev,
 	struct drm_gem_object *obj = NULL;
 	uint32_t size;
 	int ret;
-	unsigned long flags = 0;
 
 	size = PAGE_ALIGN(dmabuf->size);
 
@@ -1201,16 +1200,12 @@ struct drm_gem_object *msm_gem_import(struct drm_device *dev,
 	 */
 	msm_obj->flags |= MSM_BO_EXTBUF;
 
-	ret = dma_buf_get_flags(dmabuf, &flags);
-	if (ret)
-		DRM_ERROR("dma_buf_get_flags failure, err=%d\n", ret);
-
 	mutex_unlock(&msm_obj->lock);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-	mutex_lock(&dev->struct_mutex);
+	mutex_lock(&priv->mm_lock);
 	list_add_tail(&msm_obj->mm_list, &priv->inactive_list);
-	mutex_unlock(&dev->struct_mutex);
+	mutex_unlock(&priv->mm_lock);
 #endif
 
 	return obj;

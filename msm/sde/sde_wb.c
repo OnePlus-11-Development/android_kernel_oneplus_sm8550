@@ -593,7 +593,6 @@ int sde_wb_connector_post_init(struct drm_connector *connector, void *display)
 	struct msm_drm_private *priv;
 	struct sde_kms *sde_kms;
 	struct sde_mdss_cfg *catalog;
-	struct sde_sc_cfg *sde_cfg;
 	static const struct drm_prop_enum_list e_fb_translation_mode[] = {
 		{SDE_DRM_FB_NON_SEC, "non_sec"},
 		{SDE_DRM_FB_SEC, "sec"},
@@ -622,13 +621,12 @@ int sde_wb_connector_post_init(struct drm_connector *connector, void *display)
 	}
 
 	catalog = sde_kms->catalog;
-	sde_cfg = &catalog->sc_cfg[SDE_SYS_CACHE_DISP_WB];
-
 	c_conn = to_sde_connector(connector);
 	wb_dev->connector = connector;
 	wb_dev->detect_status = connector_status_connected;
 
-	if (sde_cfg->has_sys_cache)
+	if (catalog->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache
+			|| catalog->sc_cfg[SDE_SYS_CACHE_DISP_WB].has_sys_cache)
 		msm_property_install_enum(&c_conn->property_info, "cache_state",
 			0x0, 0, e_cache_state, ARRAY_SIZE(e_cache_state),
 			0, CONNECTOR_PROP_CACHE_STATE);

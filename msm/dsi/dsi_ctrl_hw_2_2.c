@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/iopoll.h>
 #include "dsi_ctrl_hw.h"
@@ -19,6 +20,9 @@
 #define MDP_INTF_TEAR_OFFSET 0x280
 #define MDP_INTF_TEAR_LINE_COUNT_OFFSET 0x30
 #define MDP_INTF_LINE_COUNT_OFFSET 0xB0
+
+#define DSI_MDP_MISR_CTRL 0x364
+#define DSI_MDP_MISR_SIGNATURE 0x368
 
 void dsi_ctrl_hw_22_setup_lane_map(struct dsi_ctrl_hw *ctrl,
 		       struct dsi_lane_map *lane_map)
@@ -311,4 +315,36 @@ void dsi_ctrl_hw_22_configure_splitlink(struct dsi_ctrl_hw *ctrl,
 
 	/* Make sure the split link config is updated */
 	wmb();
+}
+
+void dsi_ctrl_hw_22_setup_misr(struct dsi_ctrl_hw *ctrl, enum dsi_op_mode panel_mode,
+			bool enable, u32 frame_count)
+{
+	u32 config = 0;
+
+	DSI_W32(ctrl, DSI_MDP_MISR_CTRL, config);
+	wmb(); /* clear misr data */
+
+	if (enable) {
+		config = (frame_count & 0xffff);
+		config |= BIT(8) | BIT(24) | BIT(31); /* enable, panel data-only, free run mode */
+	}
+
+	DSI_CTRL_HW_DBG(ctrl, "MISR enable:%d, frame_count:%d, config:0x%x\n",
+			enable, frame_count, config);
+	DSI_W32(ctrl, DSI_MDP_MISR_CTRL, config);
+	wmb(); /* make sure MISR is configured */
+}
+
+u32 dsi_ctrl_hw_22_collect_misr(struct dsi_ctrl_hw *ctrl, enum dsi_op_mode panel_mode)
+{
+	u32 enabled;
+	u32 misr = 0;
+
+	enabled = DSI_R32(ctrl, DSI_MDP_MISR_CTRL) & BIT(8);
+	if (enabled)
+		misr = DSI_R32(ctrl, DSI_MDP_MISR_SIGNATURE);
+
+	DSI_CTRL_HW_DBG(ctrl, "MISR enabled:%d value:0x%x\n", enabled, misr);
+	return misr;
 }

@@ -410,7 +410,7 @@ static void sde_hw_wb_setup_sys_cache(struct sde_hw_wb *ctx, struct sde_hw_wb_sc
 		return;
 
 	if (cfg->flags & SYS_CACHE_EN_FLAG)
-		val |= BIT(15);
+		val |= (cfg->wr_en ? BIT(15) : 0);
 
 	if (cfg->flags & SYS_CACHE_SCID)
 		val |= ((cfg->wr_scid & 0x1f) << 8);

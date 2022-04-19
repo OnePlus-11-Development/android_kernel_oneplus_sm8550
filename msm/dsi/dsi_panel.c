@@ -782,6 +782,7 @@ static int dsi_panel_parse_timing(struct dsi_mode_info *mode,
 	u64 tmp64 = 0;
 	struct dsi_display_mode *display_mode;
 	struct dsi_display_mode_priv_info *priv_info;
+	u32 usecs_fps = 0;
 
 	display_mode = container_of(mode, struct dsi_display_mode, timing);
 
@@ -804,11 +805,22 @@ static int dsi_panel_parse_timing(struct dsi_mode_info *mode,
 
 	rc = utils->read_u32(utils->data, "qcom,mdss-mdp-transfer-time-us",
 				&mode->mdp_transfer_time_us);
-	if (!rc)
-		display_mode->priv_info->mdp_transfer_time_us =
-			mode->mdp_transfer_time_us;
-	else
-		display_mode->priv_info->mdp_transfer_time_us = 0;
+	if (rc)
+		mode->mdp_transfer_time_us = 0;
+
+	rc = utils->read_u32(utils->data, "qcom,mdss-mdp-transfer-time-us-min",
+				&priv_info->mdp_transfer_time_us_min);
+	if (rc)
+		priv_info->mdp_transfer_time_us_min = 0;
+	else if (!rc && mode->mdp_transfer_time_us < priv_info->mdp_transfer_time_us_min)
+		mode->mdp_transfer_time_us = priv_info->mdp_transfer_time_us_min;
+
+	rc = utils->read_u32(utils->data, "qcom,mdss-mdp-transfer-time-us-max",
+				&priv_info->mdp_transfer_time_us_max);
+	if (rc)
+		priv_info->mdp_transfer_time_us_max = 0;
+	else if (!rc && mode->mdp_transfer_time_us > priv_info->mdp_transfer_time_us_max)
+		mode->mdp_transfer_time_us = priv_info->mdp_transfer_time_us_max;
 
 	priv_info->disable_rsc_solver = utils->read_bool(utils->data, "qcom,disable-rsc-solver");
 
@@ -820,6 +832,11 @@ static int dsi_panel_parse_timing(struct dsi_mode_info *mode,
 		       rc);
 		goto error;
 	}
+
+	usecs_fps = DIV_ROUND_UP((1 * 1000 * 1000), mode->refresh_rate);
+	if (mode->mdp_transfer_time_us > usecs_fps)
+		mode->mdp_transfer_time_us = 0;
+	priv_info->mdp_transfer_time_us = mode->mdp_transfer_time_us;
 
 	rc = utils->read_u32(utils->data, "qcom,mdss-dsi-panel-width",
 				  &mode->h_active);
@@ -1162,7 +1179,8 @@ static int dsi_panel_parse_misc_host_config(struct dsi_host_common_cfg *host,
 		host->dma_sched_window = 0;
 	else
 		host->dma_sched_window = window;
-
+	rc = utils->read_u32(utils->data, "qcom,vert-padding-value", &host->vpadding);
+	host->line_insertion_enable = (rc || host->vpadding <= 0) ? false : true;
 	DSI_DEBUG("[%s] DMA scheduling parameters Line: %d Window: %d\n", name,
 			host->dma_sched_line, host->dma_sched_window);
 	return 0;
@@ -1769,6 +1787,9 @@ static int dsi_panel_parse_panel_mode(struct dsi_panel *panel)
 					"qcom,poms-align-panel-vsync");
 	panel->panel_mode = panel_mode;
 	panel->panel_mode_switch_enabled = panel_mode_switch_enabled;
+
+	panel->panel_ack_disabled = utils->read_bool(utils->data,
+					"qcom,panel-ack-disabled");
 error:
 	return rc;
 }
@@ -3997,6 +4018,7 @@ void dsi_panel_calc_dsi_transfer_time(struct dsi_host_common_cfg *config,
 	struct dsi_mode_info *timing = &mode->timing;
 	struct dsi_display_mode *display_mode;
 	u32 jitter_numer, jitter_denom, prefill_lines;
+	u32 default_prefill_lines, actual_prefill_lines, vtotal;
 	u32 min_threshold_us, prefill_time_us, max_transfer_us, packet_overhead;
 	u16 bpp;
 
@@ -4060,11 +4082,15 @@ void dsi_panel_calc_dsi_transfer_time(struct dsi_host_common_cfg *config,
 	 * Increase the prefill_lines proportionately as recommended
 	 * 40lines for 60fps, 60 for 90fps, 120lines for 120fps, and so on.
 	 */
-	prefill_lines = mult_frac(MIN_PREFILL_LINES,
-			timing->refresh_rate, 60);
+	default_prefill_lines = mult_frac(MIN_PREFILL_LINES, timing->refresh_rate, 60);
 
-	prefill_time_us = mult_frac(frame_time_us, prefill_lines,
-			(timing->v_active));
+	actual_prefill_lines = timing->v_back_porch + timing->v_front_porch + timing->v_sync_width;
+	vtotal = actual_prefill_lines + timing->v_active;
+
+	/* consider the max of default prefill lines and actual prefill lines */
+	prefill_lines = max(actual_prefill_lines, default_prefill_lines);
+
+	prefill_time_us = mult_frac(frame_time_us, prefill_lines, vtotal);
 
 	min_threshold_us = min_threshold_us + prefill_time_us;
 

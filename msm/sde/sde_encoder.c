@@ -227,13 +227,8 @@ static void _sde_encoder_control_fal10_veto(struct drm_encoder *drm_enc, bool ve
 	struct sde_kms *sde_kms = sde_encoder_get_kms(drm_enc);
 	struct sde_encoder_virt *sde_enc = to_sde_encoder_virt(drm_enc);
 
-	if (sde_kms->catalog && !sde_kms->catalog->uidle_cfg.uidle_rev)
+	if (!sde_kms || !sde_kms->hw_uidle || !sde_kms->hw_uidle->ops.uidle_fal10_override)
 		return;
-
-	if (!sde_kms->hw_uidle || !sde_kms->hw_uidle->ops.uidle_fal10_override) {
-		SDE_ERROR("invalid args\n");
-		return;
-	}
 
 	/*
 	 * clone mode is the only scenario where we want to enable software override
@@ -1074,6 +1069,32 @@ static int _sde_encoder_atomic_check_reserve(struct drm_encoder *drm_enc,
 	return ret;
 }
 
+bool sde_encoder_is_line_insertion_supported(struct drm_encoder *drm_enc)
+{
+	struct sde_connector *sde_conn = NULL;
+	struct sde_kms *sde_kms = NULL;
+	struct drm_connector *conn = NULL;
+
+	if (!drm_enc) {
+		SDE_ERROR("invalid drm encoder\n");
+		return false;
+	}
+
+	sde_kms = sde_encoder_get_kms(drm_enc);
+	if (!sde_kms)
+		return false;
+
+	conn = sde_encoder_get_connector(sde_kms->dev, drm_enc);
+	if (!conn || !conn->state)
+		return false;
+
+	sde_conn = to_sde_connector(conn);
+	if (!sde_conn)
+		return false;
+
+	return sde_connector_is_line_insertion_supported(sde_conn);
+}
+
 static void _sde_encoder_get_qsync_fps_callback(struct drm_encoder *drm_enc,
 			u32 *qsync_fps, struct drm_connector_state *conn_state)
 {
@@ -1898,7 +1919,7 @@ static void _sde_encoder_rc_restart_delayed(struct sde_encoder_virt *sde_enc,
 	else
 		lp = SDE_MODE_DPMS_ON;
 
-	if (lp == SDE_MODE_DPMS_LP2)
+	if ((lp == SDE_MODE_DPMS_LP1) || (lp == SDE_MODE_DPMS_LP2))
 		idle_pc_duration = IDLE_SHORT_TIMEOUT;
 	else
 		idle_pc_duration = IDLE_POWERCOLLAPSE_DURATION;
@@ -3182,9 +3203,18 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 
 	SDE_EVT32(DRMID(drm_enc));
 
-	/* wait for idle */
-	if (!sde_encoder_in_clone_mode(drm_enc))
+	if (!sde_encoder_in_clone_mode(drm_enc)) {
+		/* disable autorefresh */
+		for (i = 0; i < sde_enc->num_phys_encs; i++) {
+			struct sde_encoder_phys *phys = sde_enc->phys_encs[i];
+
+			if (phys && phys->ops.disable_autorefresh)
+				phys->ops.disable_autorefresh(phys);
+		}
+
+		/* wait for idle */
 		sde_encoder_wait_for_event(drm_enc, MSM_ENC_TX_COMPLETE);
+	}
 
 	_sde_encoder_input_handler_unregister(drm_enc);
 
@@ -4165,6 +4195,9 @@ static void sde_encoder_early_wakeup_work_handler(struct kthread_work *work)
 	struct sde_encoder_virt *sde_enc = container_of(work,
 			struct sde_encoder_virt, early_wakeup_work);
 	struct sde_kms *sde_kms = to_sde_kms(ddev_to_msm_kms(sde_enc->base.dev));
+
+	if (!sde_kms)
+		return;
 
 	sde_vm_lock(sde_kms);
 	if (!sde_vm_owns_hw(sde_kms)) {

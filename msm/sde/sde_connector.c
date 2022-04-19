@@ -1112,7 +1112,7 @@ void sde_connector_helper_bridge_disable(struct drm_connector *connector)
 	/* Disable ESD thread */
 	sde_connector_schedule_status_work(connector, false);
 
-	if (!sde_in_trusted_vm(sde_kms) && c_conn->bl_device) {
+	if (!sde_in_trusted_vm(sde_kms) && c_conn->bl_device && !poms_pending) {
 		c_conn->bl_device->props.power = FB_BLANK_POWERDOWN;
 		c_conn->bl_device->props.state |= BL_CORE_FBBLANK;
 		backlight_update_status(c_conn->bl_device);
@@ -1156,7 +1156,7 @@ void sde_connector_helper_bridge_enable(struct drm_connector *connector)
 				MSM_ENC_TX_COMPLETE);
 	c_conn->allow_bl_update = true;
 
-	if (!sde_in_trusted_vm(sde_kms) && c_conn->bl_device) {
+	if (!sde_in_trusted_vm(sde_kms) && c_conn->bl_device && !display->poms_pending) {
 		c_conn->bl_device->props.power = FB_BLANK_UNBLANK;
 		c_conn->bl_device->props.state &= ~BL_CORE_FBBLANK;
 		backlight_update_status(c_conn->bl_device);
@@ -1686,6 +1686,20 @@ end:
 	return rc;
 }
 
+static int _sde_connector_set_prop_dyn_transfer_time(struct sde_connector *c_conn, uint64_t val)
+{
+	int rc = 0;
+
+	if (!c_conn->ops.update_transfer_time)
+		return rc;
+
+	rc = c_conn->ops.update_transfer_time(c_conn->display, val);
+	if (rc)
+		SDE_ERROR_CONN(c_conn, "updating transfer time failed, val: %u, rc %d\n", val, rc);
+
+	return rc;
+}
+
 static int sde_connector_atomic_set_property(struct drm_connector *connector,
 		struct drm_connector_state *state,
 		struct drm_property *property,
@@ -1776,6 +1790,9 @@ static int sde_connector_atomic_set_property(struct drm_connector *connector,
 		if (rc)
 			SDE_ERROR_CONN(c_conn, "dynamic bit clock set failed, rc: %d", rc);
 
+		break;
+	case CONNECTOR_PROP_DYN_TRANSFER_TIME:
+		_sde_connector_set_prop_dyn_transfer_time(c_conn, val);
 		break;
 	default:
 		break;
@@ -2879,6 +2896,13 @@ static int sde_connector_populate_mode_info(struct drm_connector *conn,
 		sde_kms_info_add_keyint(info, "mdp_transfer_time_us",
 			mode_info.mdp_transfer_time_us);
 
+		if (mode_info.mdp_transfer_time_us_min && mode_info.mdp_transfer_time_us_max) {
+			sde_kms_info_add_keyint(info, "mdp_transfer_time_us_min",
+					mode_info.mdp_transfer_time_us_min);
+			sde_kms_info_add_keyint(info, "mdp_transfer_time_us_max",
+					mode_info.mdp_transfer_time_us_max);
+		}
+
 		sde_kms_info_add_keyint(info, "allowed_mode_switch",
 			mode_info.allowed_mode_switches);
 
@@ -3044,6 +3068,8 @@ static int _sde_connector_install_properties(struct drm_device *dev,
 			msm_property_install_range(&c_conn->property_info, "dyn_bit_clk",
 					0x0, 0, ~0, 0, CONNECTOR_PROP_DYN_BIT_CLK);
 
+		msm_property_install_range(&c_conn->property_info, "dyn_transfer_time",
+				 0x0, 0, 1000000, 0, CONNECTOR_PROP_DYN_TRANSFER_TIME);
 
 		mutex_lock(&c_conn->base.dev->mode_config.mutex);
 		sde_connector_fill_modes(&c_conn->base,
@@ -3115,7 +3141,8 @@ static int _sde_connector_install_properties(struct drm_device *dev,
 			msm_property_install_enum(&c_conn->property_info,
 			"panel_mode", 0, 0,
 			e_panel_mode,
-			ARRAY_SIZE(e_panel_mode), 0,
+			ARRAY_SIZE(e_panel_mode),
+			(dsi_display->panel->panel_mode == DSI_OP_VIDEO_MODE) ? 0 : 1,
 			CONNECTOR_PROP_SET_PANEL_MODE);
 
 		if (test_bit(SDE_FEATURE_DEMURA, sde_kms->catalog->features)) {
@@ -3433,4 +3460,21 @@ int sde_connector_event_notify(struct drm_connector *connector, uint32_t type,
 			connector->base.id, type, val);
 
 	return ret;
+}
+
+bool sde_connector_is_line_insertion_supported(struct sde_connector *sde_conn)
+{
+	struct dsi_display *display = NULL;
+
+	if (!sde_conn)
+		return false;
+
+	if (sde_conn->connector_type != DRM_MODE_CONNECTOR_DSI)
+		return false;
+
+	display = (struct dsi_display *)sde_conn->display;
+	if (!display || !display->panel)
+		return false;
+
+	return display->panel->host_config.line_insertion_enable;
 }

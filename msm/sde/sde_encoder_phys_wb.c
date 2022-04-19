@@ -389,7 +389,7 @@ static void _sde_encoder_phys_wb_setup_roi(struct sde_encoder_phys *phys_enc,
 	struct sde_crtc_state *cstate = to_sde_crtc_state(crtc_state);
 	struct sde_rect pu_roi = {0,};
 
-	if (hw_wb->ops.setup_roi)
+	if (!hw_wb->ops.setup_roi)
 		return;
 
 	if (hw_wb->ops.setup_crop && phys_enc->in_clone_mode) {
@@ -838,7 +838,7 @@ static int _sde_enc_phys_wb_validate_cwb(struct sde_encoder_phys *phys_enc,
 	struct sde_rect wb_roi = {0,}, pu_roi = {0,};
 	u32  out_width = 0, out_height = 0;
 	const struct sde_format *fmt;
-	int prog_line, ret = 0, i;
+	int prog_line, ret = 0;
 
 	fb = sde_wb_connector_state_get_output_fb(conn_state);
 	if (!fb) {
@@ -900,16 +900,6 @@ static int _sde_enc_phys_wb_validate_cwb(struct sde_encoder_phys *phys_enc,
 		SDE_ERROR("invalid wb roi[%dx%d] out[%dx%d]\n",
 				wb_roi.w, wb_roi.h, out_width, out_height);
 		return -EINVAL;
-	}
-
-	/* pitch has to be multiple of 256 bits */
-	for (i = 0; i < fb->format->num_planes; i++) {
-		if (fb->pitches[i] % 32) {
-			SDE_ERROR("invalid stride plane:%d pitch:%u fmt: %4.4s bpp:%d wxh:%dx%d\n",
-				i, fb->pitches[i], (char *)&fmt->base.pixel_format,
-				fmt->bpp, wb_roi.w, wb_roi.h);
-			return -EINVAL;
-		}
 	}
 
 	/*
@@ -1084,17 +1074,25 @@ static int sde_encoder_phys_wb_atomic_check(struct sde_encoder_phys *phys_enc,
 	return rc;
 }
 
-static void _sde_encoder_phys_wb_setup_cache(struct sde_encoder_phys_wb *wb_enc,
+static void _sde_encoder_phys_wb_setup_cache(struct sde_encoder_phys *phys_enc,
 		struct drm_framebuffer *fb)
 {
+	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
 	struct sde_wb_device *wb_dev = wb_enc->wb_dev;
 	struct drm_connector_state *state = wb_dev->connector->state;
 	struct sde_hw_wb *hw_wb = wb_enc->hw_wb;
 	struct sde_crtc *sde_crtc = to_sde_crtc(wb_enc->crtc);
-	struct sde_sc_cfg *sc_cfg = &hw_wb->catalog->sc_cfg[SDE_SYS_CACHE_DISP_WB];
+	struct sde_sc_cfg *sc_cfg;
 	struct sde_hw_wb_sc_cfg *cfg  = &wb_enc->sc_cfg;
-	u32 cache_enable;
+	u32 cache_enable, cache_type;
 
+	/*
+	 * - use LLCC_DISP for cwb static display
+	 * - use LLCC_DISP_WB for 2-pass composition using offline-wb
+	 */
+	cache_type = phys_enc->in_clone_mode ? SDE_SYS_CACHE_DISP : SDE_SYS_CACHE_DISP_WB;
+
+	sc_cfg = &hw_wb->catalog->sc_cfg[cache_type];
 	if (!sc_cfg->has_sys_cache) {
 		SDE_DEBUG("sys cache feature not enabled\n");
 		return;
@@ -1115,19 +1113,111 @@ static void _sde_encoder_phys_wb_setup_cache(struct sde_encoder_phys_wb *wb_enc,
 
 	if (cache_enable) {
 		cfg->wr_scid = sc_cfg->llcc_scid;
-		cfg->type = SDE_SYS_CACHE_DISP_WB;
-		msm_framebuffer_set_cache_hint(fb, MSM_FB_CACHE_WRITE_EN, SDE_SYS_CACHE_DISP_WB);
+		cfg->type = cache_type;
+		msm_framebuffer_set_cache_hint(fb, MSM_FB_CACHE_WRITE_EN, cache_type);
 	} else {
 		cfg->wr_scid = 0x0;
 		cfg->type = SDE_SYS_CACHE_NONE;
 		msm_framebuffer_set_cache_hint(fb, MSM_FB_CACHE_NONE, SDE_SYS_CACHE_NONE);
 	}
 
-	sde_crtc->new_perf.llcc_active[SDE_SYS_CACHE_DISP_WB] = cache_enable;
-	sde_core_perf_crtc_update_llcc(wb_enc->crtc);
+	/*
+	 * avoid llcc_active reset for crtc while in clone mode as it will reset it for
+	 * primary display as well
+	 */
+	if (cache_enable || !phys_enc->in_clone_mode) {
+		sde_crtc->new_perf.llcc_active[cache_type] = cache_enable;
+		sde_core_perf_crtc_update_llcc(wb_enc->crtc);
+	}
 
 	hw_wb->ops.setup_sys_cache(hw_wb, cfg);
 	SDE_EVT32(WBID(wb_enc), cfg->wr_scid, cfg->flags, cfg->type, cache_enable);
+}
+
+static void _sde_encoder_phys_wb_update_cwb_flush_helper(
+		struct sde_encoder_phys *phys_enc, bool enable)
+{
+	struct sde_connector *c_conn = NULL;
+	struct sde_connector_state *c_state = NULL;
+	struct sde_hw_wb *hw_wb;
+	struct sde_hw_ctl *hw_ctl;
+	struct sde_hw_pingpong *hw_pp;
+	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
+	struct sde_crtc_state *crtc_state;
+	struct sde_crtc *crtc;
+	int i = 0;
+	int cwb_capture_mode = 0;
+	bool need_merge = false;
+	bool dspp_out = false;
+	enum sde_cwb cwb_idx = 0;
+	enum sde_cwb src_pp_idx = 0;
+	enum sde_dcwb dcwb_idx = 0;
+	size_t dither_sz = 0;
+	void *dither_cfg = NULL;
+
+	/* In CWB mode, program actual source master sde_hw_ctl from crtc */
+	crtc = to_sde_crtc(wb_enc->crtc);
+	hw_ctl = crtc->mixers[0].hw_ctl;
+	hw_pp = phys_enc->hw_pp;
+	hw_wb = wb_enc->hw_wb;
+	if (!hw_ctl || !hw_wb || !hw_pp) {
+		SDE_ERROR("[enc:%d wb:%d] HW resource not available for CWB\n",
+				DRMID(phys_enc->parent), WBID(wb_enc));
+		return;
+	}
+
+	crtc_state = to_sde_crtc_state(wb_enc->crtc->state);
+	cwb_capture_mode = sde_crtc_get_property(crtc_state, CRTC_PROP_CAPTURE_OUTPUT);
+	need_merge = (crtc->num_mixers > 1) ? true : false;
+	dspp_out = (cwb_capture_mode == CAPTURE_DSPP_OUT);
+	cwb_idx = (enum sde_cwb)hw_pp->idx;
+	src_pp_idx = (enum sde_cwb)crtc->mixers[0].hw_lm->idx;
+
+	if (test_bit(SDE_WB_CWB_DITHER_CTRL, &hw_wb->caps->features)) {
+		if (cwb_capture_mode) {
+			c_conn = to_sde_connector(phys_enc->connector);
+			c_state = to_sde_connector_state(phys_enc->connector->state);
+			dither_cfg = msm_property_get_blob(&c_conn->property_info,
+					&c_state->property_state, &dither_sz,
+					CONNECTOR_PROP_PP_CWB_DITHER);
+			SDE_DEBUG("Read cwb dither setting from blob %pK\n", dither_cfg);
+		} else {
+			/* disable case: tap is lm */
+			dither_cfg = NULL;
+		}
+	}
+
+	for (i = 0; i < crtc->num_mixers; i++) {
+		src_pp_idx = (enum sde_cwb) (src_pp_idx + i);
+
+		if (test_bit(SDE_WB_DCWB_CTRL, &hw_wb->caps->features)) {
+			dcwb_idx = (enum sde_dcwb) ((hw_pp->idx % 2) + i);
+			if ((test_bit(SDE_WB_CWB_DITHER_CTRL, &hw_wb->caps->features)) &&
+				hw_wb->ops.program_cwb_dither_ctrl){
+				hw_wb->ops.program_cwb_dither_ctrl(hw_wb,
+					dcwb_idx, dither_cfg, dither_sz, enable);
+			}
+			if (hw_wb->ops.program_dcwb_ctrl)
+				hw_wb->ops.program_dcwb_ctrl(hw_wb, dcwb_idx,
+					src_pp_idx, cwb_capture_mode, enable);
+			if (hw_ctl->ops.update_bitmask)
+				hw_ctl->ops.update_bitmask(hw_ctl,
+					SDE_HW_FLUSH_CWB, dcwb_idx, 1);
+
+		} else if (test_bit(SDE_WB_CWB_CTRL, &hw_wb->caps->features)) {
+			cwb_idx = (enum sde_cwb) (hw_pp->idx + i);
+			if (hw_wb->ops.program_cwb_ctrl)
+				hw_wb->ops.program_cwb_ctrl(hw_wb, cwb_idx,
+					src_pp_idx, dspp_out, enable);
+			if (hw_ctl->ops.update_bitmask)
+				hw_ctl->ops.update_bitmask(hw_ctl,
+					SDE_HW_FLUSH_CWB, cwb_idx, 1);
+		}
+	}
+
+	if (need_merge && hw_ctl->ops.update_bitmask && hw_pp && hw_pp->merge_3d)
+		hw_ctl->ops.update_bitmask(hw_ctl, SDE_HW_FLUSH_MERGE_3D,
+				hw_pp->merge_3d->idx, 1);
 }
 
 static void _sde_encoder_phys_wb_update_cwb_flush(struct sde_encoder_phys *phys_enc, bool enable)
@@ -1145,10 +1235,6 @@ static void _sde_encoder_phys_wb_update_cwb_flush(struct sde_encoder_phys *phys_
 	enum sde_dcwb dcwb_idx = 0;
 	enum sde_cwb src_pp_idx = 0;
 	bool dspp_out = false, need_merge = false;
-	struct sde_connector *c_conn = NULL;
-	struct sde_connector_state *c_state = NULL;
-	void *dither_cfg = NULL;
-	size_t dither_sz = 0;
 
 	if (!phys_enc->in_clone_mode) {
 		SDE_DEBUG("enc:%d, wb:%d - not in CWB mode. early return\n",
@@ -1207,51 +1293,7 @@ static void _sde_encoder_phys_wb_update_cwb_flush(struct sde_encoder_phys *phys_
 
 	if (test_bit(SDE_WB_CWB_CTRL, &hw_wb->caps->features) ||
 			test_bit(SDE_WB_DCWB_CTRL, &hw_wb->caps->features)) {
-		if (test_bit(SDE_WB_CWB_DITHER_CTRL, &hw_wb->caps->features)) {
-			if (cwb_capture_mode) {
-				c_conn = to_sde_connector(phys_enc->connector);
-				c_state = to_sde_connector_state(phys_enc->connector->state);
-				dither_cfg = msm_property_get_blob(&c_conn->property_info,
-						&c_state->property_state, &dither_sz,
-						CONNECTOR_PROP_PP_CWB_DITHER);
-				SDE_DEBUG("Read cwb dither setting from blob %pK\n", dither_cfg);
-			} else {
-				/* disable case: tap is lm */
-				dither_cfg = NULL;
-			}
-		}
-
-		for (i = 0; i < crtc->num_mixers; i++) {
-			src_pp_idx = (enum sde_cwb) (src_pp_idx + i);
-
-			if (test_bit(SDE_WB_DCWB_CTRL, &hw_wb->caps->features)) {
-				dcwb_idx = (enum sde_dcwb) ((hw_pp->idx % 2) + i);
-				if (test_bit(SDE_WB_CWB_DITHER_CTRL, &hw_wb->caps->features)) {
-					if (hw_wb->ops.program_cwb_dither_ctrl)
-						hw_wb->ops.program_cwb_dither_ctrl(hw_wb,
-							dcwb_idx, dither_cfg, dither_sz, enable);
-				}
-				if (hw_wb->ops.program_dcwb_ctrl)
-					hw_wb->ops.program_dcwb_ctrl(hw_wb, dcwb_idx,
-						src_pp_idx, cwb_capture_mode, enable);
-				if (hw_ctl->ops.update_bitmask)
-					hw_ctl->ops.update_bitmask(hw_ctl,
-						SDE_HW_FLUSH_CWB, dcwb_idx, 1);
-
-			} else if (test_bit(SDE_WB_CWB_CTRL, &hw_wb->caps->features)) {
-				cwb_idx = (enum sde_cwb) (hw_pp->idx + i);
-				if (hw_wb->ops.program_cwb_ctrl)
-					hw_wb->ops.program_cwb_ctrl(hw_wb, cwb_idx,
-						src_pp_idx, dspp_out, enable);
-				if (hw_ctl->ops.update_bitmask)
-					hw_ctl->ops.update_bitmask(hw_ctl,
-						SDE_HW_FLUSH_CWB, cwb_idx, 1);
-			}
-		}
-
-		if (need_merge && hw_ctl->ops.update_bitmask && hw_pp && hw_pp->merge_3d)
-			hw_ctl->ops.update_bitmask(hw_ctl, SDE_HW_FLUSH_MERGE_3D,
-					hw_pp->merge_3d->idx, 1);
+		_sde_encoder_phys_wb_update_cwb_flush_helper(phys_enc, enable);
 	} else {
 		phys_enc->hw_mdptop->ops.set_cwb_ppb_cntl(phys_enc->hw_mdptop,
 				need_merge, dspp_out);
@@ -1451,7 +1493,7 @@ static void sde_encoder_phys_wb_setup(struct sde_encoder_phys *phys_enc)
 
 	_sde_encoder_phys_wb_setup_ctl(phys_enc, wb_enc->wb_fmt);
 
-	_sde_encoder_phys_wb_setup_cache(wb_enc, fb);
+	_sde_encoder_phys_wb_setup_cache(phys_enc, fb);
 
 	_sde_encoder_phys_wb_setup_cwb(phys_enc, true);
 
@@ -2174,9 +2216,15 @@ static void sde_encoder_phys_wb_disable(struct sde_encoder_phys *phys_enc)
 		if (hw_wb->ops.setup_sys_cache)
 			hw_wb->ops.setup_sys_cache(hw_wb, &wb_enc->sc_cfg);
 
-		for (i = 0; i < SDE_SYS_CACHE_MAX; i++)
-			sde_crtc->new_perf.llcc_active[i] = 0;
-		sde_core_perf_crtc_update_llcc(wb_enc->crtc);
+		/*
+		 * avoid llcc_active reset for crtc while in clone mode as it will reset it for
+		 * primary display as well
+		 */
+		if (!phys_enc->in_clone_mode) {
+			for (i = 0; i < SDE_SYS_CACHE_MAX; i++)
+				sde_crtc->new_perf.llcc_active[i] = 0;
+			sde_core_perf_crtc_update_llcc(wb_enc->crtc);
+		}
 	}
 
 	if (phys_enc->in_clone_mode) {
