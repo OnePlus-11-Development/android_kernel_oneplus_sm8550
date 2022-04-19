@@ -1197,6 +1197,10 @@
 
 /* Device-specific RSCC registers */
 #define GEN7_2_0_RSCC_SEQ_MEM_0_DRV0			0x00154
+#define GEN7_2_0_RSCC_TCS0_DRV0_STATUS			0x0034a
+#define GEN7_2_0_RSCC_TCS1_DRV0_STATUS			0x003f2
+#define GEN7_2_0_RSCC_TCS2_DRV0_STATUS			0x0049a
+#define GEN7_2_0_RSCC_TCS3_DRV0_STATUS			0x00542
 
 /* GPU PDC sequencer registers in AOSS.RPMh domain */
 #define GEN7_PDC_GPU_ENABLE_PDC				0x1140
