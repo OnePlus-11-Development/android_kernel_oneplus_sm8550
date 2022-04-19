@@ -3419,6 +3419,7 @@ int sde_connector_register_custom_event(struct sde_kms *kms,
 		break;
 	case DRM_EVENT_SDE_HW_RECOVERY:
 		ret = _sde_conn_enable_hw_recovery(conn_drm);
+		sde_dbg_update_dump_mode(val);
 		break;
 	default:
 		break;
