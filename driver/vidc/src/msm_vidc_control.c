@@ -2355,7 +2355,7 @@ int msm_vidc_adjust_blur_type(void *instance, struct v4l2_ctrl *ctrl)
 	struct msm_vidc_inst_capability *capability;
 	s32 adjusted_value;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
-	s32 rc_type = -1;
+	s32 rc_type = -1, roi_enable = -1;
 	s32 pix_fmts = -1, min_quality = -1;
 
 	if (!inst || !inst->capabilities) {
@@ -2375,7 +2375,9 @@ int msm_vidc_adjust_blur_type(void *instance, struct v4l2_ctrl *ctrl)
 		msm_vidc_get_parent_value(inst, BLUR_TYPES, PIX_FMTS,
 		&pix_fmts, __func__) ||
 		msm_vidc_get_parent_value(inst, BLUR_TYPES, MIN_QUALITY,
-		&min_quality, __func__))
+		&min_quality, __func__) ||
+		msm_vidc_get_parent_value(inst, BLUR_TYPES, META_ROI_INFO,
+		&roi_enable, __func__))
 		return -EINVAL;
 
 	if (adjusted_value == VIDC_BLUR_EXTERNAL) {
@@ -2387,7 +2389,7 @@ int msm_vidc_adjust_blur_type(void *instance, struct v4l2_ctrl *ctrl)
 			(rc_type != HFI_RC_VBR_CFR &&
 			rc_type != HFI_RC_CBR_CFR &&
 			rc_type != HFI_RC_CBR_VFR) ||
-			is_10bit_colorformat(pix_fmts)) {
+			is_10bit_colorformat(pix_fmts) || roi_enable) {
 			adjusted_value = VIDC_BLUR_NONE;
 		}
 	}
@@ -2834,7 +2836,9 @@ int msm_vidc_adjust_roi_info(void *instance, struct v4l2_ctrl *ctrl)
 		&pix_fmt, __func__))
 		return -EINVAL;
 
-	if (rc_type != HFI_RC_VBR_CFR || !is_8bit_colorformat(pix_fmt))
+	if ((rc_type != HFI_RC_VBR_CFR && rc_type != HFI_RC_CBR_CFR
+		&& rc_type != HFI_RC_CBR_VFR) || !is_8bit_colorformat(pix_fmt)
+		|| is_scaling_enabled(inst) || is_rotation_90_or_270(inst))
 		adjusted_value = 0;
 
 	msm_vidc_update_cap_value(inst, META_ROI_INFO,

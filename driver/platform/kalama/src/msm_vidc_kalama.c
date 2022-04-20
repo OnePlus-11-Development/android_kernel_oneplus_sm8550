@@ -1840,7 +1840,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kala
 		msm_vidc_set_u32},
 
 	{BLUR_TYPES, ENC, H264|HEVC,
-		{PIX_FMTS, BITRATE_MODE, MIN_QUALITY},
+		{PIX_FMTS, BITRATE_MODE, MIN_QUALITY, META_ROI_INFO},
 		{BLUR_RESOLUTION},
 		msm_vidc_adjust_blur_type,
 		msm_vidc_set_u32_enum},
