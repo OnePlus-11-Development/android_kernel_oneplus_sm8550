@@ -13,6 +13,7 @@
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+#include <linux/soc/qcom/msm_mmrm.h>
 
 #include <soc/qcom/socinfo.h>
 
@@ -22,8 +23,6 @@
 #define MODULE_NAME "mmrm_vm_fe_test"
 
 enum supported_soc_ids {
-	SOC_LAHAINA_ID = 415,		/* LAHAINA */
-	SOC_WAIPIO_ID = 457,		/* WAIPIO */
 	SOC_KALAMA_ID = 519			/* KAILUA */
 };
 
@@ -196,28 +195,18 @@ static int mmrm_test(struct platform_device *pdev, int flags)
 
 	// Get socid to get known mmrm configurations
 	soc_id = socinfo_get_id();
+	d_mpr_e("%s: soc id: %d flags=%x\n", __func__, soc_id, flags);
 	soc_id = SOC_KALAMA_ID;
 	d_mpr_e("%s: soc id: %d flags=%x\n", __func__, soc_id, flags);
 
 	switch (soc_id) {
-	case SOC_LAHAINA_ID:
-//		if (flags & 1)
-//			test_mmrm_client(pdev, MMRM_TEST_LAHAINA, MMRM_TEST_LAHAINA_NUM_CLK_CLIENTS);
-//		if (flags & 2)
-//			test_mmrm_concurrent_client_cases(pdev, all_lahaina_testcases);
-		break;
-	case SOC_WAIPIO_ID:
-//		test_mmrm_client(pdev, MMRM_TEST_WAIPIO, MMRM_TEST_WAIPIO_NUM_CLK_CLIENTS);
-//		test_mmrm_concurrent_client_cases(pdev, waipio_testcases, waipio_testcases_count);
-//		test_mmrm_switch_volt_corner_client_testcases(pdev, waipio_cornercase_testcases, waipio_cornercase_testcases_count);
-		break;
 	case SOC_KALAMA_ID:
 		if (flags & 1)
 			mmrm_vm_fe_client_tests(pdev);
 		if (flags & 2)
-			test_mmrm_concurrent_client_cases(pdev, waipio_testcases, waipio_testcases_count);
+			test_mmrm_concurrent_client_cases(pdev, kalama_testcases, kalama_testcases_count);
 		if (flags & 4)
-			test_mmrm_switch_volt_corner_client_testcases(pdev, waipio_cornercase_testcases, waipio_cornercase_testcases_count);
+			test_mmrm_switch_volt_corner_client_testcases(pdev, kalama_cornercase_testcases, kalama_cornercase_testcases_count);
 		break;
 	default:
 		d_mpr_e("%s: Not supported for soc_id %d\n", __func__, soc_id);
@@ -306,7 +295,7 @@ static struct attribute_group mmrm_vm_fe_test_fs_attrs_group = {
 
 static int mmrm_vm_fe_test_probe(struct platform_device *pdev)
 {
-//	bool is_mmrm_supported = false;
+	bool is_mmrm_supported = false;
 	int rc;
 
 	// Check if of_node is found
@@ -315,11 +304,11 @@ static int mmrm_vm_fe_test_probe(struct platform_device *pdev)
 		return 1;
 	}
 
-//	is_mmrm_supported = mmrm_client_check_scaling_supported(MMRM_CLIENT_CLOCK, 0);
-//	if (!is_mmrm_supported) {
-//		pr_info("%s: MMRM not supported on %s\n", __func__, socinfo_get_id_string());
-//		return 0;
-//	}
+	is_mmrm_supported = mmrm_client_check_scaling_supported(MMRM_CLIENT_CLOCK, 0);
+	if (!is_mmrm_supported) {
+		d_mpr_e("%s: MMRM not supported on %s\n", __func__, socinfo_get_id_string());
+		return 0;
+	}
 
 	test_drv_data = kzalloc(sizeof(*test_drv_data), GFP_KERNEL);
 	if (!test_drv_data) {
