@@ -974,9 +974,6 @@ int ipa3_qmi_filter_request_ex_send(
 			return -EINVAL;
 		if (req->filter_spec_ex_list[i].is_mux_id_valid == false)
 			return -EINVAL;
-		if (req->filter_spec_ex_list[i].is_routing_table_index_valid
-			== false)
-			return -EINVAL;
 		if ((req->filter_spec_ex_list[i].filter_action <=
 			QMI_IPA_FILTER_ACTION_INVALID_V01) ||
 			(req->filter_spec_ex_list[i].filter_action >

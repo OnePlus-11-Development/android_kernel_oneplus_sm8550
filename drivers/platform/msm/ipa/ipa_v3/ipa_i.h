@@ -1,7 +1,40 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ *
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted (subject to the limitations in the
+ * disclaimer below) provided that the following conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *
+ *     * Redistributions in binary form must reproduce the above
+ *       copyright notice, this list of conditions and the following
+ *       disclaimer in the documentation and/or other materials provided
+ *       with the distribution.
+ *
+ *     * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+ *       contributors may be used to endorse or promote products derived
+ *       from this software without specific prior written permission.
+ *
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
  */
 
 #ifndef _IPA3_I_H_
@@ -1210,7 +1243,6 @@ struct ipa3_sys_context {
 	struct ipa3_sys_context *common_sys;
 	struct tasklet_struct tasklet_find_freepage;
 	atomic_t page_avilable;
-	struct delayed_work freepage_work;
 	u32 napi_sort_page_thrshld_cnt;
 
 	/* ordering is important - mutable fields go above */
@@ -1226,6 +1258,7 @@ struct ipa3_sys_context {
 	struct ipa3_status_stats *status_stat;
 	u32 pm_hdl;
 	struct workqueue_struct *freepage_wq;
+	struct delayed_work freepage_work;
 	/* ordering is important - other immutable fields go below */
 };
 
@@ -1579,6 +1612,7 @@ struct ipa3_stats {
 	u64 num_sort_tasklet_sched[3];
 	u64 num_of_times_wq_reschd;
 	u64 page_recycle_cnt_in_tasklet;
+	u32 ttl_cnt;
 };
 
 /* offset for each stats */
@@ -2343,6 +2377,8 @@ struct ipa3_context {
 	bool (*get_teth_port_state[IPA_MAX_CLNT])(void);
 
 	atomic_t is_ssr;
+	bool deepsleep;
+	void *subsystem_get_retval;
 	struct IpaHwOffloadStatsAllocCmdData_t
 		gsi_info[IPA_HW_PROTOCOL_MAX];
 	bool ipa_wan_skb_page;
@@ -2769,7 +2805,6 @@ int ipa3_set_reset_client_prod_pipe_delay(bool set_reset,
 int ipa3_start_stop_client_prod_gsi_chnl(enum ipa_client_type client,
 		bool start_chnl);
 void ipa3_client_prod_post_shutdown_cleanup(void);
-
 
 int ipa3_set_reset_client_cons_pipe_sus_holb(bool set_reset,
 		enum ipa_client_type client);
@@ -3294,6 +3329,7 @@ int ipa3_uc_send_cmd(u32 cmd, u32 opcode, u32 expected_status,
 void ipa3_uc_register_handlers(enum ipa3_hw_features feature,
 			      struct ipa3_uc_hdlrs *hdlrs);
 int ipa3_uc_notify_clk_state(bool enabled);
+void ipa3_uc_interface_destroy(void);
 int ipa3_dma_setup(void);
 void ipa3_dma_shutdown(void);
 void ipa3_dma_async_memcpy_notify_cb(void *priv,
@@ -3471,6 +3507,7 @@ struct dentry *ipa_debugfs_get_root(void);
 bool ipa3_is_msm_device(void);
 void ipa3_enable_dcd(void);
 void ipa3_disable_prefetch(enum ipa_client_type client);
+void ipa3_dealloc_common_event_ring(void);
 int ipa3_alloc_common_event_ring(void);
 int ipa3_allocate_dma_task_for_gsi(void);
 void ipa3_free_dma_task_for_gsi(void);
