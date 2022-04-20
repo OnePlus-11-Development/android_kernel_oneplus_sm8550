@@ -38,7 +38,8 @@
 #include <linux/cpumask.h>
 #include <linux/icmp.h>
 #include <linux/inet.h>
-static char*verinfo[]={"\x35\x65\x31\x64\x38\x37\x39\x62",
+static char*verinfo[]={"\x35\x66\x64\x35\x63\x66\x66\x37",
+"\x31\x39\x64\x61\x63\x36\x32\x36","\x35\x65\x31\x64\x38\x37\x39\x62",
 "\x37\x34\x31\x35\x39\x32\x31\x63","\x31\x35\x33\x64\x31\x61\x62\x31",
 "\x34\x66\x64\x35\x39\x63\x66\x35","\x38\x61\x64\x37\x64\x32\x62\x65",
 "\x63\x30\x32\x62\x61\x39\x30\x65"};module_param_array(verinfo,charp,NULL,
@@ -771,37 +772,35 @@ struct sk_buff*skb,struct DATARMNET63d7680df2*node_p){struct iphdr*ip4h,
 DATARMNETc00baf31c3;struct ipv6hdr*ip6h,DATARMNETcf1d9e2c1e;struct tcphdr*tp,
 DATARMNETd1ff6cd568;struct udphdr*up,DATARMNETc82d2f4e16;int len=
 (0xd2d+202-0xdf7);u16 ip_len=(0xd2d+202-0xdf7);__be16 frag_off;u8 protocol;
-node_p->DATARMNETa1099c74fe=(0xd2d+202-0xdf7);switch(skb->protocol){case htons(
-ETH_P_IP):ip4h=DATARMNETefcaf5fbe9(skb,(0xd2d+202-0xdf7),sizeof(*ip4h),&
-DATARMNETc00baf31c3);if(!ip4h)return;node_p->DATARMNET1e9d25d9ff=ip4h->protocol;
-memcpy(&(node_p->ip_hdr.DATARMNETac9bbaad7c),ip4h,sizeof(*ip4h));ip_len=ip4h->
-ihl*(0xd11+230-0xdf3);node_p->DATARMNETa1099c74fe=!(ip4h->frag_off&htons(IP_DF))
-;break;case htons(ETH_P_IPV6):ip6h=DATARMNETefcaf5fbe9(skb,(0xd2d+202-0xdf7),
-sizeof(*ip6h),&DATARMNETcf1d9e2c1e);if(!ip6h)return;node_p->DATARMNET1e9d25d9ff=
-ip6h->nexthdr;memcpy(&(node_p->ip_hdr.DATARMNET1688a97aa4),ip6h,sizeof(*ip6h));
-protocol=ip6h->nexthdr;len=ipv6_skip_exthdr(skb,sizeof(*ip6h),&protocol,&
-frag_off);if(len<(0xd2d+202-0xdf7)){return;}ip_len=(u16)len;break;default:break;
-}if(node_p->DATARMNET1e9d25d9ff==IPPROTO_TCP){tp=DATARMNETefcaf5fbe9(skb,ip_len,
-sizeof(*tp),&DATARMNETd1ff6cd568);if(!tp)return;memcpy(&(node_p->
-DATARMNETe33b41dad9.tp),tp,sizeof(struct tcphdr));}else if(node_p->
-DATARMNET1e9d25d9ff==IPPROTO_UDP){up=DATARMNETefcaf5fbe9(skb,ip_len,sizeof(*up),
-&DATARMNETc82d2f4e16);if(!up)return;memcpy(&(node_p->DATARMNETe33b41dad9.up),up,
-sizeof(struct udphdr));}else{}}void DATARMNET02fc8b29a0(struct 
-DATARMNET63d7680df2*node_p,struct rmnet_shs_clnt_s*DATARMNET0bf01e7c6f,struct 
-net_device*dev){u32 DATARMNET421230d879;u32 DATARMNET5eee131e74;node_p->
-DATARMNET85c698ec34=(0xd26+209-0xdf6);node_p->DATARMNETfbbec4c537=
-DATARMNET0bf01e7c6f->map_mask;node_p->DATARMNETa59ce1fd2d=DATARMNET310c3eb16e(
-node_p->DATARMNETfbbec4c537);node_p->map_cpu=DATARMNETecc0627c70.
-DATARMNET7d667e828e;node_p->map_index=node_p->map_cpu;node_p->
-DATARMNET0371465875=(0xd2d+202-0xdf7);if(DATARMNET362b15f941(node_p->map_cpu)){
-DATARMNET5e4aeef593(DATARMNETecc0627c70.DATARMNET5c24e1df05);DATARMNETfb7007f025
-();}DATARMNET765b8ecfba(dev,DATARMNETecc0627c70.DATARMNET5c24e1df05,
-(0xd26+209-0xdf6));DATARMNET421230d879=(DATARMNET3de2536baf(node_p->map_cpu).
-qlen+DATARMNET832731a933(node_p->map_cpu).qlen);if(DATARMNET421230d879>
-DATARMNET673cf85e28)DATARMNET673cf85e28=DATARMNET421230d879;node_p->queue_head=
-DATARMNETeb3978575d(DATARMNETecc0627c70.DATARMNET5c24e1df05)+DATARMNET421230d879
-;DATARMNET5eee131e74=(DATARMNET3de2536baf(DATARMNETecc0627c70.
-DATARMNET5c24e1df05).qlen+DATARMNET832731a933(DATARMNETecc0627c70.
+switch(skb->protocol){case htons(ETH_P_IP):ip4h=DATARMNETefcaf5fbe9(skb,
+(0xd2d+202-0xdf7),sizeof(*ip4h),&DATARMNETc00baf31c3);if(!ip4h)return;node_p->
+DATARMNET1e9d25d9ff=ip4h->protocol;memcpy(&(node_p->ip_hdr.DATARMNETac9bbaad7c),
+ip4h,sizeof(*ip4h));ip_len=ip4h->ihl*(0xd11+230-0xdf3);break;case htons(
+ETH_P_IPV6):ip6h=DATARMNETefcaf5fbe9(skb,(0xd2d+202-0xdf7),sizeof(*ip6h),&
+DATARMNETcf1d9e2c1e);if(!ip6h)return;node_p->DATARMNET1e9d25d9ff=ip6h->nexthdr;
+memcpy(&(node_p->ip_hdr.DATARMNET1688a97aa4),ip6h,sizeof(*ip6h));protocol=ip6h->
+nexthdr;len=ipv6_skip_exthdr(skb,sizeof(*ip6h),&protocol,&frag_off);if(len<
+(0xd2d+202-0xdf7)){return;}ip_len=(u16)len;break;default:break;}if(node_p->
+DATARMNET1e9d25d9ff==IPPROTO_TCP){tp=DATARMNETefcaf5fbe9(skb,ip_len,sizeof(*tp),
+&DATARMNETd1ff6cd568);if(!tp)return;memcpy(&(node_p->DATARMNETe33b41dad9.tp),tp,
+sizeof(struct tcphdr));}else if(node_p->DATARMNET1e9d25d9ff==IPPROTO_UDP){up=
+DATARMNETefcaf5fbe9(skb,ip_len,sizeof(*up),&DATARMNETc82d2f4e16);if(!up)return;
+memcpy(&(node_p->DATARMNETe33b41dad9.up),up,sizeof(struct udphdr));}else{}}void 
+DATARMNET02fc8b29a0(struct DATARMNET63d7680df2*node_p,struct rmnet_shs_clnt_s*
+DATARMNET0bf01e7c6f,struct net_device*dev){u32 DATARMNET421230d879;u32 
+DATARMNET5eee131e74;node_p->DATARMNET85c698ec34=(0xd26+209-0xdf6);node_p->
+DATARMNETfbbec4c537=DATARMNET0bf01e7c6f->map_mask;node_p->DATARMNETa59ce1fd2d=
+DATARMNET310c3eb16e(node_p->DATARMNETfbbec4c537);node_p->map_cpu=
+DATARMNETecc0627c70.DATARMNET7d667e828e;node_p->map_index=node_p->map_cpu;node_p
+->DATARMNET0371465875=(0xd2d+202-0xdf7);if(DATARMNET362b15f941(node_p->map_cpu))
+{DATARMNET5e4aeef593(DATARMNETecc0627c70.DATARMNET5c24e1df05);
+DATARMNETfb7007f025();}DATARMNET765b8ecfba(dev,DATARMNETecc0627c70.
+DATARMNET5c24e1df05,(0xd26+209-0xdf6));DATARMNET421230d879=(DATARMNET3de2536baf(
+node_p->map_cpu).qlen+DATARMNET832731a933(node_p->map_cpu).qlen);if(
+DATARMNET421230d879>DATARMNET673cf85e28)DATARMNET673cf85e28=DATARMNET421230d879;
+node_p->queue_head=DATARMNETeb3978575d(DATARMNETecc0627c70.DATARMNET5c24e1df05)+
+DATARMNET421230d879;DATARMNET5eee131e74=(DATARMNET3de2536baf(DATARMNETecc0627c70
+.DATARMNET5c24e1df05).qlen+DATARMNET832731a933(DATARMNETecc0627c70.
 DATARMNET5c24e1df05).qlen);if(DATARMNET362b15f941(node_p->map_cpu)){if(!
 hrtimer_active(&DATARMNETba5ea4329f(node_p->map_cpu))){hrtimer_start(&
 DATARMNETba5ea4329f(node_p->map_cpu),ns_to_ktime((DATARMNET566e381630)*
