@@ -33,6 +33,7 @@
 #include "rmnet_vnd.h"
 #include "rmnet_genl.h"
 #include "rmnet_ll.h"
+#include "rmnet_ctl.h"
 
 #include "qmi_rmnet.h"
 #include "rmnet_qmi.h"
@@ -489,6 +490,18 @@ static const char rmnet_gstrings_stats[][ETH_GSTRING_LEN] = {
 	"Coalescing packets over VEID1",
 	"Coalescing packets over VEID2",
 	"Coalescing packets over VEID3",
+	"Coalescing packets over VEID4",
+	"Coalescing packets over VEID5",
+	"Coalescing packets over VEID6",
+	"Coalescing packets over VEID7",
+	"Coalescing packets over VEID8",
+	"Coalescing packets over VEID9",
+	"Coalescing packets over VEID10",
+	"Coalescing packets over VEID11",
+	"Coalescing packets over VEID12",
+	"Coalescing packets over VEID13",
+	"Coalescing packets over VEID14",
+	"Coalescing packets over VEID15",
 	"Coalescing TCP frames",
 	"Coalescing TCP bytes",
 	"Coalescing UDP frames",
@@ -553,6 +566,14 @@ static const char rmnet_ll_gstrings_stats[][ETH_GSTRING_LEN] = {
 	"LL TX FC err",
 };
 
+static const char rmnet_qmap_gstrings_stats[][ETH_GSTRING_LEN] = {
+	"QMAP RX success",
+	"QMAP RX errors",
+	"QMAP TX queued",
+	"QMAP TX errors",
+	"QMAP TX complete (MHI)",
+};
+
 static void rmnet_get_strings(struct net_device *dev, u32 stringset, u8 *buf)
 {
 	size_t off = 0;
@@ -568,6 +589,9 @@ static void rmnet_get_strings(struct net_device *dev, u32 stringset, u8 *buf)
 		off += sizeof(rmnet_port_gstrings_stats);
 		memcpy(buf + off, &rmnet_ll_gstrings_stats,
 		       sizeof(rmnet_ll_gstrings_stats));
+		off += sizeof(rmnet_ll_gstrings_stats);
+		memcpy(buf + off, &rmnet_qmap_gstrings_stats,
+		       sizeof(rmnet_qmap_gstrings_stats));
 		break;
 	}
 }
@@ -578,7 +602,8 @@ static int rmnet_get_sset_count(struct net_device *dev, int sset)
 	case ETH_SS_STATS:
 		return ARRAY_SIZE(rmnet_gstrings_stats) +
 		       ARRAY_SIZE(rmnet_port_gstrings_stats) +
-		       ARRAY_SIZE(rmnet_ll_gstrings_stats);
+		       ARRAY_SIZE(rmnet_ll_gstrings_stats) +
+		       ARRAY_SIZE(rmnet_qmap_gstrings_stats);
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -593,6 +618,7 @@ static void rmnet_get_ethtool_stats(struct net_device *dev,
 	struct rmnet_ll_stats *llp;
 	struct rmnet_port *port;
 	size_t off = 0;
+	u64 qmap_s[ARRAY_SIZE(rmnet_qmap_gstrings_stats)];
 
 	port = rmnet_get_port(priv->real_dev);
 
@@ -609,6 +635,12 @@ static void rmnet_get_ethtool_stats(struct net_device *dev,
 	off += ARRAY_SIZE(rmnet_port_gstrings_stats);
 	memcpy(data + off, llp,
 	       ARRAY_SIZE(rmnet_ll_gstrings_stats) * sizeof(u64));
+
+	off += ARRAY_SIZE(rmnet_ll_gstrings_stats);
+	memset(qmap_s, 0, sizeof(qmap_s));
+	rmnet_ctl_get_stats(qmap_s, ARRAY_SIZE(rmnet_qmap_gstrings_stats));
+	memcpy(data + off, qmap_s,
+	       ARRAY_SIZE(rmnet_qmap_gstrings_stats) * sizeof(u64));
 }
 
 static int rmnet_stats_reset(struct net_device *dev)
