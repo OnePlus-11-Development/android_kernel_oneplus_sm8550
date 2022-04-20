@@ -443,7 +443,6 @@ int msm_vidc_update_cap_value(struct msm_vidc_inst *inst, u32 cap_id,
 	s32 adjusted_val, const char *func)
 {
 	int prev_value = 0;
-	bool is_updated = false;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -464,19 +463,15 @@ int msm_vidc_update_cap_value(struct msm_vidc_inst *inst, u32 cap_id,
 			/* disable metadata */
 			inst->capabilities->cap[cap_id].value &= ~adjusted_val;
 		}
-		if (prev_value != (prev_value | adjusted_val))
-			is_updated = true;
 	} else {
 		inst->capabilities->cap[cap_id].value = adjusted_val;
-		if (prev_value != adjusted_val)
-			is_updated = true;
 	}
 
-	if (is_updated) {
+	if (prev_value != inst->capabilities->cap[cap_id].value) {
 		i_vpr_h(inst,
 			"%s: updated database: name: %s, value: %#x -> %#x\n",
 			func, cap_name(cap_id),
-			prev_value, adjusted_val);
+			prev_value, inst->capabilities->cap[cap_id].value);
 	}
 
 	return 0;
@@ -2743,7 +2738,7 @@ int msm_vidc_adjust_preprocess(void *instance, struct v4l2_ctrl *ctrl)
 	return 0;
 }
 
-int msm_vidc_adjust_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl)
+int msm_vidc_adjust_enc_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl)
 {
 	struct msm_vidc_inst_capability *capability;
 	s32 adjusted_value;
@@ -2765,6 +2760,36 @@ int msm_vidc_adjust_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl)
 
 	if (rc_type == HFI_RC_CBR_CFR ||
 		rc_type == HFI_RC_CBR_VFR)
+		adjusted_value = 1;
+
+	msm_vidc_update_cap_value(inst, LOWLATENCY_MODE,
+		adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_dec_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst_capability *capability;
+	s32 adjusted_value;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	s32 outbuf_fence = V4L2_MPEG_VIDC_META_DISABLE;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val :
+		capability->cap[LOWLATENCY_MODE].value;
+
+	if (msm_vidc_get_parent_value(inst, LOWLATENCY_MODE, META_OUTBUF_FENCE,
+		&outbuf_fence, __func__))
+		return -EINVAL;
+
+	if (outbuf_fence & V4L2_MPEG_VIDC_META_ENABLE &&
+		outbuf_fence & V4L2_MPEG_VIDC_META_RX_INPUT)
 		adjusted_value = 1;
 
 	msm_vidc_update_cap_value(inst, LOWLATENCY_MODE,
@@ -2889,6 +2914,37 @@ int msm_vidc_adjust_dec_operating_rate(void *instance, struct v4l2_ctrl *ctrl)
 	capability = inst->capabilities;
 	adjusted_value = ctrl ? ctrl->val : capability->cap[OPERATING_RATE].value;
 	msm_vidc_update_cap_value(inst, OPERATING_RATE, adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_dec_outbuf_fence(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst_capability *capability;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	u32 adjusted_value = 0;
+	s32 picture_order = -1;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val : capability->cap[META_OUTBUF_FENCE].value;
+
+	if (msm_vidc_get_parent_value(inst, META_OUTBUF_FENCE, OUTPUT_ORDER,
+		&picture_order, __func__))
+		return -EINVAL;
+
+	if (picture_order == V4L2_MPEG_MSM_VIDC_DISABLE) {
+		/* disable outbuf fence */
+		adjusted_value = V4L2_MPEG_VIDC_META_DISABLE |
+			V4L2_MPEG_VIDC_META_RX_INPUT;
+	}
+
+	msm_vidc_update_cap_value(inst, META_OUTBUF_FENCE,
+		adjusted_value, __func__);
 
 	return 0;
 }

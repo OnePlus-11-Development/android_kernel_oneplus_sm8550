@@ -1190,7 +1190,7 @@ static int msm_vdec_read_input_subcr_params(struct msm_vidc_inst *inst)
 	u32 colour_description_present_flag = 0;
 	u32 video_signal_type_present_flag = 0;
 
-	if (!inst || !inst->core) {
+	if (!inst || !inst->core || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
@@ -1296,6 +1296,14 @@ static int msm_vdec_read_input_subcr_params(struct msm_vidc_inst *inst)
 			subsc_params.av1_film_grain_present, __func__);
 		msm_vidc_update_cap_value(inst, SUPER_BLOCK,
 			subsc_params.av1_super_block_enabled, __func__);
+	}
+
+	/* disable META_OUTBUF_FENCE if session is Interlace type */
+	if (inst->capabilities->cap[CODED_FRAMES].value ==
+		CODED_FRAMES_INTERLACE) {
+		msm_vidc_update_cap_value(inst, META_OUTBUF_FENCE,
+			V4L2_MPEG_VIDC_META_RX_INPUT |
+			V4L2_MPEG_VIDC_META_DISABLE, __func__);
 	}
 
 	return 0;

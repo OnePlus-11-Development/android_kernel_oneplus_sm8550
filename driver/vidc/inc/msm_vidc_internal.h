@@ -762,6 +762,7 @@ struct msm_vidc_hfi_frame_info {
 	u32                    cf;
 	u32                    data_corrupt;
 	u32                    overflow;
+	u32                    fence_id;
 };
 
 struct msm_vidc_decode_vpp_delay {

@@ -13,10 +13,12 @@ struct msm_vidc_fence *msm_vidc_fence_create(
 		struct msm_vidc_inst *inst);
 int msm_vidc_create_fence_fd(struct msm_vidc_inst *inst,
 		struct msm_vidc_fence *fence);
+struct msm_vidc_fence *msm_vidc_get_fence_from_id(
+	struct msm_vidc_inst *inst, u32 fence_id);
 int msm_vidc_fence_signal(struct msm_vidc_inst *inst,
 		u32 fence_id);
 void msm_vidc_fence_destroy(struct msm_vidc_inst *inst,
-		struct msm_vidc_fence *fence);
+		u32 fence_id);
 int msm_vidc_fence_init(struct msm_vidc_inst *inst);
 void msm_vidc_fence_deinit(struct msm_vidc_inst *inst);
 

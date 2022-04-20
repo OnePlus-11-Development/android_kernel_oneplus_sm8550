@@ -864,7 +864,7 @@ static int handle_output_buffer(struct msm_vidc_inst *inst,
 		if (buffer->data_size) {
 			i_vpr_e(inst, "%s: reset data size to zero for last flag buffer\n",
 				__func__);
-			buffer->data_size = 0;
+			buf->data_size = 0;
 		}
 		if (buffer->flags & HFI_BUF_FW_FLAG_READONLY) {
 			i_vpr_e(inst, "%s: reset RO flag for last flag buffer\n",
@@ -894,6 +894,19 @@ static int handle_output_buffer(struct msm_vidc_inst *inst,
 
 	buf->flags = 0;
 	buf->flags = get_driver_buffer_flags(inst, buffer->flags);
+
+	/* fence signalling */
+	if (inst->hfi_frame_info.fence_id) {
+		if (buf->data_size) {
+			/* signal fence */
+			msm_vidc_fence_signal(inst,
+				inst->hfi_frame_info.fence_id);
+		} else {
+			/* destroy fence */
+			msm_vidc_fence_destroy(inst,
+				inst->hfi_frame_info.fence_id);
+		}
+	}
 
 	if (is_decode_session(inst)) {
 		inst->power.fw_cr = inst->hfi_frame_info.cr;
@@ -1435,7 +1448,6 @@ static int handle_property_with_payload(struct msm_vidc_inst *inst,
 {
 	int rc = 0;
 	u32 *payload_ptr = NULL;
-	u32 fence_id = 0;
 
 	payload_ptr = (u32 *)((u8 *)pkt + sizeof(struct hfi_packet));
 	if (!payload_ptr) {
@@ -1536,13 +1548,7 @@ static int handle_property_with_payload(struct msm_vidc_inst *inst,
 				__func__,  payload_ptr[0], inst->capabilities->cap[PIPE].value);
 		break;
 	case HFI_PROP_FENCE:
-		if (is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE)) {
-			fence_id = payload_ptr[0];
-			rc = msm_vidc_fence_signal(inst, fence_id);
-		} else {
-			i_vpr_e(inst, "%s: fence is not enabled for this session\n",
-				__func__);
-		}
+		inst->hfi_frame_info.fence_id = payload_ptr[0];
 		break;
 	default:
 		i_vpr_e(inst, "%s: invalid property %#x\n",

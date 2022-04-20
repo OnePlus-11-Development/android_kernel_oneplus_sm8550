@@ -46,7 +46,8 @@ int msm_vidc_adjust_blur_resolution(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_brs(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_bitrate_boost(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_min_quality(void *instance, struct v4l2_ctrl *ctrl);
-int msm_vidc_adjust_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl);
+int msm_vidc_adjust_enc_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl);
+int msm_vidc_adjust_dec_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_set_v4l2_properties(struct msm_vidc_inst *inst);
 int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst);
 int msm_vidc_adjust_session_priority(void *instance, struct v4l2_ctrl *ctrl);
@@ -54,6 +55,7 @@ int msm_vidc_adjust_roi_info(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_all_intra(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_dec_frame_rate(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_dec_operating_rate(void *instance, struct v4l2_ctrl *ctrl);
+int msm_vidc_adjust_dec_outbuf_fence(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_preprocess(void *instance, struct v4l2_ctrl *ctrl);
 
 int msm_vidc_set_header_mode(void *instance,

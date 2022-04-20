@@ -389,6 +389,16 @@ enum meta_interlace_info {
 	META_INTERLACE_FRAME_INTERLACE_BOTTOMFIELD_FIRST    = 0x00000020,
 };
 
+enum meta_picture_type {
+	META_PICTURE_TYPE_IDR                            = 0x00000001,
+	META_PICTURE_TYPE_P                              = 0x00000002,
+	META_PICTURE_TYPE_B                              = 0x00000004,
+	META_PICTURE_TYPE_I                              = 0x00000008,
+	META_PICTURE_TYPE_CRA                            = 0x00000010,
+	META_PICTURE_TYPE_BLA                            = 0x00000020,
+	META_PICTURE_TYPE_NOSHOW                         = 0x00000040,
+};
+
 /* vendor controls end */
 
 /* vendor events start */

@@ -330,7 +330,7 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 	 * Client will enable V4L2_CID_MPEG_VIDC_METADATA_OUTBUF_FENCE
 	 * to get fence_id in input metadata buffer done.
 	 */
-	{META_OUTBUF_FENCE, DEC, CODECS_ALL,
+	{META_OUTBUF_FENCE, DEC, H264|HEVC|VP9|AV1,
 		V4L2_MPEG_VIDC_META_DISABLE,
 		V4L2_MPEG_VIDC_META_ENABLE | V4L2_MPEG_VIDC_META_RX_INPUT,
 		0, V4L2_MPEG_VIDC_META_DISABLE,
@@ -1327,7 +1327,10 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 		0,
 		HFI_PROP_PIPE},
 
-	{POC, DEC, H264, 0, 18, 1, 1},
+	{POC, DEC, H264,
+		0, 18, 1, 1,
+		0,
+		HFI_PROP_PIC_ORDER_CNT_TYPE},
 
 	{QUALITY_MODE, ENC, CODECS_ALL,
 		MSM_VIDC_MAX_QUALITY_MODE,
@@ -1729,6 +1732,12 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kala
 		NULL,
 		msm_vidc_set_u32},
 
+	{META_OUTBUF_FENCE, DEC, H264|HEVC|VP9|AV1,
+		{OUTPUT_ORDER},
+		{LOWLATENCY_MODE},
+		msm_vidc_adjust_dec_outbuf_fence,
+		NULL},
+
 	{HFLIP, ENC, CODECS_ALL,
 		{0},
 		{0},
@@ -1860,7 +1869,13 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kala
 	{LOWLATENCY_MODE, ENC, H264 | HEVC,
 		{BITRATE_MODE},
 		{STAGE},
-		msm_vidc_adjust_lowlatency_mode,
+		msm_vidc_adjust_enc_lowlatency_mode,
+		NULL},
+
+	{LOWLATENCY_MODE, DEC, H264|HEVC|VP9|AV1,
+		{META_OUTBUF_FENCE},
+		{STAGE},
+		msm_vidc_adjust_dec_lowlatency_mode,
 		NULL},
 
 	{LTR_COUNT, ENC, H264|HEVC,
@@ -2150,7 +2165,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kala
 
 	{OUTPUT_ORDER, DEC, H264|HEVC|VP9|AV1,
 		{THUMBNAIL_MODE, DISPLAY_DELAY, DISPLAY_DELAY_ENABLE},
-		{0},
+		{META_OUTBUF_FENCE},
 		msm_vidc_adjust_output_order,
 		msm_vidc_set_u32},
 
@@ -2190,7 +2205,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kala
 		NULL,
 		msm_vidc_set_u32_packed},
 
-	{STAGE, DEC|ENC, CODECS_ALL,
+	{STAGE, ENC | DEC, CODECS_ALL,
 		{0},
 		{0},
 		NULL,
@@ -2198,6 +2213,12 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kala
 
 	{STAGE, ENC, H264|HEVC,
 		{LOWLATENCY_MODE, SLICE_MODE},
+		{0},
+		NULL,
+		msm_vidc_set_stage},
+
+	{STAGE, DEC, H264|HEVC|VP9|AV1,
+		{LOWLATENCY_MODE},
 		{0},
 		NULL,
 		msm_vidc_set_stage},
