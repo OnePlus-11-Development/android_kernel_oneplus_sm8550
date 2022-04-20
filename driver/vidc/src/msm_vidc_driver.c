@@ -5923,12 +5923,25 @@ static int msm_vidc_print_insts_info(struct msm_vidc_core *core)
 	return 0;
 }
 
+bool msm_vidc_ignore_session_load(struct msm_vidc_inst *inst) {
+
+	if (!inst) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	if (!is_realtime_session(inst) || is_thumbnail_session(inst) ||
+			is_image_session(inst))
+		return true;
+
+	return false;
+}
+
 int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst)
 {
-	u32 mbps = 0;
+	u32 mbps = 0, total_mbps = 0, enc_mbps = 0;
 	struct msm_vidc_core *core;
 	struct msm_vidc_inst *instance;
-	int rc = 0;
 
 	if (!inst || !inst->core || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -5936,11 +5949,14 @@ int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst)
 	}
 	core = inst->core;
 
-	if (!inst->capabilities->cap[CHECK_MBPS].value) {
-		i_vpr_h(inst, "%s: skip mbps check\n", __func__);
+	/* skip mbps check for non-realtime, thumnail, image sessions */
+	if (msm_vidc_ignore_session_load(inst)) {
+		i_vpr_h(inst,
+			"%s: skip mbps check due to NRT %d, TH %d, IMG %d\n", __func__,
+			!is_realtime_session(inst), is_thumbnail_session(inst),
+			is_image_session(inst));
 		return 0;
 	}
-
 	core_lock(core, __func__);
 	list_for_each_entry(instance, &core->instances, list) {
 		/* ignore invalid/error session */
@@ -5948,24 +5964,49 @@ int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst)
 			continue;
 
 		/* ignore thumbnail, image, and non realtime sessions */
-		if (is_thumbnail_session(instance) ||
-			is_image_session(instance) ||
-			!is_realtime_session(instance))
+		if (msm_vidc_ignore_session_load(inst))
 			continue;
 
-		mbps += msm_vidc_get_inst_load(instance);
+		mbps = msm_vidc_get_inst_load(instance);
+		total_mbps += mbps;
+		if (is_encode_session(instance))
+			enc_mbps += mbps;
 	}
 	core_unlock(core, __func__);
 
-	if (mbps > core->capabilities[MAX_MBPS].value) {
-		rc = -ENOMEM;
-		i_vpr_e(inst, "%s: Hardware overloaded. needed %u, max %u", __func__,
-			mbps, core->capabilities[MAX_MBPS].value);
-		return rc;
-	} else {
-		i_vpr_h(inst, "%s: HW load needed %u is within max %u", __func__,
-			mbps, core->capabilities[MAX_MBPS].value);
+	if (is_encode_session(inst)) {
+		/* reject encoder if all encoders mbps is greater than MAX_MBPS */
+		if (enc_mbps > core->capabilities[MAX_MBPS].value) {
+			i_vpr_e(inst, "%s: Hardware overloaded. needed %u, max %u", __func__,
+				mbps, core->capabilities[MAX_MBPS].value);
+			return -ENOMEM;
+		}
+		/*
+		 * if total_mbps is greater than max_mbps then reduce all decoders
+		 * priority by 1 to allow this encoder
+		 */
+		if (total_mbps > core->capabilities[MAX_MBPS].value) {
+			core_lock(core, __func__);
+			list_for_each_entry(instance, &core->instances, list) {
+				/* reduce realtime decode sessions priority */
+				if (is_decode_session(inst) && is_realtime_session(inst)) {
+					instance->adjust_priority = RT_DEC_DOWN_PRORITY_OFFSET;
+					i_vpr_h(inst, "%s: pending adjust priority by %d\n",
+						__func__, inst->adjust_priority);
+				}
+			}
+			core_unlock(core, __func__);
+		}
+	} else if (is_decode_session(inst)){
+		if (total_mbps > core->capabilities[MAX_MBPS].value) {
+			inst->adjust_priority = RT_DEC_DOWN_PRORITY_OFFSET;
+			i_vpr_h(inst, "%s: pending adjust priority by %d\n",
+				__func__, inst->adjust_priority);
+		}
 	}
+
+	i_vpr_h(inst, "%s: HW load needed %u is within max %u", __func__,
+			total_mbps, core->capabilities[MAX_MBPS].value);
 
 	return 0;
 }
@@ -6010,9 +6051,7 @@ int msm_vidc_check_core_mbpf(struct msm_vidc_inst *inst)
 	core_lock(core, __func__);
 	/* check real-time video sessions max limit */
 	list_for_each_entry(instance, &core->instances, list) {
-		if (is_thumbnail_session(instance) ||
-			is_image_session(instance) ||
-			!is_realtime_session(instance))
+		if (msm_vidc_ignore_session_load(inst))
 			continue;
 
 		video_rt_mbpf += msm_vidc_get_mbs_per_frame(instance);

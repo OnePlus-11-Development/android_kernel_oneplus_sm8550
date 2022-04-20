@@ -477,6 +477,7 @@ int msm_vidc_update_debug_str(struct msm_vidc_inst *inst);
 void msm_vidc_allow_dcvs(struct msm_vidc_inst *inst);
 bool msm_vidc_allow_decode_batch(struct msm_vidc_inst *inst);
 int msm_vidc_check_session_supported(struct msm_vidc_inst *inst);
+bool msm_vidc_ignore_session_load(struct msm_vidc_inst *inst);
 int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst);
 int msm_vidc_check_core_mbpf(struct msm_vidc_inst *inst);
 int msm_vidc_check_scaling_supported(struct msm_vidc_inst *inst);
