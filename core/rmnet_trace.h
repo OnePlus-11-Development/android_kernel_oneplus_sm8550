@@ -265,9 +265,9 @@ DEFINE_EVENT
 DECLARE_EVENT_CLASS(print_udp,
 
 	TP_PROTO(struct sk_buff *skb, const char *saddr, const char *daddr,
-		 struct udphdr *uh),
+		 struct udphdr *uh, u16 ip_id),
 
-	TP_ARGS(skb, saddr, daddr, uh),
+	TP_ARGS(skb, saddr, daddr, uh, ip_id),
 
 	TP_STRUCT__entry(
 		__field(void *, skbaddr)
@@ -276,6 +276,7 @@ DECLARE_EVENT_CLASS(print_udp,
 		__string(daddr, daddr)
 		__field(__be16, source)
 		__field(__be16, dest)
+		__field(__be16, ip_id)
 	),
 
 	TP_fast_assign(
@@ -285,30 +286,32 @@ DECLARE_EVENT_CLASS(print_udp,
 		__assign_str(daddr, daddr);
 		__entry->source = uh->source;
 		__entry->dest = uh->dest;
+		__entry->ip_id = ip_id;
 	),
 
-	TP_printk("UDP: skbaddr=%pK, len=%d source=%s %u dest=%s %u",
+	TP_printk("UDP: skbaddr=%pK, len=%d source=%s %u dest=%s %u ip_id=%u",
 		__entry->skbaddr, __entry->len,
 		__get_str(saddr), be16_to_cpu(__entry->source),
-		__get_str(daddr), be16_to_cpu(__entry->dest))
+		__get_str(daddr), be16_to_cpu(__entry->dest),
+		__entry->ip_id)
 );
 
 DEFINE_EVENT
 	(print_udp, print_udp_tx,
 
 	TP_PROTO(struct sk_buff *skb, const char *saddr, const char *daddr,
-		 struct udphdr *uh),
+		 struct udphdr *uh, u16 ip_id),
 
-	TP_ARGS(skb, saddr, daddr, uh)
+	TP_ARGS(skb, saddr, daddr, uh, ip_id)
 );
 
 DEFINE_EVENT
 	(print_udp, print_udp_rx,
 
 	TP_PROTO(struct sk_buff *skb, const char *saddr, const char *daddr,
-		 struct udphdr *uh),
+		 struct udphdr *uh, u16 ip_id),
 
-	TP_ARGS(skb, saddr, daddr, uh)
+	TP_ARGS(skb, saddr, daddr, uh, ip_id)
 );
 
 TRACE_EVENT(print_pfn,

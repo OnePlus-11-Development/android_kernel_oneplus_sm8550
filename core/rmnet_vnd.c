@@ -355,6 +355,7 @@ skip_trace_print_icmp_tx:
 skip_trace_print_tcp_tx:
 	if (trace_print_udp_tx_enabled()) {
 		char saddr[INET6_ADDRSTRLEN], daddr[INET6_ADDRSTRLEN];
+		u16 ip_id = 0;
 
 		memset(saddr, 0, INET6_ADDRSTRLEN);
 		memset(daddr, 0, INET6_ADDRSTRLEN);
@@ -365,6 +366,7 @@ skip_trace_print_tcp_tx:
 
 			snprintf(saddr, INET6_ADDRSTRLEN, "%pI4", &ip_hdr(skb)->saddr);
 			snprintf(daddr, INET6_ADDRSTRLEN, "%pI4", &ip_hdr(skb)->daddr);
+			ip_id = ntohs(ip_hdr(skb)->id);
 		}
 
 		if (skb->protocol == htons(ETH_P_IPV6)) {
@@ -375,7 +377,7 @@ skip_trace_print_tcp_tx:
 			snprintf(daddr, INET6_ADDRSTRLEN, "%pI6", &ipv6_hdr(skb)->daddr);
 		}
 
-		trace_print_udp_tx(skb, saddr, daddr, udp_hdr(skb));
+		trace_print_udp_tx(skb, saddr, daddr, udp_hdr(skb), ip_id);
 	}
 
 skip_trace_print_udp_tx:
