@@ -10,6 +10,7 @@
 #include "dp_debug.h"
 #include "dp_pll.h"
 #include <linux/rational.h>
+#include <drm/drm_fixed.h>
 
 #define dp_catalog_get_priv_v420(x) ({ \
 	struct dp_catalog *catalog; \
@@ -163,14 +164,13 @@ static void dp_catalog_panel_config_msa_v420(struct dp_catalog_panel *panel,
 					u32 rate, u32 stream_rate_khz)
 {
 	u32 mvid, nvid, mvid_off = 0, nvid_off = 0;
-	u32 div, pixel_div = 0, rate_vco_div = 0;
 	u32 const nvid_fixed = 0x8000;
-	u32 const link_rate_hbr2 = 540000;
-	u32 const link_rate_hbr3 = 810000;
 	struct dp_catalog *dp_catalog;
 	struct dp_catalog_private_v420 *catalog;
 	struct dp_io_data *io_data;
 	unsigned long num, den;
+	u32 const input_scale = 10;
+	u64 f1, f2;
 
 	if (!panel || !rate) {
 		DP_ERR("invalid input\n");
@@ -185,53 +185,26 @@ static void dp_catalog_panel_config_msa_v420(struct dp_catalog_panel *panel,
 	dp_catalog = container_of(panel, struct dp_catalog, panel);
 	catalog = container_of(dp_catalog->sub, struct dp_catalog_private_v420, sub);
 
-	io_data = catalog->io->dp_pll;
-	div = dp_read(DP_PHY_VCO_DIV);
-
-	div &= 0x03;
-
-	if (div == 0)
-		pixel_div = 6;
-	else if (div == 1)
-		pixel_div = 2;
-	else if (div == 2)
-		pixel_div = 4;
-
-	if (!pixel_div) {
-		DP_ERR("Invalid pixel mux divider, not setting software mvid and nvid\n");
-		return;
-	}
-
-	rate_vco_div = (rate * 10) / pixel_div;
-
-	rational_best_approximation(rate_vco_div, (stream_rate_khz / 2),
+	/*
+	 * MND calculator requires the target clock to be less than half the input clock. To meet
+	 * this requirement, the input clock is scaled here and then the resulting M value is
+	 * scaled by the same factor to offset the pre-scale.
+	 */
+	rational_best_approximation(rate * input_scale, stream_rate_khz,
 			(unsigned long)(1 << 16) - 1,
 			(unsigned long)(1 << 16) - 1, &den, &num);
 
-	den = ~(den - num);
-	den = den & 0xFFFF;
-
-	mvid = (num & 0xFFFF) * 5;
-	nvid = (0xFFFF & (~den)) + (num & 0xFFFF);
+	mvid = (num & 0xFFFF);
+	nvid = (den & 0xFFFF);
+	mvid *= input_scale;
 
 	if (nvid < nvid_fixed) {
-		u32 temp;
-
-		temp = (nvid_fixed / nvid) * nvid;
-		mvid = (nvid_fixed / nvid) * mvid;
-		nvid = temp;
+		f1 = drm_fixp_from_fraction(nvid_fixed, nvid);
+		f2 = drm_fixp_from_fraction(mvid, 1);
+		f1 = drm_fixp_mul(f1, f2);
+		mvid = drm_fixp2int(f1);
+		nvid = nvid_fixed;
 	}
-
-	DP_DEBUG("rate = %d\n", rate);
-
-	if (panel->widebus_en)
-		mvid <<= 1;
-
-	if (link_rate_hbr2 == rate)
-		nvid *= 2;
-
-	if (link_rate_hbr3 == rate)
-		nvid *= 3;
 
 	io_data = catalog->io->dp_link;
 
@@ -240,7 +213,7 @@ static void dp_catalog_panel_config_msa_v420(struct dp_catalog_panel *panel,
 		nvid_off = DP1_SOFTWARE_NVID - DP_SOFTWARE_NVID;
 	}
 
-	DP_DEBUG("mvid=0x%x, nvid=0x%x\n", mvid, nvid);
+	DP_DEBUG("pclk=%ld, lclk=%ld, mvid=0x%x, nvid=0x%x\n", stream_rate_khz, rate, mvid, nvid);
 	dp_write(DP_SOFTWARE_MVID + mvid_off, mvid);
 	dp_write(DP_SOFTWARE_NVID + nvid_off, nvid);
 }
