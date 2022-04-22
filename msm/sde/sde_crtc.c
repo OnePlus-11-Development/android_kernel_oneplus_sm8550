@@ -3711,7 +3711,7 @@ bool sde_crtc_is_line_insertion_supported(struct drm_crtc *crtc)
 		return false;
 
 	kms = _sde_crtc_get_kms(crtc);
-	if (!kms->catalog->has_line_insertion)
+	if (!kms || !kms->catalog || !kms->catalog->has_line_insertion)
 		return false;
 
 	list_for_each_entry(enc, &crtc->dev->mode_config.encoder_list, head) {

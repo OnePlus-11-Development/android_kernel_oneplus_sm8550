@@ -1652,6 +1652,12 @@ static void _sde_cp_crtc_commit_feature(struct sde_cp_node *prop_node,
 	struct sde_mdss_cfg *catalog = NULL;
 	struct sde_crtc_state *sde_crtc_state;
 
+	sde_crtc_state = to_sde_crtc_state(sde_crtc->base.state);
+	if (!sde_crtc_state) {
+		DRM_ERROR("sde_crtc_state is null\n");
+		return;
+	}
+
 	memset(&hw_cfg, 0, sizeof(hw_cfg));
 	_sde_cp_get_cached_payload(prop_node, &hw_cfg, &feature_enabled);
 	hw_cfg.num_of_mixers = sde_crtc->num_mixers;
@@ -1663,11 +1669,6 @@ static void _sde_cp_crtc_commit_feature(struct sde_cp_node *prop_node,
 	hw_cfg.skip_blend_plane_h = sde_crtc->skip_blend_plane_h;
 	hw_cfg.skip_blend_plane_w = sde_crtc->skip_blend_plane_w;
 
-	sde_crtc_state = to_sde_crtc_state(sde_crtc->base.state);
-	if (!sde_crtc_state) {
-		DRM_ERROR("invalid sde_crtc_state %pK\n", sde_crtc_state);
-		return;
-	}
 	hw_cfg.num_ds_enabled = sde_crtc_state->num_ds_enabled;
 
 	SDE_EVT32(hw_cfg.panel_width, hw_cfg.panel_height);
