@@ -383,13 +383,12 @@ static void _sde_core_perf_crtc_set_llcc_cache_type(struct sde_kms *kms,
 {
 	struct drm_crtc *tmp_crtc;
 	struct sde_crtc *sde_crtc;
-	struct sde_sc_cfg *sc_cfg = kms->perf.catalog->sc_cfg;
 	struct sde_core_perf_params *cur_perf;
 	enum sde_crtc_client_type curr_client_type
 					= sde_crtc_get_client_type(crtc);
 	u32 llcc_active = 0;
 
-	if (!sc_cfg[type].has_sys_cache) {
+	if (!test_bit(type, kms->perf.catalog->sde_sys_cache_type_map)) {
 		SDE_DEBUG("System Cache %d is not enabled!. Won't use\n",
 				type);
 		return;

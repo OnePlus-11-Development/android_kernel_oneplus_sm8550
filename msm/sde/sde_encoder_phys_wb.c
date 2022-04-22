@@ -1093,8 +1093,8 @@ static void _sde_encoder_phys_wb_setup_cache(struct sde_encoder_phys *phys_enc,
 	cache_type = phys_enc->in_clone_mode ? SDE_SYS_CACHE_DISP : SDE_SYS_CACHE_DISP_WB;
 
 	sc_cfg = &hw_wb->catalog->sc_cfg[cache_type];
-	if (!sc_cfg->has_sys_cache) {
-		SDE_DEBUG("sys cache feature not enabled\n");
+	if (!test_bit(cache_type, hw_wb->catalog->sde_sys_cache_type_map)) {
+		SDE_DEBUG("sys cache type %d not enabled\n", cache_type);
 		return;
 	}
 

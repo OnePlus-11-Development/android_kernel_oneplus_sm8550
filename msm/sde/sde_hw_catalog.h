@@ -710,7 +710,6 @@ enum {
  * @SDE_FEATURE_INLINE_SKIP_THRESHOLD      Skip inline rotation threshold
  * @SDE_FEATURE_DITHER_LUMA_MODE           Dither LUMA mode supported
  * @SDE_FEATURE_RC_LM_FLUSH_OVERRIDE       RC LM flush override supported
- * @SDE_FEATURE_SYSCACHE       System cache supported
  * @SDE_FEATURE_SUI_MISR       SecureUI MISR supported
  * @SDE_FEATURE_SUI_BLENDSTAGE SecureUI Blendstage supported
  * @SDE_FEATURE_SUI_NS_ALLOWED SecureUI allowed to access non-secure context banks
@@ -750,7 +749,6 @@ enum sde_mdss_features {
 	SDE_FEATURE_INLINE_SKIP_THRESHOLD,
 	SDE_FEATURE_DITHER_LUMA_MODE,
 	SDE_FEATURE_RC_LM_FLUSH_OVERRIDE,
-	SDE_FEATURE_SYSCACHE,
 	SDE_FEATURE_SUI_MISR,
 	SDE_FEATURE_SUI_BLENDSTAGE,
 	SDE_FEATURE_SUI_NS_ALLOWED,
@@ -1639,13 +1637,11 @@ struct sde_perf_cdp_cfg {
 
 /**
  * struct sde_sc_cfg - define system cache configuration
- * @has_sys_cache: true if system cache is enabled
  * @llcc_uuid: llcc use case id for the system cache
  * @llcc_scid: scid for the system cache
  * @llcc_slice_size: slice size of the system cache
  */
 struct sde_sc_cfg {
-	bool has_sys_cache;
 	int llcc_uid;
 	int llcc_scid;
 	size_t llcc_slice_size;
@@ -1943,6 +1939,7 @@ struct sde_mdss_cfg {
 	u32 allowed_dsc_reservation_switch;
 	enum autorefresh_disable_sequence autorefresh_disable_seq;
 	struct sde_sc_cfg sc_cfg[SDE_SYS_CACHE_MAX];
+	DECLARE_BITMAP(sde_sys_cache_type_map, SDE_SYS_CACHE_MAX);
 	struct sde_perf_cfg perf;
 	struct sde_uidle_cfg uidle_cfg;
 	struct list_head irq_offset_list;

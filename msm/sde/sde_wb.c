@@ -625,8 +625,8 @@ int sde_wb_connector_post_init(struct drm_connector *connector, void *display)
 	wb_dev->connector = connector;
 	wb_dev->detect_status = connector_status_connected;
 
-	if (catalog->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache
-			|| catalog->sc_cfg[SDE_SYS_CACHE_DISP_WB].has_sys_cache)
+	if (test_bit(SDE_SYS_CACHE_DISP, catalog->sde_sys_cache_type_map)
+			|| test_bit(SDE_SYS_CACHE_DISP_WB, catalog->sde_sys_cache_type_map))
 		msm_property_install_enum(&c_conn->property_info, "cache_state",
 			0x0, 0, e_cache_state, ARRAY_SIZE(e_cache_state),
 			0, CONNECTOR_PROP_CACHE_STATE);
