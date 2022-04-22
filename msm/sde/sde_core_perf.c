@@ -327,6 +327,7 @@ static int _sde_core_perf_activate_llcc(struct sde_kms *kms,
 	struct drm_device *drm_dev;
 	struct device *dev;
 	struct platform_device *pdev;
+	u32 scid;
 	int rc = 0;
 
 	if (!kms || !kms->dev || !kms->dev->dev) {
@@ -340,17 +341,12 @@ static int _sde_core_perf_activate_llcc(struct sde_kms *kms,
 	pdev = to_platform_device(dev);
 
 	/* If LLCC is already in the requested state, skip */
-	SDE_EVT32(activate, type, kms->perf.llcc_active[type]);
 	if ((activate && kms->perf.llcc_active[type]) ||
 		(!activate && !kms->perf.llcc_active[type])) {
 		SDE_DEBUG("skip llcc type:%d request:%d state:%d\n",
 			type, activate, kms->perf.llcc_active[type]);
 		goto exit;
 	}
-
-	SDE_DEBUG("%sactivate the llcc type:%d state:%d\n",
-		activate ? "" : "de",
-		type, kms->perf.llcc_active[type]);
 
 	slice = llcc_slice_getd(kms->catalog->sc_cfg[type].llcc_uid);
 	if (IS_ERR_OR_NULL(slice))  {
@@ -359,6 +355,11 @@ static int _sde_core_perf_activate_llcc(struct sde_kms *kms,
 		rc = -EINVAL;
 		goto exit;
 	}
+
+	scid = llcc_get_slice_id(slice);
+	SDE_EVT32(activate, type, kms->perf.llcc_active[type], scid);
+	SDE_DEBUG("%sactivate the llcc type:%d state:%d scid:%d\n", activate ? "" : "de", type,
+			kms->perf.llcc_active[type], scid);
 
 	if (activate) {
 		llcc_slice_activate(slice);
