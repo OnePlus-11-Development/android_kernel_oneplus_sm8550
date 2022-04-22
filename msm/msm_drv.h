@@ -1260,8 +1260,10 @@ struct drm_framebuffer *msm_framebuffer_init(struct drm_device *dev,
 		struct drm_gem_object **bos);
 struct drm_framebuffer *msm_framebuffer_create(struct drm_device *dev,
 		struct drm_file *file, const struct drm_mode_fb_cmd2 *mode_cmd);
-void msm_framebuffer_set_cache_hint(struct drm_framebuffer *fb, u32 flags, u32 type);
-void msm_framebuffer_get_cache_hint(struct drm_framebuffer *fb, u32 *flags, u32 *type);
+int msm_framebuffer_set_cache_hint(struct drm_framebuffer *fb,
+		u32 flags, u32 rd_type, u32 wr_type);
+int msm_framebuffer_get_cache_hint(struct drm_framebuffer *fb,
+		u32 *flags, u32 *rd_type, u32 *wr_type);
 
 struct drm_fb_helper *msm_fbdev_init(struct drm_device *dev);
 void msm_fbdev_free(struct drm_device *dev);
