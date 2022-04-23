@@ -1085,21 +1085,11 @@ static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
 			return rc;
 	}
 
+	/* call this explicitly to adjust client priority */
 	if (ctrl->id == V4L2_CID_MPEG_VIDC_PRIORITY) {
 		rc = msm_vidc_adjust_session_priority(inst, ctrl);
 		if (rc)
 			return rc;
-
-		/**
-		 * This is the last static s_ctrl from client(commit point). So update
-		 * input & output counts to reflect final buffer counts based on dcvs
-		 * & decoder_batching enable/disable. So client is expected to query
-		 * for final counts after setting priority control.
-		 */
-		if (is_decode_session(inst))
-			inst->decode_batch.enable = msm_vidc_allow_decode_batch(inst);
-
-		msm_vidc_allow_dcvs(inst);
 	}
 	if (ctrl->id == V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER) {
 		u32 enable;
@@ -2792,8 +2782,29 @@ int msm_vidc_adjust_session_priority(void *instance, struct v4l2_ctrl *ctrl)
 		return -EINVAL;
 	}
 	capability = inst->capabilities;
-	adjusted_value = ctrl ? ctrl->val :
-		capability->cap[PRIORITY].value;
+	/*
+	 * Priority handling
+	 * Client will set 0 (realtime), 1+ (non-realtime)
+	 * Driver adds NRT_PRIORITY_OFFSET (2) to clients non-realtime priority
+	 * and hence PRIORITY values in the driver become 0, 3+.
+	 * Driver may move decode realtime sessions to non-realtime by
+	 * increasing priority by 1 to RT sessions in HW overloaded cases.
+	 * So driver PRIORITY values can be 0, 1, 3+.
+	 * When driver setting priority to firmware, driver adds
+	 * FIRMWARE_PRIORITY_OFFSET (1) for all sessions except
+	 * non-critical sessions. So finally firmware priority values ranges
+	 * from 0 (Critical session), 1 (realtime session),
+	 * 2+ (non-realtime session)
+	 */
+	if (ctrl) {
+		/* add offset when client sets non-realtime */
+		if (ctrl->val)
+			adjusted_value = ctrl->val + NRT_PRIORITY_OFFSET;
+		else
+			adjusted_value = ctrl->val;
+	} else {
+		adjusted_value = capability->cap[PRIORITY].value;
+	}
 
 	msm_vidc_update_cap_value(inst, PRIORITY, adjusted_value, __func__);
 
