@@ -4406,7 +4406,7 @@ int gsi_poll_n_channel(unsigned long chan_hdl,
 		/* update rp to see of we have anything new to process */
 		rp = ctx->evtr->props.gsi_read_event_ring_rp(
 			&ctx->evtr->props, ctx->evtr->id, ee);
-		rp |= ctx->ring.rp & GSI_MSB_MASK;
+		rp |= ctx->evtr->ring.rp & GSI_MSB_MASK;
 
 		ctx->evtr->ring.rp = rp;
 		/* read gsi event ring rp again if last read is empty */
@@ -4425,7 +4425,7 @@ int gsi_poll_n_channel(unsigned long chan_hdl,
 			__iowmb();
 			rp = ctx->evtr->props.gsi_read_event_ring_rp(
 				&ctx->evtr->props, ctx->evtr->id, ee);
-			rp |= ctx->ring.rp & GSI_MSB_MASK;
+			rp |= ctx->evtr->ring.rp & GSI_MSB_MASK;
 			ctx->evtr->ring.rp = rp;
 			if (rp == ctx->evtr->ring.rp_local) {
 				spin_unlock_irqrestore(
