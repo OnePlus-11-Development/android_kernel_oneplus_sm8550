@@ -802,6 +802,7 @@ struct vidc_bus_vote_data {
 	u64 calc_bw_ddr;
 	u64 calc_bw_llcc;
 	u32 num_vpp_pipes;
+	bool vpss_preprocessing_enabled;
 };
 
 struct msm_vidc_power {
