@@ -4345,62 +4345,65 @@ int ipa3_setup_dflt_rt_tables(void)
 
 static int ipa3_setup_exception_path(void)
 {
-	struct ipa_ioc_add_hdr *hdr;
-	struct ipa_hdr_add *hdr_entry;
-	struct ipahal_reg_route route = { 0 };
-	struct ipa3_hdr_entry *hdr_entry_internal;
-	int ret;
+	struct ipa_ioc_add_hdr *hdr = NULL;
+	int ret = 0;
 
-	/* install the basic exception header */
-	hdr = kzalloc(sizeof(struct ipa_ioc_add_hdr) + 1 *
-		sizeof(struct ipa_hdr_add), GFP_KERNEL);
-	if (!hdr)
-		return -ENOMEM;
+	if ( ! lan_coal_enabled() ) {
 
-	hdr->num_hdrs = 1;
-	hdr->commit = 1;
-	hdr_entry = &hdr->hdr[0];
+		struct ipa_hdr_add *hdr_entry;
+		struct ipahal_reg_route route = { 0 };
+		struct ipa3_hdr_entry *hdr_entry_internal;
 
-	strlcpy(hdr_entry->name, IPA_LAN_RX_HDR_NAME, IPA_RESOURCE_NAME_MAX);
-	hdr_entry->hdr_len = IPA_LAN_RX_HEADER_LENGTH;
+		/* install the basic exception header */
+		hdr = kzalloc(sizeof(struct ipa_ioc_add_hdr) + 1 *
+					  sizeof(struct ipa_hdr_add), GFP_KERNEL);
+		if (!hdr)
+			return -ENOMEM;
 
-	if (ipa3_add_hdr(hdr)) {
-		IPAERR("fail to add exception hdr\n");
-		ret = -EPERM;
-		goto bail;
+		hdr->num_hdrs = 1;
+		hdr->commit = 1;
+		hdr_entry = &hdr->hdr[0];
+
+		strlcpy(hdr_entry->name, IPA_LAN_RX_HDR_NAME, IPA_RESOURCE_NAME_MAX);
+		hdr_entry->hdr_len = IPA_LAN_RX_HEADER_LENGTH;
+
+		if (ipa3_add_hdr(hdr)) {
+			IPAERR("fail to add exception hdr\n");
+			ret = -EPERM;
+			goto bail;
+		}
+
+		if (hdr_entry->status) {
+			IPAERR("fail to add exception hdr\n");
+			ret = -EPERM;
+			goto bail;
+		}
+
+		hdr_entry_internal = ipa3_id_find(hdr_entry->hdr_hdl);
+		if (unlikely(!hdr_entry_internal)) {
+			IPAERR("fail to find internal hdr structure\n");
+			ret = -EPERM;
+			goto bail;
+		}
+
+		ipa3_ctx->excp_hdr_hdl = hdr_entry->hdr_hdl;
+
+		/* set the route register to pass exception packets to Apps */
+		route.route_def_pipe = ipa3_get_ep_mapping(IPA_CLIENT_APPS_LAN_CONS);
+		route.route_frag_def_pipe = ipa3_get_ep_mapping(
+			IPA_CLIENT_APPS_LAN_CONS);
+		route.route_def_hdr_table = !hdr_entry_internal->is_lcl;
+		route.route_def_retain_hdr = 1;
+
+		if (ipa3_cfg_route(&route)) {
+			IPAERR("fail to add exception hdr\n");
+			ret = -EPERM;
+			goto bail;
+		}
 	}
 
-	if (hdr_entry->status) {
-		IPAERR("fail to add exception hdr\n");
-		ret = -EPERM;
-		goto bail;
-	}
-
-	hdr_entry_internal = ipa3_id_find(hdr_entry->hdr_hdl);
-	if (unlikely(!hdr_entry_internal)) {
-		IPAERR("fail to find internal hdr structure\n");
-		ret = -EPERM;
-		goto bail;
-	}
-
-	ipa3_ctx->excp_hdr_hdl = hdr_entry->hdr_hdl;
-
-	/* set the route register to pass exception packets to Apps */
-	route.route_def_pipe = ipa3_get_ep_mapping(IPA_CLIENT_APPS_LAN_CONS);
-	route.route_frag_def_pipe = ipa3_get_ep_mapping(
-		IPA_CLIENT_APPS_LAN_CONS);
-	route.route_def_hdr_table = !hdr_entry_internal->is_lcl;
-	route.route_def_retain_hdr = 1;
-
-	if (ipa3_cfg_route(&route)) {
-		IPAERR("fail to add exception hdr\n");
-		ret = -EPERM;
-		goto bail;
-	}
-
-	ret = 0;
 bail:
-	kfree(hdr);
+	if ( hdr ) kfree(hdr);
 	return ret;
 }
 
@@ -6115,35 +6118,75 @@ static int ipa3_setup_apps_pipes(void)
 	}
 	IPADBG("default routing was set\n");
 
-	/* LAN IN (IPA->AP) */
-	memset(&sys_in, 0, sizeof(struct ipa_sys_connect_params));
-	sys_in.client = IPA_CLIENT_APPS_LAN_CONS;
-	sys_in.desc_fifo_sz = IPA_SYS_DESC_FIFO_SZ;
-	sys_in.notify = ipa3_lan_rx_cb;
-	sys_in.priv = NULL;
-	if (ipa3_ctx->lan_rx_napi_enable)
-		sys_in.napi_obj = &ipa3_ctx->napi_lan_rx;
-	sys_in.ipa_ep_cfg.hdr.hdr_len = IPA_LAN_RX_HEADER_LENGTH;
-	sys_in.ipa_ep_cfg.hdr_ext.hdr_little_endian = false;
-	sys_in.ipa_ep_cfg.hdr_ext.hdr_total_len_or_pad_valid = true;
-	sys_in.ipa_ep_cfg.hdr_ext.hdr_total_len_or_pad = IPA_HDR_PAD;
-	sys_in.ipa_ep_cfg.hdr_ext.hdr_payload_len_inc_padding = false;
-	sys_in.ipa_ep_cfg.hdr_ext.hdr_total_len_or_pad_offset = 0;
-	sys_in.ipa_ep_cfg.hdr_ext.hdr_pad_to_alignment = 2;
-	sys_in.ipa_ep_cfg.cfg.cs_offload_en = IPA_DISABLE_CS_OFFLOAD;
+	ipa3_ctx->clnt_hdl_data_in = 0;
 
-	/**
-	 * ipa_lan_rx_cb() intended to notify the source EP about packet
-	 * being received on the LAN_CONS via calling the source EP call-back.
-	 * There could be a race condition with calling this call-back. Other
-	 * thread may nullify it - e.g. on EP disconnect.
-	 * This lock intended to protect the access to the source EP call-back
-	 */
-	spin_lock_init(&ipa3_ctx->disconnect_lock);
-	if (ipa3_setup_sys_pipe(&sys_in, &ipa3_ctx->clnt_hdl_data_in)) {
-		IPAERR(":setup sys pipe (LAN_CONS) failed.\n");
-		result = -EPERM;
-		goto fail_flt_hash_tuple;
+	if ( ipa3_ctx->ipa_hw_type >= IPA_HW_v5_5 ) {
+		/*
+		 * LAN_COAL IN (IPA->AP)
+		 */
+		memset(&sys_in, 0, sizeof(struct ipa_sys_connect_params));
+		sys_in.client = IPA_CLIENT_APPS_LAN_COAL_CONS;
+		sys_in.desc_fifo_sz = IPA_SYS_DESC_FIFO_SZ;
+		sys_in.notify = ipa3_lan_coal_rx_cb;
+		sys_in.priv = NULL;
+		if (ipa3_ctx->lan_rx_napi_enable)
+			sys_in.napi_obj = &ipa3_ctx->napi_lan_rx;
+		sys_in.ipa_ep_cfg.hdr_ext.hdr_little_endian = false;
+		sys_in.ipa_ep_cfg.hdr_ext.hdr_total_len_or_pad_valid = true;
+		sys_in.ipa_ep_cfg.hdr_ext.hdr_total_len_or_pad = IPA_HDR_PAD;
+		sys_in.ipa_ep_cfg.hdr_ext.hdr_payload_len_inc_padding = false;
+		sys_in.ipa_ep_cfg.hdr_ext.hdr_total_len_or_pad_offset = 0;
+		sys_in.ipa_ep_cfg.hdr_ext.hdr_pad_to_alignment = 2;
+		sys_in.ipa_ep_cfg.cfg.cs_offload_en = IPA_DISABLE_CS_OFFLOAD;
+
+		/**
+		 * ipa3_lan_coal_rx_cb() intended to notify the source EP about
+		 * packet being received on the LAN_COAL_CONS via calling the
+		 * source EP call-back.  There could be a race condition with
+		 * calling this call-back. Other thread may nullify it - e.g. on
+		 * EP disconnect.  This lock intended to protect the access to the
+		 * source EP call-back
+		 */
+		spin_lock_init(&ipa3_ctx->disconnect_lock);
+		if (ipa3_setup_sys_pipe(&sys_in, &ipa3_ctx->clnt_hdl_data_in)) {
+			IPAERR(":setup sys pipe (LAN_COAL_CONS) failed.\n");
+			result = -EPERM;
+			goto fail_flt_hash_tuple;
+		}
+
+	} else { /* ipa3_ctx->ipa_hw_type < IPA_HW_v5_5 */
+		/*
+		 * LAN IN (IPA->AP)
+		 */
+		memset(&sys_in, 0, sizeof(struct ipa_sys_connect_params));
+		sys_in.client = IPA_CLIENT_APPS_LAN_CONS;
+		sys_in.desc_fifo_sz = IPA_SYS_DESC_FIFO_SZ;
+		sys_in.notify = ipa3_lan_rx_cb;
+		sys_in.priv = NULL;
+		if (ipa3_ctx->lan_rx_napi_enable)
+			sys_in.napi_obj = &ipa3_ctx->napi_lan_rx;
+		sys_in.ipa_ep_cfg.hdr.hdr_len = IPA_LAN_RX_HEADER_LENGTH;
+		sys_in.ipa_ep_cfg.hdr_ext.hdr_little_endian = false;
+		sys_in.ipa_ep_cfg.hdr_ext.hdr_total_len_or_pad_valid = true;
+		sys_in.ipa_ep_cfg.hdr_ext.hdr_total_len_or_pad = IPA_HDR_PAD;
+		sys_in.ipa_ep_cfg.hdr_ext.hdr_payload_len_inc_padding = false;
+		sys_in.ipa_ep_cfg.hdr_ext.hdr_total_len_or_pad_offset = 0;
+		sys_in.ipa_ep_cfg.hdr_ext.hdr_pad_to_alignment = 2;
+		sys_in.ipa_ep_cfg.cfg.cs_offload_en = IPA_DISABLE_CS_OFFLOAD;
+
+		/**
+		 * ipa_lan_rx_cb() intended to notify the source EP about packet
+		 * being received on the LAN_CONS via calling the source EP call-back.
+		 * There could be a race condition with calling this call-back. Other
+		 * thread may nullify it - e.g. on EP disconnect.
+		 * This lock intended to protect the access to the source EP call-back
+		 */
+		spin_lock_init(&ipa3_ctx->disconnect_lock);
+		if (ipa3_setup_sys_pipe(&sys_in, &ipa3_ctx->clnt_hdl_data_in)) {
+			IPAERR(":setup sys pipe (LAN_CONS) failed.\n");
+			result = -EPERM;
+			goto fail_flt_hash_tuple;
+		}
 	}
 
 	/* LAN OUT (AP->IPA) */
@@ -6172,7 +6215,8 @@ static int ipa3_setup_apps_pipes(void)
 	return 0;
 
 fail_lan_data_out:
-	ipa3_teardown_sys_pipe(ipa3_ctx->clnt_hdl_data_in);
+	if ( ipa3_ctx->clnt_hdl_data_in )
+		ipa3_teardown_sys_pipe(ipa3_ctx->clnt_hdl_data_in);
 fail_flt_hash_tuple:
 	if (ipa3_ctx->dflt_v6_rt_rule_hdl)
 		__ipa3_del_rt_rule(ipa3_ctx->dflt_v6_rt_rule_hdl);
@@ -6189,7 +6233,8 @@ static void ipa3_teardown_apps_pipes(void)
 {
 	if (!ipa3_ctx->ipa_config_is_mhi)
 		ipa3_teardown_sys_pipe(ipa3_ctx->clnt_hdl_data_out);
-	ipa3_teardown_sys_pipe(ipa3_ctx->clnt_hdl_data_in);
+	if ( ipa3_ctx->clnt_hdl_data_in )
+		ipa3_teardown_sys_pipe(ipa3_ctx->clnt_hdl_data_in);
 	__ipa3_del_rt_rule(ipa3_ctx->dflt_v6_rt_rule_hdl);
 	__ipa3_del_rt_rule(ipa3_ctx->dflt_v4_rt_rule_hdl);
 	__ipa3_del_hdr(ipa3_ctx->excp_hdr_hdl, false);
@@ -6798,7 +6843,7 @@ static void __ipa3_dec_client_disable_clks(void)
 	 */
 	if (atomic_read(&ipa3_ctx->ipa3_active_clients.cnt) == 1 &&
 		!ipa3_ctx->tag_process_before_gating) {
-		ipa3_force_close_coal();
+		ipa3_force_close_coal(true, true);
 		/* While sending force close command setting
 		 * tag process as true to make configure to
 		 * original state
@@ -8789,8 +8834,11 @@ static inline void ipa3_enable_napi_netdev(void)
 	if (ipa3_ctx->lan_rx_napi_enable || ipa3_ctx->tx_napi_enable) {
 		init_dummy_netdev(&ipa3_ctx->generic_ndev);
 		if(ipa3_ctx->lan_rx_napi_enable) {
-			netif_napi_add(&ipa3_ctx->generic_ndev, &ipa3_ctx->napi_lan_rx,
-					ipa3_lan_poll, NAPI_WEIGHT);
+			netif_napi_add(
+				&ipa3_ctx->generic_ndev,
+				&ipa3_ctx->napi_lan_rx,
+				ipa3_lan_poll,
+				NAPI_WEIGHT);
 		}
 	}
 }
@@ -8909,10 +8957,18 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	ipa3_ctx->uc_ctx.holb_monitor.max_cnt_11ad =
 		resource_p->ipa_holb_monitor_max_cnt_11ad;
 	ipa3_ctx->ipa_wan_aggr_pkt_cnt = resource_p->ipa_wan_aggr_pkt_cnt;
-	ipa3_ctx->stats.page_recycle_stats[0].total_replenished = 0;
-	ipa3_ctx->stats.page_recycle_stats[0].tmp_alloc = 0;
-	ipa3_ctx->stats.page_recycle_stats[1].total_replenished = 0;
-	ipa3_ctx->stats.page_recycle_stats[1].tmp_alloc = 0;
+	memset(
+		ipa3_ctx->stats.page_recycle_stats,
+		0,
+		sizeof(ipa3_ctx->stats.page_recycle_stats));
+	memset(
+		ipa3_ctx->stats.cache_recycle_stats,
+		0,
+		sizeof(ipa3_ctx->stats.cache_recycle_stats));
+	memset(
+		&ipa3_ctx->stats.coal,
+		0,
+		sizeof(ipa3_ctx->stats.coal));
 	memset(ipa3_ctx->stats.page_recycle_cnt, 0,
 		sizeof(ipa3_ctx->stats.page_recycle_cnt));
 	ipa3_ctx->stats.num_sort_tasklet_sched[0] = 0;

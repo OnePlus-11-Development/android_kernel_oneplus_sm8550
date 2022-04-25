@@ -170,6 +170,19 @@ do {\
 	(x < IPA_CLIENT_MAX && (x & 0x1) == 0)
 #define IPA_CLIENT_IS_CONS(x) \
 	(x < IPA_CLIENT_MAX && (x & 0x1) == 1)
+/*
+ * The following macro does two things:
+ *   1) It checks to see if client x is allocated, and
+ *   2) It assigns a value to index idx
+ */
+#define IPA_CLIENT_IS_MAPPED(x, idx) \
+	((idx = ipa3_get_ep_mapping(x)) != IPA_EP_NOT_ALLOCATED)
+/*
+ * Same behavior as the macro above; but in addition, determines if
+ * the client is valid as well.
+ */
+#define IPA_CLIENT_IS_MAPPED_VALID(x, idx) \
+	(IPA_CLIENT_IS_MAPPED(x, idx) && ipa3_ctx->ep[idx].valid == 1)
 #define IPA_CLIENT_IS_ETH_PROD(x) \
 	((x == ipa3_get_ep_mapping(IPA_CLIENT_ETHERNET_PROD)) || \
 	 (x == ipa3_get_ep_mapping(IPA_CLIENT_ETHERNET2_PROD)) || \

@@ -1077,9 +1077,18 @@ static int __ipa_create_rt_entry(struct ipa3_rt_entry **entry,
 	(*(entry))->ipacm_installed = user;
 
 	if ((*(entry))->rule.coalesce &&
-		(*(entry))->rule.dst == IPA_CLIENT_APPS_WAN_CONS &&
-		ipa3_get_ep_mapping(IPA_CLIENT_APPS_WAN_COAL_CONS) != -1)
-		(*(entry))->rule.dst = IPA_CLIENT_APPS_WAN_COAL_CONS;
+		IPA_CLIENT_IS_LAN_or_WAN_CONS((*(entry))->rule.dst)) {
+		int unused;
+		if ((*(entry))->rule.dst == IPA_CLIENT_APPS_LAN_CONS) {
+			if (IPA_CLIENT_IS_MAPPED(IPA_CLIENT_APPS_LAN_COAL_CONS, unused)) {
+				(*(entry))->rule.dst = IPA_CLIENT_APPS_LAN_COAL_CONS;
+			}
+		} else { /* == IPA_CLIENT_APPS_WAN_CONS */
+			if (IPA_CLIENT_IS_MAPPED(IPA_CLIENT_APPS_WAN_COAL_CONS, unused)) {
+				(*(entry))->rule.dst = IPA_CLIENT_APPS_WAN_COAL_CONS;
+			}
+		}
+	}
 
 	if (rule->enable_stats)
 		(*entry)->cnt_idx = rule->cnt_idx;

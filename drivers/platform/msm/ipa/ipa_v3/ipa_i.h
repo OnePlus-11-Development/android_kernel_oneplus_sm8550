@@ -1546,6 +1546,30 @@ struct ipa3_page_recycle_stats {
 	u64 tmp_alloc;
 };
 
+struct ipa3_cache_recycle_stats {
+	u64 pkt_allocd;
+	u64 pkt_found;
+	u64 tot_pkt_replenished;
+};
+
+struct lan_coal_stats {
+	u64 coal_rx;
+	u64 coal_left_as_is;
+	u64 coal_reconstructed;
+	u64 coal_pkts;
+	u64 coal_hdr_qmap_err;
+	u64 coal_hdr_nlo_err;
+	u64 coal_hdr_pkt_err;
+	u64 coal_csum_err;
+	u64 coal_ip_invalid;
+	u64 coal_trans_invalid;
+	u64 coal_veid[GSI_VEID_MAX];
+	u64 coal_tcp;
+	u64 coal_tcp_bytes;
+	u64 coal_udp;
+	u64 coal_udp_bytes;
+};
+
 struct ipa3_stats {
 	u32 tx_sw_pkts;
 	u32 tx_hw_pkts;
@@ -1565,6 +1589,7 @@ struct ipa3_stats {
 	u32 rmnet_ll_rx_empty;
 	u32 rmnet_ll_repl_rx_empty;
 	u32 lan_rx_empty;
+	u32 lan_rx_empty_coal;
 	u32 lan_repl_rx_empty;
 	u32 low_lat_rx_empty;
 	u32 low_lat_repl_rx_empty;
@@ -1575,11 +1600,13 @@ struct ipa3_stats {
 	u64 lower_order;
 	u32 pipe_setup_fail_cnt;
 	struct ipa3_page_recycle_stats page_recycle_stats[3];
+	struct ipa3_cache_recycle_stats cache_recycle_stats[3];
 	u64 page_recycle_cnt[3][IPA_PAGE_POLL_THRESHOLD_MAX];
 	atomic_t num_buff_above_thresh_for_def_pipe_notified;
 	atomic_t num_buff_above_thresh_for_coal_pipe_notified;
 	atomic_t num_buff_below_thresh_for_def_pipe_notified;
 	atomic_t num_buff_below_thresh_for_coal_pipe_notified;
+	struct lan_coal_stats coal;
 	u64 num_sort_tasklet_sched[3];
 	u64 num_of_times_wq_reschd;
 	u64 page_recycle_cnt_in_tasklet;
@@ -2174,6 +2201,7 @@ struct ipa_ntn3_client_stats {
  * mhi_ctrl_state: state of mhi ctrl pipes
  */
 struct ipa3_context {
+	bool coal_stopped;
 	struct ipa3_char_device_context cdev;
 	struct ipa3_ep_context ep[IPA5_MAX_NUM_PIPES];
 	bool skip_ep_cfg_shadow[IPA5_MAX_NUM_PIPES];
@@ -2364,7 +2392,11 @@ struct ipa3_context {
 	u32 icc_num_cases;
 	u32 icc_num_paths;
 	u32 icc_clk[IPA_ICC_LVL_MAX][IPA_ICC_PATH_MAX][IPA_ICC_TYPE_MAX];
-	struct ipahal_imm_cmd_pyld *coal_cmd_pyld[2];
+#define WAN_COAL_SUB  0
+#define LAN_COAL_SUB  1
+#define ULSO_COAL_SUB 2
+#define MAX_CCP_SUB (ULSO_COAL_SUB + 1)
+	struct ipahal_imm_cmd_pyld *coal_cmd_pyld[MAX_CCP_SUB];
 	struct ipa_mem_buffer ulso_wa_cmd;
 	u32 tx_wrapper_cache_max_size;
 	struct ipa3_app_clock_vote app_clock_vote;
@@ -2745,6 +2777,36 @@ struct ipa3_controller {
 	struct icc_path *icc_path[IPA_ICC_PATH_MAX];
 };
 
+/*
+ * When data arrives on IPA_CLIENT_APPS_LAN_COAL_CONS, said data will
+ * contain a qmap header followed by an array of the following.  The
+ * number of them in the array is always MAX_COAL_PACKET_STATUS_INFO
+ * (see below); however, only "num_nlos" (a field in the cmap heeader)
+ * will be valid.  The rest are to be ignored.
+ */
+struct coal_packet_status_info {
+	u16 pkt_len;
+	u8  pkt_cksum_errs;
+	u8  num_pkts;
+} __aligned(1);
+/*
+ * This is the number of the struct coal_packet_status_info that
+ * follow the qmap header.  As above, only "num_nlos" are valid.  The
+ * rest are to be ignored.
+ */
+#define MAX_COAL_PACKET_STATUS_INFO (6)
+#define VALID_NLS(nls) \
+	((nls) > 0 && (nls) <= MAX_COAL_PACKET_STATUS_INFO)
+/*
+ * The following is the total number of bits in all the pkt_cksum_errs
+ * in each of the struct coal_packet_status_info(s) that follow the
+ * qmap header.  Each bit is meant to tell us if a packet is good or
+ * bad, relative to a checksum. Given this, the max number of bits
+ * dictates the max number of packets that can be in a buffer from the
+ * IPA.
+ */
+#define MAX_COAL_PACKETS            (48)
+
 extern struct ipa3_context *ipa3_ctx;
 extern bool ipa_net_initialized;
 
@@ -2937,6 +2999,9 @@ void ipa3_get_default_evict_values(
 void ipa3_default_evict_register( void );
 int ipa3_set_evict_policy(
 	struct ipa_ioc_coal_evict_policy *evict_pol);
+void start_coalescing( void );
+void stop_coalescing( void );
+bool lan_coal_enabled( void );
 
 /*
  * Messaging
@@ -3238,6 +3303,10 @@ void wwan_cleanup(void);
 
 int ipa3_teth_bridge_driver_init(void);
 void ipa3_lan_rx_cb(void *priv, enum ipa_dp_evt_type evt, unsigned long data);
+void ipa3_lan_coal_rx_cb(
+	void                *priv,
+	enum ipa_dp_evt_type evt,
+	unsigned long        data);
 
 int _ipa_init_sram_v3(void);
 int _ipa_init_hdr_v3_0(void);
@@ -3410,7 +3479,9 @@ int ipa3_set_rt_tuple_mask(int tbl_idx, struct ipahal_reg_hash_tuple *tuple);
 void ipa3_set_resorce_groups_min_max_limits(void);
 void ipa3_set_resorce_groups_config(void);
 int ipa3_suspend_apps_pipes(bool suspend);
-void ipa3_force_close_coal(void);
+void ipa3_force_close_coal(
+	bool close_wan,
+	bool close_lan );
 int ipa3_flt_read_tbl_from_hw(u32 pipe_idx,
 	enum ipa_ip_type ip_type,
 	bool hashable,
@@ -3619,7 +3690,7 @@ static inline void *alloc_and_init(u32 size, u32 init_val)
  */
 #define IPA_COAL_VP_LRU_THRSHLD        0
 #define IPA_COAL_EVICTION_EN           true
-#define IPA_COAL_VP_LRU_GRAN_SEL       IPA_EVICT_TIME_GRAN_10_USEC
+#define IPA_COAL_VP_LRU_GRAN_SEL       0
 #define IPA_COAL_VP_LRU_UDP_THRSHLD    0
 #define IPA_COAL_VP_LRU_TCP_THRSHLD    0
 #define IPA_COAL_VP_LRU_UDP_THRSHLD_EN 1
@@ -3631,15 +3702,10 @@ static inline void *alloc_and_init(u32 size, u32 init_val)
  * eviction timers.
  */
 enum ipa_evict_time_gran_type {
-	IPA_EVICT_TIME_GRAN_10_USEC,
-	IPA_EVICT_TIME_GRAN_20_USEC,
-	IPA_EVICT_TIME_GRAN_50_USEC,
-	IPA_EVICT_TIME_GRAN_100_USEC,
-	IPA_EVICT_TIME_GRAN_1_MSEC,
-	IPA_EVICT_TIME_GRAN_10_MSEC,
-	IPA_EVICT_TIME_GRAN_100_MSEC,
-	IPA_EVICT_TIME_GRAN_NEAR_HALF_SEC, /* 0.65536s */
-	IPA_EVICT_TIME_GRAN_MAX,
+	IPA_EVICT_TIME_GRAN_0,
+	IPA_EVICT_TIME_GRAN_1,
+	IPA_EVICT_TIME_GRAN_2,
+	IPA_EVICT_TIME_GRAN_3,
 };
 
 /* query ipa APQ mode*/
