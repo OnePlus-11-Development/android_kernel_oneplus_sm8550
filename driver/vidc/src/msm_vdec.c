@@ -1275,9 +1275,9 @@ static int msm_vdec_read_input_subcr_params(struct msm_vidc_inst *inst)
 	inst->crop.top = subsc_params.crop_offsets[0] & 0xFFFF;
 	inst->crop.left = (subsc_params.crop_offsets[0] >> 16) & 0xFFFF;
 	inst->crop.height = inst->fmts[INPUT_PORT].fmt.pix_mp.height -
-		(subsc_params.crop_offsets[1] & 0xFFFF);
+		(subsc_params.crop_offsets[1] & 0xFFFF) - inst->crop.top;
 	inst->crop.width = inst->fmts[INPUT_PORT].fmt.pix_mp.width -
-		((subsc_params.crop_offsets[1] >> 16) & 0xFFFF);
+		((subsc_params.crop_offsets[1] >> 16) & 0xFFFF) - inst->crop.left;
 
 	msm_vidc_update_cap_value(inst, PROFILE, subsc_params.profile, __func__);
 	msm_vidc_update_cap_value(inst, LEVEL, subsc_params.level, __func__);
