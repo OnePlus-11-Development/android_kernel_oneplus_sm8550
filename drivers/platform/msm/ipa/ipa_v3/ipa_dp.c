@@ -1272,7 +1272,6 @@ int ipa3_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl)
 	int i, ipa_ep_idx, wan_handle, coal_ep_id;
 	int result = -EINVAL;
 	struct ipahal_reg_coal_qmap_cfg qmap_cfg;
-	struct ipahal_reg_coal_evict_lru evict_lru;
 	char buff[IPA_RESOURCE_NAME_MAX];
 	struct ipa_ep_cfg ep_cfg_copy;
 	int (*tx_completion_func)(struct napi_struct *, int);
@@ -1646,12 +1645,10 @@ int ipa3_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl)
 	IPADBG("client %d (ep: %d) connected sys=%pK\n", sys_in->client,
 			ipa_ep_idx, ep->sys);
 
-	/* configure the registers and setup the default pipe */
+	/*
+	 * Configure the registers and setup the default pipe
+	 */
 	if (sys_in->client == IPA_CLIENT_APPS_WAN_COAL_CONS) {
-		evict_lru.coal_vp_lru_thrshld = 0;
-		evict_lru.coal_eviction_en = true;
-		ipahal_write_reg_fields(IPA_COAL_EVICT_LRU, &evict_lru);
-
 		qmap_cfg.mux_id_byte_sel = IPA_QMAP_ID_BYTE;
 		ipahal_write_reg_fields(IPA_COAL_QMAP_CFG, &qmap_cfg);
 
@@ -1664,6 +1661,8 @@ int ipa3_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl)
 			IPAERR("failed to setup default coalescing pipe\n");
 			goto fail_repl;
 		}
+
+		ipa3_default_evict_register();
 	}
 
 	if (!ep->keep_ipa_awake)
