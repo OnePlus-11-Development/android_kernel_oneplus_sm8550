@@ -9919,6 +9919,10 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 		IPAERR(":get resource failed for ipa-hw-ver\n");
 		return -ENODEV;
 	}
+
+	if(ipa_drv_res->ipa_hw_type == 24) {
+		ipa_drv_res->ipa_hw_type = IPA_HW_v5_5;
+	}
 	IPADBG(": ipa_hw_type = %d", ipa_drv_res->ipa_hw_type);
 
 	if (ipa_drv_res->ipa_hw_type < IPA_HW_v3_0) {
@@ -11241,6 +11245,10 @@ int ipa3_plat_drv_probe(struct platform_device *pdev_p)
 			return -ENODEV;
 		}
 		pr_debug("ipa: ipa_hw_type = %d\n", ipa3_ctx->ipa_hw_type);
+	}
+
+	if (ipa3_ctx->ipa_hw_type == 24) {
+		ipa3_ctx->ipa_hw_type = IPA_HW_v5_5;
 	}
 
 	if (ipa3_ctx->ipa_hw_type < IPA_HW_v3_0) {
