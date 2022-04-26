@@ -1074,7 +1074,7 @@ static int sde_encoder_phys_wb_atomic_check(struct sde_encoder_phys *phys_enc,
 	return rc;
 }
 
-static void _sde_encoder_phys_wb_setup_cache(struct sde_encoder_phys *phys_enc,
+static void _sde_encoder_phys_wb_setup_sys_cache(struct sde_encoder_phys *phys_enc,
 		struct drm_framebuffer *fb)
 {
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
@@ -1084,17 +1084,32 @@ static void _sde_encoder_phys_wb_setup_cache(struct sde_encoder_phys *phys_enc,
 	struct sde_crtc *sde_crtc = to_sde_crtc(wb_enc->crtc);
 	struct sde_sc_cfg *sc_cfg;
 	struct sde_hw_wb_sc_cfg *cfg  = &wb_enc->sc_cfg;
-	u32 cache_enable, cache_type;
+	u32 cache_enable, cache_flag, cache_rd_type, cache_wr_type;
+
+	if (!fb) {
+		SDE_ERROR("invalid fb on wb %d\n", WBID(wb_enc));
+		return;
+	}
 
 	/*
 	 * - use LLCC_DISP for cwb static display
+	 * - use LLCC_DISP_1 for cwb static display read path only
 	 * - use LLCC_DISP_WB for 2-pass composition using offline-wb
 	 */
-	cache_type = phys_enc->in_clone_mode ? SDE_SYS_CACHE_DISP : SDE_SYS_CACHE_DISP_WB;
+	if (phys_enc->in_clone_mode) {
+		cache_rd_type = SDE_SYS_CACHE_DISP;
+		if (test_bit(SDE_SYS_CACHE_DISP_1, hw_wb->catalog->sde_sys_cache_type_map))
+			cache_wr_type = SDE_SYS_CACHE_DISP_1;
+		else
+			cache_wr_type = SDE_SYS_CACHE_DISP;
+	} else {
+		cache_rd_type = SDE_SYS_CACHE_DISP_WB;
+		cache_wr_type = SDE_SYS_CACHE_DISP_WB;
+	}
 
-	sc_cfg = &hw_wb->catalog->sc_cfg[cache_type];
-	if (!test_bit(cache_type, hw_wb->catalog->sde_sys_cache_type_map)) {
-		SDE_DEBUG("sys cache type %d not enabled\n", cache_type);
+	sc_cfg = &hw_wb->catalog->sc_cfg[cache_wr_type];
+	if (!test_bit(cache_wr_type, hw_wb->catalog->sde_sys_cache_type_map)) {
+		SDE_DEBUG("sys cache type %d not enabled\n", cache_wr_type);
 		return;
 	}
 
@@ -1113,25 +1128,31 @@ static void _sde_encoder_phys_wb_setup_cache(struct sde_encoder_phys *phys_enc,
 
 	if (cache_enable) {
 		cfg->wr_scid = sc_cfg->llcc_scid;
-		cfg->type = cache_type;
-		msm_framebuffer_set_cache_hint(fb, MSM_FB_CACHE_WRITE_EN, cache_type);
+		cfg->type = cache_wr_type;
+		cache_flag = MSM_FB_CACHE_WRITE_EN;
 	} else {
 		cfg->wr_scid = 0x0;
 		cfg->type = SDE_SYS_CACHE_NONE;
-		msm_framebuffer_set_cache_hint(fb, MSM_FB_CACHE_NONE, SDE_SYS_CACHE_NONE);
+		cache_flag = MSM_FB_CACHE_NONE;
+		cache_rd_type = SDE_SYS_CACHE_NONE;
+		cache_wr_type = SDE_SYS_CACHE_NONE;
 	}
+	msm_framebuffer_set_cache_hint(fb, cache_flag, cache_rd_type, cache_wr_type);
 
 	/*
 	 * avoid llcc_active reset for crtc while in clone mode as it will reset it for
 	 * primary display as well
 	 */
 	if (cache_enable || !phys_enc->in_clone_mode) {
-		sde_crtc->new_perf.llcc_active[cache_type] = cache_enable;
+		sde_crtc->new_perf.llcc_active[cache_wr_type] = cache_enable;
+		sde_crtc->new_perf.llcc_active[cache_rd_type] = cache_enable;
 		sde_core_perf_crtc_update_llcc(wb_enc->crtc);
 	}
 
 	hw_wb->ops.setup_sys_cache(hw_wb, cfg);
-	SDE_EVT32(WBID(wb_enc), cfg->wr_scid, cfg->flags, cfg->type, cache_enable);
+	SDE_EVT32(WBID(wb_enc), cfg->wr_scid, cfg->flags, cfg->type, cache_enable,
+			phys_enc->in_clone_mode, cache_flag, cache_rd_type,
+			cache_wr_type, fb->base.id);
 }
 
 static void _sde_encoder_phys_wb_update_cwb_flush_helper(
@@ -1493,7 +1514,7 @@ static void sde_encoder_phys_wb_setup(struct sde_encoder_phys *phys_enc)
 
 	_sde_encoder_phys_wb_setup_ctl(phys_enc, wb_enc->wb_fmt);
 
-	_sde_encoder_phys_wb_setup_cache(phys_enc, fb);
+	_sde_encoder_phys_wb_setup_sys_cache(phys_enc, fb);
 
 	_sde_encoder_phys_wb_setup_cwb(phys_enc, true);
 

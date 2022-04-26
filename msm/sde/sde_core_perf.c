@@ -389,8 +389,7 @@ static void _sde_core_perf_crtc_set_llcc_cache_type(struct sde_kms *kms,
 	u32 llcc_active = 0;
 
 	if (!test_bit(type, kms->perf.catalog->sde_sys_cache_type_map)) {
-		SDE_DEBUG("System Cache %d is not enabled!. Won't use\n",
-				type);
+		SDE_DEBUG("system cache %d is not enabled!. Won't use\n", type);
 		return;
 	}
 

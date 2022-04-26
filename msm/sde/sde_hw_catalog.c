@@ -3488,11 +3488,13 @@ static int sde_cache_parse_dt(struct device_node *np,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	const u32 sde_sys_cache_usecase_id[SDE_SYS_CACHE_MAX] = {
 		[SDE_SYS_CACHE_DISP] = LLCC_DISP,
+		[SDE_SYS_CACHE_DISP_1] = LLCC_DISP_1,
 		[SDE_SYS_CACHE_DISP_WB] = LLCC_DISP_WB,
 	};
 #else
 	const u32 sde_sys_cache_usecase_id[SDE_SYS_CACHE_MAX] = {
 		[SDE_SYS_CACHE_DISP] = LLCC_DISP,
+		[SDE_SYS_CACHE_DISP_1] = 0,
 		[SDE_SYS_CACHE_DISP_WB] = 0,
 	};
 #endif
@@ -5148,6 +5150,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		set_bit(SDE_FEATURE_CTL_DONE, sde_cfg->features);
 		set_bit(SDE_FEATURE_TRUSTED_VM, sde_cfg->features);
 		set_bit(SDE_SYS_CACHE_DISP, sde_cfg->sde_sys_cache_type_map);
+		set_bit(SDE_SYS_CACHE_DISP_1, sde_cfg->sde_sys_cache_type_map);
 		set_bit(SDE_SYS_CACHE_DISP_WB, sde_cfg->sde_sys_cache_type_map);
 		sde_cfg->allowed_dsc_reservation_switch = SDE_DP_DSC_RESERVATION_SWITCH;
 		sde_cfg->autorefresh_disable_seq = AUTOREFRESH_DISABLE_SEQ2;
