@@ -2861,7 +2861,7 @@ static void _sde_plane_sspp_setup_sys_cache(struct sde_plane *psde,
 	cfg->flags = SYS_CACHE_EN_FLAG | SYS_CACHE_SCID;
 	cfg->type = SDE_SYS_CACHE_NONE;
 
-	if ((sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache)
+	if ((test_bit(SDE_SYS_CACHE_DISP, psde->catalog->sde_sys_cache_type_map))
 			&& ((pstate->static_cache_state == CACHE_STATE_FRAME_WRITE)
 				|| (pstate->static_cache_state == CACHE_STATE_FRAME_READ))) {
 		cfg->rd_en = true;
@@ -2870,7 +2870,8 @@ static void _sde_plane_sspp_setup_sys_cache(struct sde_plane *psde,
 		cfg->flags |= SYS_CACHE_NO_ALLOC;
 		cfg->type = SDE_SYS_CACHE_DISP;
 
-	} else if ((sc_cfg[fb_cache_type].has_sys_cache) && fb_cache_flag) {
+	} else if (test_bit(fb_cache_type, psde->catalog->sde_sys_cache_type_map)
+			&& fb_cache_flag) {
 		cfg->rd_en = true;
 		cfg->rd_scid = sc_cfg[fb_cache_type].llcc_scid;
 		cfg->rd_noallocate = true;
