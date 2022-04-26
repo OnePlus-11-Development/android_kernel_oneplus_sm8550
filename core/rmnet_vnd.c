@@ -57,6 +57,10 @@ typedef int (*rmnet_aps_post_queue_t)(struct net_device *dev,
 rmnet_aps_post_queue_t rmnet_aps_post_queue __read_mostly;
 EXPORT_SYMBOL(rmnet_aps_post_queue);
 
+typedef void (*rmnet_wlan_ll_tuple_hook_t)(struct sk_buff *skb);
+rmnet_wlan_ll_tuple_hook_t rmnet_wlan_ll_tuple_hook __rcu __read_mostly;
+EXPORT_SYMBOL(rmnet_wlan_ll_tuple_hook);
+
 /* RX/TX Fixup */
 
 void rmnet_vnd_rx_fixup(struct net_device *dev, u32 skb_len)
@@ -96,6 +100,7 @@ static netdev_tx_t rmnet_vnd_start_xmit(struct sk_buff *skb,
 	unsigned int len;
 	rmnet_perf_tether_egress_hook_t rmnet_perf_tether_egress;
 	rmnet_aps_post_queue_t aps_post_queue;
+	rmnet_wlan_ll_tuple_hook_t rmnet_wlan_ll_tuple;
 	bool low_latency = false;
 	bool need_to_drop = false;
 
@@ -118,6 +123,11 @@ static netdev_tx_t rmnet_vnd_start_xmit(struct sk_buff *skb,
 		rmnet_perf_tether_egress = rcu_dereference(rmnet_perf_tether_egress_hook);
 		if (rmnet_perf_tether_egress) {
 			rmnet_perf_tether_egress(skb);
+		}
+
+		rmnet_wlan_ll_tuple = rcu_dereference(rmnet_wlan_ll_tuple_hook);
+		if (rmnet_wlan_ll_tuple) {
+			rmnet_wlan_ll_tuple(skb);
 		}
 
 		qmi_rmnet_get_flow_state(dev, skb, &need_to_drop, &low_latency);
