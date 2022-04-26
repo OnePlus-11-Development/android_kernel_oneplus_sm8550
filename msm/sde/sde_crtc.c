@@ -4971,7 +4971,7 @@ static void sde_crtc_enable(struct drm_crtc *crtc,
 		intf_mode = sde_crtc_get_intf_mode(crtc, crtc->state);
 		if ((intf_mode != INTF_MODE_WB_BLOCK) && (intf_mode != INTF_MODE_WB_LINE)) {
 			/* max possible vsync_cnt(atomic_t) soft counter */
-			if (kms->catalog->has_precise_vsync_ts)
+			if (test_bit(SDE_FEATURE_HW_VSYNC_TS, kms->catalog->features))
 				drm_crtc_set_max_vblank_count(crtc, INT_MAX);
 			drm_crtc_vblank_on(crtc);
 		}

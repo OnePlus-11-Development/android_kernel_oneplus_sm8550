@@ -1747,7 +1747,6 @@ struct sde_perf_cfg {
  * @smart_dma_rev       smartDMA block version
  * @ctl_rev             control path block version
  * @sid_rev             SID version
- * @has_precise_vsync_ts  indicates if HW has vsyc timestamp logging capability
  * @has_reduced_ob_max indicate if DSC size is limited to 10k
  * @ts_prefill_rev      prefill traffic shaper feature revision
  * @true_inline_rot_rev inline rotator feature revision
@@ -1853,7 +1852,6 @@ struct sde_mdss_cfg {
 	u32 smart_dma_rev;
 	u32 ctl_rev;
 	u32 sid_rev;
-	bool has_precise_vsync_ts;
 	bool has_reduced_ob_max;
 	u32 ts_prefill_rev;
 	u32 true_inline_rot_rev;
