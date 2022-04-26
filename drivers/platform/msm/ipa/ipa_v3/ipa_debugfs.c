@@ -1672,7 +1672,7 @@ static ssize_t ipa3_read_lan_coal_stats(
 {
 	int nbytes=0, cnt=0;
 	u32 i;
-	char buf[4096];
+	char buf[1024];
 
 	*buf = '\0';
 
