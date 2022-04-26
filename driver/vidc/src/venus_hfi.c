@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  */
+/* Copyright (c) 2022. Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #include <linux/iommu.h>
 #include <linux/qcom_scm.h>
@@ -2252,6 +2253,8 @@ static int __interface_queues_init(struct msm_vidc_core *core)
 		d_vpr_e("%s: alloc failed\n", __func__);
 		goto fail_alloc_queue;
 	}
+	core->iface_q_table.align_virtual_addr = alloc.kvaddr;
+	core->iface_q_table.alloc = alloc;
 
 	memset(&map, 0, sizeof(map));
 	map.type         = alloc.type;
@@ -2262,12 +2265,10 @@ static int __interface_queues_init(struct msm_vidc_core *core)
 		d_vpr_e("%s: alloc failed\n", __func__);
 		goto fail_alloc_queue;
 	}
-
-	core->iface_q_table.align_virtual_addr = alloc.kvaddr;
 	core->iface_q_table.align_device_addr = map.device_addr;
-	core->iface_q_table.mem_size = VIDC_IFACEQ_TABLE_SIZE;
-	core->iface_q_table.alloc = alloc;
 	core->iface_q_table.map = map;
+
+	core->iface_q_table.mem_size = VIDC_IFACEQ_TABLE_SIZE;
 	offset += core->iface_q_table.mem_size;
 
 	for (i = 0; i < VIDC_IFACEQ_NUMQ; i++) {
@@ -2324,6 +2325,9 @@ static int __interface_queues_init(struct msm_vidc_core *core)
 		d_vpr_e("%s: sfr alloc failed\n", __func__);
 		goto fail_alloc_queue;
 	}
+	core->sfr.align_virtual_addr = alloc.kvaddr;
+	core->sfr.alloc = alloc;
+
 	memset(&map, 0, sizeof(map));
 	map.type         = alloc.type;
 	map.region       = alloc.region;
@@ -2334,12 +2338,11 @@ static int __interface_queues_init(struct msm_vidc_core *core)
 		goto fail_alloc_queue;
 	}
 	core->sfr.align_device_addr = map.device_addr;
-	core->sfr.align_virtual_addr = alloc.kvaddr;
-	core->sfr.mem_size = ALIGNED_SFR_SIZE;
-	core->sfr.alloc = alloc;
 	core->sfr.map = map;
+
+	core->sfr.mem_size = ALIGNED_SFR_SIZE;
 	/* write sfr buffer size in first word */
-	*((u32 *)core->sfr.align_virtual_addr) = ALIGNED_SFR_SIZE;
+	*((u32 *)core->sfr.align_virtual_addr) = core->sfr.mem_size;
 
 	rc = call_venus_op(core, setup_ucregion_memmap, core);
 	if (rc)
