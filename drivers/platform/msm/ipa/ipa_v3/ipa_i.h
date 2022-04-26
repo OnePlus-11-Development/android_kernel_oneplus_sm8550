@@ -2078,7 +2078,19 @@ struct ipa_ntn3_client_stats {
 	struct ipa_ntn3_stats_rx rx_stats;
 	struct ipa_ntn3_stats_tx tx_stats;
 };
-
+#if defined(CONFIG_IPA_TSP)
+struct ipa3_tsp_ctx {
+	u8 ingr_tc_max;
+	u8 egr_ep_max;
+	u8 egr_tc_max;
+	enum ipa_client_type *egr_ep_config;
+	u32 egr_tc_range_mask;
+	struct ipa_mem_buffer ingr_tc_tbl;
+	struct ipa_mem_buffer egr_ep_tbl;
+	struct ipa_mem_buffer egr_tc_tbl;
+	struct ipa_mem_buffer qm_tlv_mem;
+};
+#endif
 
 /**
  * struct ipa3_context - IPA context
@@ -2368,6 +2380,9 @@ struct ipa3_context {
 	struct ipa3_aqc_ctx aqc_ctx;
 	struct ipa3_rtk_ctx rtk_ctx;
 	struct ipa3_ntn_ctx ntn_ctx;
+#if defined(CONFIG_IPA_TSP)
+	struct ipa3_tsp_ctx tsp;
+#endif
 	atomic_t ipa_clk_vote;
 
 	int (*client_lock_unlock[IPA_MAX_CLNT])(bool is_lock);

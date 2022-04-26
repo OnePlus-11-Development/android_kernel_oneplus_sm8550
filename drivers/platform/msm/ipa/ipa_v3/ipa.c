@@ -63,6 +63,9 @@
 
 #include "ipa_i.h"
 #include "ipa_rm_i.h"
+#if defined(CONFIG_IPA_TSP)
+#include "ipa_tsp.h"
+#endif
 #include "ipahal.h"
 #include "ipahal_fltrt.h"
 
@@ -2829,6 +2832,15 @@ static long ipa3_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	struct ipa_ioc_eogre_info eogre_info;
 	struct ipa_ioc_macsec_info macsec_info;
 	struct ipa_macsec_map *macsec_map;
+#if defined(CONFIG_IPA_TSP)
+	struct ipa_ioc_tsp_ingress_class_get ingr_tc_get;
+	struct ipa_ioc_tsp_egress_class_get egr_tc_get;
+	struct ipa_ioc_tsp_egress_prod_get egr_ep_get;
+	struct ipa_ioc_tsp_ingress_class_set ingr_tc_set;
+	struct ipa_ioc_tsp_egress_class_set egr_tc_set;
+	struct ipa_ioc_tsp_egress_prod_set egr_ep_set;
+	u32 u32temp;
+#endif
 	bool send2uC, send2ipacm;
 	size_t sz;
 	int pre_entry;
@@ -4270,6 +4282,161 @@ static long ipa3_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	case IPA_IOC_SET_CONN_TRACK_EXC_RT_TBL_IDX:
 		retval = ipa3_set_nat_conn_track_exc_rt_tbl(arg, IPA_IP_v6);
 		break;
+#if defined(CONFIG_IPA_TSP)
+	case IPA_IOC_TSP_GET_INGR_TC_NUM:
+		u32temp = (u32)ipa3_ctx->tsp.ingr_tc_max;
+		goto send;
+	case IPA_IOC_TSP_GET_EGR_EP_NUM:
+		u32temp = (u32)ipa3_ctx->tsp.egr_ep_max;
+		goto send;
+	case IPA_IOC_TSP_GET_EGR_TC_NUM:
+		u32temp = (u32)ipa3_ctx->tsp.egr_tc_max;
+send:
+		if (copy_to_user((void __user *)arg, &u32temp, sizeof(u32temp))) {
+			retval = -EFAULT;
+			break;
+		}
+		break;
+
+	case IPA_IOC_TSP_GET_INGR_TC:
+		if (copy_from_user(&ingr_tc_get, (const void __user *)arg,
+			sizeof(struct ipa_ioc_tsp_ingress_class_get))) {
+			retval = -EFAULT;
+			break;
+		}
+
+		if (ingr_tc_get.index == 0 || ingr_tc_get.index > (u32)ipa3_ctx->tsp.ingr_tc_max) {
+			retval = -EINVAL;
+			break;
+		}
+
+		retval = ipa_tsp_get_ingr_tc(ingr_tc_get.index, &(ingr_tc_get.params));
+		if (retval != 0)
+			break;
+
+		if (copy_to_user((void __user *)arg, &ingr_tc_get,
+			sizeof(struct ipa_ioc_tsp_ingress_class_get))) {
+			retval = -EFAULT;
+			break;
+		}
+		break;
+
+	case IPA_IOC_TSP_GET_EGR_EP:
+		if (copy_from_user(&egr_ep_get, (const void __user *)arg,
+			sizeof(struct ipa_ioc_tsp_egress_prod_get))) {
+			retval = -EFAULT;
+			break;
+		}
+
+		if (egr_ep_get.index >= (u32)ipa3_ctx->tsp.egr_ep_max) {
+			retval = -EINVAL;
+			break;
+		}
+
+		retval = ipa_tsp_get_egr_ep(egr_ep_get.index, &(egr_ep_get.params));
+		if (retval != 0)
+			break;
+
+		if (copy_to_user((void __user *)arg, &egr_ep_get,
+			sizeof(struct ipa_ioc_tsp_egress_prod_get))) {
+			retval = -EFAULT;
+			break;
+		}
+		break;
+
+	case IPA_IOC_TSP_GET_EGR_TC:
+		if (copy_from_user(&egr_tc_get, (const void __user *)arg,
+			sizeof(struct ipa_ioc_tsp_egress_class_get))) {
+			retval = -EFAULT;
+			break;
+		}
+
+		if (egr_tc_get.index == 0 || egr_tc_get.index > (u32)ipa3_ctx->tsp.egr_tc_max) {
+			retval = -EINVAL;
+			break;
+		}
+
+		retval = ipa_tsp_get_egr_tc(egr_tc_get.index, &(egr_tc_get.params));
+		if (retval != 0)
+			break;
+
+		if (copy_to_user((void __user *)arg, &egr_tc_get,
+			sizeof(struct ipa_ioc_tsp_egress_class_get))) {
+			retval = -EFAULT;
+			break;
+		}
+		break;
+
+	case IPA_IOC_TSP_SET_INGR_TC:
+		if (copy_from_user(&ingr_tc_set, (const void __user *)arg,
+			sizeof(struct ipa_ioc_tsp_ingress_class_set))) {
+			retval = -EFAULT;
+			break;
+		}
+
+		if (ingr_tc_set.index == 0 || ingr_tc_set.index > (u32)ipa3_ctx->tsp.ingr_tc_max) {
+			retval = -EINVAL;
+			break;
+		}
+
+		retval = ipa_tsp_set_ingr_tc(ingr_tc_set.index, &(ingr_tc_set.params));
+		if (retval != 0)
+			break;
+
+		if (ingr_tc_set.commit)
+			retval = ipa_tsp_commit();
+
+		break;
+
+	case IPA_IOC_TSP_SET_EGR_EP:
+		if (copy_from_user(&egr_ep_set, (const void __user *)arg,
+			sizeof(struct ipa_ioc_tsp_egress_prod_set))) {
+			retval = -EFAULT;
+			break;
+		}
+
+		if (egr_ep_set.index >= (u32)ipa3_ctx->tsp.egr_ep_max) {
+			retval = -EINVAL;
+			break;
+		}
+
+		retval = ipa_tsp_set_egr_ep(egr_ep_set.index, &(egr_ep_set.params));
+		if (retval != 0)
+			break;
+
+		if (egr_ep_set.commit)
+			retval = ipa_tsp_commit();
+		break;
+
+	case IPA_IOC_TSP_SET_EGR_TC:
+		if (copy_from_user(&egr_tc_set, (const void __user *)arg,
+			sizeof(struct ipa_ioc_tsp_egress_class_set))) {
+			retval = -EFAULT;
+			break;
+		}
+
+		if (egr_tc_set.index == 0 || egr_tc_set.index > (u32)ipa3_ctx->tsp.egr_tc_max) {
+			retval = -EINVAL;
+			break;
+		}
+
+		retval = ipa_tsp_set_egr_tc(egr_tc_set.index, &(egr_tc_set.params));
+		if (retval != 0)
+			break;
+
+		if (egr_tc_set.commit)
+			retval = ipa_tsp_commit();
+
+		break;
+
+	case IPA_IOC_TSP_COMMIT:
+		retval = ipa_tsp_commit();
+		break;
+
+	case IPA_IOC_TSP_RESET:
+		retval = ipa_tsp_reset();
+		break;
+#endif
 
 	default:
 		IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
@@ -8003,6 +8170,13 @@ static int ipa3_post_init(const struct ipa3_plat_drv_res *resource_p,
 		IPAERR(":ntn init failed (%d)\n", -result);
 	else
 		IPADBG(":ntn init ok\n");
+#if defined(CONFIG_IPA_TSP)
+	result = ipa_tsp_init();
+	if (result)
+		IPAERR(":TSP init failed (%d)\n", -result);
+	else
+		IPADBG(":TSP init ok\n");
+#endif
 
 	result = ipa_hw_stats_init();
 	if (result)
