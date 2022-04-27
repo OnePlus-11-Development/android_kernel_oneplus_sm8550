@@ -3355,7 +3355,7 @@ int venus_hfi_queue_super_buffer(struct msm_vidc_inst *inst,
 	}
 
 	/* Sanitize super meta buffer */
-	if (metabuf && meta_size * batch_size != metabuf->buffer_size) {
+	if (metabuf && meta_size * batch_size > metabuf->buffer_size) {
 		i_vpr_e(inst, "%s: invalid super meta buffer. meta %u, batch %u, buffer size %u\n",
 			__func__, meta_size, batch_size, metabuf->buffer_size);
 		goto unlock;
