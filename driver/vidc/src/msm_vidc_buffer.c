@@ -369,30 +369,7 @@ static inline u32 ROI_METADATA_SIZE(
 
 u32 msm_vidc_encoder_input_meta_size(struct msm_vidc_inst *inst)
 {
-	u32 size = 0;
-	u32 lcu_size = 0;
-	struct v4l2_format *f;
-
-	if (!inst || !inst->capabilities) {
-		d_vpr_e("%s: invalid params\n", __func__);
-		return 0;
-	}
-
-	size = MSM_VIDC_METADATA_SIZE;
-
-	if (inst->capabilities->cap[META_ROI_INFO].value) {
-		lcu_size = 16;
-
-		f = &inst->fmts[OUTPUT_PORT];
-		if (f->fmt.pix_mp.pixelformat == V4L2_PIX_FMT_HEVC)
-			lcu_size = 32;
-
-		f = &inst->fmts[INPUT_PORT];
-		size += ROI_METADATA_SIZE(f->fmt.pix_mp.width,
-			f->fmt.pix_mp.height, lcu_size);
-		size = ALIGN(size, SZ_4K);
-	}
-	return size;
+	return ENCODE_INPUT_METADATA_SIZE;
 }
 
 u32 msm_vidc_encoder_output_meta_size(struct msm_vidc_inst *inst)
