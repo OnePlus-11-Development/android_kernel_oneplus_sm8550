@@ -2737,10 +2737,10 @@ int msm_vidc_get_delayed_unmap(struct msm_vidc_inst *inst, struct msm_vidc_map *
 		return -EINVAL;
 	}
 
-	map->skip_delayed_unmap = 1;
 	rc = msm_vidc_memory_map(inst->core, map);
 	if (rc)
 		return rc;
+	map->skip_delayed_unmap = 1;
 
 	return 0;
 }
@@ -2764,12 +2764,6 @@ int msm_vidc_put_delayed_unmap(struct msm_vidc_inst *inst, struct msm_vidc_map *
 	rc = msm_vidc_memory_unmap(inst->core, map);
 	if (rc)
 		i_vpr_e(inst, "%s: unmap failed\n", __func__);
-
-	if (!map->refcount) {
-		msm_vidc_memory_put_dmabuf(inst, map->dmabuf);
-		list_del(&map->list);
-		msm_memory_pool_free(inst, map);
-	}
 
 	return rc;
 }
@@ -2877,29 +2871,37 @@ int msm_vidc_map_driver_buf(struct msm_vidc_inst *inst,
 			return -ENOMEM;
 		}
 		INIT_LIST_HEAD(&map->list);
+		list_add_tail(&map->list, &mappings->list);
 		map->type = buf->type;
 		map->dmabuf = msm_vidc_memory_get_dmabuf(inst, buf->fd);
-		if (!map->dmabuf)
-			return -EINVAL;
+		if (!map->dmabuf) {
+			rc = -EINVAL;
+			goto error;
+		}
 		map->region = msm_vidc_get_buffer_region(inst, buf->type, __func__);
 		/* delayed unmap feature needed for decoder output buffers */
 		if (is_decode_session(inst) && is_output_buffer(buf->type)) {
 			rc = msm_vidc_get_delayed_unmap(inst, map);
-			if (rc) {
-				msm_vidc_memory_put_dmabuf(inst, map->dmabuf);
-				msm_memory_pool_free(inst, map);
-				return rc;
-			}
+			if (rc)
+				goto error;
 		}
-		list_add_tail(&map->list, &mappings->list);
 	}
 	rc = msm_vidc_memory_map(inst->core, map);
 	if (rc)
-		return rc;
+		goto error;
 
 	buf->device_addr = map->device_addr;
 
 	return 0;
+error:
+	if (!found) {
+		if (is_decode_session(inst) && is_output_buffer(buf->type))
+			msm_vidc_put_delayed_unmap(inst, map);
+		msm_vidc_memory_put_dmabuf(inst, map->dmabuf);
+		list_del_init(&map->list);
+		msm_memory_pool_free(inst, map);
+	}
+	return rc;
 }
 
 int msm_vidc_put_driver_buf(struct msm_vidc_inst *inst,

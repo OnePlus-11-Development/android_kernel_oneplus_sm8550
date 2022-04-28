@@ -2089,6 +2089,11 @@ static int msm_vidc_unmap_excessive_mappings(struct msm_vidc_inst *inst)
 			rc = msm_vidc_put_delayed_unmap(inst, map);
 			if (rc)
 				return rc;
+			if (!map->refcount) {
+				list_del_init(&map->list);
+				msm_vidc_memory_put_dmabuf(inst, map->dmabuf);
+				msm_memory_pool_free(inst, map);
+			}
 		}
 	}
 	return rc;
