@@ -6947,11 +6947,11 @@ start_poll:
 		if (ret)
 			break;
 
-		trace_ipa3_rx_poll_num(num);
+		trace_ipa3_napi_rx_poll_num(ep->client, num);
 		ipa3_rx_napi_chain(ep->sys, notify, num);
 		remain_aggr_weight -= num;
 
-		trace_ipa3_rx_poll_cnt(ep->sys->len);
+		trace_ipa3_napi_rx_poll_cnt(ep->client, ep->sys->len);
 		if (ep->sys->len == 0) {
 			if (remain_aggr_weight == 0)
 				cnt--;
@@ -7160,6 +7160,8 @@ static int ipa3_rmnet_ll_rx_poll(struct napi_struct *napi_rx, int budget)
 	}
 
 	sys->napi_sort_page_thrshld_cnt++;
+
+	trace_ipa3_napi_poll_entry(sys->ep->client);
 start_poll:
 	/*
 	 * it is guaranteed we already have clock here.
@@ -7173,9 +7175,12 @@ start_poll:
 			remain_aggr_weight, &num);
 		if (ret)
 			break;
+
+		trace_ipa3_napi_rx_poll_num(sys->ep->client, num);
 		ipa3_rx_napi_chain(sys, notify, num);
 		remain_aggr_weight -= num;
 
+		trace_ipa3_napi_rx_poll_cnt(sys->ep->client, sys->len);
 		if (sys->len == 0) {
 			if (remain_aggr_weight == 0)
 				cnt--;

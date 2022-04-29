@@ -156,39 +156,47 @@ TRACE_EVENT(
 );
 
 TRACE_EVENT(
-	ipa3_rx_poll_num,
+	ipa3_napi_rx_poll_num,
 
-	TP_PROTO(int poll_num),
+	TP_PROTO(unsigned long client, int poll_num),
 
-	TP_ARGS(poll_num),
+	TP_ARGS(client, poll_num),
 
 	TP_STRUCT__entry(
+		__field(unsigned long,	client)
 		__field(int,	poll_num)
 	),
 
 	TP_fast_assign(
+		__entry->client = client;
 		__entry->poll_num = poll_num;
 	),
 
-	TP_printk("each_poll_aggr_pkt_num=%d", __entry->poll_num)
+	TP_printk("client=%lu each_poll_aggr_pkt_num=%d",
+		__entry->client,
+		__entry->poll_num)
 );
 
 TRACE_EVENT(
-	ipa3_rx_poll_cnt,
+	ipa3_napi_rx_poll_cnt,
 
-	TP_PROTO(int poll_num),
+	TP_PROTO(unsigned long client, int poll_num),
 
-	TP_ARGS(poll_num),
+	TP_ARGS(client, poll_num),
 
 	TP_STRUCT__entry(
+		__field(unsigned long,	client)
 		__field(int,	poll_num)
 	),
 
 	TP_fast_assign(
+		__entry->client = client;
 		__entry->poll_num = poll_num;
 	),
 
-	TP_printk("napi_overall_poll_pkt_cnt=%d", __entry->poll_num)
+	TP_printk("client=%lu napi_overall_poll_pkt_cnt=%d",
+		__entry->client,
+		__entry->poll_num)
 );
 
 TRACE_EVENT(
