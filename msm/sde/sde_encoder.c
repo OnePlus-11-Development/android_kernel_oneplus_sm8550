@@ -3709,6 +3709,7 @@ int sde_encoder_idle_request(struct drm_encoder *drm_enc)
 static inline void _sde_encoder_update_retire_txq(struct sde_encoder_phys *phys)
 {
 	struct sde_connector *c_conn;
+	int line_count;
 
 	c_conn = to_sde_connector(phys->connector);
 	if (!c_conn) {
@@ -3716,8 +3717,10 @@ static inline void _sde_encoder_update_retire_txq(struct sde_encoder_phys *phys)
 		return;
 	}
 
+	line_count = sde_connector_get_property(phys->connector->state,
+			CONNECTOR_PROP_EARLY_FENCE_LINE);
 	if (c_conn->hwfence_wb_retire_fences_enable)
-		sde_fence_update_hw_fences_txq(c_conn->retire_fence, false);
+		sde_fence_update_hw_fences_txq(c_conn->retire_fence, false, line_count);
 }
 
 /**
@@ -3939,7 +3942,7 @@ void sde_encoder_helper_update_out_fence_txq(struct sde_encoder_virt *sde_enc, b
 	sde_crtc = to_sde_crtc(sde_enc->crtc);
 
 	SDE_EVT32(DRMID(sde_enc->crtc), is_vid);
-	sde_fence_update_hw_fences_txq(sde_crtc->output_fence, is_vid);
+	sde_fence_update_hw_fences_txq(sde_crtc->output_fence, is_vid, 0);
 }
 
 /**

@@ -4626,7 +4626,7 @@ void sde_crtc_commit_kickoff(struct drm_crtc *crtc,
 	 * condition between txq update and the hw signal during ctl-done for partial updates
 	 */
 	if (test_bit(HW_FENCE_OUT_FENCES_ENABLE, sde_crtc->hwfence_features_mask) && !is_vid)
-		sde_fence_update_hw_fences_txq(sde_crtc->output_fence, false);
+		sde_fence_update_hw_fences_txq(sde_crtc->output_fence, false, 0);
 
 	list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
 		if (encoder->crtc != crtc)
@@ -6543,6 +6543,16 @@ static void sde_crtc_install_properties(struct drm_crtc *crtc,
 	vfree(info);
 }
 
+static bool _is_crtc_intf_mode_wb(struct drm_crtc *crtc)
+{
+	enum sde_intf_mode intf_mode = sde_crtc_get_intf_mode(crtc, crtc->state);
+
+	if ((intf_mode != INTF_MODE_WB_BLOCK) && (intf_mode != INTF_MODE_WB_LINE))
+		return false;
+
+	return true;
+}
+
 static int _sde_crtc_get_output_fence(struct drm_crtc *crtc,
 	const struct drm_crtc_state *state, uint64_t *val)
 {
@@ -6550,6 +6560,7 @@ static int _sde_crtc_get_output_fence(struct drm_crtc *crtc,
 	struct sde_crtc_state *cstate;
 	uint32_t offset;
 	bool is_vid = false;
+	bool is_wb = false;
 	struct drm_encoder *encoder;
 	struct sde_hw_ctl *hw_ctl = NULL;
 	static u32 count;
@@ -6558,10 +6569,12 @@ static int _sde_crtc_get_output_fence(struct drm_crtc *crtc,
 	cstate = to_sde_crtc_state(state);
 
 	drm_for_each_encoder_mask(encoder, crtc->dev, state->encoder_mask) {
-		if (sde_encoder_check_curr_mode(encoder,
-						MSM_DISPLAY_VIDEO_MODE))
+		if (sde_encoder_check_curr_mode(encoder, MSM_DISPLAY_VIDEO_MODE))
 			is_vid = true;
-		if (is_vid)
+		else if (_is_crtc_intf_mode_wb(crtc))
+			is_wb = true;
+
+		if (is_vid || is_wb)
 			break;
 	}
 
@@ -6570,7 +6583,7 @@ static int _sde_crtc_get_output_fence(struct drm_crtc *crtc,
 	 * to create a hw-fence for this ctl, whereas if hw_ctl is not passed to sde_fence, this
 	 * won't use hw-fences for this output-fence.
 	 */
-	if (test_bit(HW_FENCE_OUT_FENCES_ENABLE, sde_crtc->hwfence_features_mask) &&
+	if (!is_wb && test_bit(HW_FENCE_OUT_FENCES_ENABLE, sde_crtc->hwfence_features_mask) &&
 			(count++ % sde_crtc->hwfence_out_fences_skip))
 		hw_ctl = _sde_crtc_get_hw_ctl(crtc);
 

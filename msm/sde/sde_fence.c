@@ -251,7 +251,7 @@ int sde_fence_register_hw_fences_wait(struct sde_hw_ctl *hw_ctl, struct dma_fenc
 	return ret;
 }
 
-static int _arm_output_hw_fence(struct sde_hw_ctl *hw_ctl)
+static int _arm_output_hw_fence(struct sde_hw_ctl *hw_ctl, u32 line_count)
 {
 	struct sde_hw_fence_data *data;
 	u32 ipcc_out_signal;
@@ -284,12 +284,16 @@ static int _arm_output_hw_fence(struct sde_hw_ctl *hw_ctl)
 	SDE_EVT32_VERBOSE(ctl_id, ipcc_out_signal);
 
 	/* arm dpu to trigger output fence signal once ready */
-	hw_ctl->ops.hw_fence_trigger_output_fence(hw_ctl, HW_FENCE_TRIGGER_SEL_CTRL_DONE);
+	if (line_count)
+		hw_ctl->ops.hw_fence_trigger_output_fence(hw_ctl,
+			HW_FENCE_TRIGGER_SEL_PROG_LINE_COUNT);
+	else
+		hw_ctl->ops.hw_fence_trigger_output_fence(hw_ctl, HW_FENCE_TRIGGER_SEL_CTRL_DONE);
 
 	return 0;
 }
 
-static int _sde_fence_arm_output_hw_fence(struct sde_fence_context *ctx)
+static int _sde_fence_arm_output_hw_fence(struct sde_fence_context *ctx, u32 line_count)
 {
 	struct sde_hw_ctl *hw_ctl = NULL;
 	struct sde_fence *fc, *next;
@@ -326,13 +330,13 @@ static int _sde_fence_arm_output_hw_fence(struct sde_fence_context *ctx)
 
 	/* arm dpu to trigger output hw-fence ipcc signal upon completion */
 	if (hw_ctl)
-		_arm_output_hw_fence(hw_ctl);
+		_arm_output_hw_fence(hw_ctl, line_count);
 
 	return 0;
 }
 
 /* update output hw_fences txq */
-int sde_fence_update_hw_fences_txq(struct sde_fence_context *ctx, bool vid_mode)
+int sde_fence_update_hw_fences_txq(struct sde_fence_context *ctx, bool vid_mode, u32 line_count)
 {
 	int ret = 0;
 	struct sde_hw_fence_data *data;
@@ -404,8 +408,8 @@ exit:
 	spin_unlock(&ctx->list_lock);
 
 	/* arm dpu to trigger output hw-fence ipcc signal upon completion in vid-mode */
-	if (txq_updated && hw_ctl)
-		_sde_fence_arm_output_hw_fence(ctx);
+	if ((txq_updated && hw_ctl) || line_count)
+		_sde_fence_arm_output_hw_fence(ctx, line_count);
 
 	return ret;
 }

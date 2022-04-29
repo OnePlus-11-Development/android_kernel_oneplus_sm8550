@@ -175,10 +175,11 @@ int sde_fence_register_hw_fences_wait(struct sde_hw_ctl *hw_ctl, struct dma_fenc
  *
  * @ctx: sde fence context
  * @vid_mode: is video-mode update
+ * @line_count: prog line count value, must be non-zero
  *
  * Returns: Zero on success, otherwise returns an error code.
  */
-int sde_fence_update_hw_fences_txq(struct sde_fence_context *ctx, bool vid_mode);
+int sde_fence_update_hw_fences_txq(struct sde_fence_context *ctx, bool vid_mode, u32 line_count);
 
 /**
  * sde_fence_update_input_hw_fence_signal - updates input-fence ipcc signal in dpu and enables
