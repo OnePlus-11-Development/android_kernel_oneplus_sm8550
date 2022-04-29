@@ -430,4 +430,9 @@ struct v4l2_event_vidc_metadata {
 };
 /* vendor events end */
 
+/* Default metadata size (align to 4KB) */
+#define MSM_VIDC_METADATA_SIZE           (4 * 4096) /* 16 KB */
+#define ENCODE_INPUT_METADATA_SIZE       (512 * 4096) /* 2 MB */
+#define DECODE_INPUT_METADATA_SIZE       MSM_VIDC_METADATA_SIZE
+
 #endif
