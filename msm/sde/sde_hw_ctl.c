@@ -60,6 +60,7 @@
 #define CTL_OUTPUT_FENCE_CTRL         0x25C
 #define CTL_OUTPUT_FENCE_ID           0x260
 #define CTL_HW_FENCE_STATUS           0x278
+#define CTL_OUTPUT_FENCE_SW_OVERRIDE  0x27C
 
 #define CTL_MIXER_BORDER_OUT            BIT(24)
 #define CTL_FLUSH_MASK_ROT              BIT(27)
@@ -369,6 +370,11 @@ static inline void sde_hw_ctl_trigger_sw_override(struct sde_hw_ctl *ctx)
 	sde_hw_ctl_update_input_fence(ctx, 0, 0);
 
 	SDE_REG_WRITE(&ctx->hw, CTL_FENCE_READY_SW_OVERRIDE, 0x1);
+}
+
+static inline void sde_hw_ctl_trigger_output_fence_override(struct sde_hw_ctl *ctx)
+{
+	SDE_REG_WRITE(&ctx->hw, CTL_OUTPUT_FENCE_SW_OVERRIDE, 0x1);
 }
 
 static inline int sde_hw_ctl_trigger_start(struct sde_hw_ctl *ctx)
@@ -1426,6 +1432,7 @@ static void _setup_ctl_ops(struct sde_hw_ctl_ops *ops,
 		ops->hw_fence_ctrl = sde_hw_ctl_hw_fence_ctrl;
 		ops->hw_fence_trigger_sw_override = sde_hw_ctl_trigger_sw_override;
 		ops->get_hw_fence_status = sde_hw_ctl_get_hw_fence_status;
+		ops->trigger_output_fence_override = sde_hw_ctl_trigger_output_fence_override;
 	}
 
 	if (cap & BIT(SDE_CTL_UIDLE))

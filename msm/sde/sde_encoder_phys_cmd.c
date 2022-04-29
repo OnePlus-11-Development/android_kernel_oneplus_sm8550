@@ -196,11 +196,23 @@ static void _sde_encoder_phys_signal_frame_done(struct sde_encoder_phys *phys_en
 		spin_unlock(phys_enc->enc_spinlock);
 	}
 
-	if (ctl && ctl->ops.get_scheduler_status)
+	if (ctl->ops.get_scheduler_status)
 		scheduler_status = ctl->ops.get_scheduler_status(ctl);
 
 	SDE_EVT32_IRQ(DRMID(phys_enc->parent), ctl->idx - CTL_0,
-		phys_enc->hw_pp->idx - PINGPONG_0, event, scheduler_status);
+		phys_enc->hw_pp->idx - PINGPONG_0, event, scheduler_status,
+		phys_enc->autorefresh_disable_trans);
+
+	/*
+	 * For hw-fences, in the last frame during the autorefresh disable transition
+	 * hw won't trigger the output-fence signal once the frame is done, therefore
+	 * sw must trigger the override to force the signal here
+	 */
+	if (phys_enc->autorefresh_disable_trans) {
+		if (ctl->ops.trigger_output_fence_override)
+			ctl->ops.trigger_output_fence_override(ctl);
+		phys_enc->autorefresh_disable_trans = false;
+	}
 
 	/* Signal any waiting atomic commit thread */
 	wake_up_all(&phys_enc->pending_kickoff_wq);
@@ -1881,6 +1893,8 @@ static void _sde_encoder_phys_disable_autorefresh(struct sde_encoder_phys *phys_
 
 	sde_encoder_phys_cmd_connect_te(phys_enc, false);
 	_sde_encoder_phys_cmd_config_autorefresh(phys_enc, 0);
+	phys_enc->autorefresh_disable_trans = true;
+
 	if (sde_kms && sde_kms->catalog &&
 			(sde_kms->catalog->autorefresh_disable_seq == AUTOREFRESH_DISABLE_SEQ1)) {
 		_sde_encoder_autorefresh_disable_seq1(phys_enc);

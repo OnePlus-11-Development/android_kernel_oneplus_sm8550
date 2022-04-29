@@ -178,6 +178,12 @@ struct sde_hw_ctl_ops {
 	void (*hw_fence_ctrl)(struct sde_hw_ctl *ctx, bool sw_set, bool sw_clear, u32 mode);
 
 	/**
+	 * override to trigger the signal for the output hw-fence
+	 * @ctx         : ctl path ctx pointer
+	 */
+	void (*trigger_output_fence_override)(struct sde_hw_ctl *ctx);
+
+	/**
 	 * trigger hw fence fence-ready sw override
 	 * @ctx         : ctl path ctx pointer
 	 */

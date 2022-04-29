@@ -311,6 +311,7 @@ struct sde_encoder_irq {
  * @frame_trigger_mode:		frame trigger mode indication for command
  *				mode display
  * @recovered:			flag set to true when recovered from pp timeout
+ * @autorefresh_disable_trans:   flag set to true during autorefresh disable transition
  */
 struct sde_encoder_phys {
 	struct drm_encoder *parent;
@@ -358,6 +359,7 @@ struct sde_encoder_phys {
 	int vfp_cached;
 	enum frame_trigger_mode_type frame_trigger_mode;
 	bool recovered;
+	bool autorefresh_disable_trans;
 };
 
 static inline int sde_encoder_phys_inc_pending(struct sde_encoder_phys *phys)
