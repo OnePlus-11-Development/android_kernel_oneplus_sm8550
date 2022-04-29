@@ -12,10 +12,15 @@
 #include <linux/stringify.h>
 #include "ipa_i.h"
 #include "ipa_rm_i.h"
+#include "ipahal_reg.h"
 #include "ipahal_nat.h"
 #include "ipa_odl.h"
 #include "ipa_qmi_service.h"
-
+#if defined(CONFIG_IPA_TSP)
+/* The following line should be removed once TSP feature is POR */
+#include "ipa_test_module_tsp.h"
+#include "ipahal_tsp.h"
+#endif
 #define IPA_MAX_ENTRY_STRING_LEN 500
 #define IPA_MAX_MSG_LEN 4096
 #define IPA_DBG_MAX_RULE_IN_TBL 128
@@ -368,7 +373,8 @@ int _ipa_read_ep_reg_v3_0(char *buf, int max_len, int pipe)
 		"IPA_ENDP_INIT_HOL_EN_%u=0x%x\n"
 		"IPA_ENDP_INIT_HOL_TIMER_%u=0x%x\n"
 		"IPA_ENDP_INIT_DEAGGR_%u=0x%x\n"
-		"IPA_ENDP_INIT_CFG_%u=0x%x\n",
+		"IPA_ENDP_INIT_CFG_%u=0x%x\n"
+		"IPA_ENDP_INIT_PROD_CFG_%u=0x%x\n",
 		pipe, ipahal_read_reg_n(IPA_ENDP_INIT_NAT_n, pipe),
 		pipe, ipahal_read_reg_n(IPA_ENDP_INIT_HDR_n, pipe),
 		pipe, ipahal_read_reg_n(IPA_ENDP_INIT_HDR_EXT_n, pipe),
@@ -379,7 +385,8 @@ int _ipa_read_ep_reg_v3_0(char *buf, int max_len, int pipe)
 		pipe, ipahal_read_reg_n(IPA_ENDP_INIT_HOL_BLOCK_EN_n, pipe),
 		pipe, ipahal_read_reg_n(IPA_ENDP_INIT_HOL_BLOCK_TIMER_n, pipe),
 		pipe, ipahal_read_reg_n(IPA_ENDP_INIT_DEAGGR_n, pipe),
-		pipe, ipahal_read_reg_n(IPA_ENDP_INIT_CFG_n, pipe));
+		pipe, ipahal_read_reg_n(IPA_ENDP_INIT_CFG_n, pipe),
+		pipe, ipahal_read_reg_n(IPA_ENDP_INIT_PROD_CFG_n, pipe));
 }
 
 /**
@@ -3306,8 +3313,103 @@ static ssize_t ipa3_write_nat_table_move(struct file *file,
 
 	return count;
 }
+#if defined(CONFIG_IPA_TSP)
+static ssize_t ipa3_read_tsp(struct file *file, char __user *buf, size_t count, loff_t *ppos)
+{
+	int i, nbytes = 0;
+	struct ipahal_ipa_state_tsp state_tsp;
+	u32 qm_non_empty;
+	struct ipa_ioc_tsp_ingress_class_params ingr_tc;
+	struct ipa_ioc_tsp_egress_prod_params egr_ep;
+	struct ipa_ioc_tsp_egress_class_params egr_tc;
 
+	/* Print the global TSP state flags */
+	IPA_ACTIVE_CLIENTS_INC_SIMPLE();
+	ipahal_read_reg_fields(IPA_STATE_TSP, &state_tsp);
+	ipahal_read_reg_fields(IPA_STATE_QMNGR_QUEUE_NONEMPTY, &qm_non_empty);
+	IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
 
+	if (state_tsp.traffic_shaper_idle)
+		nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"Traffic-Sahper module IDLE\n");
+	if (state_tsp.traffic_shaper_fifo_empty)
+		nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"Traffic-Sahper FIFO empty\n");
+	if (state_tsp.queue_mngr_idle)
+		nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"QMNGR overall IDLE\n");
+	if (state_tsp.queue_mngr_head_idle)
+		nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"QMNGR head module IDLE\n");
+	if (state_tsp.queue_mngr_shared_idle)
+		nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"QMNGR shared module IDLE\n");
+	if (state_tsp.queue_mngr_tail_idle)
+		nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"QMNGR tail module IDLE\n");
+	if (state_tsp.queue_mngr_block_ctrl_idle)
+		nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"Block control module IDLE\n");
+
+	nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"QM non-empty bitmask: 0x%08X\n", qm_non_empty);
+
+	/* Dump Ingress Class, Egress Producer and Egress Class tables */
+	nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"Ingress Trafic Class Table:\n");
+	nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"TC Index\tMax Rate\tMax Burst\tInclude L2\n");
+	for (i = 1; i <= ipa3_ctx->tsp.ingr_tc_max; i++) {
+		ipahal_tsp_parse_hw_ingr_tc(ipa3_ctx->tsp.ingr_tc_tbl.base, i, &ingr_tc);
+		nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"%02d:\t\t%u\t\t%u\t\t%u\n",
+			i, ingr_tc.max_rate, ingr_tc.max_burst, ingr_tc.include_l2_len);
+	}
+
+	nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"Egress Producer Table:\n");
+	nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"EP Index\tClient\tMax Rate\tMax Burst\n");
+	for (i = 0; i < ipa3_ctx->tsp.egr_ep_max; i++) {
+		ipahal_tsp_parse_hw_egr_ep(ipa3_ctx->tsp.egr_ep_tbl.base, i, &egr_ep);
+		nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"%d:\t\t%d\t%u\t\t%u\n",
+			i, ipa3_ctx->tsp.egr_ep_config[i], egr_ep.max_rate, egr_ep.max_burst);
+	}
+
+	nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"Egress Trafic Class Table:\n");
+	nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"TC Index\tMax Rate\tMax Burst\tG. Rate\tG. Burst\n");
+	for (i = 1; i <= ipa3_ctx->tsp.egr_tc_max; i++) {
+		ipahal_tsp_parse_hw_egr_tc(ipa3_ctx->tsp.egr_tc_tbl.base, i, &egr_tc);
+		nbytes += scnprintf(dbg_buff + nbytes, IPA_MAX_MSG_LEN - nbytes,
+			"%02d:\t\t%u\t\t%u\t\t%u\t%u\n",
+			i, egr_tc.max_rate, egr_tc.max_burst,
+			egr_tc.guaranteed_rate, egr_tc.guaranteed_burst);
+	}
+
+	return simple_read_from_buffer(buf, count, ppos, dbg_buff, nbytes);
+}
+
+static ssize_t ipa3_write_tsp(struct file *file, const char __user *buf,
+			      size_t count, loff_t *ppos) {
+
+	int ret;
+	u8 option = 0;
+
+	if (count >= sizeof(dbg_buff))
+		return -EFAULT;
+
+	ret = kstrtou8_from_user(buf, count, 0, &option);
+	if(ret)
+		return ret;
+
+	pr_err("TSP write is not implemented.\n");
+
+	return count;
+}
+#endif
 static const struct ipa3_debugfs_file debugfs_files[] = {
 	{
 		"gen_reg", IPA_READ_ONLY_MODE, NULL, {
@@ -3532,6 +3634,13 @@ static const struct ipa3_debugfs_file debugfs_files[] = {
 			.read = ipa3_read_ipa_max_napi_sort_page_thrshld,
 			.write = ipa3_write_ipa_max_napi_sort_page_thrshld,
 		}
+#if defined(CONFIG_IPA_TSP)
+	}, {
+		"tsp", IPA_READ_WRITE_MODE, NULL, {
+			.read = ipa3_read_tsp,
+			.write = ipa3_write_tsp,
+		}
+#endif
 	},
 };
 
