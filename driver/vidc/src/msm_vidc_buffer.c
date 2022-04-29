@@ -302,6 +302,46 @@ u32 msm_vidc_encoder_input_size(struct msm_vidc_inst *inst)
 	return size;
 }
 
+static u32 msm_vidc_enc_delivery_mode_based_output_buf_size(struct msm_vidc_inst *inst,
+	u32 frame_size)
+{
+	u32 slice_size;
+	u32 width, height;
+	u32 width_in_lcus, height_in_lcus, lcu_size;
+	u32 total_mb_count;
+	struct v4l2_format *f;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return frame_size;
+	}
+
+	f = &inst->fmts[OUTPUT_PORT];
+
+	if (f->fmt.pix_mp.pixelformat != V4L2_PIX_FMT_HEVC &&
+		f->fmt.pix_mp.pixelformat != V4L2_PIX_FMT_H264)
+		return frame_size;
+
+	if (inst->capabilities->cap[SLICE_MODE].value != V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_MAX_MB)
+		return frame_size;
+
+	if (!is_enc_slice_delivery_mode(inst))
+		return frame_size;
+
+	lcu_size = (f->fmt.pix_mp.pixelformat == V4L2_PIX_FMT_HEVC) ? 32 : 16;
+	width = f->fmt.pix_mp.width;
+	height = f->fmt.pix_mp.height;
+	width_in_lcus = (width + lcu_size - 1) / lcu_size;
+	height_in_lcus = (height + lcu_size - 1) / lcu_size;
+	total_mb_count = width_in_lcus * height_in_lcus;
+
+	slice_size = ((frame_size * inst->capabilities->cap[SLICE_MAX_MB].value) \
+					+ total_mb_count - 1) / total_mb_count;
+
+	slice_size = ALIGN(slice_size, SZ_4K);
+	return slice_size;
+}
+
 u32 msm_vidc_encoder_output_size(struct msm_vidc_inst *inst)
 {
 	u32 frame_size;
@@ -348,7 +388,10 @@ skip_calc:
 		f->fmt.pix_mp.pixelformat == V4L2_PIX_FMT_HEIC)
 		frame_size = frame_size + (frame_size >> 2);
 
-	return ALIGN(frame_size, SZ_4K);
+	frame_size = ALIGN(frame_size, SZ_4K);
+	frame_size = msm_vidc_enc_delivery_mode_based_output_buf_size(inst, frame_size);
+
+	return frame_size;
 }
 
 static inline u32 ROI_METADATA_SIZE(
