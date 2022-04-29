@@ -5568,8 +5568,7 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 	}
 
 	list_for_each_entry_safe(fence, dummy_fence, &inst->fence_list, list) {
-		i_vpr_e(inst, "%s: destroying fence id: %llu\n",
-			__func__, fence->dma_fence.seqno);
+		i_vpr_e(inst, "%s: destroying fence %s\n", __func__, fence->name);
 		msm_vidc_fence_destroy(inst, (u32)fence->dma_fence.seqno);
 	}
 

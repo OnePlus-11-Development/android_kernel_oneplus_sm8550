@@ -2810,6 +2810,7 @@ int msm_vidc_adjust_dec_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl)
 		&outbuf_fence, __func__))
 		return -EINVAL;
 
+	/* enable lowlatency if outbuf fence is enabled */
 	if (outbuf_fence & V4L2_MPEG_VIDC_META_ENABLE &&
 		outbuf_fence & V4L2_MPEG_VIDC_META_RX_INPUT)
 		adjusted_value = 1;

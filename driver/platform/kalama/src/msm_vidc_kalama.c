@@ -1327,8 +1327,7 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 		0,
 		HFI_PROP_PIPE},
 
-	{POC, DEC, H264,
-		0, 18, 1, 1,
+	{POC, DEC, H264, 0, 2, 1, 1,
 		0,
 		HFI_PROP_PIC_ORDER_CNT_TYPE},
 

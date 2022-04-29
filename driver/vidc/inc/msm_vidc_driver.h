@@ -153,6 +153,36 @@ static inline bool is_meta_tx_out_enabled(struct msm_vidc_inst *inst, u32 cap)
 	return enabled;
 }
 
+static inline bool is_any_meta_tx_out_enabled(struct msm_vidc_inst *inst)
+{
+	bool enabled = false;
+	u32 i;
+
+	for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+		if (is_meta_tx_out_enabled(inst, i)) {
+			enabled = true;
+			break;
+		}
+	}
+
+	return enabled;
+}
+
+static inline bool is_any_meta_tx_inp_enabled(struct msm_vidc_inst *inst)
+{
+	bool enabled = false;
+	u32 i;
+
+	for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+		if (is_meta_tx_inp_enabled(inst, i)) {
+			enabled = true;
+			break;
+		}
+	}
+
+	return enabled;
+}
+
 static inline bool is_input_meta_enabled(struct msm_vidc_inst *inst)
 {
 	bool enabled = false;
