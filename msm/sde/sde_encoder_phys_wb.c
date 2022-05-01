@@ -1091,6 +1091,11 @@ static void _sde_encoder_phys_wb_setup_sys_cache(struct sde_encoder_phys *phys_e
 		return;
 	}
 
+	if (!hw_wb || !hw_wb->ops.setup_sys_cache) {
+		SDE_DEBUG("unsupported ops: setup_sys_cache WB %d\n", WBID(wb_enc));
+		return;
+	}
+
 	/*
 	 * - use LLCC_DISP for cwb static display
 	 * - use LLCC_DISP_1 for cwb static display read path only
@@ -1110,11 +1115,6 @@ static void _sde_encoder_phys_wb_setup_sys_cache(struct sde_encoder_phys *phys_e
 	sc_cfg = &hw_wb->catalog->sc_cfg[cache_wr_type];
 	if (!test_bit(cache_wr_type, hw_wb->catalog->sde_sys_cache_type_map)) {
 		SDE_DEBUG("sys cache type %d not enabled\n", cache_wr_type);
-		return;
-	}
-
-	if (!hw_wb || !hw_wb->ops.setup_sys_cache) {
-		SDE_DEBUG("unsupported ops: setup_sys_cache WB %d\n", WBID(wb_enc));
 		return;
 	}
 

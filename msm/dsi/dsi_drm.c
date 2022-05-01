@@ -621,7 +621,7 @@ int dsi_conn_get_mode_info(struct drm_connector *connector,
 
 	convert_to_dsi_mode(drm_mode, &partial_dsi_mode);
 	rc = dsi_display_find_mode(dsi_display, &partial_dsi_mode, sub_mode, &dsi_mode);
-	if (rc || !dsi_mode->priv_info)
+	if (rc || !dsi_mode->priv_info || !dsi_display || !dsi_display->panel)
 		return -EINVAL;
 
 	memset(mode_info, 0, sizeof(*mode_info));
@@ -641,12 +641,12 @@ int dsi_conn_get_mode_info(struct drm_connector *connector,
 	mode_info->qsync_min_fps = dsi_mode->timing.qsync_min_fps;
 	mode_info->wd_jitter = dsi_mode->priv_info->wd_jitter;
 
-	if (dsi_display->panel)
-		mode_info->vpadding = dsi_display->panel->host_config.vpadding;
+	mode_info->vpadding = dsi_display->panel->host_config.vpadding;
 	if (mode_info->vpadding < drm_mode->vdisplay) {
 		mode_info->vpadding = 0;
 		dsi_display->panel->host_config.line_insertion_enable = 0;
 	}
+
 	memcpy(&mode_info->topology, &dsi_mode->priv_info->topology,
 			sizeof(struct msm_display_topology));
 

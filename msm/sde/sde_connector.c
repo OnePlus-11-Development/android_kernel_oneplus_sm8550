@@ -3136,7 +3136,8 @@ static int _sde_connector_install_properties(struct drm_device *dev,
 		msm_property_install_enum(&c_conn->property_info, "dsc_mode", 0,
 			0, e_dsc_mode, ARRAY_SIZE(e_dsc_mode), 0, CONNECTOR_PROP_DSC_MODE);
 
-		if (display_info->capabilities & MSM_DISPLAY_CAP_CMD_MODE &&
+		if (dsi_display && dsi_display->panel &&
+			display_info->capabilities & MSM_DISPLAY_CAP_CMD_MODE &&
 			display_info->capabilities & MSM_DISPLAY_CAP_VID_MODE)
 			msm_property_install_enum(&c_conn->property_info,
 			"panel_mode", 0, 0,
