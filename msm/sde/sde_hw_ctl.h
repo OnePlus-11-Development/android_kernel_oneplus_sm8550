@@ -191,6 +191,13 @@ struct sde_hw_ctl_ops {
 	void (*hw_fence_trigger_output_fence)(struct sde_hw_ctl *ctx, u32 trigger_sel);
 
 	/**
+	 * get hw fence status
+	 * @ctx         : ctl path ctx pointer
+	 * @Return: fence status
+	 */
+	int (*get_hw_fence_status)(struct sde_hw_ctl *ctx);
+
+	/**
 	 * update output hw fence ipcc client_id and signal_id
 	 * @ctx       : ctl path ctx pointer
 	 * @client_id : value to write to update the client_id
