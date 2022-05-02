@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2002,2007-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -510,6 +511,14 @@ int kgsl_mmu_pagetable_get_context_bank(struct kgsl_pagetable *pagetable)
 {
 	if (PT_OP_VALID(pagetable, get_context_bank))
 		return pagetable->pt_ops->get_context_bank(pagetable);
+
+	return -ENOENT;
+}
+
+int kgsl_mmu_pagetable_get_asid(struct kgsl_pagetable *pagetable)
+{
+	if (PT_OP_VALID(pagetable, get_asid))
+		return pagetable->pt_ops->get_asid(pagetable);
 
 	return -ENOENT;
 }
