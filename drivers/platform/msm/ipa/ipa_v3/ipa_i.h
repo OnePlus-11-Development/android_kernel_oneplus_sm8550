@@ -1626,6 +1626,9 @@ struct ipa3_stats {
 	atomic_t num_buff_above_thresh_for_coal_pipe_notified;
 	atomic_t num_buff_below_thresh_for_def_pipe_notified;
 	atomic_t num_buff_below_thresh_for_coal_pipe_notified;
+	atomic_t num_buff_above_thresh_for_ll_pipe_notified;
+	atomic_t num_buff_below_thresh_for_ll_pipe_notified;
+	atomic_t num_free_page_task_scheduled;
 	struct lan_coal_stats coal;
 	u64 num_sort_tasklet_sched[3];
 	u64 num_of_times_wq_reschd;
@@ -2483,8 +2486,11 @@ struct ipa3_context {
 	bool ipa_rmnet_notifier_enabled;
 	bool buff_above_thresh_for_def_pipe_notified;
 	bool buff_above_thresh_for_coal_pipe_notified;
+	bool buff_above_thresh_for_ll_pipe_notified;
 	bool buff_below_thresh_for_def_pipe_notified;
 	bool buff_below_thresh_for_coal_pipe_notified;
+	bool buff_below_thresh_for_ll_pipe_notified;
+	bool free_page_task_scheduled;
 	u8 mhi_ctrl_state;
 	struct ipa_mem_buffer uc_act_tbl;
 	bool uc_act_tbl_valid;
