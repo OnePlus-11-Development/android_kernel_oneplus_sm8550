@@ -1575,8 +1575,8 @@ static void gen7_set_isdb_breakpoint_registers(struct adreno_device *adreno_dev)
 	isdb_write(device->qdss_gfx_virt, 0x6000);
 	isdb_write(device->qdss_gfx_virt, 0x7000);
 
-	/* gen7_2_0 has additional SPs */
-	if (adreno_is_gen7_2_0(adreno_dev)) {
+	/* gen7_2_x has additional SPs */
+	if (adreno_is_gen7_2_x(adreno_dev)) {
 		isdb_write(device->qdss_gfx_virt, 0x8000);
 		isdb_write(device->qdss_gfx_virt, 0x9000);
 		isdb_write(device->qdss_gfx_virt, 0xa000);
