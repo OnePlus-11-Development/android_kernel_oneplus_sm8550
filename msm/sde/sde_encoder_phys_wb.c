@@ -1097,16 +1097,19 @@ static void _sde_encoder_phys_wb_setup_sys_cache(struct sde_encoder_phys *phys_e
 	}
 
 	/*
-	 * - use LLCC_DISP for cwb static display
-	 * - use LLCC_DISP_1 for cwb static display read path only
+	 * - use LLCC_DISP/LLCC_DISP_1 for cwb static display
 	 * - use LLCC_DISP_WB for 2-pass composition using offline-wb
 	 */
 	if (phys_enc->in_clone_mode) {
-		cache_rd_type = SDE_SYS_CACHE_DISP;
-		if (test_bit(SDE_SYS_CACHE_DISP_1, hw_wb->catalog->sde_sys_cache_type_map))
+		/* toggle system cache SCID between consecutive CWB writes */
+		if (test_bit(SDE_SYS_CACHE_DISP_1, hw_wb->catalog->sde_sys_cache_type_map)
+				&& cfg->type == SDE_SYS_CACHE_DISP) {
 			cache_wr_type = SDE_SYS_CACHE_DISP_1;
-		else
+			cache_rd_type = SDE_SYS_CACHE_DISP_1;
+		} else {
 			cache_wr_type = SDE_SYS_CACHE_DISP;
+			cache_rd_type = SDE_SYS_CACHE_DISP;
+		}
 	} else {
 		cache_rd_type = SDE_SYS_CACHE_DISP_WB;
 		cache_wr_type = SDE_SYS_CACHE_DISP_WB;
@@ -2212,6 +2215,7 @@ static void sde_encoder_phys_wb_disable(struct sde_encoder_phys *phys_enc)
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
 	struct sde_hw_wb *hw_wb = wb_enc->hw_wb;
 	struct sde_crtc *sde_crtc = to_sde_crtc(wb_enc->crtc);
+	struct sde_hw_wb_sc_cfg cfg = { 0 };
 	int i;
 
 	if (phys_enc->enable_state == SDE_ENC_DISABLED) {
@@ -2233,9 +2237,8 @@ static void sde_encoder_phys_wb_disable(struct sde_encoder_phys *phys_enc)
 
 	/* reset system cache properties */
 	if (wb_enc->sc_cfg.wr_en) {
-		memset(&wb_enc->sc_cfg, 0, sizeof(struct sde_hw_wb_sc_cfg));
 		if (hw_wb->ops.setup_sys_cache)
-			hw_wb->ops.setup_sys_cache(hw_wb, &wb_enc->sc_cfg);
+			hw_wb->ops.setup_sys_cache(hw_wb, &cfg);
 
 		/*
 		 * avoid llcc_active reset for crtc while in clone mode as it will reset it for

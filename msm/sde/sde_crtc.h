@@ -308,6 +308,7 @@ struct sde_frame_data {
  * @target_bpp      : target bpp used to calculate compression ratio
  * @static_cache_read_work: delayed worker to transition cache state to read
  * @cache_state     : Current static image cache state
+ * @cache_type      : Current static image cache type to use
  * @dspp_blob_info  : blob containing dspp hw capability information
  * @cached_encoder_mask : cached encoder_mask for vblank work
  * @valid_skip_blend_plane: flag to indicate if skip blend plane is valid
@@ -410,6 +411,7 @@ struct sde_crtc {
 
 	struct kthread_delayed_work static_cache_read_work;
 	enum sde_sys_cache_state cache_state;
+	enum sde_sys_cache_type cache_type;
 
 	struct drm_property_blob *dspp_blob_info;
 	u32 cached_encoder_mask;

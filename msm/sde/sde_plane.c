@@ -2853,22 +2853,23 @@ static void _sde_plane_sspp_setup_sys_cache(struct sde_plane *psde,
 	struct sde_hw_pipe_sc_cfg *cfg = &pstate->sc_cfg;
 	bool prev_rd_en = cfg->rd_en;
 	u32 cache_flag, cache_rd_type, cache_wr_type;
+	enum sde_sys_cache_state cache_state;
 
 	if (!state->fb) {
 		SDE_ERROR("invalid fb on plane %d\n", DRMID(&psde->base));
 		return;
 	}
 
+	cache_state = pstate->static_cache_state;
 	msm_framebuffer_get_cache_hint(state->fb, &cache_flag, &cache_rd_type, &cache_wr_type);
 
 	cfg->rd_en = false;
 	cfg->rd_scid = 0x0;
 	cfg->flags = SYS_CACHE_EN_FLAG | SYS_CACHE_SCID;
-	cfg->type = SDE_SYS_CACHE_NONE;
 
 	/*
 	 * if condition handles static display legacy path, where internal state machine is
-	 * transitioning the "static_cache_state" variable to program the LLCC cache through
+	 * transitioning the "cache_state" variable to program the LLCC cache through
 	 * SSPP hardware using SDE_SYS_CACHE_DISP SCID.
 	 * else condition handles static display and IWE path, were the frame is programmed to
 	 * LLCC cache through WB/CWB path and read back by SSPP hardware. The FB cache hints are
@@ -2876,17 +2877,23 @@ static void _sde_plane_sspp_setup_sys_cache(struct sde_plane *psde,
 	 * keep active.
 	 */
 	if (test_bit(SDE_SYS_CACHE_DISP, psde->catalog->sde_sys_cache_type_map)
-			&& ((pstate->static_cache_state == CACHE_STATE_FRAME_WRITE)
-				|| (pstate->static_cache_state == CACHE_STATE_FRAME_READ))) {
+			&& ((cache_state == CACHE_STATE_FRAME_WRITE)
+				|| (cache_state == CACHE_STATE_FRAME_READ))) {
+		cfg->type = pstate->static_cache_type;
 		cfg->rd_en = true;
-		cfg->rd_scid = sc_cfg[SDE_SYS_CACHE_DISP].llcc_scid;
-		cfg->rd_noallocate = (pstate->static_cache_state == CACHE_STATE_FRAME_READ);
+		cfg->rd_scid = sc_cfg[cfg->type].llcc_scid;
+		if (test_bit(SDE_FEATURE_SYS_CACHE_NSE, psde->catalog->features)) {
+			cfg->rd_noallocate = false;
+			pstate->static_cache_state = CACHE_STATE_NORMAL;
+		} else {
+			cfg->rd_noallocate = (cache_state == CACHE_STATE_FRAME_READ);
+		}
 		cfg->flags |= SYS_CACHE_NO_ALLOC;
-		cfg->type = SDE_SYS_CACHE_DISP;
 	} else if (test_bit(cache_rd_type, psde->catalog->sde_sys_cache_type_map) && cache_flag) {
 		cfg->rd_en = true;
+		cfg->type = cache_rd_type;
 		cfg->rd_scid = sc_cfg[cache_rd_type].llcc_scid;
-		cfg->rd_noallocate = true;
+		cfg->rd_noallocate = false;
 		cfg->flags |= SYS_CACHE_NO_ALLOC;
 		cache_flag = MSM_FB_CACHE_READ_EN;
 
@@ -2896,13 +2903,14 @@ static void _sde_plane_sspp_setup_sys_cache(struct sde_plane *psde,
 	if (!cfg->rd_en && !prev_rd_en)
 		return;
 
-	SDE_EVT32(DRMID(&psde->base), cfg->rd_scid, cfg->rd_en, cfg->rd_noallocate, cfg->flags,
-			cache_flag, cache_rd_type, cache_wr_type, state->fb->base.id);
+	SDE_EVT32(DRMID(&psde->base), cfg->type, cfg->rd_scid, cfg->rd_en, cfg->rd_noallocate,
+			cfg->flags, cache_state, cache_flag, cache_rd_type, cache_wr_type,
+			state->fb->base.id);
 	psde->pipe_hw->ops.setup_sys_cache(psde->pipe_hw, cfg);
 }
 
 void sde_plane_static_img_control(struct drm_plane *plane,
-		enum sde_sys_cache_state state)
+		enum sde_sys_cache_state state, enum sde_sys_cache_type type)
 {
 	struct sde_plane *psde;
 	struct sde_plane_state *pstate;
@@ -2916,6 +2924,7 @@ void sde_plane_static_img_control(struct drm_plane *plane,
 	pstate = to_sde_plane_state(plane->state);
 
 	pstate->static_cache_state = state;
+	pstate->static_cache_type = type;
 
 	if (state == CACHE_STATE_FRAME_WRITE || state == CACHE_STATE_FRAME_READ)
 		_sde_plane_sspp_setup_sys_cache(psde, pstate);

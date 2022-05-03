@@ -720,6 +720,7 @@ enum {
  * @SDE_FEATURE_UBWC_STATS     UBWC statistics supported
  * @SDE_FEATURE_VBIF_CLK_SPLIT VBIF clock split supported
  * @SDE_FEATURE_CTL_DONE       Support for CTL DONE irq
+ * @SDE_FEATURE_SYS_CACHE_NSE  Support for no-self-evict feature
  * @SDE_FEATURE_MAX:             MAX features value
  */
 enum sde_mdss_features {
@@ -759,6 +760,7 @@ enum sde_mdss_features {
 	SDE_FEATURE_UBWC_STATS,
 	SDE_FEATURE_VBIF_CLK_SPLIT,
 	SDE_FEATURE_CTL_DONE,
+	SDE_FEATURE_SYS_CACHE_NSE,
 	SDE_FEATURE_MAX
 };
 
