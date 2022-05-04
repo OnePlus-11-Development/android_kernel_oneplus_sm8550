@@ -44,6 +44,7 @@
 #include "sde_hw_qdss.h"
 #include "sde_encoder_dce.h"
 #include "sde_vm.h"
+#include "sde_fence.h"
 
 #define SDE_DEBUG_ENC(e, fmt, ...) SDE_DEBUG("enc%d " fmt,\
 		(e) ? (e)->base.base.id : -1, ##__VA_ARGS__)
@@ -3297,6 +3298,13 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 		sde_encoder_virt_reset(drm_enc);
 }
 
+static void _trigger_encoder_hw_fences_override(struct sde_kms *sde_kms, struct sde_hw_ctl *ctl)
+{
+	/* trigger hw-fences override signal */
+	if (sde_kms && sde_kms->catalog->hw_fence_rev && ctl->ops.hw_fence_trigger_sw_override)
+		ctl->ops.hw_fence_trigger_sw_override(ctl);
+}
+
 void sde_encoder_helper_phys_disable(struct sde_encoder_phys *phys_enc,
 		struct sde_encoder_phys_wb *wb_enc)
 {
@@ -3377,6 +3385,8 @@ void sde_encoder_helper_phys_disable(struct sde_encoder_phys *phys_enc,
 				ctl->ops.update_bitmask(ctl, SDE_HW_FLUSH_DSC, hw_dsc->idx, true);
 		}
 	}
+
+	_trigger_encoder_hw_fences_override(phys_enc->sde_kms, ctl);
 
 	sde_crtc_disable_cp_features(sde_enc->base.crtc);
 	ctl->ops.get_pending_flush(ctl, &cfg);
@@ -3692,6 +3702,25 @@ int sde_encoder_idle_request(struct drm_encoder *drm_enc)
 }
 
 /**
+* _sde_encoder_update_retire_txq - update tx queue for a retire hw fence
+* phys: Pointer to physical encoder structure
+*
+*/
+static inline void _sde_encoder_update_retire_txq(struct sde_encoder_phys *phys)
+{
+	struct sde_connector *c_conn;
+
+	c_conn = to_sde_connector(phys->connector);
+	if (!c_conn) {
+		SDE_ERROR("invalid connector");
+		return;
+	}
+
+	if (c_conn->hwfence_wb_retire_fences_enable)
+		sde_fence_update_hw_fences_txq(c_conn->retire_fence, false);
+}
+
+/**
  * _sde_encoder_trigger_flush - trigger flush for a physical encoder
  * drm_enc: Pointer to drm encoder structure
  * phys: Pointer to physical encoder structure
@@ -3898,6 +3927,21 @@ void sde_encoder_helper_hw_reset(struct sde_encoder_phys *phys_enc)
 	phys_enc->enable_state = SDE_ENC_ENABLED;
 }
 
+void sde_encoder_helper_update_out_fence_txq(struct sde_encoder_virt *sde_enc, bool is_vid)
+{
+	struct sde_crtc *sde_crtc;
+
+	if (!sde_enc || !sde_enc->crtc) {
+		SDE_ERROR("invalid encoder %d\n", !sde_enc);
+		return;
+	}
+
+	sde_crtc = to_sde_crtc(sde_enc->crtc);
+
+	SDE_EVT32(DRMID(sde_enc->crtc), is_vid);
+	sde_fence_update_hw_fences_txq(sde_crtc->output_fence, is_vid);
+}
+
 /**
  * _sde_encoder_kickoff_phys - handle physical encoder kickoff
  *	Iterate through the physical encoders and perform consolidated flush
@@ -3987,8 +4031,7 @@ static void _sde_encoder_kickoff_phys(struct sde_encoder_virt *sde_enc,
 			pending_kickoff_cnt =
 					sde_encoder_phys_inc_pending(phys);
 			SDE_EVT32(pending_kickoff_cnt,
-					pending_flush.pending_flush_mask,
-					SDE_EVTLOG_FUNC_CASE2);
+					pending_flush.pending_flush_mask, SDE_EVTLOG_FUNC_CASE2);
 		}
 	}
 
@@ -4571,6 +4614,10 @@ void sde_encoder_kickoff(struct drm_encoder *drm_enc, bool config_changed)
 
 		SDE_EVT32(DRMID(drm_enc), i, SDE_EVTLOG_FUNC_CASE1);
 	}
+
+	/* update txq for any output retire hw-fence (wb-path) */
+	if (sde_enc->cur_master)
+		_sde_encoder_update_retire_txq(sde_enc->cur_master);
 
 	/* All phys encs are ready to go, trigger the kickoff */
 	_sde_encoder_kickoff_phys(sde_enc, config_changed);
@@ -5905,6 +5952,33 @@ bool sde_encoder_needs_dsc_disable(struct drm_encoder *drm_enc)
 
 	conn_state = to_sde_connector_state(conn->state);
 	return TOPOLOGY_DSC_MODE(conn_state->old_topology_name);
+}
+
+struct sde_hw_ctl *sde_encoder_get_hw_ctl(struct sde_connector *c_conn)
+{
+	struct drm_encoder *drm_enc;
+	struct sde_encoder_virt *sde_enc;
+	struct sde_encoder_phys *cur_master;
+	struct sde_hw_ctl *hw_ctl = NULL;
+
+	if (!c_conn || !c_conn->hwfence_wb_retire_fences_enable)
+		goto exit;
+
+	/* get encoder to find the hw_ctl for this connector */
+	drm_enc = c_conn->encoder;
+	if (!drm_enc)
+		goto exit;
+
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	cur_master = sde_enc->phys_encs[0];
+	if (!cur_master || !cur_master->hw_ctl)
+		goto exit;
+
+	hw_ctl = cur_master->hw_ctl;
+	SDE_DEBUG("conn hw_ctl idx:%d intf_mode:%d\n", hw_ctl->idx, cur_master->intf_mode);
+
+exit:
+	return hw_ctl;
 }
 
 void sde_encoder_add_data_to_minidump_va(struct drm_encoder *drm_enc)

@@ -54,6 +54,7 @@
 #include "sde_reg_dma.h"
 #include "sde_connector.h"
 #include "sde_vm.h"
+#include "sde_fence.h"
 
 #include <linux/qcom_scm.h>
 #include <linux/qcom-iommu-util.h>
@@ -4251,6 +4252,15 @@ static void sde_kms_init_rot_sid_hw(struct sde_kms *sde_kms)
 	sde_hw_set_rotator_sid(sde_kms->hw_sid);
 }
 
+static void sde_kms_init_hw_fences(struct sde_kms *sde_kms)
+{
+	if (!sde_kms || !sde_kms->hw_mdp)
+		return;
+
+	if (sde_kms->hw_mdp->ops.setup_hw_fences)
+		sde_kms->hw_mdp->ops.setup_hw_fences(sde_kms->hw_mdp);
+}
+
 static void sde_kms_init_shared_hw(struct sde_kms *sde_kms)
 {
 	if (!sde_kms || !sde_kms->hw_mdp || !sde_kms->catalog)
@@ -4410,10 +4420,11 @@ static void sde_kms_handle_power_event(u32 event_type, void *usr)
 		sde_kms->first_kickoff = true;
 
 		/**
-		 * Rotator sid needs to be programmed since uefi doesn't
-		 * configure it during continuous splash
+		 * Rotator sid and hw fences need to be programmed since uefi doesn't
+		 * configure them during continuous splash
 		 */
 		sde_kms_init_rot_sid_hw(sde_kms);
+		sde_kms_init_hw_fences(sde_kms);
 		if (sde_kms->splash_data.num_splash_displays ||
 				sde_in_trusted_vm(sde_kms))
 			return;

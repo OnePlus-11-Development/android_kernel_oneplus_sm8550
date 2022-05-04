@@ -202,6 +202,13 @@ struct sde_hw_mdp_ops {
 	 */
 	u32 (*get_autorefresh_status)(struct sde_hw_mdp *mdp,
 			u32 intf_idx);
+
+	/**
+	 * setup_hw_fences - configure hw fences top registers
+	 * @mdp:     mdp top context driver
+	 */
+	void (*setup_hw_fences)(struct sde_hw_mdp *mdp);
+
 };
 
 struct sde_hw_mdp {

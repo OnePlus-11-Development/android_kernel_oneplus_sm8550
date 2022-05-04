@@ -562,6 +562,18 @@ static void _sde_rm_hw_destroy(enum sde_hw_blk_type type, struct sde_hw_blk_reg_
 	}
 }
 
+static void _deinit_hw_fences(struct sde_rm *rm)
+{
+	struct sde_rm_hw_iter iter;
+
+	sde_rm_init_hw_iter(&iter, 0, SDE_HW_BLK_CTL);
+	while (_sde_rm_get_hw_locked(rm, &iter)) {
+		struct sde_hw_ctl *ctl = to_sde_hw_ctl(iter.blk->hw);
+
+		sde_hw_fence_deinit(ctl);
+	}
+}
+
 int sde_rm_destroy(struct sde_rm *rm)
 {
 
@@ -573,6 +585,8 @@ int sde_rm_destroy(struct sde_rm *rm)
 		SDE_ERROR("invalid rm\n");
 		return -EINVAL;
 	}
+
+	_deinit_hw_fences(rm);
 
 	list_for_each_entry_safe(rsvp_cur, rsvp_nxt, &rm->rsvps, list) {
 		list_del(&rsvp_cur->list);
@@ -693,6 +707,29 @@ static int _sde_rm_hw_blk_create(
 	return 0;
 }
 
+static int _init_hw_fences(struct sde_rm *rm, bool use_ipcc)
+{
+	struct sde_rm_hw_iter iter;
+	int ret = 0;
+
+	sde_rm_init_hw_iter(&iter, 0, SDE_HW_BLK_CTL);
+	while (_sde_rm_get_hw_locked(rm, &iter)) {
+		struct sde_hw_ctl *ctl = to_sde_hw_ctl(iter.blk->hw);
+
+		if (sde_hw_fence_init(ctl, use_ipcc)) {
+			pr_err("failed to init hw_fence idx:%d\n", ctl->idx);
+			ret = -EINVAL;
+			break;
+		}
+		SDE_DEBUG("init hw-fence for ctl %d", iter.blk->id);
+	}
+
+	if (ret)
+		_deinit_hw_fences(rm);
+
+	return ret;
+}
+
 static int _sde_rm_hw_blk_create_new(struct sde_rm *rm,
 			struct sde_mdss_cfg *cat,
 			void __iomem *mmio)
@@ -775,6 +812,13 @@ static int _sde_rm_hw_blk_create_new(struct sde_rm *rm,
 		if (rc) {
 			SDE_ERROR("failed: ctl hw not available\n");
 			goto fail;
+		}
+	}
+
+	if (cat->hw_fence_rev) {
+		if (_init_hw_fences(rm, test_bit(SDE_FEATURE_HW_FENCE_IPCC, cat->features))) {
+			SDE_INFO("failed to init hw-fences, disabling hw-fences\n");
+			cat->hw_fence_rev = 0;
 		}
 	}
 

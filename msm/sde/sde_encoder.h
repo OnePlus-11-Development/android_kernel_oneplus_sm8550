@@ -607,6 +607,13 @@ bool sde_encoder_needs_dsc_disable(struct drm_encoder *drm_enc);
 void sde_encoder_get_transfer_time(struct drm_encoder *drm_enc,
 		u32 *transfer_time_us);
 
+/**
+ * sde_encoder_helper_update_out_fence_txq - updates hw-fence tx queue
+ * @sde_enc: Pointer to sde encoder structure
+ * @is_vid: Boolean to indicate if is video-mode
+ */
+void sde_encoder_helper_update_out_fence_txq(struct sde_encoder_virt *sde_enc, bool is_vid);
+
 /*
  * sde_encoder_get_dfps_maxfps - get dynamic FPS max frame rate of
 				the given encoder
@@ -690,6 +697,13 @@ static inline bool sde_encoder_is_widebus_enabled(struct drm_encoder *drm_enc)
  * @Return: line insertion support status
  */
 bool sde_encoder_is_line_insertion_supported(struct drm_encoder *drm_enc);
+
+/**
+ * sde_encoder_get_hw_ctl - gets hw ctl from the connector
+ * @c_conn: sde connector
+ * @Return: pointer to the hw ctl from the encoder upon success, otherwise null
+ */
+struct sde_hw_ctl *sde_encoder_get_hw_ctl(struct sde_connector *c_conn);
 
 void sde_encoder_add_data_to_minidump_va(struct drm_encoder *drm_enc);
 

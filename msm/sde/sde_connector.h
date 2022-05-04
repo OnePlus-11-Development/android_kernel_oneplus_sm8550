@@ -555,6 +555,7 @@ struct sde_misr_sign {
  * @cached_edid: cached edid data for the connector
  * @misr_event_notify_enabled: Flag to indicate if misr event notify is enabled or not
  * @previous_misr_sign: store previous misr signature
+ * @hwfence_wb_retire_fences_enable: enable hw-fences for wb retire-fence
  */
 struct sde_connector {
 	struct drm_connector base;
@@ -632,6 +633,8 @@ struct sde_connector {
 	struct edid *cached_edid;
 	bool misr_event_notify_enabled;
 	struct sde_misr_sign previous_misr_sign;
+
+	bool hwfence_wb_retire_fences_enable;
 };
 
 /**

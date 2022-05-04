@@ -178,6 +178,7 @@
  *************************************************************/
 enum {
 	SDE_HW_VERSION,
+	SDE_HW_FENCE_VERSION,
 	SDE_HW_PROP_MAX,
 };
 
@@ -574,6 +575,7 @@ struct sde_dt_props {
  *************************************************************/
 static struct sde_prop_type sde_hw_prop[] = {
 	{SDE_HW_VERSION, "qcom,sde-hw-version", false, PROP_TYPE_U32},
+	{SDE_HW_FENCE_VERSION, "qcom,hw-fence-sw-version", false, PROP_TYPE_U32},
 };
 
 static struct sde_prop_type sde_prop[] = {
@@ -5215,6 +5217,22 @@ end:
 	return rc;
 }
 
+static void _sde_hw_fence_caps(struct sde_mdss_cfg *sde_cfg)
+{
+	struct sde_ctl_cfg *ctl;
+	int i;
+
+	if (!sde_cfg->hw_fence_rev)
+		return;
+
+	set_bit(SDE_FEATURE_HW_FENCE_IPCC, sde_cfg->features);
+
+	for (i = 0; i < sde_cfg->ctl_count; i++) {
+		ctl = sde_cfg->ctl + i;
+		set_bit(SDE_CTL_HW_FENCE, &ctl->features);
+	}
+}
+
 static int _sde_hardware_post_caps(struct sde_mdss_cfg *sde_cfg,
 	uint32_t hw_rev)
 {
@@ -5261,6 +5279,8 @@ static int _sde_hardware_post_caps(struct sde_mdss_cfg *sde_cfg,
 	sde_cfg->min_display_height = MIN_DISPLAY_HEIGHT;
 	sde_cfg->min_display_width = MIN_DISPLAY_WIDTH;
 	sde_cfg->max_cwb = min_t(u32, sde_cfg->wb_count, MAX_CWB_SESSIONS);
+
+	_sde_hw_fence_caps(sde_cfg);
 
 	rc = _sde_hw_dnsc_blur_filter_caps(sde_cfg);
 
@@ -5355,6 +5375,11 @@ static int sde_hw_ver_parse_dt(struct drm_device *dev, struct device_node *np,
 		cfg->hw_rev = PROP_VALUE_ACCESS(prop_value, SDE_HW_VERSION, 0);
 	else
 		cfg->hw_rev = sde_kms_get_hw_version(dev);
+
+	if (prop_exists[SDE_HW_FENCE_VERSION])
+		cfg->hw_fence_rev = PROP_VALUE_ACCESS(prop_value, SDE_HW_FENCE_VERSION, 0);
+	else
+		cfg->hw_fence_rev = 0; /* disable hw-fences */
 
 end:
 	kfree(prop_value);

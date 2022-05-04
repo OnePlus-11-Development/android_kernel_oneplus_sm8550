@@ -927,6 +927,21 @@ static int sde_encoder_phys_vid_wait_for_vblank(
 	return _sde_encoder_phys_vid_wait_for_vblank(phys_enc, true);
 }
 
+static void sde_encoder_phys_vid_update_txq(struct sde_encoder_phys *phys_enc)
+{
+	struct sde_encoder_virt *sde_enc;
+
+	if (!phys_enc)
+		return;
+
+	sde_enc = to_sde_encoder_virt(phys_enc->parent);
+	if (!sde_enc)
+		return;
+
+	SDE_EVT32(DRMID(phys_enc->parent));
+	sde_encoder_helper_update_out_fence_txq(sde_enc, true);
+}
+
 static int sde_encoder_phys_vid_wait_for_commit_done(
 		struct sde_encoder_phys *phys_enc)
 {
@@ -935,6 +950,9 @@ static int sde_encoder_phys_vid_wait_for_commit_done(
 	rc =  _sde_encoder_phys_vid_wait_for_vblank(phys_enc, true);
 	if (rc)
 		sde_encoder_helper_phys_reset(phys_enc);
+
+	/* Update TxQ for the incoming frame */
+	sde_encoder_phys_vid_update_txq(phys_enc);
 
 	return rc;
 }

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -10,6 +11,7 @@
 #include "sde_hw_util.h"
 #include "sde_hw_catalog.h"
 #include "sde_hw_sspp.h"
+#include "sde_fence.h"
 
 #define INVALID_CTL_STATUS 0xfffff88e
 #define CTL_MAX_DSPP_COUNT (DSPP_MAX - DSPP_0)
@@ -169,6 +171,41 @@ struct sde_ctl_flush_cfg {
  * Assumption is these functions will be called after clocks are enabled
  */
 struct sde_hw_ctl_ops {
+	/**
+	 * hw fence control
+	 * @ctx         : ctl path ctx pointer
+	 */
+	void (*hw_fence_ctrl)(struct sde_hw_ctl *ctx, bool sw_set, bool sw_clear, u32 mode);
+
+	/**
+	 * trigger hw fence fence-ready sw override
+	 * @ctx         : ctl path ctx pointer
+	 */
+	void (*hw_fence_trigger_sw_override)(struct sde_hw_ctl *ctx);
+
+	/**
+	 * configure output hw fence trigger
+	 * @ctx         : ctl path ctx pointer
+	 * @trigger_sel : select upon which event the output trigger will happen
+	 */
+	void (*hw_fence_trigger_output_fence)(struct sde_hw_ctl *ctx, u32 trigger_sel);
+
+	/**
+	 * update output hw fence ipcc client_id and signal_id
+	 * @ctx       : ctl path ctx pointer
+	 * @client_id : value to write to update the client_id
+	 * @signal_id : value to write to update the signal_id
+	 */
+	void (*hw_fence_update_output_fence)(struct sde_hw_ctl *ctx, u32 client_id, u32 signal_id);
+
+	/**
+	 * update input hw fence ipcc client_id and signal_id
+	 * @ctx       : ctl path ctx pointer
+	 * @client_id : value to write to update the client_id
+	 * @signal_id : value to write to update the signal_id
+	 */
+	void (*hw_fence_update_input_fence)(struct sde_hw_ctl *ctx, u32 client_id, u32 signal_id);
+
 	/**
 	 * kickoff hw operation for Sw controlled interfaces
 	 * DSI cmd mode and WB interface are SW controlled
@@ -498,6 +535,9 @@ struct sde_hw_ctl {
 	int mixer_count;
 	const struct sde_lm_cfg *mixer_hw_caps;
 	struct sde_ctl_flush_cfg flush;
+
+	/* hw fence */
+	struct sde_hw_fence_data hwfence_data;
 
 	/* ops */
 	struct sde_hw_ctl_ops ops;

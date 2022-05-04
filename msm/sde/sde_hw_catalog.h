@@ -557,6 +557,7 @@ enum {
  *                              blocks
  * @SDE_CTL_UIDLE               CTL supports uidle
  * @SDE_CTL_UNIFIED_DSPP_FLUSH  CTL supports only one flush bit for DSPP
+ * @SDE_CTL_HW_FENCE            CTL supports hw fencing
  * @SDE_CTL_MAX
  */
 enum {
@@ -566,6 +567,7 @@ enum {
 	SDE_CTL_ACTIVE_CFG,
 	SDE_CTL_UIDLE,
 	SDE_CTL_UNIFIED_DSPP_FLUSH,
+	SDE_CTL_HW_FENCE,
 	SDE_CTL_MAX
 };
 
@@ -721,6 +723,7 @@ enum {
  * @SDE_FEATURE_VBIF_CLK_SPLIT VBIF clock split supported
  * @SDE_FEATURE_CTL_DONE       Support for CTL DONE irq
  * @SDE_FEATURE_SYS_CACHE_NSE  Support for no-self-evict feature
+ * @SDE_FEATURE_HW_FENCE_IPCC  HW fence supports ipcc signaling in dpu
  * @SDE_FEATURE_MAX:             MAX features value
  */
 enum sde_mdss_features {
@@ -761,6 +764,7 @@ enum sde_mdss_features {
 	SDE_FEATURE_VBIF_CLK_SPLIT,
 	SDE_FEATURE_CTL_DONE,
 	SDE_FEATURE_SYS_CACHE_NSE,
+	SDE_FEATURE_HW_FENCE_IPCC,
 	SDE_FEATURE_MAX
 };
 
@@ -1752,6 +1756,7 @@ struct sde_perf_cfg {
  * @ts_prefill_rev      prefill traffic shaper feature revision
  * @true_inline_rot_rev inline rotator feature revision
  * @dnsc_blur_rev       downscale blur HW block version
+ * @hw_fence_rev        hw fence feature revision
  * @mdss_count          number of valid MDSS HW blocks
  * @mdss                array of pointers to MDSS HW blocks
  * @mdss_hw_block_size  max offset of MDSS_HW block (0 offset), used for debug
@@ -1857,6 +1862,7 @@ struct sde_mdss_cfg {
 	u32 ts_prefill_rev;
 	u32 true_inline_rot_rev;
 	u32 dnsc_blur_rev;
+	u32 hw_fence_rev;
 
 	/* HW Blocks */
 	u32 mdss_count;

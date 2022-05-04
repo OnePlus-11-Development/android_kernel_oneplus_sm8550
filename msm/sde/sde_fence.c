@@ -16,6 +16,481 @@
 #define SPEC_FENCE_FLAG_FENCE_ARRAY	0x10
 #define SPEC_FENCE_FLAG_ARRAY_BIND	0x11
 
+/**
+ * struct sde_fence - release/retire fence structure
+ * @base: base fence structure
+ * @ctx: fence context
+ * @name: name of each fence- it is fence timeline + commit_count
+ * @fence_list: list to associated this fence on timeline/context
+ * @fd: fd attached to this fence - debugging purpose.
+ * @hwfence_out_ctl: hw ctl for the output fence
+ * @hwfence_index: hw fence index for this fence
+ * @txq_updated_fence: flag to indicate that a fence has been updated in txq
+ */
+struct sde_fence {
+	struct dma_fence base;
+	struct sde_fence_context *ctx;
+	char name[SDE_FENCE_NAME_SIZE];
+	struct list_head fence_list;
+	int fd;
+	struct sde_hw_ctl *hwfence_out_ctl;
+	u64 hwfence_index;
+	bool txq_updated_fence;
+};
+
+/**
+ * enum sde_hw_fence_clients - sde clients for the hw-fence feature
+ *
+ * Do not modify the order of this struct and/or add more elements
+ * without modify/add fields in the 'hw_fence_data' structs.
+ */
+enum sde_hw_fence_clients {
+	SDE_HW_FENCE_CLIENT_CTL_0,
+	SDE_HW_FENCE_CLIENT_CTL_1,
+	SDE_HW_FENCE_CLIENT_CTL_2,
+	SDE_HW_FENCE_CLIENT_CTL_3,
+	SDE_HW_FENCE_CLIENT_CTL_4,
+	SDE_HW_FENCE_CLIENT_CTL_5,
+	SDE_HW_FENCE_CLIENT_MAX,
+};
+
+/**
+ * hw_fence_data_dpu_client - this table maps the dpu ipcc input and output signals for each display
+ *              clients to communicate with the fence controller.
+ * This struct must match the order of the 'sde_hw_fence_clients' enum,
+ * the output signal must match with the signals that FenceCTL expects for each display client.
+ * This 'hw_fence_data_dpu_client' must be used for HW that does not support dpu-signal.
+ */
+struct sde_hw_fence_data hw_fence_data_no_dpu[SDE_HW_FENCE_CLIENT_MAX] = {
+	{SDE_HW_FENCE_CLIENT_CTL_0, HW_FENCE_CLIENT_ID_CTL0, NULL, {0}, 8, 14, {2, 3},   0, 8, 8},
+	{SDE_HW_FENCE_CLIENT_CTL_1, HW_FENCE_CLIENT_ID_CTL1, NULL, {0}, 8, 15, {4, 5},   0, 8, 8},
+	{SDE_HW_FENCE_CLIENT_CTL_2, HW_FENCE_CLIENT_ID_CTL2, NULL, {0}, 8, 16, {6, 7},   0, 8, 8},
+	{SDE_HW_FENCE_CLIENT_CTL_3, HW_FENCE_CLIENT_ID_CTL3, NULL, {0}, 8, 17, {8, 9},   0, 8, 8},
+	{SDE_HW_FENCE_CLIENT_CTL_4, HW_FENCE_CLIENT_ID_CTL4, NULL, {0}, 8, 18, {10, 11}, 0, 8, 8},
+	{SDE_HW_FENCE_CLIENT_CTL_5, HW_FENCE_CLIENT_ID_CTL5, NULL, {0}, 8, 19, {12, 13}, 0, 8, 8}
+};
+
+/**
+ * hw_fence_data_dpu_client - this table maps the dpu ipcc input and output signals for each display
+ *              clients to communicate with the fence controller.
+ * This struct must match the order of the 'sde_hw_fence_clients' enum,
+ * the output signal must match with the signals that FenceCTL expects for each display client.
+ * This 'hw_fence_data_dpu_client' must be used for HW that supports dpu-signal
+ */
+struct sde_hw_fence_data hw_fence_data_dpu_client[SDE_HW_FENCE_CLIENT_MAX] = {
+	{SDE_HW_FENCE_CLIENT_CTL_0, HW_FENCE_CLIENT_ID_CTL0, NULL, {0}, 8, 0, {0, 6},  0, 8, 25},
+	{SDE_HW_FENCE_CLIENT_CTL_1, HW_FENCE_CLIENT_ID_CTL1, NULL, {0}, 8, 1, {1, 7},  0, 8, 25},
+	{SDE_HW_FENCE_CLIENT_CTL_2, HW_FENCE_CLIENT_ID_CTL2, NULL, {0}, 8, 2, {2, 8},  0, 8, 25},
+	{SDE_HW_FENCE_CLIENT_CTL_3, HW_FENCE_CLIENT_ID_CTL3, NULL, {0}, 8, 3, {3, 9},  0, 8, 25},
+	{SDE_HW_FENCE_CLIENT_CTL_4, HW_FENCE_CLIENT_ID_CTL4, NULL, {0}, 8, 4, {4, 10}, 0, 8, 25},
+	{SDE_HW_FENCE_CLIENT_CTL_5, HW_FENCE_CLIENT_ID_CTL5, NULL, {0}, 8, 5, {5, 11}, 0, 8, 25}
+};
+
+int sde_hw_fence_init(struct sde_hw_ctl *hw_ctl, bool use_dpu_ipcc)
+{
+	struct sde_hw_fence_data *sde_hw_fence_data;
+	struct sde_hw_fence_data *hwfence_data;
+	int ctl_id;
+
+	if (!hw_ctl)
+		return -EINVAL;
+
+	ctl_id = hw_ctl->idx - CTL_0;
+	if (ctl_id >= SDE_HW_FENCE_CLIENT_MAX || ctl_id < 0) {
+		SDE_ERROR("unexpected ctl_id:%d\n", ctl_id);
+		return -EINVAL;
+	}
+
+	hwfence_data = &hw_ctl->hwfence_data;
+	sde_hw_fence_data = use_dpu_ipcc ? hw_fence_data_dpu_client : hw_fence_data_no_dpu;
+
+	if (sde_hw_fence_data[ctl_id].client_id != ctl_id) {
+		SDE_ERROR("Unexpected client_id:%d for ctl_id:%d\n",
+			sde_hw_fence_data[ctl_id].client_id, ctl_id);
+		return -EINVAL;
+	}
+
+	/* init the default fence-data for this client */
+	memcpy(hwfence_data, &sde_hw_fence_data[ctl_id], sizeof(struct sde_hw_fence_data));
+
+	SDE_DEBUG("hwfence register ctl:%d client:%d\n", ctl_id, hwfence_data->hw_fence_client_id);
+	hwfence_data->hw_fence_handle = msm_hw_fence_register(hwfence_data->hw_fence_client_id,
+		&hwfence_data->mem_descriptor);
+	if (IS_ERR_OR_NULL(hwfence_data->hw_fence_handle)) {
+
+		hwfence_data->hw_fence_handle = NULL;
+
+		SDE_ERROR("error cannot register ctl_id:%d hw-fence client:%d\n", ctl_id,
+			hwfence_data->hw_fence_client_id);
+		return -EINVAL;
+	}
+
+	SDE_DEBUG("hwfence registered ctl_id:%d hw_fence_client_id:%d handle:0x%p\n",
+		ctl_id, hwfence_data->hw_fence_client_id, hwfence_data->hw_fence_handle);
+
+	return 0;
+}
+
+void sde_hw_fence_deinit(struct sde_hw_ctl *hw_ctl)
+{
+	struct sde_hw_fence_data *hwfence_data;
+
+	if (!hw_ctl)
+		return;
+
+	hwfence_data = &hw_ctl->hwfence_data;
+
+	/* client was not registered */
+	if (IS_ERR_OR_NULL(hwfence_data->hw_fence_handle))
+		return;
+
+	SDE_DEBUG("hwfence deregister ctl_id:%d hw_fence_client_id:%d\n",
+		hw_ctl->idx - CTL_0, hwfence_data->hw_fence_client_id);
+
+	msm_hw_fence_deregister(hwfence_data->hw_fence_handle);
+
+	hwfence_data->hw_fence_handle = NULL;
+}
+
+static int sde_fence_create_hw_fence(struct sde_hw_ctl *hw_ctl, struct sde_fence *sde_fence)
+{
+	struct sde_hw_fence_data *data;
+	struct msm_hw_fence_create_params params;
+	int ctl_id;
+	u64 hwfence_index;
+	int ret;
+
+	if (!hw_ctl)
+		return -EINVAL;
+
+	ctl_id = hw_ctl->idx - CTL_0;
+	data = &hw_ctl->hwfence_data;
+
+	if (IS_ERR_OR_NULL(data->hw_fence_handle)) {
+		SDE_ERROR("unexpected handle for ctl_id:%d\n", ctl_id);
+		return -EINVAL;
+	}
+	params.fence = &sde_fence->base;
+	params.handle = &hwfence_index;
+
+	/* Create the HW fence */
+	ret = msm_hw_fence_create(data->hw_fence_handle, &params);
+	if (ret) {
+		SDE_ERROR("failed to create hw_fence for client:%d ctx:%llu seqno:%llu\n", ctl_id,
+			sde_fence->base.context, sde_fence->base.seqno);
+	} else {
+		/* store ctl and index for this fence */
+		sde_fence->hwfence_out_ctl = hw_ctl;
+		sde_fence->hwfence_index = hwfence_index;
+
+		SDE_DEBUG("create hfence index:%llu ctl:%d ctx:%llu seqno:%llu name:%s\n",
+			sde_fence->hwfence_index, ctl_id, sde_fence->base.context,
+			sde_fence->base.seqno, sde_fence->name);
+	}
+
+	return ret;
+}
+
+static inline char *_get_client_id_name(int hw_fence_client_id)
+{
+	switch (hw_fence_client_id) {
+	case HW_FENCE_CLIENT_ID_CTX0:
+		return "HW_FENCE_CLIENT_ID_CTX0";
+	case HW_FENCE_CLIENT_ID_CTL0:
+		return "HW_FENCE_CLIENT_ID_CTL0";
+	case HW_FENCE_CLIENT_ID_CTL1:
+		return "HW_FENCE_CLIENT_ID_CTL1";
+	case HW_FENCE_CLIENT_ID_CTL2:
+		return "HW_FENCE_CLIENT_ID_CTL2";
+	case HW_FENCE_CLIENT_ID_CTL3:
+		return "HW_FENCE_CLIENT_ID_CTL3";
+	case HW_FENCE_CLIENT_ID_CTL4:
+		return "HW_FENCE_CLIENT_ID_CTL4";
+	case HW_FENCE_CLIENT_ID_CTL5:
+		return "HW_FENCE_CLIENT_ID_CTL15";
+	default:
+		return "Unknown";
+	}
+
+	return "unknown";
+}
+
+int sde_fence_register_hw_fences_wait(struct sde_hw_ctl *hw_ctl, struct dma_fence **fences,
+	u32 num_fences)
+{
+	struct sde_hw_fence_data *data;
+	int i, ret;
+	int ctl_id;
+
+	if (!hw_ctl) {
+		SDE_ERROR("wrong ctl\n");
+		return -EINVAL;
+	}
+
+	ctl_id = hw_ctl->idx - CTL_0;
+	data = &hw_ctl->hwfence_data;
+	if (IS_ERR_OR_NULL(data->hw_fence_handle)) {
+		SDE_ERROR("unexpected handle for ctl_id:%d\n", ctl_id);
+		return -EINVAL;
+	}
+
+	SDE_DEBUG("register for wait fences:%d ctl_id:%d hw_fence_client:%s\n",
+		num_fences, ctl_id, _get_client_id_name(data->hw_fence_client_id));
+
+	for (i = 0; i < num_fences; i++) {
+		SDE_DEBUG("registering fence: ctx:%llu seqno:%llu\n",
+			(fences[i])->context, (fences[i])->seqno);
+	}
+
+	/* register for wait */
+	ret = msm_hw_fence_wait_update(data->hw_fence_handle, fences, num_fences, true);
+	if (ret)
+		SDE_ERROR("failed to register wait fences for ctl_id:%d ret:%d\n", ctl_id, ret);
+	SDE_EVT32_VERBOSE(ctl_id, num_fences, ret);
+
+	return ret;
+}
+
+static int _arm_output_hw_fence(struct sde_hw_ctl *hw_ctl)
+{
+	struct sde_hw_fence_data *data;
+	u32 ipcc_out_signal;
+	int ctl_id;
+
+	if (!hw_ctl || !hw_ctl->ops.hw_fence_trigger_output_fence ||
+			!hw_ctl->ops.hw_fence_update_output_fence) {
+		SDE_ERROR("missing ctl/trigger or update fence %d\n", !hw_ctl);
+		return -EINVAL;
+	}
+
+	ctl_id = hw_ctl->idx - CTL_0;
+	data = &hw_ctl->hwfence_data;
+	if (data->ipcc_out_signal_pp_idx >= MAX_SDE_HFENCE_OUT_SIGNAL_PING_PONG) {
+		/* This should not have happened!, review the ping pong calculation */
+		SDE_ERROR("Wrong pp_idx:%d, max:%d\n", data->ipcc_out_signal_pp_idx,
+			MAX_SDE_HFENCE_OUT_SIGNAL_PING_PONG);
+		return -EINVAL;
+	}
+
+	ipcc_out_signal = data->ipcc_out_signal_pp[data->ipcc_out_signal_pp_idx];
+	data->ipcc_out_signal_pp_idx = (++data->ipcc_out_signal_pp_idx %
+		MAX_SDE_HFENCE_OUT_SIGNAL_PING_PONG);
+
+	SDE_DEBUG("out-fence ctl_id:%d out_signal:%d hw_fence_client:%s\n",
+		ctl_id, ipcc_out_signal, _get_client_id_name(data->hw_fence_client_id));
+
+	/* update client/signal output fence */
+	hw_ctl->ops.hw_fence_update_output_fence(hw_ctl, data->ipcc_out_client, ipcc_out_signal);
+	SDE_EVT32_VERBOSE(ctl_id, ipcc_out_signal);
+
+	/* arm dpu to trigger output fence signal once ready */
+	hw_ctl->ops.hw_fence_trigger_output_fence(hw_ctl, HW_FENCE_TRIGGER_SEL_CTRL_DONE);
+
+	return 0;
+}
+
+static int _sde_fence_arm_output_hw_fence(struct sde_fence_context *ctx)
+{
+	struct sde_hw_ctl *hw_ctl = NULL;
+	struct sde_fence *fc, *next;
+
+	spin_lock(&ctx->list_lock);
+	if (list_empty(&ctx->fence_list_head)) {
+		spin_unlock(&ctx->list_lock);
+		return 0;
+	}
+
+	list_for_each_entry_safe(fc, next, &ctx->fence_list_head, fence_list) {
+		struct dma_fence *fence = &fc->base;
+
+		/* this is not hw-fence, or already processed */
+		if (!test_bit(MSM_HW_FENCE_FLAG_ENABLED_BIT, &fence->flags))
+			continue;
+
+		hw_ctl = fc->hwfence_out_ctl;
+		if (!hw_ctl) {
+			/*
+			 * We flaged an output dma-fence as hw-fence but the hw ctl to handle
+			 * it is not available, this should not have happened, but if it does,
+			 * this can translate to a fence-timeout!
+			 */
+			SDE_ERROR("invalid hw ctl, this can cause a fence-timeout!\n");
+			SDE_EVT32(SDE_EVTLOG_ERROR, SDE_EVTLOG_FUNC_CASE1, fence->flags,
+				fence->context, fence->seqno);
+
+			spin_unlock(&ctx->list_lock);
+			return -EINVAL;
+		}
+	}
+	spin_unlock(&ctx->list_lock);
+
+	/* arm dpu to trigger output hw-fence ipcc signal upon completion */
+	if (hw_ctl)
+		_arm_output_hw_fence(hw_ctl);
+
+	return 0;
+}
+
+/* update output hw_fences txq */
+int sde_fence_update_hw_fences_txq(struct sde_fence_context *ctx, bool vid_mode)
+{
+	int ret = 0;
+	struct sde_hw_fence_data *data;
+	struct sde_fence *fc, *next;
+	struct sde_hw_ctl *hw_ctl = NULL;
+	int ctl_id;
+	bool txq_updated = false;
+
+	spin_lock(&ctx->list_lock);
+	if (list_empty(&ctx->fence_list_head)) {
+		spin_unlock(&ctx->list_lock);
+		return 0;
+	}
+
+	list_for_each_entry_safe(fc, next, &ctx->fence_list_head, fence_list) {
+		struct dma_fence *fence = &fc->base;
+
+		/* this is not hw-fence, or already processed */
+		if (!test_bit(MSM_HW_FENCE_FLAG_ENABLED_BIT, &fence->flags) ||
+				fc->txq_updated_fence)
+			continue;
+
+		hw_ctl = fc->hwfence_out_ctl;
+		if (!hw_ctl) {
+			/* We flaged an output dma-fence as hw-fence but the hw ctl to handle
+			 * it is not available, this should not have happened, but if it does,
+			 * this can translate to a fence-timeout!
+			 */
+			SDE_ERROR("invalid hw ctl, this can cause a fence-timeout!\n");
+			SDE_EVT32(SDE_EVTLOG_FUNC_CASE1, fence->flags, fence->context,
+				fence->seqno, SDE_EVTLOG_ERROR);
+			ret = -EINVAL;
+			goto exit;
+		}
+
+		ctl_id = hw_ctl->idx - CTL_0;
+		data = &hw_ctl->hwfence_data;
+		if (IS_ERR_OR_NULL(data->hw_fence_handle)) {
+			SDE_ERROR("unexpected handle for ctl_id:%d, this can fence-timeout\n",
+				ctl_id);
+			SDE_EVT32(SDE_EVTLOG_FUNC_CASE2, fence->flags, fence->context,
+				fence->seqno, ctl_id, SDE_EVTLOG_ERROR);
+			ret = -EINVAL;
+			goto exit;
+		}
+
+		/* update hw-fence tx queue */
+		ret = msm_hw_fence_update_txq(data->hw_fence_handle, fc->hwfence_index, 0, 0);
+		if (ret) {
+			SDE_ERROR("fail txq update index:%llu fctx:%llu seqno:%llu client:%d\n",
+				fc->hwfence_index, fence->context, fence->seqno,
+				data->hw_fence_client_id);
+			SDE_EVT32(SDE_EVTLOG_FUNC_CASE3, fence->flags, fence->context,
+				fence->seqno, ctl_id, SDE_EVTLOG_ERROR);
+			goto exit;
+		}
+		/* avoid updating txq more than once and avoid repeating the same fence twice */
+		txq_updated = fc->txq_updated_fence = true;
+
+		SDE_DEBUG("update txq fence:0x%pK ctx:%llu seqno:%llu f:0x%llx ctl:%d vid:%d\n",
+			fence, fence->context, fence->seqno, fence->flags, ctl_id, vid_mode);
+
+		/* We will update TxQ one time per frame */
+		if (txq_updated)
+			break;
+	}
+
+exit:
+	spin_unlock(&ctx->list_lock);
+
+	/* arm dpu to trigger output hw-fence ipcc signal upon completion in vid-mode */
+	if (txq_updated && hw_ctl)
+		_sde_fence_arm_output_hw_fence(ctx);
+
+	return ret;
+}
+
+static void _sde_hw_fence_release(struct sde_fence *f)
+{
+	struct sde_hw_fence_data *data;
+	struct sde_hw_ctl *hw_ctl = f->hwfence_out_ctl;
+	int ctl_id;
+	int ret;
+
+	if (!hw_ctl) {
+		SDE_ERROR("invalid hw_ctl\n");
+		return;
+	}
+
+	ctl_id = hw_ctl->idx - CTL_0;
+	data = &hw_ctl->hwfence_data;
+	if (IS_ERR_OR_NULL(data->hw_fence_handle)) {
+		SDE_ERROR("unexpected handle for ctl_id:%d\n", ctl_id);
+		return;
+	}
+
+	SDE_DEBUG("destroy hw fence ctl_id:%d ctx:%llu seqno:%llu name:%s\n",
+		ctl_id, f->base.context, f->base.seqno, f->name);
+
+	/* Delete the HW fence */
+	ret = msm_hw_fence_destroy(data->hw_fence_handle, &f->base);
+	if (ret)
+		SDE_ERROR("failed to destroy hw_fence for ctl_id:%d ctx:%llu seqno:%llu\n", ctl_id,
+			f->base.context, f->base.seqno);
+}
+
+static int _reset_hw_fence_timeline(struct sde_hw_ctl *hw_ctl, u32 flags)
+{
+	struct sde_hw_fence_data *data;
+	int ret = 0;
+
+	data = &hw_ctl->hwfence_data;
+
+	if (!IS_ERR_OR_NULL(data->hw_fence_handle)) {
+		SDE_EVT32(data->hw_fence_client_id);
+		ret = msm_hw_fence_reset_client(data->hw_fence_handle, flags);
+		if (ret) {
+			pr_err("failed to reset client %d\n", data->hw_fence_client_id);
+			return -EINVAL;
+		}
+	}
+
+	return ret;
+}
+
+int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *hw_ctl)
+{
+	struct sde_hw_fence_data *data;
+	u32 ipcc_signal_id;
+	u32 ipcc_client_id;
+	int ctl_id;
+
+	/* we must support sw_override as well, so check both functions */
+	if (!hw_ctl || !hw_ctl->ops.hw_fence_update_input_fence ||
+			!hw_ctl->ops.hw_fence_trigger_sw_override) {
+		SDE_ERROR("missing ctl/override/update fence %d\n", !hw_ctl);
+		return -EINVAL;
+	}
+
+	ctl_id = hw_ctl->idx - CTL_0;
+	data = &hw_ctl->hwfence_data;
+
+	ipcc_signal_id = data->ipcc_in_signal;
+	ipcc_client_id = data->ipcc_in_client;
+
+	SDE_DEBUG("configure input signal:%d out client:%d ctl_id:%d\n", ipcc_signal_id,
+		ipcc_client_id, ctl_id);
+	SDE_EVT32(ctl_id, ipcc_signal_id, ipcc_client_id);
+
+	/* configure dpu hw for the client/signal pair signaling input-fence */
+	hw_ctl->ops.hw_fence_update_input_fence(hw_ctl, ipcc_client_id, ipcc_signal_id);
+
+	/* Enable hw-fence for this ctrl-path */
+	hw_ctl->ops.hw_fence_ctrl(hw_ctl, true, true, 1);
+
+	return 0;
+}
+
 void *sde_sync_get(uint64_t fd)
 {
 	/* force signed compare, fdget accepts an int argument */
@@ -117,21 +592,6 @@ uint32_t sde_sync_get_name_prefix(void *fence)
 	return prefix;
 }
 
-/**
- * struct sde_fence - release/retire fence structure
- * @fence: base fence structure
- * @name: name of each fence- it is fence timeline + commit_count
- * @fence_list: list to associated this fence on timeline/context
- * @fd: fd attached to this fence - debugging purpose.
- */
-struct sde_fence {
-	struct dma_fence base;
-	struct sde_fence_context *ctx;
-	char name[SDE_FENCE_NAME_SIZE];
-	struct list_head	fence_list;
-	int fd;
-};
-
 static void sde_fence_destroy(struct kref *kref)
 {
 	struct sde_fence_context *ctx;
@@ -186,6 +646,11 @@ static void sde_fence_release(struct dma_fence *fence)
 
 	if (fence) {
 		f = to_sde_fence(fence);
+
+		/* Delete the HW fence */
+		if (test_bit(MSM_HW_FENCE_FLAG_ENABLED_BIT, &fence->flags))
+			_sde_hw_fence_release(f);
+
 		kref_put(&f->ctx->kref, sde_fence_destroy);
 		kfree(f);
 	}
@@ -228,7 +693,7 @@ static struct dma_fence_ops sde_fence_ops = {
  * @val: Timeline value at which to signal the fence
  * Return: File descriptor on success, or error code on error
  */
-static int _sde_fence_create_fd(void *fence_ctx, uint32_t val)
+static int _sde_fence_create_fd(void *fence_ctx, uint32_t val, struct sde_hw_ctl *hw_ctl)
 {
 	struct sde_fence *sde_fence;
 	struct sync_file *sync_file;
@@ -269,6 +734,10 @@ static int _sde_fence_create_fd(void *fence_ctx, uint32_t val)
 		dma_fence_put(&sde_fence->base);
 		goto exit;
 	}
+
+	/* If ctl_id is valid, try to create a hw-fence */
+	if (hw_ctl)
+		sde_fence_create_hw_fence(hw_ctl, sde_fence);
 
 	fd_install(fd, sync_file->file);
 	sde_fence->fd = fd;
@@ -366,7 +835,7 @@ end:
 }
 
 int sde_fence_create(struct sde_fence_context *ctx, uint64_t *val,
-							uint32_t offset)
+				uint32_t offset, struct sde_hw_ctl *hw_ctl)
 {
 	uint32_t trigger_value;
 	int fd, rc = -EINVAL;
@@ -390,19 +859,19 @@ int sde_fence_create(struct sde_fence_context *ctx, uint64_t *val,
 	trigger_value = ctx->commit_count + offset;
 	spin_unlock_irqrestore(&ctx->lock, flags);
 
-	fd = _sde_fence_create_fd(ctx, trigger_value);
+	fd = _sde_fence_create_fd(ctx, trigger_value, hw_ctl);
 	*val = fd;
 	SDE_DEBUG("fd:%d trigger:%d commit:%d offset:%d\n",
 			fd, trigger_value, ctx->commit_count, offset);
 
-	SDE_EVT32(ctx->drm_id, trigger_value, fd);
+	SDE_EVT32(ctx->drm_id, trigger_value, fd, hw_ctl ? hw_ctl->idx : 0);
 	rc = (fd >= 0) ? 0 : fd;
 
 	return rc;
 }
 
 void sde_fence_signal(struct sde_fence_context *ctx, ktime_t ts,
-		enum sde_fence_event fence_event)
+		enum sde_fence_event fence_event, struct sde_hw_ctl *hw_ctl)
 {
 	unsigned long flags;
 
@@ -413,6 +882,11 @@ void sde_fence_signal(struct sde_fence_context *ctx, ktime_t ts,
 
 	spin_lock_irqsave(&ctx->lock, flags);
 	if (fence_event == SDE_FENCE_RESET_TIMELINE) {
+		/* reset hw-fences without error */
+		if (hw_ctl)
+			_reset_hw_fence_timeline(hw_ctl, MSM_HW_FENCE_RESET_WITHOUT_ERROR |
+				MSM_HW_FENCE_RESET_WITHOUT_DESTROY);
+
 		if ((int)(ctx->done_count - ctx->commit_count) < 0) {
 			SDE_DEBUG(
 			  "timeline reset attempt! done count:%d commit:%d\n",
