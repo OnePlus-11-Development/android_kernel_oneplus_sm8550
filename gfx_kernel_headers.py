@@ -45,8 +45,7 @@ def gen_gfx_headers(verbose, gen_dir, headers_install, unifdef, gfx_include_uapi
     for h in gfx_include_uapi:
         gfx_uapi_include_prefix = os.path.join(h.split('/include/uapi/')[0],
                                                  'include',
-                                                 'uapi',
-                                                 'linux') + os.sep
+                                                 'uapi') + os.sep
 
         if not run_headers_install(
                 verbose, gen_dir, headers_install, unifdef,
