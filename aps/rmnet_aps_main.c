@@ -17,12 +17,14 @@
 #include <net/ip.h>
 #include <net/ipv6.h>
 #include "rmnet_config.h"
+#include "rmnet_module.h"
 #include "rmnet_aps.h"
 #include "rmnet_aps_genl.h"
-static char*verinfo[]={"\x33\x32\x61\x36\x65\x62\x61\x39",
-"\x36\x39\x30\x35\x35\x36\x38\x65","\x37\x34\x31\x35\x39\x32\x31\x63",
-"\x39\x66\x36\x36\x38\x31\x62\x34"};module_param_array(verinfo,charp,NULL,
-(0xcb7+5769-0x221c));MODULE_PARM_DESC(verinfo,
+static char*verinfo[]={"\x65\x32\x31\x38\x66\x34\x35\x31",
+"\x33\x32\x61\x36\x65\x62\x61\x39","\x36\x39\x30\x35\x35\x36\x38\x65",
+"\x37\x34\x31\x35\x39\x32\x31\x63","\x39\x66\x36\x36\x38\x31\x62\x34"};
+module_param_array(verinfo,charp,NULL,(0xcb7+5769-0x221c));MODULE_PARM_DESC(
+verinfo,
 "\x56\x65\x72\x73\x69\x6f\x6e\x20\x6f\x66\x20\x74\x68\x65\x20\x64\x72\x69\x76\x65\x72"
 );
 #define DATARMNET63ff5c35c2 (0xd26+209-0xdf6)
@@ -490,7 +492,10 @@ DATARMNET912d2a7edd;if(aps_cb->DATARMNET91119c34ed&&skb_hwtstamps(
 DATARMNET543491eb0f)->hwtstamp&&DATARMNETe7a1ab1dab){DATARMNET912d2a7edd=
 ktime_get_boottime();if(ktime_sub(DATARMNET912d2a7edd,skb_hwtstamps(
 DATARMNET543491eb0f)->hwtstamp)>DATARMNETe7a1ab1dab)return-ETIMEDOUT;}return
-(0xd2d+202-0xdf7);}static int __init DATARMNET0718a3fa4c(void){int 
+(0xd2d+202-0xdf7);}static const struct rmnet_module_hook_register_info 
+DATARMNET509284caa6[]={{.hooknum=RMNET_MODULE_HOOK_APS_PRE_QUEUE,.func=
+DATARMNETe0c7b9d5a4,},{.hooknum=RMNET_MODULE_HOOK_APS_POST_QUEUE,.func=
+DATARMNET6ab4bbdaf4,},};static int __init DATARMNET0718a3fa4c(void){int 
 DATARMNETb14e52a504;pr_info(
 "\x61\x70\x73\x3a\x20\x69\x6e\x69\x74\x20\x28\x25\x73\x29" "\n",
 DATARMNETe5ef0e617c);DATARMNETb14e52a504=DATARMNETcfa8d492f8();if(
@@ -498,11 +503,13 @@ DATARMNETb14e52a504){pr_err(
 "\x61\x70\x73\x3a\x20\x66\x61\x69\x6c\x65\x64\x20\x74\x6f\x20\x72\x65\x67\x69\x73\x74\x65\x72\x20\x67\x65\x6e\x6c\x20\x66\x61\x6d\x69\x6c\x79" "\n"
 );return DATARMNETb14e52a504;}register_netdevice_notifier(&DATARMNETc580548769);
 rcu_assign_pointer(rmnet_aps_pre_queue,DATARMNETe0c7b9d5a4);rcu_assign_pointer(
-rmnet_aps_post_queue,DATARMNET6ab4bbdaf4);mutex_lock(&DATARMNETd7b5a80f84);
-DATARMNET54b95e4416=true;mutex_unlock(&DATARMNETd7b5a80f84);return
-(0xd2d+202-0xdf7);}static void __exit DATARMNETff67054ba9(void){
+rmnet_aps_post_queue,DATARMNET6ab4bbdaf4);rmnet_module_hook_register(
+DATARMNET509284caa6,ARRAY_SIZE(DATARMNET509284caa6));mutex_lock(&
+DATARMNETd7b5a80f84);DATARMNET54b95e4416=true;mutex_unlock(&DATARMNETd7b5a80f84)
+;return(0xd2d+202-0xdf7);}static void __exit DATARMNETff67054ba9(void){
 rcu_assign_pointer(rmnet_aps_pre_queue,NULL);rcu_assign_pointer(
-rmnet_aps_post_queue,NULL);synchronize_rcu();mutex_lock(&DATARMNETd7b5a80f84);
+rmnet_aps_post_queue,NULL);rmnet_module_hook_unregister(DATARMNET509284caa6,
+ARRAY_SIZE(DATARMNET509284caa6));mutex_lock(&DATARMNETd7b5a80f84);
 DATARMNET54b95e4416=false;DATARMNET9ac8a34003();mutex_unlock(&
 DATARMNETd7b5a80f84);DATARMNET446f780f19((0xd2d+202-0xdf7),DATARMNET94016043b8);
 cancel_delayed_work_sync(&DATARMNET3481998252);del_timer_sync(&
