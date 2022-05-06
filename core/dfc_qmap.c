@@ -11,6 +11,7 @@
 #include "rmnet_qmi.h"
 #include "qmi_rmnet.h"
 #include "dfc.h"
+#include "rmnet_map.h"
 
 #define QMAP_DFC_VER		1
 
@@ -82,6 +83,31 @@ struct qmap_dfc_end_marker_req {
 
 struct qmap_dfc_end_marker_cnf {
 	struct qmap_cmd_hdr	hdr;
+	u8			cmd_ver;
+	u8			reserved;
+	u8			bearer_id;
+	u8			reserved2;
+	u16			reserved3;
+	__be16			seq_num;
+	u32			reserved4;
+} __aligned(1);
+
+struct qmapv5_cmd_hdr {
+	u8	pad_len:6;
+	u8	next_hdr:1;
+	u8	cd_bit:1;
+	u8	mux_id;
+	__be16	pkt_len;
+	struct rmnet_map_v5_csum_header csum_hdr;
+	u8	cmd_name;
+	u8	cmd_type:2;
+	u8	reserved:6;
+	u16	reserved2;
+	__be32	tx_id;
+} __aligned(1);
+
+struct qmapv5_dfc_end_marker_cnf {
+	struct qmapv5_cmd_hdr	hdr;
 	u8			cmd_ver;
 	u8			reserved;
 	u8			bearer_id;
@@ -254,7 +280,6 @@ static int dfc_qmap_handle_end_marker_req(struct dfc_qmi_data *dfc,
 		return QMAP_CMD_INVALID;
 
 	cmd = (struct qmap_dfc_end_marker_req *)skb->data;
-
 	return dfc_qmap_set_end_marker(dfc, cmd->hdr.mux_id, cmd->bearer_id,
 				       ntohs(cmd->seq_num),
 				       ntohl(cmd->hdr.tx_id));
@@ -372,19 +397,23 @@ static void dfc_qmap_send_end_marker_cnf(struct qos_info *qos,
 					 u16 seq, u32 tx_id)
 {
 	struct sk_buff *skb;
-	struct qmap_dfc_end_marker_cnf *em_cnf;
-	unsigned int len = sizeof(struct qmap_dfc_end_marker_cnf);
+	struct qmapv5_dfc_end_marker_cnf *em_cnf;
+	unsigned int len = sizeof(struct qmapv5_dfc_end_marker_cnf);
 
 	skb = alloc_skb(len, GFP_ATOMIC);
 	if (!skb)
 		return;
 
-	em_cnf = (struct qmap_dfc_end_marker_cnf *)skb_put(skb, len);
+	em_cnf = (struct qmapv5_dfc_end_marker_cnf *)skb_put(skb, len);
 	memset(em_cnf, 0, len);
 
 	em_cnf->hdr.cd_bit = 1;
+	em_cnf->hdr.next_hdr = 1;
 	em_cnf->hdr.mux_id = qos->mux_id;
-	em_cnf->hdr.pkt_len = htons(len - QMAP_HDR_LEN);
+	em_cnf->hdr.pkt_len = htons(len -
+				    (QMAP_HDR_LEN +
+				     sizeof(struct rmnet_map_v5_csum_header)));
+	em_cnf->hdr.csum_hdr.header_type = RMNET_MAP_HEADER_TYPE_CSUM_OFFLOAD;
 	em_cnf->hdr.cmd_name = QMAP_DFC_END_MARKER;
 	em_cnf->hdr.cmd_type = QMAP_CMD_ACK;
 	em_cnf->hdr.tx_id = htonl(tx_id);
@@ -393,14 +422,7 @@ static void dfc_qmap_send_end_marker_cnf(struct qos_info *qos,
 	em_cnf->bearer_id = bearer->bearer_id;
 	em_cnf->seq_num = htons(seq);
 
-	/* This cmd needs to be sent in-band after data on the currnet
-	 * channel. But due to IPA bug, it cannot be sent over LLC so send
-	 * it over QMAP channel if current channel is LLC.
-	 */
-	if (bearer->ch_switch.current_ch == RMNET_CH_DEFAULT)
-		rmnet_qmap_send(skb, bearer->ch_switch.current_ch, true);
-	else
-		rmnet_qmap_send(skb, RMNET_CH_CTL, false);
+	rmnet_qmap_send(skb, bearer->ch_switch.current_ch, true);
 }
 
 static int dfc_qmap_send_powersave(u8 enable, u8 num_bearers, u8 *bearer_id)

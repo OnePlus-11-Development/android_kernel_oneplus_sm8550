@@ -1,4 +1,5 @@
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -248,25 +249,28 @@ TRACE_EVENT(dfc_tx_link_status_ind,
 
 TRACE_EVENT(dfc_qmap,
 
-	TP_PROTO(const void *data, size_t len, bool in),
+	TP_PROTO(const void *data, size_t len, bool in, u8 chn),
 
-	TP_ARGS(data, len, in),
+	TP_ARGS(data, len, in, chn),
 
 	TP_STRUCT__entry(
 		__field(bool, in)
 		__field(size_t, len)
 		__dynamic_array(u8, data, len)
+		__field(u8, chn)
 	),
 
 	TP_fast_assign(
 		__entry->in = in;
 		__entry->len = len;
 		memcpy(__get_dynamic_array(data), data, len);
+		__entry->chn = chn;
 	),
 
-	TP_printk("%s [%s]",
+	TP_printk("[0x%02x] %s %s", __entry->chn,
 		__entry->in ? "<--" : "-->",
-		__print_hex(__get_dynamic_array(data), __entry->len))
+		__print_array(__get_dynamic_array(data), __entry->len,
+			      sizeof(u8)))
 );
 
 TRACE_EVENT(dfc_adjust_grant,
