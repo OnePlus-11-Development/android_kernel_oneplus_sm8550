@@ -783,6 +783,37 @@ static int _sde_kms_release_shared_buffer(unsigned int mem_addr,
 
 }
 
+static int _sde_kms_one2one_mem_map_ipcc_reg(struct sde_kms *sde_kms, u32 buf_size,
+		unsigned long buf_base)
+{
+	struct msm_mmu *mmu = NULL;
+	int ret = 0;
+
+	if (!sde_kms->aspace[MSM_SMMU_DOMAIN_UNSECURE]
+		|| !sde_kms->aspace[MSM_SMMU_DOMAIN_UNSECURE]->mmu) {
+		SDE_ERROR("aspace not found for sde kms node\n");
+		return -EINVAL;
+	}
+
+	mmu = sde_kms->aspace[MSM_SMMU_DOMAIN_UNSECURE]->mmu;
+	if (!mmu) {
+		SDE_ERROR("mmu not found for aspace\n");
+		return -EINVAL;
+	}
+
+	if (!mmu->funcs || !mmu->funcs->one_to_one_map) {
+		SDE_ERROR("invalid input params for map\n");
+		return -EINVAL;
+	}
+
+	ret = mmu->funcs->one_to_one_map(mmu, buf_base, buf_base, buf_size,
+		IOMMU_READ | IOMMU_WRITE);
+	if (ret)
+		SDE_ERROR("one2one memory smmu map failed:%d\n", ret);
+
+	return ret;
+}
+
 static int _sde_kms_splash_mem_get(struct sde_kms *sde_kms,
 		struct sde_splash_mem *splash)
 {
@@ -4169,6 +4200,8 @@ static int _sde_kms_mmu_destroy(struct sde_kms *sde_kms)
 static int _sde_kms_mmu_init(struct sde_kms *sde_kms)
 {
 	struct msm_mmu *mmu;
+	struct resource *res;
+	struct platform_device *pdev;
 	int i, ret;
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
@@ -4207,6 +4240,25 @@ static int _sde_kms_mmu_init(struct sde_kms *sde_kms)
 			if (ret) {
 				SDE_ERROR("failed to map ret:%d\n", ret);
 				goto enable_trans_fail;
+			}
+		}
+
+		if (i == MSM_SMMU_DOMAIN_UNSECURE && sde_kms->catalog->hw_fence_rev) {
+			pdev = to_platform_device(sde_kms->dev->dev);
+			res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ipcc_reg");
+			if (!res) {
+				SDE_DEBUG("failed to get resource ipcc_reg, cannot map ipcc\n");
+				sde_kms->catalog->hw_fence_rev = 0;
+			} else {
+				sde_kms->ipcc_base_addr = res->start;
+
+				ret = _sde_kms_one2one_mem_map_ipcc_reg(sde_kms, resource_size(res),
+					HW_FENCE_IPCC_PROTOCOLp_CLIENTc(res->start,
+					sde_kms->catalog->ipcc_protocol_id,
+					HW_FENCE_IPCC_CLIENT_DPU));
+				/* if mapping fails disable hw-fences */
+				if (ret)
+					sde_kms->catalog->hw_fence_rev = 0;
 			}
 		}
 
@@ -4258,7 +4310,8 @@ static void sde_kms_init_hw_fences(struct sde_kms *sde_kms)
 		return;
 
 	if (sde_kms->hw_mdp->ops.setup_hw_fences)
-		sde_kms->hw_mdp->ops.setup_hw_fences(sde_kms->hw_mdp);
+		sde_kms->hw_mdp->ops.setup_hw_fences(sde_kms->hw_mdp,
+			sde_kms->catalog->ipcc_protocol_id, sde_kms->ipcc_base_addr);
 }
 
 static void sde_kms_init_shared_hw(struct sde_kms *sde_kms)

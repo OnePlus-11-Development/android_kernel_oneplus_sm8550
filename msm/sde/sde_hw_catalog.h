@@ -1847,6 +1847,7 @@ struct sde_perf_cfg {
  * @inline_rot_restricted_formats       restricted formats for inline rotation
  * @dnsc_blur_filters        supported filters for downscale blur
  * @dnsc_blur_filter_count   supported filter count for downscale blur
+ * @ipcc_protocol_id    ipcc protocol id for the hw
  */
 struct sde_mdss_cfg {
 	/* Block Revisions */
@@ -1964,6 +1965,8 @@ struct sde_mdss_cfg {
 	struct sde_format_extended *inline_rot_restricted_formats;
 	struct sde_dnsc_blur_filter_info *dnsc_blur_filters;
 	u32 dnsc_blur_filter_count;
+
+	u32 ipcc_protocol_id;
 };
 
 struct sde_mdss_hw_cfg_handler {

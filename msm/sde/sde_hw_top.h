@@ -11,6 +11,9 @@
 #include "sde_hw_mdss.h"
 #include "sde_hw_util.h"
 
+#define HW_FENCE_IPCC_CLIENT_DPU   25
+#define HW_FENCE_IPCC_PROTOCOLp_CLIENTc(ba, p, c)   (ba + (0x40000*p) + (0x1000*c))
+
 struct sde_hw_mdp;
 struct sde_hw_sid;
 
@@ -206,8 +209,11 @@ struct sde_hw_mdp_ops {
 	/**
 	 * setup_hw_fences - configure hw fences top registers
 	 * @mdp:     mdp top context driver
+	 * @protocol_id:    ipcc protocol id
+	 * @ipcc_base_addr: base address for ipcc reg block
 	 */
-	void (*setup_hw_fences)(struct sde_hw_mdp *mdp);
+	void (*setup_hw_fences)(struct sde_hw_mdp *mdp, u32 protocol_id,
+			unsigned long ipcc_base_addr);
 
 };
 
