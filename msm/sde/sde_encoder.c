@@ -2164,6 +2164,14 @@ static int _sde_encoder_rc_post_modeset(struct drm_encoder *drm_enc,
 		goto end;
 	}
 
+	/* toggle te bit to update vsync source for sim cmd mode panels */
+	if (sde_encoder_check_curr_mode(&sde_enc->base, MSM_DISPLAY_CMD_MODE)
+			&& sde_enc->disp_info.is_te_using_watchdog_timer) {
+		sde_encoder_control_te(drm_enc, false);
+		_sde_encoder_update_vsync_source(sde_enc, &sde_enc->disp_info);
+		sde_encoder_control_te(drm_enc, true);
+	}
+
 	_sde_encoder_update_rsc_client(drm_enc, true);
 
 	SDE_EVT32(DRMID(drm_enc), sw_event, sde_enc->rc_state,
