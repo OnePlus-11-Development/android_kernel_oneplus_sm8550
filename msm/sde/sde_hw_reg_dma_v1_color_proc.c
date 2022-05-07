@@ -103,6 +103,9 @@
 #define QSEED3_COEF_LUT_SWAP_BIT           0
 #define QSEED3_COEF_LUT_CTRL_OFF               0x4C
 
+#define QSEED5_DE_LPF_OFFSET                   0x64
+#define QSEED5_DEFAULT_DE_LPF_BLEND            0x3FF00000
+
 /* SDE_SCALER_QSEED3LITE */
 #define QSEED3L_COEF_LUT_SWAP_BIT          0
 #define QSEED3L_COEF_LUT_Y_SEP_BIT         4
@@ -3264,11 +3267,13 @@ void reg_dmav1_setup_scaler3lite_lut(
 }
 
 static int reg_dmav1_setup_scaler3_de(struct sde_reg_dma_setup_ops_cfg *buf,
-	struct sde_hw_scaler3_de_cfg *de_cfg, u32 offset)
+	struct sde_hw_scaler3_cfg *scaler3_cfg, u32 offset, bool de_lpf)
 {
 	u32 de_config[7];
 	struct sde_hw_reg_dma_ops *dma_ops;
 	int rc;
+	struct sde_hw_scaler3_de_cfg *de_cfg = &scaler3_cfg->de;
+	u32 de_lpf_config;
 
 	dma_ops = sde_reg_dma_get_ops();
 	de_config[0] = (de_cfg->sharpen_level1 & 0x1FF) |
@@ -3297,14 +3302,31 @@ static int reg_dmav1_setup_scaler3_de(struct sde_reg_dma_setup_ops_cfg *buf,
 		((de_cfg->adjust_c[1] & 0x3FF) << 10) |
 		((de_cfg->adjust_c[2] & 0x3FF) << 20);
 
-	offset += QSEED3_DE_OFFSET;
-	REG_DMA_SETUP_OPS(*buf, offset,
+	REG_DMA_SETUP_OPS(*buf, offset + QSEED3_DE_OFFSET,
 		de_config, sizeof(de_config), REG_BLK_WRITE_SINGLE, 0, 0, 0);
 	rc = dma_ops->setup_payload(buf);
 	if (rc) {
 		DRM_ERROR("de write failed ret %d\n", rc);
 		return rc;
 	}
+
+	if (de_lpf) {
+		if (scaler3_cfg->de_lpf_flags & SDE_DE_LPF_BLEND_FLAG_EN)
+			de_lpf_config = (scaler3_cfg->de_lpf_l & 0x3FF) |
+				((scaler3_cfg->de_lpf_m & 0x3FF) << 10) |
+				((scaler3_cfg->de_lpf_h & 0x3FF) << 20);
+		else
+			de_lpf_config = QSEED5_DEFAULT_DE_LPF_BLEND;
+
+		REG_DMA_SETUP_OPS(*buf, offset + QSEED5_DE_LPF_OFFSET,
+			&de_lpf_config, sizeof(u32), REG_SINGLE_WRITE, 0, 0, 0);
+		rc = dma_ops->setup_payload(buf);
+		if (rc) {
+			DRM_ERROR("de lpf write failed ret %d\n", rc);
+			return rc;
+		}
+	}
+
 	return 0;
 }
 
@@ -3322,6 +3344,7 @@ void reg_dmav1_setup_vig_qseed3(struct sde_hw_pipe *ctx,
 	u32 preload, src_y_rgb, src_uv, dst, dir_weight;
 	u32 cache[4];
 	enum sde_sspp_multirect_index idx = SDE_SSPP_RECT_0;
+	bool de_lpf_cap = false;
 
 	if (!ctx || !pe || !scaler_cfg) {
 		DRM_ERROR("invalid params ctx %pK pe %pK scaler_cfg %pK",
@@ -3387,8 +3410,10 @@ void reg_dmav1_setup_vig_qseed3(struct sde_hw_pipe *ctx,
 		((scaler3_cfg->dst_height & 0xFFFF) << 16);
 
 	if (scaler3_cfg->de.enable) {
+		if (test_bit(SDE_SSPP_SCALER_DE_LPF_BLEND, &ctx->cap->features))
+			de_lpf_cap = true;
 		rc = reg_dmav1_setup_scaler3_de(&dma_write_cfg,
-			&scaler3_cfg->de, offset);
+			scaler3_cfg, offset, de_lpf_cap);
 		if (!rc)
 			op_mode |= BIT(8);
 	}
