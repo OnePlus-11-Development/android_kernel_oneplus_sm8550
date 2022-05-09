@@ -2568,7 +2568,7 @@ int msm_vidc_flush_ts(struct msm_vidc_inst *inst)
 
 int msm_vidc_update_timestamp_rate(struct msm_vidc_inst *inst, u64 timestamp)
 {
-	struct msm_vidc_timestamp *ts, *prev;
+	struct msm_vidc_timestamp *ts, *prev = NULL;
 	int rc = 0;
 	u32 window_size = 0;
 	u32 timestamp_rate = 0;
