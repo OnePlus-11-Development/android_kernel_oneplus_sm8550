@@ -1687,7 +1687,7 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 
 	{COMPLEXITY, ENC, H264|HEVC,
 		0, 100,
-		1, 100,
+		1, DEFAULT_COMPLEXITY,
 		V4L2_CID_MPEG_VIDC_VENC_COMPLEXITY},
 
 	{META_MAX_NUM_REORDER_FRAMES, DEC, HEVC | H264,

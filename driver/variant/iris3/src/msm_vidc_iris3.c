@@ -1116,8 +1116,8 @@ int msm_vidc_decide_quality_mode_iris3(struct msm_vidc_inst* inst)
 		goto decision_done;
 	}
 
-	/* for least complexity, make LP for all resolution */
-	if (!capability->cap[COMPLEXITY].value) {
+	/* for lesser complexity, make LP for all resolution */
+	if (capability->cap[COMPLEXITY].value < DEFAULT_COMPLEXITY) {
 		mode = MSM_VIDC_POWER_SAVE_MODE;
 		goto decision_done;
 	}
