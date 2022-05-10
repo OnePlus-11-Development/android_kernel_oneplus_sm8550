@@ -17,7 +17,9 @@ static struct nla_policy DATARMNET157d4c7a8a[DATARMNET3b044438b9+
 DATARMNET5d4139d9d7)),[DATARMNET818a0b6438]=NLA_POLICY_EXACT_LEN(sizeof(struct 
 DATARMNETca79857d4a)),[DATARMNET572e4a28eb]=NLA_POLICY_EXACT_LEN(sizeof(struct 
 DATARMNET797a5b1493)),[DATARMNETe54d857ffe]=NLA_POLICY_EXACT_LEN(sizeof(struct 
-DATARMNET9a727f81bc)),};
+DATARMNET9a727f81bc)),[DATARMNET7edfedec7f]=NLA_POLICY_EXACT_LEN(sizeof(struct 
+DATARMNETd51e57e3f4)),[DATARMNETd2b1517d6b]=NLA_POLICY_EXACT_LEN(sizeof(struct 
+DATARMNET15bcb4844b)),};
 #define DATARMNET7dc6237681(DATARMNET5aeb0ef9bc, DATARMNETbd9859b58e)\
                                          \
 	{                                                                      \
@@ -26,7 +28,8 @@ flags = (0xd2d+202-0xdf7),        \
 	}
 static const struct genl_ops DATARMNET27a52625e4[]={DATARMNET7dc6237681(
 DATARMNET15437be67e,DATARMNET37a9efbbcb),DATARMNET7dc6237681(DATARMNET4f09ad7688
-,DATARMNET1998d09852),};struct genl_family DATARMNETcdba30eca9={.hdrsize=
+,DATARMNET1998d09852),DATARMNET7dc6237681(DATARMNET97eefd45e3,
+DATARMNETae6b282c61),};struct genl_family DATARMNETcdba30eca9={.hdrsize=
 (0xd2d+202-0xdf7),.name=DATARMNETa4a6e34e45,.version=DATARMNET33d1a3e23a,.
 maxattr=DATARMNET3b044438b9,.policy=DATARMNET157d4c7a8a,.ops=DATARMNET27a52625e4
 ,.n_ops=ARRAY_SIZE(DATARMNET27a52625e4),};int DATARMNETcfa8d492f8(void){return 
