@@ -287,7 +287,12 @@ u32 msm_vidc_decoder_input_meta_size(struct msm_vidc_inst *inst)
 
 u32 msm_vidc_decoder_output_meta_size(struct msm_vidc_inst *inst)
 {
-	return MSM_VIDC_METADATA_SIZE;
+	u32 size = MSM_VIDC_METADATA_SIZE;
+
+	if (inst->capabilities->cap[META_DOLBY_RPU].value)
+		size += MSM_VIDC_METADATA_DOLBY_RPU_SIZE;
+
+	return ALIGN(size, SZ_4K);
 }
 
 u32 msm_vidc_encoder_input_size(struct msm_vidc_inst *inst)
@@ -448,6 +453,11 @@ u32 msm_vidc_encoder_input_meta_size(struct msm_vidc_inst *inst)
 			height = ALIGN(height, HEIC_GRID_DIMENSION);
 		}
 		size += ROI_METADATA_SIZE(width, height, lcu_size);
+		size = ALIGN(size, SZ_4K);
+	}
+
+	if (inst->capabilities->cap[META_DOLBY_RPU].value) {
+		size += MSM_VIDC_METADATA_DOLBY_RPU_SIZE;
 		size = ALIGN(size, SZ_4K);
 	}
 	return size;

@@ -338,6 +338,10 @@ static int handle_session_info(struct msm_vidc_inst *inst,
 		info = "data corrupt";
 		inst->hfi_frame_info.data_corrupt = 1;
 		break;
+	case HFI_INFO_BUFFER_OVERFLOW:
+		info = "buffer overflow";
+		inst->hfi_frame_info.overflow = 1;
+		break;
 	default:
 		info = "unknown";
 		break;

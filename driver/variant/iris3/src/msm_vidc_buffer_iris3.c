@@ -220,16 +220,20 @@ static u32 msm_vidc_decoder_partial_data_size_iris3(struct msm_vidc_inst *inst)
 static u32 msm_vidc_decoder_persist_size_iris3(struct msm_vidc_inst *inst)
 {
 	u32 size = 0;
+	u32 rpu_enabled = 0;
 
 	if (!inst) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return size;
 	}
 
+	if (inst->capabilities->cap[META_DOLBY_RPU].value)
+		rpu_enabled = 1;
+
 	if (inst->codec == MSM_VIDC_H264) {
-		HFI_BUFFER_PERSIST_H264D(size);
+		HFI_BUFFER_PERSIST_H264D(size, rpu_enabled);
 	} else if (inst->codec == MSM_VIDC_HEVC || inst->codec == MSM_VIDC_HEIC) {
-		HFI_BUFFER_PERSIST_H265D(size);
+		HFI_BUFFER_PERSIST_H265D(size, rpu_enabled);
 	} else if (inst->codec == MSM_VIDC_VP9) {
 		HFI_BUFFER_PERSIST_VP9D(size);
 	} else if (inst->codec == MSM_VIDC_AV1) {

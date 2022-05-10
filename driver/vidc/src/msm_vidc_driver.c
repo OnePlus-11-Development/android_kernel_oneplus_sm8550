@@ -83,6 +83,7 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{META_ROI_INFO,                  "META_ROI_INFO"              },
 	{META_SALIENCY_INFO,             "META_SALIENCY_INFO"         },
 	{META_TRANSCODING_STAT_INFO,     "META_TRANSCODING_STAT_INFO" },
+	{META_DOLBY_RPU,                 "META_DOLBY_RPU"             },
 	{META_CAP_MAX,                   "META_CAP_MAX"               },
 	{FRAME_WIDTH,                    "FRAME_WIDTH"                },
 	{LOSSLESS_FRAME_WIDTH,           "LOSSLESS_FRAME_WIDTH"       },
