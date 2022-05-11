@@ -233,6 +233,16 @@ struct sde_frame_data {
 };
 
 /**
+ * struct sde_opr_value - defines sde opr value structure
+ * @num_valid_opr : count of valid opr values
+ * @opr_value : list of opr value
+ */
+struct sde_opr_value {
+	atomic_t num_valid_opr;
+	u32 opr_value[MAX_DSI_DISPLAYS];
+};
+
+/**
  * struct sde_crtc - virtualized CRTC data structure
  * @base          : Base drm crtc structure
  * @name          : ASCII description of this crtc
@@ -317,6 +327,8 @@ struct sde_frame_data {
  * @skip_blend_plane_h: skip blend plane height
  * @line_time_in_ns : current mode line time in nano sec is needed for QOS update
  * @frame_data      : Framedata data structure
+ * @previous_opr_value : store previous opr values
+ * @opr_event_notify_enabled : Flag to indicate if opr event notify is enabled or not
  */
 struct sde_crtc {
 	struct drm_crtc base;
@@ -423,6 +435,9 @@ struct sde_crtc {
 	u32 line_time_in_ns;
 
 	struct sde_frame_data frame_data;
+
+	struct sde_opr_value previous_opr_value;
+	bool opr_event_notify_enabled;
 };
 
 enum sde_crtc_dirty_flags {

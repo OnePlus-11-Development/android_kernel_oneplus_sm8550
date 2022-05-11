@@ -8,6 +8,12 @@
 #define _MSM_DRM_PP_H_
 
 #include <linux/types.h>
+#include <drm/drm.h>
+
+#define ENABLE_EVENT_SPR_OPR_VALUE
+#define ENABLE_EVENT_INTF_MISR_SIGNATURE
+#define MAX_DSI_DISPLAY 4
+
 /**
  * struct drm_msm_pcc_coeff - PCC coefficient structure for each color
  *                            component.
@@ -750,6 +756,23 @@ struct drm_msm_backlight_info {
 struct drm_msm_dimming_bl_lut {
 	__u32 length;
 	__u32 mapped_bl[DIMMING_BL_LUT_LEN];
+};
+
+struct drm_msm_opr_value {
+	__u32 num_valid_opr;
+	__u32 opr_value[MAX_DSI_DISPLAY];
+};
+
+#define SDE_MAX_ROI 4
+struct drm_msm_roi {
+	__u32 num_rects;
+	struct drm_clip_rect roi[SDE_MAX_ROI];
+};
+
+struct drm_msm_misr_sign {
+	__u64 num_valid_misr;
+	struct drm_msm_roi roi_list;
+	__u64 misr_sign_value[MAX_DSI_DISPLAY];
 };
 
 #endif /* _MSM_DRM_PP_H_ */

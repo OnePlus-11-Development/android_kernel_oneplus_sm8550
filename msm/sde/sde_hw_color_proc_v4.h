@@ -153,4 +153,12 @@ void sde_setup_fp16_unmultv1(struct sde_hw_pipe *ctx,
  * @cfg: partial update configuraton for the frame.
 */
 void sde_demura_pu_cfg(struct sde_hw_dspp *ctx, void *cfg);
+
+/**
+ * sde_spr_read_opr_value - api to read spr opr value
+ * @ctx: pointer to dspp object.
+ * @opr_value: Pointer to opr value.
+ */
+int sde_spr_read_opr_value(struct sde_hw_dspp *ctx, uint32_t *opr_value);
+
 #endif /* _SDE_HW_COLOR_PROC_V4_H_ */
