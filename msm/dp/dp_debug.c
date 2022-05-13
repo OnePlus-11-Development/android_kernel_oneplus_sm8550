@@ -893,7 +893,7 @@ static ssize_t dp_debug_tpg_write(struct file *file,
 	struct dp_debug_private *debug = file->private_data;
 	char buf[SZ_8];
 	size_t len = 0;
-	u32 tpg_state = 0;
+	u32 tpg_pattern = 0;
 
 	if (!debug)
 		return -ENODEV;
@@ -908,19 +908,18 @@ static ssize_t dp_debug_tpg_write(struct file *file,
 
 	buf[len] = '\0';
 
-	if (kstrtoint(buf, 10, &tpg_state) != 0)
+	if (kstrtoint(buf, 10, &tpg_pattern) != 0)
 		goto bail;
 
-	tpg_state &= 0x1;
-	DP_DEBUG("tpg_state: %d\n", tpg_state);
+	DP_DEBUG("tpg_pattern: %d\n", tpg_pattern);
 
-	if (tpg_state == debug->dp_debug.tpg_state)
+	if (tpg_pattern == debug->dp_debug.tpg_pattern)
 		goto bail;
 
 	if (debug->panel)
-		debug->panel->tpg_config(debug->panel, tpg_state);
+		debug->panel->tpg_config(debug->panel, tpg_pattern);
 
-	debug->dp_debug.tpg_state = tpg_state;
+	debug->dp_debug.tpg_pattern = tpg_pattern;
 bail:
 	return len;
 }
@@ -1386,7 +1385,7 @@ static ssize_t dp_debug_tpg_read(struct file *file,
 	if (*ppos)
 		return 0;
 
-	len += snprintf(buf, SZ_8, "%d\n", debug->dp_debug.tpg_state);
+	len += scnprintf(buf, SZ_8, "%d\n", debug->dp_debug.tpg_pattern);
 
 	len = min_t(size_t, count, len);
 	if (copy_to_user(user_buff, buf, len))

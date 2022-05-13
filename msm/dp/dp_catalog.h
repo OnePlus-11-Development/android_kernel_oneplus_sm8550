@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -208,7 +209,7 @@ struct dp_catalog_panel {
 	void (*config_sdp)(struct dp_catalog_panel *panel, bool en);
 	int (*set_colorspace)(struct dp_catalog_panel *panel,
 		 bool vsc_supported);
-	void (*tpg_config)(struct dp_catalog_panel *panel, bool enable);
+	void (*tpg_config)(struct dp_catalog_panel *panel, u32  pattern);
 	void (*config_spd)(struct dp_catalog_panel *panel);
 	void (*config_misc)(struct dp_catalog_panel *panel);
 	void (*config_msa)(struct dp_catalog_panel *panel,
