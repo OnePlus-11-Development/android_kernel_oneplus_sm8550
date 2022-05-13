@@ -66,6 +66,7 @@ static const u32 msm_vdec_subscribe_for_psc_av1[] = {
 	HFI_PROP_PROFILE,
 	HFI_PROP_LEVEL,
 	HFI_PROP_TIER,
+	HFI_PROP_SIGNAL_COLOR_INFO,
 };
 
 static const u32 msm_vdec_input_subscribe_for_properties[] = {
@@ -469,9 +470,7 @@ static int msm_vdec_set_colorspace(struct msm_vidc_inst *inst,
 		return -EINVAL;
 	}
 
-	if (inst->codec != MSM_VIDC_H264 &&
-		inst->codec != MSM_VIDC_HEVC &&
-		inst->codec != MSM_VIDC_HEIC)
+	if (inst->codec == MSM_VIDC_VP9)
 		return 0;
 
 	if (inst->fmts[port].fmt.pix_mp.colorspace != V4L2_COLORSPACE_DEFAULT ||
