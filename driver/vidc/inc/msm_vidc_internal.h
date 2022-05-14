@@ -827,16 +827,16 @@ struct msm_vidc_power {
 };
 
 struct msm_vidc_fence_context {
-        char name[MAX_NAME_LENGTH];
-        u64 ctx_num;
-        u64 seq_num;
+	char                      name[MAX_NAME_LENGTH];
+	u64                       ctx_num;
+	u64                       seq_num;
+	spinlock_t                lock;
 };
 
 struct msm_vidc_fence {
 	struct list_head            list;
 	struct dma_fence            dma_fence;
 	char                        name[MAX_NAME_LENGTH];
-	spinlock_t                  lock;
 	struct sync_file            *sync_file;
 	int                         fd;
 };
