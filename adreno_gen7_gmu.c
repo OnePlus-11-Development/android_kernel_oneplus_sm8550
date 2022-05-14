@@ -2047,6 +2047,9 @@ static int gen7_gmu_regulators_probe(struct gen7_gmu_device *gmu,
 		return PTR_ERR(gmu->gx_gdsc);
 	}
 
+	init_completion(&gmu->gdsc_gate);
+	complete_all(&gmu->gdsc_gate);
+
 	gmu->gdsc_nb.notifier_call = gmu_cx_gdsc_event;
 	ret = devm_regulator_register_notifier(gmu->cx_gdsc, &gmu->gdsc_nb);
 
@@ -2054,9 +2057,6 @@ static int gen7_gmu_regulators_probe(struct gen7_gmu_device *gmu,
 		dev_err(&pdev->dev, "Failed to register gmu cx gdsc notifier: %d\n", ret);
 		return ret;
 	}
-
-	init_completion(&gmu->gdsc_gate);
-	complete_all(&gmu->gdsc_gate);
 
 	return 0;
 }
