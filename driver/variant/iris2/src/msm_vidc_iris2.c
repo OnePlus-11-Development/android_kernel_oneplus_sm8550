@@ -1158,10 +1158,10 @@ int msm_vidc_decide_quality_mode_iris2(struct msm_vidc_inst* inst)
 	max_hq_mbpf = core->capabilities[MAX_MBPF_HQ].value;;
 	max_hq_mbps = core->capabilities[MAX_MBPS_HQ].value;;
 
-	/* NRT session to have max quality unless client configures least complexity */
+	/* NRT session to have max quality unless client configures lesser complexity */
 	if (!is_realtime_session(inst) && mbpf <= max_hq_mbpf) {
 		mode = MSM_VIDC_MAX_QUALITY_MODE;
-		if (!capability->cap[COMPLEXITY].value)
+		if (capability->cap[COMPLEXITY].value < DEFAULT_COMPLEXITY)
 			mode = MSM_VIDC_POWER_SAVE_MODE;
 		goto exit;
 	}
