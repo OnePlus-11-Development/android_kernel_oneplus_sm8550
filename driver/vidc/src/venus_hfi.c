@@ -1741,6 +1741,8 @@ static int __init_subcaches(struct msm_vidc_core *core)
 			sinfo->subcache = llcc_slice_getd(LLCC_VIDSC1);
 		} else if (!strcmp("vidscfw", sinfo->name)) {
 			sinfo->subcache = llcc_slice_getd(LLCC_VIDFW);
+		} else if (!strcmp("vidvsp", sinfo->name)) {
+			sinfo->subcache = llcc_slice_getd(LLCC_VIDVSP);
 		} else {
 			d_vpr_e("Invalid subcache name %s\n",
 					sinfo->name);
