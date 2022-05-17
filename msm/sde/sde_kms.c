@@ -1557,6 +1557,7 @@ static void sde_kms_complete_commit(struct msm_kms *kms,
 static void sde_kms_wait_for_commit_done(struct msm_kms *kms,
 		struct drm_crtc *crtc)
 {
+	struct sde_kms *sde_kms;
 	struct drm_encoder *encoder;
 	struct drm_device *dev;
 	int ret;
@@ -1568,6 +1569,7 @@ static void sde_kms_wait_for_commit_done(struct msm_kms *kms,
 	}
 
 	dev = crtc->dev;
+	sde_kms = to_sde_kms(kms);
 
 	if (!crtc->state->enable) {
 		SDE_DEBUG("[crtc:%d] not enable\n", crtc->base.id);
@@ -1614,7 +1616,9 @@ static void sde_kms_wait_for_commit_done(struct msm_kms *kms,
 			sde_encoder_virt_reset(encoder);
 	}
 
-	sde_crtc_static_cache_read_kickoff(crtc);
+	/* avoid system cache update to set rd-noalloc bit when NSE feature is enabled */
+	if (!test_bit(SDE_FEATURE_SYS_CACHE_NSE, sde_kms->catalog->features))
+		sde_crtc_static_cache_read_kickoff(crtc);
 
 	SDE_ATRACE_END("sde_ksm_wait_for_commit_done");
 }

@@ -343,6 +343,7 @@ static void dspp_spr(struct sde_hw_dspp *c)
 
 		c->ops.setup_spr_init_config = reg_dmav1_setup_spr_init_cfgv1;
 		c->ops.setup_spr_pu_config = reg_dmav1_setup_spr_pu_cfgv1;
+		c->ops.read_spr_opr_value = sde_spr_read_opr_value;
 	}
 }
 

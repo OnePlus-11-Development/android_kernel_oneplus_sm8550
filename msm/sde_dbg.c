@@ -249,8 +249,7 @@ struct sde_dbg_regbuf {
  * @panic_on_err: whether to kernel panic after triggering dump via debugfs
  * @dump_work: work struct for deferring register dump work to separate thread
  * @work_panic: panic after dump if internal user passed "panic" special region
- * @enable_reg_dump: whether to dump registers into memory, kernel log, or both
- * @enable_dbgbus_dump: whether to dump dbgbus into memory, kernel log, or both
+ * @dump_option: whether to dump registers and dbgbus into memory, kernel log, or both
  * @coredump_pending: coredump is pending read from userspace
  * @coredump_reading: coredump is in reading stage
  * @dbgbus_sde: debug bus structure for the sde
@@ -283,8 +282,7 @@ struct sde_dbg_base {
 	u32 panic_on_err;
 	struct work_struct dump_work;
 	bool work_panic;
-	u32 enable_reg_dump;
-	u32 enable_dbgbus_dump;
+	u32 dump_option;
 	bool coredump_pending;
 	bool coredump_reading;
 
@@ -833,7 +831,7 @@ static void _sde_dump_reg_mask(u64 dump_blk_mask, bool dump_secure)
 		if (dump_secure && is_block_exclude((char **)exclude_modules, blk_base->name))
 			continue;
 
-		_sde_dump_reg_by_ranges(blk_base, dbg_base->enable_reg_dump);
+		_sde_dump_reg_by_ranges(blk_base, dbg_base->dump_option);
 	}
 }
 
@@ -1284,7 +1282,7 @@ static void _sde_dump_array(bool do_panic, const char *name, bool dump_secure, u
 		}
 	}
 
-	in_dump = (dbg_base->enable_dbgbus_dump & SDE_DBG_DUMP_IN_COREDUMP);
+	in_dump = (dbg_base->dump_option & SDE_DBG_DUMP_IN_COREDUMP);
 	coredump_reading = sde_dbg_base.coredump_reading;
 
 	start = ktime_get();
@@ -1299,32 +1297,32 @@ static void _sde_dump_array(bool do_panic, const char *name, bool dump_secure, u
 	if (in_dump && coredump_reading)
 		drm_printf(dbg_base->sde_dbg_printer, "============== dump dbgbus_sde ==============\n");
 	if (dump_blk_mask & SDE_DBG_SDE_DBGBUS)
-		_sde_dbg_dump_sde_dbg_bus(&dbg_base->dbgbus_sde, dbg_base->enable_dbgbus_dump);
+		_sde_dbg_dump_sde_dbg_bus(&dbg_base->dbgbus_sde, dbg_base->dump_option);
 
 	if (in_dump && coredump_reading)
 		drm_printf(dbg_base->sde_dbg_printer, "============== dump dbgbus_lutdma ==============\n");
 	if (dump_blk_mask & SDE_DBG_LUTDMA_DBGBUS)
-		_sde_dbg_dump_sde_dbg_bus(&dbg_base->dbgbus_lutdma, dbg_base->enable_dbgbus_dump);
+		_sde_dbg_dump_sde_dbg_bus(&dbg_base->dbgbus_lutdma, dbg_base->dump_option);
 
 	if (in_dump && coredump_reading)
 		drm_printf(dbg_base->sde_dbg_printer, "============== dump dbgbus_rsc ==============\n");
 	if (dump_blk_mask & SDE_DBG_RSC_DBGBUS)
-		_sde_dbg_dump_sde_dbg_bus(&dbg_base->dbgbus_rsc, dbg_base->enable_dbgbus_dump);
+		_sde_dbg_dump_sde_dbg_bus(&dbg_base->dbgbus_rsc, dbg_base->dump_option);
 
 	if (in_dump && coredump_reading)
 		drm_printf(dbg_base->sde_dbg_printer, "============== dump dbgbus_vbif_rt ==============\n");
 	if (dump_blk_mask & SDE_DBG_VBIF_RT_DBGBUS)
-		_sde_dbg_dump_sde_dbg_bus(&dbg_base->dbgbus_vbif_rt, dbg_base->enable_dbgbus_dump);
+		_sde_dbg_dump_sde_dbg_bus(&dbg_base->dbgbus_vbif_rt, dbg_base->dump_option);
 
 	if (in_dump && coredump_reading)
 		drm_printf(dbg_base->sde_dbg_printer, "============== dump dbgbus_dsi ==============\n");
 	if (dump_blk_mask & SDE_DBG_DSI_DBGBUS)
-		_sde_dbg_dump_dsi_dbg_bus(&dbg_base->dbgbus_dsi, dbg_base->enable_dbgbus_dump);
+		_sde_dbg_dump_dsi_dbg_bus(&dbg_base->dbgbus_dsi, dbg_base->dump_option);
 
 	if (in_dump && coredump_reading)
 		drm_printf(dbg_base->sde_dbg_printer, "============== dump dbgbus_dp ==============\n");
 	if (dump_blk_mask & SDE_DBG_DP_DBGBUS)
-		_sde_dbg_dump_sde_dbg_bus(&dbg_base->dbgbus_dp, dbg_base->enable_dbgbus_dump);
+		_sde_dbg_dump_sde_dbg_bus(&dbg_base->dbgbus_dp, dbg_base->dump_option);
 
 	end = ktime_get();
 	dev_info(dbg_base->dev,
@@ -1408,6 +1406,21 @@ static void sde_devcoredump_free(void *data)
 	sde_dbg_base.coredump_reading = false;
 	sde_dbg_base.coredump_pending = false;
 }
+
+void sde_dbg_update_dump_mode(bool enable_coredump)
+{
+	struct sde_dbg_base *dbg_base = &sde_dbg_base;
+	u32 new_mode = SDE_DBG_DEFAULT_DUMP_MODE;
+
+	if (enable_coredump)
+		new_mode = SDE_DBG_DUMP_IN_COREDUMP;
+	dbg_base->dump_option = new_mode;
+	dbg_base->evtlog->dump_mode = new_mode;
+}
+#else
+void sde_dbg_update_dump_mode(bool enable_coredump)
+{
+}
 #endif /* CONFIG_DEV_COREDUMP */
 
 /**
@@ -1420,7 +1433,7 @@ static void _sde_dump_work(struct work_struct *work)
 			sde_dbg_base.dump_secure, sde_dbg_base.dump_blk_mask);
 
 #ifdef CONFIG_DEV_COREDUMP
-	if (sde_dbg_base.enable_reg_dump & SDE_DBG_DUMP_IN_COREDUMP) {
+	if (sde_dbg_base.dump_option & SDE_DBG_DUMP_IN_COREDUMP) {
 		dev_coredumpm(sde_dbg_base.dev, THIS_MODULE, &sde_dbg_base, 0, GFP_KERNEL,
 				sde_devcoredump_read, sde_devcoredump_free);
 		sde_dbg_base.coredump_pending = true;
@@ -1446,7 +1459,7 @@ void sde_dbg_dump(enum sde_dbg_dump_context dump_mode, const char *name, u64 dum
 	 */
 	if (((dump_mode == SDE_DBG_DUMP_IRQ_CTX) && work_pending(&sde_dbg_base.dump_work)) ||
 		sde_dbg_base.coredump_pending) {
-		pr_debug("dump is pending , dump flag: %d \n", sde_dbg_base.enable_reg_dump);
+		pr_debug("dump is pending, dump flag: %d\n", sde_dbg_base.dump_option);
 		return;
 	}
 
@@ -1466,17 +1479,6 @@ void sde_dbg_dump(enum sde_dbg_dump_context dump_mode, const char *name, u64 dum
 	}
 	va_end(args);
 
-#ifdef CONFIG_DEV_COREDUMP
-	/*
-	 * if CONFIG_DEV_COREDUMP is defined put all the mode control in one flag
-	 * to simplify the control logic of enable/disable devcoredump.
-	 */
-	if (sde_dbg_base.enable_reg_dump != SDE_DBG_DEFAULT_DUMP_MODE) {
-		sde_dbg_base.evtlog->dump_mode = sde_dbg_base.enable_reg_dump;
-		sde_dbg_base.enable_dbgbus_dump = sde_dbg_base.enable_reg_dump;
-	}
-#endif
-
 	if (dump_mode == SDE_DBG_DUMP_IRQ_CTX) {
 		/* schedule work to dump later */
 		sde_dbg_base.work_panic = do_panic;
@@ -1486,7 +1488,7 @@ void sde_dbg_dump(enum sde_dbg_dump_context dump_mode, const char *name, u64 dum
 		_sde_dump_array(do_panic, name, dump_secure, dump_blk_mask);
 
 #ifdef CONFIG_DEV_COREDUMP
-		if (sde_dbg_base.enable_reg_dump & SDE_DBG_DUMP_IN_COREDUMP) {
+		if (sde_dbg_base.dump_option & SDE_DBG_DUMP_IN_COREDUMP) {
 			dev_coredumpm(sde_dbg_base.dev, THIS_MODULE, &sde_dbg_base, 0, GFP_KERNEL,
 					sde_devcoredump_read, sde_devcoredump_free);
 			sde_dbg_base.coredump_pending = true;
@@ -2508,13 +2510,11 @@ int sde_dbg_debugfs_register(struct device *dev)
 
 	debugfs_create_u32("enable", 0600, debugfs_root, &(sde_dbg_base.evtlog->enable));
 	debugfs_create_u32("panic", 0600, debugfs_root, &sde_dbg_base.panic_on_err);
-	debugfs_create_u32("reg_dump", 0600, debugfs_root, &sde_dbg_base.enable_reg_dump);
+	debugfs_create_u32("dump_mode", 0600, debugfs_root, &sde_dbg_base.dump_option);
 	debugfs_create_u64("reg_dump_blk_mask", 0600, debugfs_root, &sde_dbg_base.dump_blk_mask);
+	debugfs_create_u32("evtlog_dump", 0600, debugfs_root, &(sde_dbg_base.evtlog->dump_mode));
 
 #ifndef CONFIG_DEV_COREDUMP
-	debugfs_create_u32("evtlog_dump", 0600, debugfs_root, &(sde_dbg_base.evtlog->dump_mode));
-	debugfs_create_u32("dbgbus_dump", 0600, debugfs_root, &sde_dbg_base.enable_dbgbus_dump);
-
 	if (dbg->dbgbus_sde.entries)
 		debugfs_create_file("recovery_dbgbus", 0400, debugfs_root, NULL,
 				&sde_recovery_dbgbus_fops);
@@ -2649,15 +2649,14 @@ int sde_dbg_init(struct device *dev)
 	sde_dbg_base.work_panic = false;
 	sde_dbg_base.coredump_reading = false;
 	sde_dbg_base.panic_on_err = DEFAULT_PANIC;
-	sde_dbg_base.enable_reg_dump = SDE_DBG_DEFAULT_DUMP_MODE;
-	sde_dbg_base.enable_dbgbus_dump = SDE_DBG_DEFAULT_DUMP_MODE;
+	sde_dbg_base.dump_option = SDE_DBG_DEFAULT_DUMP_MODE;
 	sde_dbg_base.dump_blk_mask = SDE_DBG_BUILT_IN_ALL;
 	memset(&sde_dbg_base.regbuf, 0, sizeof(sde_dbg_base.regbuf));
 	sde_register_md_panic_notifer();
 
 	pr_info("evtlog_status: enable:%d, panic:%d, dump:%d\n",
 		sde_dbg_base.evtlog->enable, sde_dbg_base.panic_on_err,
-		sde_dbg_base.enable_reg_dump);
+		sde_dbg_base.dump_option);
 
 	return 0;
 }

@@ -446,7 +446,7 @@ struct sde_encoder_phys_cmd {
  * @bo_disable:		Buffer object(s) to use during the disabling state
  * @fb_disable:		Frame buffer to use during the disabling state
  * @sc_cfg:		Stores wb system cache config
- * @crtc		Pointer to drm_crtc
+ * @crtc:		Pointer to drm_crtc
  * @prog_line:		Cached programmable line value used to trigger early wb-fence
  */
 struct sde_encoder_phys_wb {

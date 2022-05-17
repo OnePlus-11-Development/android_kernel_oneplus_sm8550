@@ -1847,7 +1847,7 @@ static void sde_sspp_set_features(struct sde_mdss_cfg *sde_cfg,
 				set_bit(SDE_PERF_SSPP_UIDLE_FILL_LVL_SCALE, &sspp->perf_features);
 		}
 
-		if (sde_cfg->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache)
+		if (test_bit(SDE_SYS_CACHE_DISP, sde_cfg->sde_sys_cache_type_map))
 			set_bit(SDE_PERF_SSPP_SYS_CACHE, &sspp->perf_features);
 
 		if (test_bit(SDE_FEATURE_MULTIRECT_ERROR, sde_cfg->features))
@@ -3488,11 +3488,13 @@ static int sde_cache_parse_dt(struct device_node *np,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	const u32 sde_sys_cache_usecase_id[SDE_SYS_CACHE_MAX] = {
 		[SDE_SYS_CACHE_DISP] = LLCC_DISP,
+		[SDE_SYS_CACHE_DISP_1] = LLCC_DISP_1,
 		[SDE_SYS_CACHE_DISP_WB] = LLCC_DISP_WB,
 	};
 #else
 	const u32 sde_sys_cache_usecase_id[SDE_SYS_CACHE_MAX] = {
 		[SDE_SYS_CACHE_DISP] = LLCC_DISP,
+		[SDE_SYS_CACHE_DISP_1] = 0,
 		[SDE_SYS_CACHE_DISP_WB] = 0,
 	};
 #endif
@@ -3512,12 +3514,12 @@ static int sde_cache_parse_dt(struct device_node *np,
 		struct sde_sc_cfg *sc_cfg = &sde_cfg->sc_cfg[i];
 		u32 usecase_id = 0;
 
-		if (!sc_cfg->has_sys_cache)
+		if (!test_bit(i, sde_cfg->sde_sys_cache_type_map))
 			continue;
 
 		usecase_id = sde_sys_cache_usecase_id[i];
 		if (!usecase_id) {
-			sc_cfg->has_sys_cache = false;
+			clear_bit(i, sde_cfg->sde_sys_cache_type_map);
 			SDE_DEBUG("invalid usecase-id for sys cache:%d\n", i);
 			continue;
 		}
@@ -3952,8 +3954,8 @@ static void _sde_top_parse_dt_helper(struct sde_mdss_cfg *cfg,
 			DEFAULT_SDE_MIXER_BLENDSTAGES;
 
 	cfg->ubwc_rev = props->exists[UBWC_VERSION] ?
-			SDE_HW_UBWC_VER(PROP_VALUE_ACCESS(props->values,
-			UBWC_VERSION, 0)) : DEFAULT_SDE_UBWC_NONE;
+			PROP_VALUE_ACCESS(props->values,
+			UBWC_VERSION, 0) : DEFAULT_SDE_UBWC_NONE;
 
 	cfg->mdp[0].highest_bank_bit = DEFAULT_SDE_HIGHEST_BANK_BIT;
 
@@ -5010,7 +5012,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		set_bit(SDE_FEATURE_DITHER_LUMA_MODE, sde_cfg->features);
 		sde_cfg->mdss_hw_block_size = 0x158;
 		set_bit(SDE_FEATURE_TRUSTED_VM, sde_cfg->features);
-		sde_cfg->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache = true;
+		set_bit(SDE_SYS_CACHE_DISP, sde_cfg->sde_sys_cache_type_map);
 	} else if (IS_HOLI_TARGET(hw_rev)) {
 		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
 		sde_cfg->perf.min_prefill_lines = 24;
@@ -5040,7 +5042,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
 		sde_cfg->mdss_hw_block_size = 0x158;
 		set_bit(SDE_FEATURE_TRUSTED_VM, sde_cfg->features);
-		sde_cfg->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache = true;
+		set_bit(SDE_SYS_CACHE_DISP, sde_cfg->sde_sys_cache_type_map);
 	} else if (IS_WAIPIO_TARGET(hw_rev) || IS_CAPE_TARGET(hw_rev)) {
 		sde_cfg->allowed_dsc_reservation_switch = SDE_DP_DSC_RESERVATION_SWITCH;
 		set_bit(SDE_FEATURE_DEDICATED_CWB, sde_cfg->features);
@@ -5062,7 +5064,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
 		set_bit(SDE_FEATURE_DITHER_LUMA_MODE, sde_cfg->features);
 		sde_cfg->mdss_hw_block_size = 0x158;
-		sde_cfg->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache = true;
+		set_bit(SDE_SYS_CACHE_DISP, sde_cfg->sde_sys_cache_type_map);
 		set_bit(SDE_FEATURE_MULTIRECT_ERROR, sde_cfg->features);
 		set_bit(SDE_FEATURE_FP16, sde_cfg->features);
 		set_bit(SDE_MDP_PERIPH_TOP_0_REMOVED, &sde_cfg->mdp[0].features);
@@ -5113,7 +5115,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
 		set_bit(SDE_FEATURE_DITHER_LUMA_MODE, sde_cfg->features);
 		sde_cfg->mdss_hw_block_size = 0x158;
-		sde_cfg->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache = true;
+		set_bit(SDE_SYS_CACHE_DISP, sde_cfg->sde_sys_cache_type_map);
 		set_bit(SDE_FEATURE_MULTIRECT_ERROR, sde_cfg->features);
 		set_bit(SDE_FEATURE_FP16, sde_cfg->features);
 		set_bit(SDE_MDP_PERIPH_TOP_0_REMOVED, &sde_cfg->mdp[0].features);
@@ -5147,8 +5149,10 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		set_bit(SDE_FEATURE_VBIF_CLK_SPLIT, sde_cfg->features);
 		set_bit(SDE_FEATURE_CTL_DONE, sde_cfg->features);
 		set_bit(SDE_FEATURE_TRUSTED_VM, sde_cfg->features);
-		sde_cfg->sc_cfg[SDE_SYS_CACHE_DISP].has_sys_cache = true;
-		sde_cfg->sc_cfg[SDE_SYS_CACHE_DISP_WB].has_sys_cache = true;
+		set_bit(SDE_SYS_CACHE_DISP, sde_cfg->sde_sys_cache_type_map);
+		set_bit(SDE_SYS_CACHE_DISP_1, sde_cfg->sde_sys_cache_type_map);
+		set_bit(SDE_SYS_CACHE_DISP_WB, sde_cfg->sde_sys_cache_type_map);
+		set_bit(SDE_FEATURE_SYS_CACHE_NSE, sde_cfg->features);
 		sde_cfg->allowed_dsc_reservation_switch = SDE_DP_DSC_RESERVATION_SWITCH;
 		sde_cfg->autorefresh_disable_seq = AUTOREFRESH_DISABLE_SEQ2;
 		sde_cfg->perf.min_prefill_lines = 40;

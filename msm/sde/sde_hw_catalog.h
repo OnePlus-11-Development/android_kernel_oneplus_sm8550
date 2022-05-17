@@ -205,12 +205,15 @@ enum {
 
 /**
  * sde_sys_cache_type: Types of system cache supported
- * SDE_SYS_CACHE_DISP: Static img system cache
- * SDE_SYS_CACHE_MAX:  Maximum number of sys cache users
- * SDE_SYS_CACHE_NONE: Sys cache not used
+ * SDE_SYS_CACHE_DISP: System cache for static display read/write path use case
+ * SDE_SYS_CACHE_DISP_1: System cache for static display write path use case
+ * SDE_SYS_CACHE_DISP_WB: System cache for IWE use case
+ * SDE_SYS_CACHE_MAX:  Maximum number of system cache users
+ * SDE_SYS_CACHE_NONE: System cache not used
  */
 enum sde_sys_cache_type {
 	SDE_SYS_CACHE_DISP,
+	SDE_SYS_CACHE_DISP_1,
 	SDE_SYS_CACHE_DISP_WB,
 	SDE_SYS_CACHE_MAX,
 	SDE_SYS_CACHE_NONE = SDE_SYS_CACHE_MAX
@@ -710,7 +713,6 @@ enum {
  * @SDE_FEATURE_INLINE_SKIP_THRESHOLD      Skip inline rotation threshold
  * @SDE_FEATURE_DITHER_LUMA_MODE           Dither LUMA mode supported
  * @SDE_FEATURE_RC_LM_FLUSH_OVERRIDE       RC LM flush override supported
- * @SDE_FEATURE_SYSCACHE       System cache supported
  * @SDE_FEATURE_SUI_MISR       SecureUI MISR supported
  * @SDE_FEATURE_SUI_BLENDSTAGE SecureUI Blendstage supported
  * @SDE_FEATURE_SUI_NS_ALLOWED SecureUI allowed to access non-secure context banks
@@ -718,6 +720,7 @@ enum {
  * @SDE_FEATURE_UBWC_STATS     UBWC statistics supported
  * @SDE_FEATURE_VBIF_CLK_SPLIT VBIF clock split supported
  * @SDE_FEATURE_CTL_DONE       Support for CTL DONE irq
+ * @SDE_FEATURE_SYS_CACHE_NSE  Support for no-self-evict feature
  * @SDE_FEATURE_MAX:             MAX features value
  */
 enum sde_mdss_features {
@@ -750,7 +753,6 @@ enum sde_mdss_features {
 	SDE_FEATURE_INLINE_SKIP_THRESHOLD,
 	SDE_FEATURE_DITHER_LUMA_MODE,
 	SDE_FEATURE_RC_LM_FLUSH_OVERRIDE,
-	SDE_FEATURE_SYSCACHE,
 	SDE_FEATURE_SUI_MISR,
 	SDE_FEATURE_SUI_BLENDSTAGE,
 	SDE_FEATURE_SUI_NS_ALLOWED,
@@ -758,6 +760,7 @@ enum sde_mdss_features {
 	SDE_FEATURE_UBWC_STATS,
 	SDE_FEATURE_VBIF_CLK_SPLIT,
 	SDE_FEATURE_CTL_DONE,
+	SDE_FEATURE_SYS_CACHE_NSE,
 	SDE_FEATURE_MAX
 };
 
@@ -1639,13 +1642,11 @@ struct sde_perf_cdp_cfg {
 
 /**
  * struct sde_sc_cfg - define system cache configuration
- * @has_sys_cache: true if system cache is enabled
  * @llcc_uuid: llcc use case id for the system cache
  * @llcc_scid: scid for the system cache
  * @llcc_slice_size: slice size of the system cache
  */
 struct sde_sc_cfg {
-	bool has_sys_cache;
 	int llcc_uid;
 	int llcc_scid;
 	size_t llcc_slice_size;
@@ -1747,7 +1748,6 @@ struct sde_perf_cfg {
  * @smart_dma_rev       smartDMA block version
  * @ctl_rev             control path block version
  * @sid_rev             SID version
- * @has_precise_vsync_ts  indicates if HW has vsyc timestamp logging capability
  * @has_reduced_ob_max indicate if DSC size is limited to 10k
  * @ts_prefill_rev      prefill traffic shaper feature revision
  * @true_inline_rot_rev inline rotator feature revision
@@ -1853,7 +1853,6 @@ struct sde_mdss_cfg {
 	u32 smart_dma_rev;
 	u32 ctl_rev;
 	u32 sid_rev;
-	bool has_precise_vsync_ts;
 	bool has_reduced_ob_max;
 	u32 ts_prefill_rev;
 	u32 true_inline_rot_rev;
@@ -1943,6 +1942,7 @@ struct sde_mdss_cfg {
 	u32 allowed_dsc_reservation_switch;
 	enum autorefresh_disable_sequence autorefresh_disable_seq;
 	struct sde_sc_cfg sc_cfg[SDE_SYS_CACHE_MAX];
+	DECLARE_BITMAP(sde_sys_cache_type_map, SDE_SYS_CACHE_MAX);
 	struct sde_perf_cfg perf;
 	struct sde_uidle_cfg uidle_cfg;
 	struct list_head irq_offset_list;

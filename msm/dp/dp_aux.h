@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -43,7 +44,7 @@ struct dp_aux {
 	struct mutex *access_lock;
 
 	struct drm_dp_aux *drm_aux;
-	int (*drm_aux_register)(struct dp_aux *aux);
+	int (*drm_aux_register)(struct dp_aux *aux, struct drm_device *drm_dev);
 	void (*drm_aux_deregister)(struct dp_aux *aux);
 	void (*isr)(struct dp_aux *aux);
 	void (*init)(struct dp_aux *aux, struct dp_aux_cfg *aux_cfg);

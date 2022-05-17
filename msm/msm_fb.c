@@ -31,7 +31,8 @@ struct msm_framebuffer {
 	struct drm_framebuffer base;
 	const struct msm_format *format;
 	u32 cache_flags;
-	u32 cache_type;
+	u32 cache_rd_type;
+	u32 cache_wr_type;
 };
 #define to_msm_framebuffer(x) container_of(x, struct msm_framebuffer, base)
 
@@ -284,29 +285,34 @@ fail:
 	return ERR_PTR(ret);
 }
 
-void msm_framebuffer_set_cache_hint(struct drm_framebuffer *fb, u32 flags, u32 type)
+int msm_framebuffer_set_cache_hint(struct drm_framebuffer *fb,
+		u32 flags, u32 rd_type, u32 wr_type)
 {
 	struct msm_framebuffer *msm_fb;
 
 	if (!fb)
-		return;
+		return -EINVAL;
 
 	msm_fb = to_msm_framebuffer(fb);
 	msm_fb->cache_flags = flags;
-	msm_fb->cache_type = type;
+	msm_fb->cache_rd_type = rd_type;
+	msm_fb->cache_wr_type = wr_type;
+
+	return 0;
 }
 
-void msm_framebuffer_get_cache_hint(struct drm_framebuffer *fb, u32 *flags, u32 *type)
+int  msm_framebuffer_get_cache_hint(struct drm_framebuffer *fb,
+		u32 *flags, u32 *rd_type, u32 *wr_type)
 {
 	struct msm_framebuffer *msm_fb;
 
-	if (!fb) {
-		*flags = 0;
-		*type = 0;
-		return;
-	}
+	if (!fb)
+		return -EINVAL;
 
 	msm_fb = to_msm_framebuffer(fb);
 	*flags = msm_fb->cache_flags;
-	*type = msm_fb->cache_type;
+	*rd_type = msm_fb->cache_rd_type;
+	*wr_type = msm_fb->cache_wr_type;
+
+	return 0;
 }

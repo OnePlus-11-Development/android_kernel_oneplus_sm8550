@@ -144,6 +144,7 @@ struct sde_plane_state {
 	struct sde_hw_pipe_sc_cfg sc_cfg;
 	uint32_t rotation;
 	uint32_t static_cache_state;
+	uint32_t static_cache_type;
 
 	struct sde_hw_pipe_cdp_cfg cdp_cfg;
 
@@ -359,9 +360,10 @@ bool sde_plane_is_cache_required(struct drm_plane *plane,
  * sde_plane_static_img_control - Switch the static image state
  * @plane: Pointer to drm plane structure
  * @state: state to set
+ * @type: cache type to set
  */
 void sde_plane_static_img_control(struct drm_plane *plane,
-		enum sde_sys_cache_state state);
+		enum sde_sys_cache_state state, enum sde_sys_cache_type type);
 
 void sde_plane_add_data_to_minidump_va(struct drm_plane *plane);
 #endif /* _SDE_PLANE_H_ */

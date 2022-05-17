@@ -279,7 +279,7 @@ static int dp_ctrl_read_link_status(struct dp_ctrl_private *ctrl,
 			break;
 		}
 
-		if (link_status[offset] & DP_LINK_STATUS_UPDATED)
+		if (!(link_status[offset] & DP_LINK_STATUS_UPDATED))
 			break;
 	}
 

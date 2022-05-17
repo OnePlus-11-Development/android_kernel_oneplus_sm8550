@@ -1794,6 +1794,11 @@ static int sde_connector_atomic_set_property(struct drm_connector *connector,
 	case CONNECTOR_PROP_DYN_TRANSFER_TIME:
 		_sde_connector_set_prop_dyn_transfer_time(c_conn, val);
 		break;
+	case CONNECTOR_PROP_LP:
+		/* suspend case: clear stale MISR */
+		if (val == SDE_MODE_DPMS_OFF)
+			memset(&c_conn->previous_misr_sign, 0, sizeof(struct sde_misr_sign));
+		break;
 	default:
 		break;
 	}
@@ -1933,7 +1938,7 @@ static void sde_connector_update_colorspace(struct drm_connector *connector)
 }
 
 static int
-sde_connector_detect_ctx(struct drm_connector *connector, 
+sde_connector_detect_ctx(struct drm_connector *connector,
 		struct drm_modeset_acquire_ctx *ctx,
 		bool force)
 {
@@ -3136,7 +3141,8 @@ static int _sde_connector_install_properties(struct drm_device *dev,
 		msm_property_install_enum(&c_conn->property_info, "dsc_mode", 0,
 			0, e_dsc_mode, ARRAY_SIZE(e_dsc_mode), 0, CONNECTOR_PROP_DSC_MODE);
 
-		if (display_info->capabilities & MSM_DISPLAY_CAP_CMD_MODE &&
+		if (dsi_display && dsi_display->panel &&
+			display_info->capabilities & MSM_DISPLAY_CAP_CMD_MODE &&
 			display_info->capabilities & MSM_DISPLAY_CAP_VID_MODE)
 			msm_property_install_enum(&c_conn->property_info,
 			"panel_mode", 0, 0,
@@ -3414,11 +3420,21 @@ int sde_connector_register_custom_event(struct sde_kms *kms,
 		c_conn->dimming_bl_notify_enabled = val;
 		ret = 0;
 		break;
+	case DRM_EVENT_MISR_SIGN:
+		if (!conn_drm) {
+			SDE_ERROR("invalid connector\n");
+			return -EINVAL;
+		}
+		c_conn = to_sde_connector(conn_drm);
+		c_conn->misr_event_notify_enabled = val;
+		ret = sde_encoder_register_misr_event(c_conn->encoder, val);
+		break;
 	case DRM_EVENT_PANEL_DEAD:
 		ret = 0;
 		break;
 	case DRM_EVENT_SDE_HW_RECOVERY:
 		ret = _sde_conn_enable_hw_recovery(conn_drm);
+		sde_dbg_update_dump_mode(val);
 		break;
 	default:
 		break;
@@ -3442,6 +3458,7 @@ int sde_connector_event_notify(struct drm_connector *connector, uint32_t type,
 	case DRM_EVENT_DIMMING_BL:
 	case DRM_EVENT_PANEL_DEAD:
 	case DRM_EVENT_SDE_HW_RECOVERY:
+	case DRM_EVENT_MISR_SIGN:
 		ret = 0;
 		break;
 	default:

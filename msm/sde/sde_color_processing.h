@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -365,5 +366,12 @@ void sde_cp_disable_features(struct drm_crtc *crtc);
 
 void sde_cp_set_skip_blend_plane_info(struct drm_crtc *crtc,
 		struct sde_cp_crtc_skip_blend_plane *skip_blend);
+
+/**
+ * sde_dspp_spr_read_opr_value(): read opr value
+ * @hw_dspp: Pointer to DSPP hardware description.
+ * @opr_value: Pointer to opr value.
+ */
+int sde_dspp_spr_read_opr_value(struct sde_hw_dspp *hw_dspp, u32 *opr_value);
 
 #endif /*_SDE_COLOR_PROCESSING_H */

@@ -745,3 +745,17 @@ void sde_demura_pu_cfg(struct sde_hw_dspp *dspp, void *cfg)
 			((roi_list) ? roi_list->roi[0].y2 : -1),
 			((hw_cfg) ? hw_cfg->panel_height : -1));
 }
+
+int sde_spr_read_opr_value(struct sde_hw_dspp *ctx, uint32_t *opr_value)
+{
+	uint32_t reg_off;
+
+	if (!ctx || !opr_value)
+		return -EINVAL;
+
+	reg_off = ctx->cap->sblk->spr.base + 0x78;
+
+	*opr_value = SDE_REG_READ(&ctx->hw, reg_off);
+
+	return 0;
+}

@@ -22,7 +22,7 @@ ifeq ($(CONFIG_ARCH_PARROT), y)
 	LINUX_INC +=	-include $(DISPLAY_ROOT)/config/gki_parrotdispconf.h
 endif
 
-#ifeq ($(CONFIG_ARCH_KALAMA), y)
+ifeq ($(CONFIG_ARCH_KALAMA), y)
 ifeq ($(CONFIG_ARCH_QTI_VM), y)
         include $(DISPLAY_ROOT)/config/gki_kalamadisptui.conf
         LINUX_INC += -include $(DISPLAY_ROOT)/config/gki_kalamadisptuiconf.h
@@ -30,7 +30,12 @@ else
 	include $(DISPLAY_ROOT)/config/gki_kalamadisp.conf
 	LINUX_INC += -include $(DISPLAY_ROOT)/config/gki_kalamadispconf.h
 endif
-#endif
+endif
+
+ifeq (y, $(findstring y, $(CONFIG_ARCH_SA8155) $(CONFIG_ARCH_SA6155) $(CONFIG_ARCH_SA8195)))
+	include $(DISPLAY_ROOT)/config/augen3disp.conf
+	LINUX_INC += -include $(DISPLAY_ROOT)/config/augen3dispconf.h
+endif
 
 LINUX_INC +=	-Iinclude/linux \
 		-Iinclude/linux/drm
