@@ -79,6 +79,10 @@ u64 msm_vidc_calc_freq_iris3(struct msm_vidc_inst *inst, u32 data_size)
 		if (fps == 960)
 			vpp_cycles += div_u64(vpp_cycles * 5, 100);
 
+		/* increase vpp_cycles by 50% for preprocessing */
+		if (inst->capabilities->cap[REQUEST_PREPROCESS].value)
+			vpp_cycles = vpp_cycles + vpp_cycles / 2;
+
 		/* VSP */
 		/* bitrate is based on fps, scale it using operating rate */
 		operating_rate = inst->capabilities->cap[OPERATING_RATE].value >> 16;
@@ -115,7 +119,7 @@ u64 msm_vidc_calc_freq_iris3(struct msm_vidc_inst *inst, u32 data_size)
 			inst->capabilities->cap[PIPE].value;
 		/* 21 / 20 is minimum overhead factor */
 		vpp_cycles += max(vpp_cycles / 20, fw_vpp_cycles);
-		/* 1.059 is multi-pipe overhead 
+		/* 1.059 is multi-pipe overhead
 		 * 1.410 AV1 RECOMMENDED TILE 1080P_V2XH1, UHD_V2X2, 8KUHD_V8X2
 		 *       av1d_commer_tile_enable=0
 		 */
@@ -453,7 +457,8 @@ static u64 __calculate_encoder(struct vidc_bus_vote_data *d)
 		b_frames_enabled = false,
 		llc_ref_chroma_cache_enabled = false,
 		llc_top_line_buf_enabled = false,
-		llc_vpss_rot_line_buf_enabled = false;
+		llc_vpss_rot_line_buf_enabled = false,
+		vpss_preprocessing_enabled = false;
 
 	unsigned int bins_to_bit_factor;
 	fp_t dpb_compression_factor,
@@ -532,6 +537,7 @@ static u64 __calculate_encoder(struct vidc_bus_vote_data *d)
 	work_mode_1 = d->work_mode == MSM_VIDC_STAGE_1;
 	low_power = d->power_mode == VIDC_POWER_LOW;
 	bins_to_bit_factor = 4;
+	vpss_preprocessing_enabled = d->vpss_preprocessing_enabled;
 
 	if (d->use_sys_cache) {
 		llc_ref_chroma_cache_enabled = true;
@@ -605,6 +611,10 @@ static u64 __calculate_encoder(struct vidc_bus_vote_data *d)
 		ddr.ref_write = fp_mult(ddr.ref_write, recon_write_bw_factor);
 	}
 
+	/* double ref_write */
+	if (vpss_preprocessing_enabled)
+		ddr.ref_write = ddr.ref_write * 2;
+
 	ddr.orig_read = dpb_bpp == 8 ? y_bw_no_ubwc_8bpp :
 		(original_compression_enabled ? y_bw_no_ubwc_10bpp :
 		y_bw_10bpp_p010);
@@ -612,6 +622,10 @@ static u64 __calculate_encoder(struct vidc_bus_vote_data *d)
 		downscaling_ratio), original_compression_factor);
 	if (rotation == 90 || rotation == 270)
 		ddr.orig_read *= lcu_size == 32 ? (dpb_bpp == 8 ? 1 : 3) : 2;
+
+	/* double orig_read */
+	if (vpss_preprocessing_enabled)
+		ddr.orig_read = ddr.orig_read * 2;
 
 	ddr.line_buffer_read =
 		fp_div(FP_INT(tnbr_per_lcu * lcu_per_frame * fps),
@@ -648,6 +662,7 @@ static u64 __calculate_encoder(struct vidc_bus_vote_data *d)
 		{"work Mode", "%d", work_mode_1},
 		{"B frame enabled", "%d", b_frames_enabled},
 		{"original frame format", "%#x", original_color_format},
+		{"VPSS preprocessing", "%d", vpss_preprocessing_enabled},
 		{"original compression enabled", "%d",
 			original_compression_enabled},
 		{"dpb compression factor", DUMP_FP_FMT,

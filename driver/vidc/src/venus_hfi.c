@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  */
+/* Copyright (c) 2022. Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #include <linux/iommu.h>
 #include <linux/qcom_scm.h>
@@ -2252,6 +2253,8 @@ static int __interface_queues_init(struct msm_vidc_core *core)
 		d_vpr_e("%s: alloc failed\n", __func__);
 		goto fail_alloc_queue;
 	}
+	core->iface_q_table.align_virtual_addr = alloc.kvaddr;
+	core->iface_q_table.alloc = alloc;
 
 	memset(&map, 0, sizeof(map));
 	map.type         = alloc.type;
@@ -2262,12 +2265,10 @@ static int __interface_queues_init(struct msm_vidc_core *core)
 		d_vpr_e("%s: alloc failed\n", __func__);
 		goto fail_alloc_queue;
 	}
-
-	core->iface_q_table.align_virtual_addr = alloc.kvaddr;
 	core->iface_q_table.align_device_addr = map.device_addr;
-	core->iface_q_table.mem_size = VIDC_IFACEQ_TABLE_SIZE;
-	core->iface_q_table.alloc = alloc;
 	core->iface_q_table.map = map;
+
+	core->iface_q_table.mem_size = VIDC_IFACEQ_TABLE_SIZE;
 	offset += core->iface_q_table.mem_size;
 
 	for (i = 0; i < VIDC_IFACEQ_NUMQ; i++) {
@@ -2324,6 +2325,9 @@ static int __interface_queues_init(struct msm_vidc_core *core)
 		d_vpr_e("%s: sfr alloc failed\n", __func__);
 		goto fail_alloc_queue;
 	}
+	core->sfr.align_virtual_addr = alloc.kvaddr;
+	core->sfr.alloc = alloc;
+
 	memset(&map, 0, sizeof(map));
 	map.type         = alloc.type;
 	map.region       = alloc.region;
@@ -2334,12 +2338,11 @@ static int __interface_queues_init(struct msm_vidc_core *core)
 		goto fail_alloc_queue;
 	}
 	core->sfr.align_device_addr = map.device_addr;
-	core->sfr.align_virtual_addr = alloc.kvaddr;
-	core->sfr.mem_size = ALIGNED_SFR_SIZE;
-	core->sfr.alloc = alloc;
 	core->sfr.map = map;
+
+	core->sfr.mem_size = ALIGNED_SFR_SIZE;
 	/* write sfr buffer size in first word */
-	*((u32 *)core->sfr.align_virtual_addr) = ALIGNED_SFR_SIZE;
+	*((u32 *)core->sfr.align_virtual_addr) = core->sfr.mem_size;
 
 	rc = call_venus_op(core, setup_ucregion_memmap, core);
 	if (rc)
@@ -2919,6 +2922,53 @@ unlock:
 	return rc;
 }
 
+int venus_hfi_reserve_hardware(struct msm_vidc_inst *inst, u32 duration)
+{
+	struct msm_vidc_core *core;
+	enum hfi_reserve_type payload;
+	int rc = 0;
+
+	if (!inst || !inst->core || !inst->packet) {
+		d_vpr_e("%s: Invalid params\n", __func__);
+		return -EINVAL;
+	}
+	core = inst->core;
+	core_lock(core, __func__);
+
+	if (!__valdiate_session(core, inst, __func__)) {
+		rc = -EINVAL;
+		goto unlock;
+	}
+
+	if (duration)
+		payload = HFI_RESERVE_START;
+	else
+		payload = HFI_RESERVE_STOP;
+
+	rc = hfi_create_header(inst->packet, inst->packet_size,
+		inst->session_id, core->header_id++);
+	if (rc)
+		goto unlock;
+
+	rc = hfi_create_packet(inst->packet, inst->packet_size,
+		HFI_CMD_RESERVE,
+		HFI_HOST_FLAGS_NONE,
+		HFI_PAYLOAD_U32_ENUM,
+		HFI_PORT_NONE,
+		core->packet_id++,
+		&payload, sizeof(u32));
+	if (rc)
+		goto unlock;
+
+	rc = __iface_cmdq_write(core, inst->packet);
+	if (rc)
+		goto unlock;
+
+unlock:
+	core_unlock(core, __func__);
+	return rc;
+}
+
 int venus_hfi_session_open(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
@@ -3355,7 +3405,7 @@ int venus_hfi_queue_super_buffer(struct msm_vidc_inst *inst,
 	}
 
 	/* Sanitize super meta buffer */
-	if (metabuf && meta_size * batch_size != metabuf->buffer_size) {
+	if (metabuf && meta_size * batch_size > metabuf->buffer_size) {
 		i_vpr_e(inst, "%s: invalid super meta buffer. meta %u, batch %u, buffer size %u\n",
 			__func__, meta_size, batch_size, metabuf->buffer_size);
 		goto unlock;

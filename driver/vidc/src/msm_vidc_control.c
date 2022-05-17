@@ -150,6 +150,12 @@ static const char *const mpeg_video_vidc_ir_type[] = {
 	NULL,
 };
 
+static const char *const mpeg_vidc_delivery_modes[] = {
+	"Frame Based Delivery Mode",
+	"Slice Based Delivery Mode",
+	NULL,
+};
+
 u32 msm_vidc_get_port_info(struct msm_vidc_inst *inst,
 	enum msm_vidc_inst_capability_type cap_id)
 {
@@ -193,6 +199,10 @@ static const char * const * msm_vidc_get_qmenu_type(
 		return av1_tier;
 	case V4L2_CID_MPEG_VIDEO_VIDC_INTRA_REFRESH_TYPE:
 		return mpeg_video_vidc_ir_type;
+	case V4L2_CID_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE:
+		return mpeg_vidc_delivery_modes;
+	case V4L2_CID_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE:
+		return mpeg_vidc_delivery_modes;
 	default:
 		i_vpr_e(inst, "%s: No available qmenu for ctrl %#x\n",
 			__func__, control_id);
@@ -443,7 +453,6 @@ int msm_vidc_update_cap_value(struct msm_vidc_inst *inst, u32 cap_id,
 	s32 adjusted_val, const char *func)
 {
 	int prev_value = 0;
-	bool is_updated = false;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -464,19 +473,15 @@ int msm_vidc_update_cap_value(struct msm_vidc_inst *inst, u32 cap_id,
 			/* disable metadata */
 			inst->capabilities->cap[cap_id].value &= ~adjusted_val;
 		}
-		if (prev_value != (prev_value | adjusted_val))
-			is_updated = true;
 	} else {
 		inst->capabilities->cap[cap_id].value = adjusted_val;
-		if (prev_value != adjusted_val)
-			is_updated = true;
 	}
 
-	if (is_updated) {
+	if (prev_value != inst->capabilities->cap[cap_id].value) {
 		i_vpr_h(inst,
 			"%s: updated database: name: %s, value: %#x -> %#x\n",
 			func, cap_name(cap_id),
-			prev_value, adjusted_val);
+			prev_value, inst->capabilities->cap[cap_id].value);
 	}
 
 	return 0;
@@ -1079,28 +1084,35 @@ static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
 			return rc;
 	}
 
+	if (ctrl->id == V4L2_CID_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE ||
+		ctrl->id == V4L2_CID_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE) {
+		struct v4l2_format *output_fmt;
+
+		output_fmt = &inst->fmts[OUTPUT_PORT];
+		rc = msm_venc_s_fmt_output(inst, output_fmt);
+		if (rc)
+			return rc;
+	}
+
 	if (ctrl->id == V4L2_CID_MPEG_VIDC_MIN_BITSTREAM_SIZE_OVERWRITE) {
 		rc = msm_vidc_update_bitstream_buffer_size(inst);
 		if (rc)
 			return rc;
 	}
 
+	/* call this explicitly to adjust client priority */
 	if (ctrl->id == V4L2_CID_MPEG_VIDC_PRIORITY) {
 		rc = msm_vidc_adjust_session_priority(inst, ctrl);
 		if (rc)
 			return rc;
-
-		/**
-		 * This is the last static s_ctrl from client(commit point). So update
-		 * input & output counts to reflect final buffer counts based on dcvs
-		 * & decoder_batching enable/disable. So client is expected to query
-		 * for final counts after setting priority control.
-		 */
-		if (is_decode_session(inst))
-			inst->decode_batch.enable = msm_vidc_allow_decode_batch(inst);
-
-		msm_vidc_allow_dcvs(inst);
 	}
+
+	if (ctrl->id == V4L2_CID_MPEG_VIDC_CRITICAL_PRIORITY) {
+		inst->decode_batch.enable = msm_vidc_allow_decode_batch(inst);
+		msm_vidc_allow_dcvs(inst);
+		msm_vidc_update_cap_value(inst, PRIORITY, 0, __func__);
+	}
+
 	if (ctrl->id == V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER) {
 		u32 enable;
 
@@ -1615,7 +1627,8 @@ int msm_vidc_adjust_output_buf_host_max_count(void *instance, struct v4l2_ctrl *
 	adjusted_value = ctrl ? ctrl->val :
 		capability->cap[OUTPUT_BUF_HOST_MAX_COUNT].value;
 
-	if (msm_vidc_is_super_buffer(inst) || is_image_session(inst))
+	if (msm_vidc_is_super_buffer(inst) || is_image_session(inst) ||
+		is_enc_slice_delivery_mode(inst))
 		adjusted_value = DEFAULT_MAX_HOST_BURST_BUF_COUNT;
 
 	msm_vidc_update_cap_value(inst, OUTPUT_BUF_HOST_MAX_COUNT,
@@ -2365,7 +2378,7 @@ int msm_vidc_adjust_blur_type(void *instance, struct v4l2_ctrl *ctrl)
 	struct msm_vidc_inst_capability *capability;
 	s32 adjusted_value;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
-	s32 rc_type = -1;
+	s32 rc_type = -1, roi_enable = -1;
 	s32 pix_fmts = -1, min_quality = -1;
 
 	if (!inst || !inst->capabilities) {
@@ -2385,7 +2398,9 @@ int msm_vidc_adjust_blur_type(void *instance, struct v4l2_ctrl *ctrl)
 		msm_vidc_get_parent_value(inst, BLUR_TYPES, PIX_FMTS,
 		&pix_fmts, __func__) ||
 		msm_vidc_get_parent_value(inst, BLUR_TYPES, MIN_QUALITY,
-		&min_quality, __func__))
+		&min_quality, __func__) ||
+		msm_vidc_get_parent_value(inst, BLUR_TYPES, META_ROI_INFO,
+		&roi_enable, __func__))
 		return -EINVAL;
 
 	if (adjusted_value == VIDC_BLUR_EXTERNAL) {
@@ -2397,7 +2412,7 @@ int msm_vidc_adjust_blur_type(void *instance, struct v4l2_ctrl *ctrl)
 			(rc_type != HFI_RC_VBR_CFR &&
 			rc_type != HFI_RC_CBR_CFR &&
 			rc_type != HFI_RC_CBR_VFR) ||
-			is_10bit_colorformat(pix_fmts)) {
+			is_10bit_colorformat(pix_fmts) || roi_enable) {
 			adjusted_value = VIDC_BLUR_NONE;
 		}
 	}
@@ -2751,7 +2766,7 @@ int msm_vidc_adjust_preprocess(void *instance, struct v4l2_ctrl *ctrl)
 	return 0;
 }
 
-int msm_vidc_adjust_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl)
+int msm_vidc_adjust_enc_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl)
 {
 	struct msm_vidc_inst_capability *capability;
 	s32 adjusted_value;
@@ -2772,7 +2787,39 @@ int msm_vidc_adjust_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl)
 		return -EINVAL;
 
 	if (rc_type == HFI_RC_CBR_CFR ||
-		rc_type == HFI_RC_CBR_VFR)
+		rc_type == HFI_RC_CBR_VFR ||
+		is_enc_slice_delivery_mode(inst))
+		adjusted_value = 1;
+
+	msm_vidc_update_cap_value(inst, LOWLATENCY_MODE,
+		adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_dec_lowlatency_mode(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst_capability *capability;
+	s32 adjusted_value;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	s32 outbuf_fence = V4L2_MPEG_VIDC_META_DISABLE;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val :
+		capability->cap[LOWLATENCY_MODE].value;
+
+	if (msm_vidc_get_parent_value(inst, LOWLATENCY_MODE, META_OUTBUF_FENCE,
+		&outbuf_fence, __func__))
+		return -EINVAL;
+
+	/* enable lowlatency if outbuf fence is enabled */
+	if (outbuf_fence & V4L2_MPEG_VIDC_META_ENABLE &&
+		outbuf_fence & V4L2_MPEG_VIDC_META_RX_INPUT)
 		adjusted_value = 1;
 
 	msm_vidc_update_cap_value(inst, LOWLATENCY_MODE,
@@ -2792,8 +2839,29 @@ int msm_vidc_adjust_session_priority(void *instance, struct v4l2_ctrl *ctrl)
 		return -EINVAL;
 	}
 	capability = inst->capabilities;
-	adjusted_value = ctrl ? ctrl->val :
-		capability->cap[PRIORITY].value;
+	/*
+	 * Priority handling
+	 * Client will set 0 (realtime), 1+ (non-realtime)
+	 * Driver adds NRT_PRIORITY_OFFSET (2) to clients non-realtime priority
+	 * and hence PRIORITY values in the driver become 0, 3+.
+	 * Driver may move decode realtime sessions to non-realtime by
+	 * increasing priority by 1 to RT sessions in HW overloaded cases.
+	 * So driver PRIORITY values can be 0, 1, 3+.
+	 * When driver setting priority to firmware, driver adds
+	 * FIRMWARE_PRIORITY_OFFSET (1) for all sessions except
+	 * non-critical sessions. So finally firmware priority values ranges
+	 * from 0 (Critical session), 1 (realtime session),
+	 * 2+ (non-realtime session)
+	 */
+	if (ctrl) {
+		/* add offset when client sets non-realtime */
+		if (ctrl->val)
+			adjusted_value = ctrl->val + NRT_PRIORITY_OFFSET;
+		else
+			adjusted_value = ctrl->val;
+	} else {
+		adjusted_value = capability->cap[PRIORITY].value;
+	}
 
 	msm_vidc_update_cap_value(inst, PRIORITY, adjusted_value, __func__);
 
@@ -2823,7 +2891,9 @@ int msm_vidc_adjust_roi_info(void *instance, struct v4l2_ctrl *ctrl)
 		&pix_fmt, __func__))
 		return -EINVAL;
 
-	if (rc_type != HFI_RC_VBR_CFR || !is_8bit_colorformat(pix_fmt))
+	if ((rc_type != HFI_RC_VBR_CFR && rc_type != HFI_RC_CBR_CFR
+		&& rc_type != HFI_RC_CBR_VFR) || !is_8bit_colorformat(pix_fmt)
+		|| is_scaling_enabled(inst) || is_rotation_90_or_270(inst))
 		adjusted_value = 0;
 
 	msm_vidc_update_cap_value(inst, META_ROI_INFO,
@@ -2874,6 +2944,74 @@ int msm_vidc_adjust_dec_operating_rate(void *instance, struct v4l2_ctrl *ctrl)
 	capability = inst->capabilities;
 	adjusted_value = ctrl ? ctrl->val : capability->cap[OPERATING_RATE].value;
 	msm_vidc_update_cap_value(inst, OPERATING_RATE, adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_dec_outbuf_fence(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst_capability *capability;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	u32 adjusted_value = 0;
+	s32 picture_order = -1;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val : capability->cap[META_OUTBUF_FENCE].value;
+
+	if (msm_vidc_get_parent_value(inst, META_OUTBUF_FENCE, OUTPUT_ORDER,
+		&picture_order, __func__))
+		return -EINVAL;
+
+	if (picture_order == V4L2_MPEG_MSM_VIDC_DISABLE) {
+		/* disable outbuf fence */
+		adjusted_value = V4L2_MPEG_VIDC_META_DISABLE |
+			V4L2_MPEG_VIDC_META_RX_INPUT;
+	}
+
+	msm_vidc_update_cap_value(inst, META_OUTBUF_FENCE,
+		adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_delivery_mode(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst_capability *capability;
+	s32 adjusted_value;
+	s32 slice_mode = -1;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	if (is_decode_session(inst))
+		return 0;
+
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val : capability->cap[DELIVERY_MODE].value;
+
+	if (msm_vidc_get_parent_value(inst, DELIVERY_MODE, SLICE_MODE,
+		&slice_mode, __func__))
+		return -EINVAL;
+
+	/* Slice encode delivery mode is only supported for Max MB slice mode */
+	if (slice_mode != V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_MAX_MB) {
+		if (inst->codec == MSM_VIDC_HEVC)
+			adjusted_value = V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_FRAME_BASED;
+		else if (inst->codec == MSM_VIDC_H264)
+			adjusted_value = V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_FRAME_BASED;
+	}
+
+	msm_vidc_update_cap_value(inst, DELIVERY_MODE,
+		adjusted_value, __func__);
 
 	return 0;
 }
@@ -3809,6 +3947,9 @@ int msm_vidc_set_session_priority(void *instance,
 	}
 
 	hfi_value = inst->capabilities->cap[cap_id].value;
+	if (!is_critical_priority_session(inst))
+		hfi_value = inst->capabilities->cap[cap_id].value +
+			inst->capabilities->cap[FIRMWARE_PRIORITY_OFFSET].value;
 
 	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_U32,
 		&hfi_value, sizeof(u32), __func__);
@@ -4071,6 +4212,41 @@ int msm_vidc_set_csc_custom_matrix(void *instance,
 	return rc;
 }
 
+int msm_vidc_set_reserve_duration(void *instance,
+	enum msm_vidc_inst_capability_type cap_id)
+{
+	int rc = 0;
+	u32 hfi_value = 0;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	/* reserve hardware only when input port is streaming*/
+	if (!inst->bufq[INPUT_PORT].vb2q->streaming)
+		return 0;
+
+	if (!(inst->capabilities->cap[cap_id].flags & CAP_FLAG_CLIENT_SET))
+		return 0;
+
+	inst->capabilities->cap[cap_id].flags &= (~CAP_FLAG_CLIENT_SET);
+
+	if (!is_critical_priority_session(inst)) {
+		i_vpr_h(inst, "%s: reserve duration allowed only for critical session\n", __func__);
+		return 0;
+	}
+
+	hfi_value = inst->capabilities->cap[cap_id].value;
+
+	rc = venus_hfi_reserve_hardware(inst, hfi_value);
+	if (rc)
+		return rc;
+
+	return rc;
+}
+
 int msm_vidc_set_level(void *instance,
 	enum msm_vidc_inst_capability_type cap_id)
 {
@@ -4276,6 +4452,32 @@ int msm_vidc_v4l2_menu_to_hfi(struct msm_vidc_inst *inst,
 			break;
 		default:
 			*value = 1;
+			goto set_default;
+		}
+		return 0;
+	case V4L2_CID_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE:
+		switch (capability->cap[cap_id].value) {
+		case V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_FRAME_BASED:
+			*value = 0;
+			break;
+		case V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_SLICE_BASED:
+			*value = 1;
+			break;
+		default:
+			*value = 0;
+			goto set_default;
+		}
+		return 0;
+	case V4L2_CID_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE:
+		switch (capability->cap[cap_id].value) {
+		case V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_FRAME_BASED:
+			*value = 0;
+			break;
+		case V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_SLICE_BASED:
+			*value = 1;
+			break;
+		default:
+			*value = 0;
 			goto set_default;
 		}
 		return 0;

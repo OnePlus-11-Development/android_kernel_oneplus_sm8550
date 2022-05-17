@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "msm_vidc_iris3.h"
@@ -1190,7 +1190,7 @@ int msm_vidc_adjust_bitrate_boost_iris3(void* instance, struct v4l2_ctrl *ctrl)
 	if (capability->cap[BITRATE_BOOST].flags & CAP_FLAG_CLIENT_SET) {
 		/* accept client set bitrate boost value as is */
 	} else {
-		if (res_is_less_than_or_equal_to(width, height, 3840, 2160) &&
+		if (res_is_less_than_or_equal_to(width, height, 4096, 2176) &&
 			frame_rate <= 60)
 			adjusted_value = MAX_BITRATE_BOOST;
 		else

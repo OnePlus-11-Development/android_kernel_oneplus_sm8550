@@ -237,6 +237,29 @@ enum v4l2_mpeg_video_av1_tier {
 #define V4L2_CID_MPEG_VIDC_METADATA_PICTURE_TYPE                             \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x3B)
 
+/* Encoder Slice Delivery Mode
+ * set format has a dependency on this control
+ * and gets invoked when this control is updated.
+ */
+#define V4L2_CID_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE                          \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x3C)
+enum v4l2_hevc_encode_delivery_mode {
+	V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_FRAME_BASED = 0,
+	V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_SLICE_BASED = 1,
+};
+
+#define V4L2_CID_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE                          \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x3D)
+enum v4l2_h264_encode_delivery_mode {
+	V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_FRAME_BASED = 0,
+	V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_SLICE_BASED = 1,
+};
+
+#define V4L2_CID_MPEG_VIDC_CRITICAL_PRIORITY                                 \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x3E)
+#define V4L2_CID_MPEG_VIDC_RESERVE_DURATION                                  \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x3F)
+
 /* add new controls above this line */
 /* Deprecate below controls once availble in gki and gsi bionic header */
 #ifndef V4L2_CID_MPEG_VIDEO_BASELAYER_PRIORITY_ID
@@ -389,6 +412,16 @@ enum meta_interlace_info {
 	META_INTERLACE_FRAME_INTERLACE_BOTTOMFIELD_FIRST    = 0x00000020,
 };
 
+enum meta_picture_type {
+	META_PICTURE_TYPE_IDR                            = 0x00000001,
+	META_PICTURE_TYPE_P                              = 0x00000002,
+	META_PICTURE_TYPE_B                              = 0x00000004,
+	META_PICTURE_TYPE_I                              = 0x00000008,
+	META_PICTURE_TYPE_CRA                            = 0x00000010,
+	META_PICTURE_TYPE_BLA                            = 0x00000020,
+	META_PICTURE_TYPE_NOSHOW                         = 0x00000040,
+};
+
 /* vendor controls end */
 
 /* vendor events start */
@@ -419,5 +452,10 @@ struct v4l2_event_vidc_metadata {
 	__u8                                 reserved[44];
 };
 /* vendor events end */
+
+/* Default metadata size (align to 4KB) */
+#define MSM_VIDC_METADATA_SIZE           (4 * 4096) /* 16 KB */
+#define ENCODE_INPUT_METADATA_SIZE       (512 * 4096) /* 2 MB */
+#define DECODE_INPUT_METADATA_SIZE       MSM_VIDC_METADATA_SIZE
 
 #endif

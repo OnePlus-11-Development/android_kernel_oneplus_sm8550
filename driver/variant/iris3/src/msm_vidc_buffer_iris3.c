@@ -670,6 +670,48 @@ static int msm_buffer_dpb_count(struct msm_vidc_inst *inst)
 	return msm_vidc_get_recon_buf_count(inst);
 }
 
+static int msm_buffer_delivery_mode_based_min_count_iris3(struct msm_vidc_inst *inst,
+	uint32_t count)
+{
+	struct v4l2_format *f;
+	u32 width, height, total_num_slices = 1;
+	u32 hfi_codec = 0;
+	u32 max_mbs_per_slice = 0;
+	u32 slice_mode = 0;
+	u32 delivery_mode = 0;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return count;
+	}
+
+	slice_mode = inst->capabilities->cap[SLICE_MODE].value;
+	delivery_mode = inst->capabilities->cap[DELIVERY_MODE].value;
+
+	if (slice_mode != V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_MAX_MB ||
+		(inst->codec == MSM_VIDC_H264 &&
+		delivery_mode != V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_SLICE_BASED) ||
+		(inst->codec == MSM_VIDC_HEVC &&
+		delivery_mode != V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_SLICE_BASED))
+		return count;
+
+	f = &inst->fmts[OUTPUT_PORT];
+	width = f->fmt.pix_mp.width;
+	height = f->fmt.pix_mp.height;
+
+	max_mbs_per_slice = inst->capabilities->cap[SLICE_MAX_MB].value;
+
+	if (inst->codec == MSM_VIDC_H264)
+		hfi_codec = HFI_CODEC_ENCODE_AVC;
+	else if (inst->codec == MSM_VIDC_HEVC)
+		hfi_codec = HFI_CODEC_ENCODE_HEVC;
+
+	HFI_IRIS3_ENC_MB_BASED_MULTI_SLICE_COUNT(total_num_slices, width, height,
+			hfi_codec, max_mbs_per_slice);
+
+	return (total_num_slices * count);
+}
+
 int msm_buffer_min_count_iris3(struct msm_vidc_inst *inst,
 		enum msm_vidc_buffer_type buffer_type)
 {
@@ -688,6 +730,7 @@ int msm_buffer_min_count_iris3(struct msm_vidc_inst *inst,
 	case MSM_VIDC_BUF_OUTPUT:
 	case MSM_VIDC_BUF_OUTPUT_META:
 		count = msm_vidc_output_min_count(inst);
+		count = msm_buffer_delivery_mode_based_min_count_iris3(inst, count);
 		break;
 	case MSM_VIDC_BUF_BIN:
 	case MSM_VIDC_BUF_COMV:

@@ -153,6 +153,36 @@ static inline bool is_meta_tx_out_enabled(struct msm_vidc_inst *inst, u32 cap)
 	return enabled;
 }
 
+static inline bool is_any_meta_tx_out_enabled(struct msm_vidc_inst *inst)
+{
+	bool enabled = false;
+	u32 i;
+
+	for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+		if (is_meta_tx_out_enabled(inst, i)) {
+			enabled = true;
+			break;
+		}
+	}
+
+	return enabled;
+}
+
+static inline bool is_any_meta_tx_inp_enabled(struct msm_vidc_inst *inst)
+{
+	bool enabled = false;
+	u32 i;
+
+	for (i = INST_CAP_NONE + 1; i < META_CAP_MAX; i++) {
+		if (is_meta_tx_inp_enabled(inst, i)) {
+			enabled = true;
+			break;
+		}
+	}
+
+	return enabled;
+}
+
 static inline bool is_input_meta_enabled(struct msm_vidc_inst *inst)
 {
 	bool enabled = false;
@@ -195,6 +225,11 @@ static inline bool is_meta_enabled(struct msm_vidc_inst *inst, unsigned int type
 		enabled = is_output_meta_enabled(inst);
 
 	return enabled;
+}
+
+static inline bool is_outbuf_fence_enabled(struct msm_vidc_inst *inst)
+{
+	return is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE);
 }
 
 static inline bool is_linear_yuv_colorformat(enum msm_vidc_colorformat_type colorformat)
@@ -258,6 +293,11 @@ static inline bool is_realtime_session(struct msm_vidc_inst *inst)
 	return inst->capabilities->cap[PRIORITY].value == 0 ? true : false;
 }
 
+static inline bool is_critical_priority_session(struct msm_vidc_inst *inst)
+{
+	return !!(inst->capabilities->cap[CRITICAL_PRIORITY].value);
+}
+
 static inline bool is_lowlatency_session(struct msm_vidc_inst *inst)
 {
 	return !!(inst->capabilities->cap[LOWLATENCY_MODE].value);
@@ -295,6 +335,21 @@ static inline bool is_secure_region(enum msm_vidc_buffer_region region)
 {
 	return !(region == MSM_VIDC_NON_SECURE ||
 			region == MSM_VIDC_NON_SECURE_PIXEL);
+}
+
+static inline bool is_enc_slice_delivery_mode(struct msm_vidc_inst *inst)
+{
+	if (is_decode_session(inst))
+		return false;
+
+	return (inst->capabilities->cap[SLICE_MODE].value ==
+			V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_MAX_MB &&
+			((inst->codec == MSM_VIDC_H264 &&
+			inst->capabilities->cap[DELIVERY_MODE].value ==
+			V4L2_MPEG_VIDC_H264_ENCODE_DELIVERY_MODE_SLICE_BASED) ||
+			(inst->codec == MSM_VIDC_HEVC &&
+			inst->capabilities->cap[DELIVERY_MODE].value ==
+			V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_SLICE_BASED)));
 }
 
 const char *cap_name(enum msm_vidc_inst_capability_type cap_id);
@@ -477,6 +532,7 @@ int msm_vidc_update_debug_str(struct msm_vidc_inst *inst);
 void msm_vidc_allow_dcvs(struct msm_vidc_inst *inst);
 bool msm_vidc_allow_decode_batch(struct msm_vidc_inst *inst);
 int msm_vidc_check_session_supported(struct msm_vidc_inst *inst);
+bool msm_vidc_ignore_session_load(struct msm_vidc_inst *inst);
 int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst);
 int msm_vidc_check_core_mbpf(struct msm_vidc_inst *inst);
 int msm_vidc_check_scaling_supported(struct msm_vidc_inst *inst);

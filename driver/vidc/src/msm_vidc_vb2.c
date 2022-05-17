@@ -450,12 +450,24 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 		goto unlock;
 	}
 
-	/* Expecting non-zero filledlen on INPUT port */
-	if (vb2->type == INPUT_MPLANE && !vb2->planes[0].bytesused) {
-		i_vpr_e(inst,
-			"%s: zero bytesused input buffer not supported\n", __func__);
-		rc = -EINVAL;
-		goto unlock;
+	if (!vb2->planes[0].bytesused) {
+		if (vb2->type == INPUT_MPLANE) {
+			/* Expecting non-zero filledlen on INPUT port */
+			i_vpr_e(inst,
+				"%s: zero bytesused input buffer not supported\n", __func__);
+			rc = -EINVAL;
+			goto unlock;
+		}
+		if ((vb2->type == OUTPUT_META_PLANE && is_any_meta_tx_out_enabled(inst)) ||
+			(vb2->type == INPUT_META_PLANE && is_any_meta_tx_inp_enabled(inst))) {
+			/*
+			 * vb2 is not allowing client to pass data in output meta plane.
+			 * adjust the bytesused as client will send buffer tag metadata
+			 * in output meta plane if DPB_TAG_LIST, or OUTBUF_FENCE metadata
+			 * is enabled.
+			 */
+			vb2->planes[0].bytesused = vb2->planes[0].length;
+		}
 	}
 
 	if (is_encode_session(inst) && vb2->type == INPUT_MPLANE) {

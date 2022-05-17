@@ -249,6 +249,8 @@ int msm_vidc_scale_buses(struct msm_vidc_inst *inst)
 		vote_data->num_formats = 1;
 		vote_data->color_formats[0] = v4l2_colorformat_to_driver(
 			inst->fmts[INPUT_PORT].fmt.pix_mp.pixelformat, __func__);
+		vote_data->vpss_preprocessing_enabled =
+			inst->capabilities->cap[REQUEST_PREPROCESS].value;
 	} else if (inst->domain == MSM_VIDC_DECODER) {
 		u32 color_format;
 
@@ -482,7 +484,8 @@ int msm_vidc_scale_power(struct msm_vidc_inst *inst, bool scale_buses)
 	struct msm_vidc_buffer *vbuf;
 	u32 data_size = 0;
 	u32 fps;
-	u32 frame_rate, operating_rate, timestamp_rate, input_rate;
+	u32 frame_rate, operating_rate;
+	u32 timestamp_rate = 0, input_rate = 0;
 
 	if (!inst || !inst->core) {
 		d_vpr_e("%s: invalid params %pK\n", __func__, inst);

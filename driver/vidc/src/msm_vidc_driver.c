@@ -55,6 +55,7 @@ struct msm_vidc_cap_name {
 	char *name;
 };
 
+/* do not modify the cap names as it is used in test scripts */
 static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{INST_CAP_NONE,                  "INST_CAP_NONE"              },
 	{META_SEQ_HDR_NAL,               "META_SEQ_HDR_NAL"           },
@@ -176,6 +177,9 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{SEQ_CHANGE_AT_SYNC_FRAME,       "SEQ_CHANGE_AT_SYNC_FRAME"   },
 	{QUALITY_MODE,                   "QUALITY_MODE"               },
 	{PRIORITY,                       "PRIORITY"                   },
+	{FIRMWARE_PRIORITY_OFFSET,       "FIRMWARE_PRIORITY_OFFSET"   },
+	{CRITICAL_PRIORITY,              "CRITICAL_PRIORITY"          },
+	{RESERVE_DURATION,               "RESERVE_DURATION"           },
 	{DPB_LIST,                       "DPB_LIST"                   },
 	{FILM_GRAIN,                     "FILM_GRAIN"                 },
 	{SUPER_BLOCK,                    "SUPER_BLOCK"                },
@@ -215,6 +219,7 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{OUTPUT_ORDER,                   "OUTPUT_ORDER"               },
 	{INPUT_BUF_HOST_MAX_COUNT,       "INPUT_BUF_HOST_MAX_COUNT"   },
 	{OUTPUT_BUF_HOST_MAX_COUNT,      "OUTPUT_BUF_HOST_MAX_COUNT"  },
+	{DELIVERY_MODE,                  "DELIVERY_MODE"              },
 	{INST_CAP_MAX,                   "INST_CAP_MAX"               },
 };
 
@@ -307,6 +312,7 @@ struct msm_vidc_inst_state_name {
 	char *name;
 };
 
+/* do not modify the state names as it is used in test scripts */
 static const struct msm_vidc_inst_state_name inst_state_name_arr[] = {
 	{MSM_VIDC_OPEN,                  "OPEN"                       },
 	{MSM_VIDC_START_INPUT,           "START_INPUT"                },
@@ -1373,6 +1379,7 @@ bool msm_vidc_allow_s_ctrl(struct msm_vidc_inst *inst, u32 id)
 			case V4L2_CID_MPEG_VIDC_PRIORITY:
 			case V4L2_CID_MPEG_VIDC_INPUT_METADATA_FD:
 			case V4L2_CID_MPEG_VIDC_INTRA_REFRESH_PERIOD:
+			case V4L2_CID_MPEG_VIDC_RESERVE_DURATION:
 				allow = true;
 				break;
 			default:
@@ -2561,7 +2568,7 @@ int msm_vidc_flush_ts(struct msm_vidc_inst *inst)
 
 int msm_vidc_update_timestamp_rate(struct msm_vidc_inst *inst, u64 timestamp)
 {
-	struct msm_vidc_timestamp *ts, *prev;
+	struct msm_vidc_timestamp *ts, *prev = NULL;
 	int rc = 0;
 	u32 window_size = 0;
 	u32 timestamp_rate = 0;
@@ -2730,10 +2737,10 @@ int msm_vidc_get_delayed_unmap(struct msm_vidc_inst *inst, struct msm_vidc_map *
 		return -EINVAL;
 	}
 
-	map->skip_delayed_unmap = 1;
 	rc = msm_vidc_memory_map(inst->core, map);
 	if (rc)
 		return rc;
+	map->skip_delayed_unmap = 1;
 
 	return 0;
 }
@@ -2757,12 +2764,6 @@ int msm_vidc_put_delayed_unmap(struct msm_vidc_inst *inst, struct msm_vidc_map *
 	rc = msm_vidc_memory_unmap(inst->core, map);
 	if (rc)
 		i_vpr_e(inst, "%s: unmap failed\n", __func__);
-
-	if (!map->refcount) {
-		msm_vidc_memory_put_dmabuf(inst, map->dmabuf);
-		list_del(&map->list);
-		msm_memory_pool_free(inst, map);
-	}
 
 	return rc;
 }
@@ -2870,29 +2871,37 @@ int msm_vidc_map_driver_buf(struct msm_vidc_inst *inst,
 			return -ENOMEM;
 		}
 		INIT_LIST_HEAD(&map->list);
+		list_add_tail(&map->list, &mappings->list);
 		map->type = buf->type;
 		map->dmabuf = msm_vidc_memory_get_dmabuf(inst, buf->fd);
-		if (!map->dmabuf)
-			return -EINVAL;
+		if (!map->dmabuf) {
+			rc = -EINVAL;
+			goto error;
+		}
 		map->region = msm_vidc_get_buffer_region(inst, buf->type, __func__);
 		/* delayed unmap feature needed for decoder output buffers */
 		if (is_decode_session(inst) && is_output_buffer(buf->type)) {
 			rc = msm_vidc_get_delayed_unmap(inst, map);
-			if (rc) {
-				msm_vidc_memory_put_dmabuf(inst, map->dmabuf);
-				msm_memory_pool_free(inst, map);
-				return rc;
-			}
+			if (rc)
+				goto error;
 		}
-		list_add_tail(&map->list, &mappings->list);
 	}
 	rc = msm_vidc_memory_map(inst->core, map);
 	if (rc)
-		return rc;
+		goto error;
 
 	buf->device_addr = map->device_addr;
 
 	return 0;
+error:
+	if (!found) {
+		if (is_decode_session(inst) && is_output_buffer(buf->type))
+			msm_vidc_put_delayed_unmap(inst, map);
+		msm_vidc_memory_put_dmabuf(inst, map->dmabuf);
+		list_del_init(&map->list);
+		msm_memory_pool_free(inst, map);
+	}
+	return rc;
 }
 
 int msm_vidc_put_driver_buf(struct msm_vidc_inst *inst,
@@ -3080,6 +3089,12 @@ void msm_vidc_allow_dcvs(struct msm_vidc_inst *inst)
 	allow = is_realtime_session(inst);
 	if (!allow) {
 		i_vpr_h(inst, "%s: non-realtime session\n", __func__);
+		goto exit;
+	}
+
+	allow = !is_critical_priority_session(inst);
+	if (!allow) {
+		i_vpr_h(inst, "%s: critical priority session\n", __func__);
 		goto exit;
 	}
 
@@ -3479,7 +3494,7 @@ exit:
 	if (rc) {
 		i_vpr_e(inst, "%s: qbuf failed\n", __func__);
 		if (fence)
-			msm_vidc_fence_destroy(inst, fence);
+			msm_vidc_fence_destroy(inst, (u32)fence->dma_fence.seqno);
 	}
 	return rc;
 }
@@ -5565,9 +5580,8 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 	}
 
 	list_for_each_entry_safe(fence, dummy_fence, &inst->fence_list, list) {
-		i_vpr_e(inst, "%s: destroying fence id: %llu\n",
-			__func__, fence->dma_fence.seqno);
-		msm_vidc_fence_destroy(inst, fence);
+		i_vpr_e(inst, "%s: destroying fence %s\n", __func__, fence->name);
+		msm_vidc_fence_destroy(inst, (u32)fence->dma_fence.seqno);
 	}
 
 	/* destroy buffers from pool */
@@ -5921,12 +5935,26 @@ static int msm_vidc_print_insts_info(struct msm_vidc_core *core)
 	return 0;
 }
 
+bool msm_vidc_ignore_session_load(struct msm_vidc_inst *inst) {
+
+	if (!inst) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	if (!is_realtime_session(inst) || is_thumbnail_session(inst) ||
+			is_image_session(inst))
+		return true;
+
+	return false;
+}
+
 int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst)
 {
-	u32 mbps = 0;
+	u32 mbps = 0, total_mbps = 0, enc_mbps = 0;
+	u32 critical_mbps = 0;
 	struct msm_vidc_core *core;
 	struct msm_vidc_inst *instance;
-	int rc = 0;
 
 	if (!inst || !inst->core || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -5934,9 +5962,26 @@ int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst)
 	}
 	core = inst->core;
 
-	if (!inst->capabilities->cap[CHECK_MBPS].value) {
-		i_vpr_h(inst, "%s: skip mbps check\n", __func__);
+	/* skip mbps check for non-realtime, thumnail, image sessions */
+	if (msm_vidc_ignore_session_load(inst)) {
+		i_vpr_h(inst,
+			"%s: skip mbps check due to NRT %d, TH %d, IMG %d\n", __func__,
+			!is_realtime_session(inst), is_thumbnail_session(inst),
+			is_image_session(inst));
 		return 0;
+	}
+
+	core_lock(core, __func__);
+	list_for_each_entry(instance, &core->instances, list) {
+		if (is_critical_priority_session(instance))
+			critical_mbps += msm_vidc_get_inst_load(instance);
+	}
+	core_unlock(core, __func__);
+
+	if (critical_mbps > core->capabilities[MAX_MBPS].value) {
+		i_vpr_e(inst, "%s: Hardware overloaded with critical sessions. needed %u, max %u",
+			__func__, critical_mbps, core->capabilities[MAX_MBPS].value);
+		return -ENOMEM;
 	}
 
 	core_lock(core, __func__);
@@ -5946,24 +5991,49 @@ int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst)
 			continue;
 
 		/* ignore thumbnail, image, and non realtime sessions */
-		if (is_thumbnail_session(instance) ||
-			is_image_session(instance) ||
-			!is_realtime_session(instance))
+		if (msm_vidc_ignore_session_load(inst))
 			continue;
 
-		mbps += msm_vidc_get_inst_load(instance);
+		mbps = msm_vidc_get_inst_load(instance);
+		total_mbps += mbps;
+		if (is_encode_session(instance))
+			enc_mbps += mbps;
 	}
 	core_unlock(core, __func__);
 
-	if (mbps > core->capabilities[MAX_MBPS].value) {
-		rc = -ENOMEM;
-		i_vpr_e(inst, "%s: Hardware overloaded. needed %u, max %u", __func__,
-			mbps, core->capabilities[MAX_MBPS].value);
-		return rc;
-	} else {
-		i_vpr_h(inst, "%s: HW load needed %u is within max %u", __func__,
-			mbps, core->capabilities[MAX_MBPS].value);
+	if (is_encode_session(inst)) {
+		/* reject encoder if all encoders mbps is greater than MAX_MBPS */
+		if (enc_mbps > core->capabilities[MAX_MBPS].value) {
+			i_vpr_e(inst, "%s: Hardware overloaded. needed %u, max %u", __func__,
+				mbps, core->capabilities[MAX_MBPS].value);
+			return -ENOMEM;
+		}
+		/*
+		 * if total_mbps is greater than max_mbps then reduce all decoders
+		 * priority by 1 to allow this encoder
+		 */
+		if (total_mbps > core->capabilities[MAX_MBPS].value) {
+			core_lock(core, __func__);
+			list_for_each_entry(instance, &core->instances, list) {
+				/* reduce realtime decode sessions priority */
+				if (is_decode_session(inst) && is_realtime_session(inst)) {
+					instance->adjust_priority = RT_DEC_DOWN_PRORITY_OFFSET;
+					i_vpr_h(inst, "%s: pending adjust priority by %d\n",
+						__func__, inst->adjust_priority);
+				}
+			}
+			core_unlock(core, __func__);
+		}
+	} else if (is_decode_session(inst)){
+		if (total_mbps > core->capabilities[MAX_MBPS].value) {
+			inst->adjust_priority = RT_DEC_DOWN_PRORITY_OFFSET;
+			i_vpr_h(inst, "%s: pending adjust priority by %d\n",
+				__func__, inst->adjust_priority);
+		}
 	}
+
+	i_vpr_h(inst, "%s: HW load needed %u is within max %u", __func__,
+			total_mbps, core->capabilities[MAX_MBPS].value);
 
 	return 0;
 }
@@ -5971,6 +6041,7 @@ int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst)
 int msm_vidc_check_core_mbpf(struct msm_vidc_inst *inst)
 {
 	u32 video_mbpf = 0, image_mbpf = 0, video_rt_mbpf = 0;
+	u32 critical_mbpf = 0;
 	struct msm_vidc_core *core;
 	struct msm_vidc_inst *instance;
 
@@ -5979,6 +6050,19 @@ int msm_vidc_check_core_mbpf(struct msm_vidc_inst *inst)
 		return -EINVAL;
 	}
 	core = inst->core;
+
+	core_lock(core, __func__);
+	list_for_each_entry(instance, &core->instances, list) {
+		if (is_critical_priority_session(instance))
+			critical_mbpf += msm_vidc_get_mbs_per_frame(instance);
+	}
+	core_unlock(core, __func__);
+
+	if (critical_mbpf > core->capabilities[MAX_MBPF].value) {
+		i_vpr_e(inst, "%s: Hardware overloaded with critical sessions. needed %u, max %u",
+			__func__, critical_mbpf, core->capabilities[MAX_MBPF].value);
+		return -ENOMEM;
+	}
 
 	core_lock(core, __func__);
 	list_for_each_entry(instance, &core->instances, list) {
@@ -6008,9 +6092,7 @@ int msm_vidc_check_core_mbpf(struct msm_vidc_inst *inst)
 	core_lock(core, __func__);
 	/* check real-time video sessions max limit */
 	list_for_each_entry(instance, &core->instances, list) {
-		if (is_thumbnail_session(instance) ||
-			is_image_session(instance) ||
-			!is_realtime_session(instance))
+		if (msm_vidc_ignore_session_load(inst))
 			continue;
 
 		video_rt_mbpf += msm_vidc_get_mbs_per_frame(instance);

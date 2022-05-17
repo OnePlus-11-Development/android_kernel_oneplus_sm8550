@@ -147,6 +147,11 @@ enum hfi_property_mode_type {
 	HFI_MODE_METADATA             = 0x00000004,
 };
 
+enum hfi_reserve_type {
+	HFI_RESERVE_START = 0x1,
+	HFI_RESERVE_STOP  = 0x2,
+};
+
 #define HFI_CMD_BEGIN                                           0x01000000
 #define HFI_CMD_INIT                                            0x01000001
 #define HFI_CMD_POWER_COLLAPSE                                  0x01000002
@@ -160,6 +165,7 @@ enum hfi_property_mode_type {
 #define HFI_CMD_DELIVERY_MODE                                   0x0100000A
 #define HFI_CMD_SUBSCRIBE_MODE                                  0x0100000B
 #define HFI_CMD_SETTINGS_CHANGE                                 0x0100000C
+#define HFI_CMD_RESERVE                                         0x0100000F
 
 #define HFI_SSR_TYPE_SW_ERR_FATAL       0x1
 #define HFI_SSR_TYPE_SW_DIV_BY_ZERO     0x2

@@ -117,15 +117,15 @@ err_fd:
 	return rc;
 }
 
-int msm_vidc_fence_signal(struct msm_vidc_inst *inst, u32 fence_id)
+struct msm_vidc_fence *msm_vidc_get_fence_from_id(
+	struct msm_vidc_inst *inst, u32 fence_id)
 {
-	int rc = 0;
 	struct msm_vidc_fence *fence, *dummy_fence;
 	bool found = false;
 
 	if (!inst) {
 		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
+		return NULL;
 	}
 
 	list_for_each_entry_safe(fence, dummy_fence, &inst->fence_list, list) {
@@ -135,12 +135,30 @@ int msm_vidc_fence_signal(struct msm_vidc_inst *inst, u32 fence_id)
 		}
 	}
 
-	if (!found) {
+	if (!found)
+		return NULL;
+
+	return fence;
+}
+
+int msm_vidc_fence_signal(struct msm_vidc_inst *inst, u32 fence_id)
+{
+	int rc = 0;
+	struct msm_vidc_fence *fence;
+
+	if (!inst) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	fence = msm_vidc_get_fence_from_id(inst, fence_id);
+	if (!fence) {
 		i_vpr_e(inst, "%s: no fence available to signal with id: %u",
 			__func__, fence_id);
 		rc = -EINVAL;
 		goto exit;
 	}
+
 	i_vpr_l(inst, "%s: fence %s\n", __func__, fence->name);
 	dma_fence_signal(&fence->dma_fence);
 	dma_fence_put(&fence->dma_fence);
@@ -150,28 +168,18 @@ exit:
 	return rc;
 }
 
-void msm_vidc_fence_destroy(struct msm_vidc_inst *inst,
-		struct msm_vidc_fence *fence_to_destroy)
-{
-	struct msm_vidc_fence *fence, *dummy_fence;
-	bool found = false;
 
-	if (!inst || !fence_to_destroy) {
+void msm_vidc_fence_destroy(struct msm_vidc_inst *inst, u32 fence_id)
+{
+	struct msm_vidc_fence *fence;
+
+	if (!inst) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return;
 	}
 
-	list_for_each_entry_safe(fence, dummy_fence, &inst->fence_list, list) {
-		if (fence->dma_fence.seqno ==
-			fence_to_destroy->dma_fence.seqno) {
-			found = true;
-			break;
-		}
-	}
-
-	if (!found) {
-		i_vpr_e(inst, "%s: no fence available to destroy with id: %llu",
-			__func__, fence_to_destroy->dma_fence.seqno);
+	fence = msm_vidc_get_fence_from_id(inst, fence_id);
+	if (!fence) {
 		return;
 	}
 

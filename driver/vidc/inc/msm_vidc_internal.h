@@ -31,6 +31,8 @@
 #define DEFAULT_WIDTH     320
 #define DEFAULT_FPS       30
 #define MAXIMUM_VP9_FPS   60
+#define NRT_PRIORITY_OFFSET        2
+#define RT_DEC_DOWN_PRORITY_OFFSET 1
 #define MAX_SUPPORTED_INSTANCES  16
 #define DEFAULT_BSE_VPP_DELAY    2
 #define MAX_CAP_PARENTS          20
@@ -134,8 +136,6 @@
   */
 #define MAX_DPB_LIST_ARRAY_SIZE (16 * 4)
 #define MAX_DPB_LIST_PAYLOAD_SIZE (16 * 4 * 4)
-/* Default metadata size */
-#define MSM_VIDC_METADATA_SIZE ALIGN(16 * 1024, SZ_4K)
 
 enum msm_vidc_domain_type {
 	MSM_VIDC_ENCODER           = BIT(0),
@@ -477,6 +477,9 @@ enum msm_vidc_inst_capability_type {
 	SEQ_CHANGE_AT_SYNC_FRAME,
 	QUALITY_MODE,
 	PRIORITY,
+	FIRMWARE_PRIORITY_OFFSET,
+	CRITICAL_PRIORITY,
+	RESERVE_DURATION,
 	DPB_LIST,
 	FILM_GRAIN,
 	SUPER_BLOCK,
@@ -520,6 +523,7 @@ enum msm_vidc_inst_capability_type {
 	OUTPUT_ORDER,
 	INPUT_BUF_HOST_MAX_COUNT,
 	OUTPUT_BUF_HOST_MAX_COUNT,
+	DELIVERY_MODE,
 	/* place all leaf(no child) enums before this line */
 	INST_CAP_MAX,
 };
@@ -760,6 +764,7 @@ struct msm_vidc_hfi_frame_info {
 	u32                    cf;
 	u32                    data_corrupt;
 	u32                    overflow;
+	u32                    fence_id;
 };
 
 struct msm_vidc_decode_vpp_delay {
@@ -799,6 +804,7 @@ struct vidc_bus_vote_data {
 	u64 calc_bw_ddr;
 	u64 calc_bw_llcc;
 	u32 num_vpp_pipes;
+	bool vpss_preprocessing_enabled;
 };
 
 struct msm_vidc_power {

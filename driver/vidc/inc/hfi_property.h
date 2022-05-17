@@ -535,6 +535,8 @@ enum hfi_nal_length_field_type {
 
 #define HFI_PROP_IR_CYCLIC_PERIOD                               0x0300017E
 
+#define HFI_PROP_ENABLE_SLICE_DELIVERY                          0x0300017F
+
 #define HFI_PROP_AV1_FILM_GRAIN_PRESENT                         0x03000180
 
 #define HFI_PROP_AV1_SUPER_BLOCK_ENABLED                        0x03000181
@@ -554,6 +556,8 @@ enum hfi_saliency_type {
 #define HFI_PROP_FENCE                                          0x0300018B
 
 #define HFI_PROP_REQUEST_PREPROCESS                             0x0300018E
+
+#define HFI_PROP_UBWC_STRIDE_SCANLINE                           0x03000190
 
 #define HFI_PROP_END                                            0x03FFFFFF
 
