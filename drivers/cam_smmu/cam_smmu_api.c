@@ -119,6 +119,13 @@ struct cam_smmu_monitor {
 	enum cam_smmu_region_id region_id;
 };
 
+struct cam_smmu_debug {
+	struct dentry *dentry;
+	bool cb_dump_enable;
+	bool map_profile_enable;
+	uint32_t fatal_pf_mask;
+};
+
 struct cam_context_bank_info {
 	struct device *dev;
 	struct iommu_domain *domain;
@@ -138,6 +145,8 @@ struct cam_context_bank_info {
 	bool is_secheap_allocated;
 	bool is_fwuncached_buf_allocated;
 	bool is_qdss_allocated;
+	bool non_fatal_faults_en;
+	bool stall_disable_en;
 
 	struct scratch_mapping scratch_map;
 	struct gen_pool *shared_mem_pool;
@@ -185,10 +194,7 @@ struct cam_iommu_cb_set {
 	struct work_struct smmu_work;
 	struct mutex payload_list_lock;
 	struct list_head payload_list;
-	u32 non_fatal_fault;
-	struct dentry *dentry;
-	bool cb_dump_enable;
-	bool map_profile_enable;
+	struct cam_smmu_debug debug_cfg;
 	bool force_cache_allocs;
 	bool need_shared_buffer_padding;
 	bool is_expanded_memory;
@@ -620,7 +626,7 @@ static void cam_smmu_dump_cb_info(int idx)
 		cb_info->shared_mapping_size, cb_info->io_mapping_size,
 		shared_free_len, io_free_len);
 
-	if (iommu_cb_set.cb_dump_enable) {
+	if (iommu_cb_set.debug_cfg.cb_dump_enable) {
 		list_for_each_entry_safe(mapping, mapping_temp,
 			&iommu_cb_set.cb_info[idx].smmu_buf_list, list) {
 			i++;
@@ -898,6 +904,24 @@ static int cam_smmu_iommu_fault_handler(struct iommu_domain *domain,
 
 	cam_smmu_page_fault_work(&iommu_cb_set.smmu_work);
 
+	/*
+	 * If cb has faults marked as non fatal, return handled to SMMU
+	 * This will skip printing any debug info from SMMU, which is also available as
+	 * part of fault handler cb. This will avoid any transaction retries which could
+	 * lead to further fault irqs being triggered
+	 */
+	if (iommu_cb_set.cb_info[idx].non_fatal_faults_en) {
+		/* Panic if debugfs is set for a context bank */
+		if (iommu_cb_set.debug_cfg.fatal_pf_mask & BIT(idx))
+			CAM_TRIGGER_PANIC("SMMU context fault from soc: %s[cb_idx: %u]",
+				iommu_cb_set.cb_info[idx].name[0], idx);
+
+		CAM_DBG(CAM_SMMU,
+			"PF marked as non-fatal for cb: %s, return success to SMMU",
+			cb_name);
+		return 0;
+	}
+
 	return -ENOSYS;
 }
 
@@ -924,7 +948,7 @@ static int cam_smmu_translate_dir_to_iommu_dir(
 	default:
 		CAM_ERR(CAM_SMMU, "Error: Direction is invalid. dir = %d", dir);
 		break;
-	};
+	}
 	return IOMMU_INVALID_DIR;
 }
 
@@ -2137,7 +2161,7 @@ static int cam_smmu_map_buffer_validate(struct dma_buf *buf,
 		goto err_out;
 	}
 
-	if (iommu_cb_set.map_profile_enable)
+	if (iommu_cb_set.debug_cfg.map_profile_enable)
 		CAM_GET_TIMESTAMP(ts1);
 
 	attach = dma_buf_attach(buf, iommu_cb_set.cb_info[idx].dev);
@@ -2220,7 +2244,7 @@ static int cam_smmu_map_buffer_validate(struct dma_buf *buf,
 		"iova=%pK, region_id=%d, paddr=0x%llx, len=%zu, dma_map_attrs=%d",
 		iova, region_id, *paddr_ptr, *len_ptr, attach->dma_map_attrs);
 
-	if (iommu_cb_set.map_profile_enable) {
+	if (iommu_cb_set.debug_cfg.map_profile_enable) {
 		CAM_GET_TIMESTAMP(ts2);
 		CAM_GET_TIMESTAMP_DIFF_IN_MICRO(ts1, ts2, microsec);
 		trace_cam_log_event("SMMUMapProfile", "size and time in micro",
@@ -2398,7 +2422,7 @@ static int cam_smmu_unmap_buf_and_remove_from_list(
 		mapping_info->region_id, mapping_info->paddr, mapping_info->len,
 		mapping_info->attach->dma_map_attrs);
 
-	if (iommu_cb_set.map_profile_enable)
+	if (iommu_cb_set.debug_cfg.map_profile_enable)
 		CAM_GET_TIMESTAMP(ts1);
 
 	if (mapping_info->region_id == CAM_SMMU_REGION_SHARED) {
@@ -2442,7 +2466,7 @@ static int cam_smmu_unmap_buf_and_remove_from_list(
 	dma_buf_detach(mapping_info->buf, mapping_info->attach);
 	dma_buf_put(mapping_info->buf);
 
-	if (iommu_cb_set.map_profile_enable) {
+	if (iommu_cb_set.debug_cfg.map_profile_enable) {
 		CAM_GET_TIMESTAMP(ts2);
 		CAM_GET_TIMESTAMP_DIFF_IN_MICRO(ts1, ts2, microsec);
 		trace_cam_log_event("SMMUUnmapProfile",
@@ -4200,13 +4224,24 @@ static int cam_smmu_get_memory_regions_info(struct device_node *of_node,
 	return rc;
 }
 
+static void cam_smmu_check_for_fault_properties(
+	const char *fault_property, struct cam_context_bank_info *cb)
+{
+	if (!strcmp(fault_property, "non-fatal"))
+		cb->non_fatal_faults_en = true;
+	else if (!strcmp(fault_property, "stall-disable"))
+		cb->stall_disable_en = true;
+
+	CAM_DBG(CAM_SMMU, "iommu fault property: %s found for cb: %s",
+		fault_property, cb->name[0]);
+}
+
 static int cam_populate_smmu_context_banks(struct device *dev,
 	enum cam_iommu_type type)
 {
-	int rc = 0;
+	int rc = 0, i, num_fault_props = 0;
 	struct cam_context_bank_info *cb;
 	struct device *ctx = NULL;
-	int i = 0;
 	bool dma_coherent, dma_coherent_hint;
 
 	if (!dev) {
@@ -4299,10 +4334,25 @@ static int cam_populate_smmu_context_banks(struct device *dev,
 			cb->name[0]);
 		goto cb_init_fail;
 	}
-	if (cb->io_support && cb->domain)
+	if (cb->io_support && cb->domain) {
 		iommu_set_fault_handler(cb->domain,
 			cam_smmu_iommu_fault_handler,
 			(void *)cb->name[0]);
+
+		num_fault_props = of_property_count_strings(dev->of_node, "qcom,iommu-faults");
+		if (num_fault_props > 0) {
+			const char *fault_property = NULL;
+
+			for (i = 0; i < num_fault_props; i++) {
+				rc = of_property_read_string_index(dev->of_node,
+					"qcom,iommu-faults", i, &fault_property);
+				if (!rc)
+					cam_smmu_check_for_fault_properties(fault_property, cb);
+			}
+			/* Missing fault property reads is not an error */
+			rc = 0;
+		}
+	}
 
 	if (!dev->dma_parms)
 		dev->dma_parms = devm_kzalloc(dev,
@@ -4453,7 +4503,26 @@ static unsigned long cam_smmu_mini_dump_cb(void *dst, unsigned long len)
 	}
 end:
 	return dumped_len;
-};
+}
+
+static int cam_smmu_set_fatal_pf_mask(void *data, u64 val)
+{
+	iommu_cb_set.debug_cfg.fatal_pf_mask = val;
+	CAM_DBG(CAM_SMMU, "Set fatal page fault value: 0x%llx",
+		iommu_cb_set.debug_cfg.fatal_pf_mask);
+	return 0;
+}
+
+static int cam_smmu_get_fatal_pf_mask(void *data, u64 *val)
+{
+	*val = iommu_cb_set.debug_cfg.fatal_pf_mask;
+	CAM_DBG(CAM_SMMU, "Get fatal page fault value: 0x%llx",
+		*val);
+	return 0;
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE(cam_smmu_fatal_pf_mask,
+	cam_smmu_get_fatal_pf_mask, cam_smmu_set_fatal_pf_mask, "%16llu");
 
 static int cam_smmu_create_debug_fs(void)
 {
@@ -4470,12 +4539,15 @@ static int cam_smmu_create_debug_fs(void)
 		goto end;
 	}
 	/* Store parent inode for cleanup in caller */
-	iommu_cb_set.dentry = dbgfileptr;
+	iommu_cb_set.debug_cfg.dentry = dbgfileptr;
 
 	debugfs_create_bool("cb_dump_enable", 0644,
-		iommu_cb_set.dentry, &iommu_cb_set.cb_dump_enable);
+		iommu_cb_set.debug_cfg.dentry, &iommu_cb_set.debug_cfg.cb_dump_enable);
 	debugfs_create_bool("map_profile_enable", 0644,
-		iommu_cb_set.dentry, &iommu_cb_set.map_profile_enable);
+		iommu_cb_set.debug_cfg.dentry, &iommu_cb_set.debug_cfg.map_profile_enable);
+	debugfs_create_file("fatal_pf_mask", 0644,
+		iommu_cb_set.debug_cfg.dentry, NULL, &cam_smmu_fatal_pf_mask);
+
 end:
 	return rc;
 }
@@ -4599,7 +4671,7 @@ static void cam_smmu_component_unbind(struct device *dev,
 	}
 
 	cam_smmu_release_cb(pdev);
-	iommu_cb_set.dentry = NULL;
+	iommu_cb_set.debug_cfg.dentry = NULL;
 }
 
 const static struct component_ops cam_smmu_component_ops = {

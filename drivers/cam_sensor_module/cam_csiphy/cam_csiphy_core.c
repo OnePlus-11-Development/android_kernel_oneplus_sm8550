@@ -964,6 +964,10 @@ static int cam_csiphy_cphy_data_rate_config(
 				}
 			}
 			break;
+			case CSIPHY_CDR_LN_SETTINGS:
+				cam_io_w_mb(reg_data,
+					csiphybase + reg_addr);
+			break;
 			default:
 				CAM_DBG(CAM_CSIPHY, "Do Nothing");
 			break;
@@ -1847,6 +1851,12 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 		index = csiphy_dev->acquire_count;
 		csiphy_acq_dev.device_handle =
 			cam_create_device_hdl(&bridge_params);
+		if (csiphy_acq_dev.device_handle <= 0) {
+			rc = -EFAULT;
+			CAM_ERR(CAM_CSIPHY, "Can not create device handle");
+			goto release_mutex;
+		}
+
 		csiphy_dev->csiphy_info[index].hdl_data.device_hdl =
 			csiphy_acq_dev.device_handle;
 		csiphy_dev->csiphy_info[index].hdl_data.session_hdl =

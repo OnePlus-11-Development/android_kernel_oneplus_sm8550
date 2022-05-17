@@ -76,8 +76,6 @@
 #define IFE_CSID_VER2_CUST_NODE_IDX_1                      0x2
 #define IFE_CSID_VER2_CUST_NODE_IDX_2                      0x4
 
-#define IFE_CSID_VER2_TOP_IRQ_STATUS_BUF_DONE                    BIT(13)
-
 enum cam_ife_csid_ver2_input_core_sel {
 	CAM_IFE_CSID_INPUT_CORE_SEL_NONE,
 	CAM_IFE_CSID_INPUT_CORE_SEL_INTERNAL,
@@ -114,18 +112,7 @@ struct cam_ife_csid_ver2_top_cfg {
 
 struct cam_ife_csid_ver2_evt_payload {
 	struct list_head            list;
-	uint32_t                    irq_reg_val[CAM_IFE_CSID_IRQ_REG_MAX];
-};
-
-/*
- * struct cam_ife_csid_ver2_camif_data: place holder for camif parameters
- *
- * @epoch0_cfg:   Epoch 0 configuration value
- * @epoch1_cfg:   Epoch 1 configuration value
- */
-struct cam_ife_csid_ver2_camif_data {
-	uint32_t epoch0;
-	uint32_t epoch1;
+	uint32_t                    irq_reg_val;
 };
 
 /*
@@ -157,6 +144,7 @@ struct cam_ife_csid_ver2_camif_data {
  * @irq_reg_idx:            IRQ Reg index
  * @sof_cnt:                SOF counter
  * @num_frames_discard:     number of frames to discard
+ * @epoch_cfg:              Epoch configured value
  * @sync_mode   :           Sync mode--> master/slave/none
  * @vfr_en   :              flag to indicate if variable frame rate is enabled
  * @frame_id_dec_en:        flag to indicate if frame id decoding is enabled
@@ -173,7 +161,6 @@ struct cam_ife_csid_ver2_camif_data {
  *
  */
 struct cam_ife_csid_ver2_path_cfg {
-	struct cam_ife_csid_ver2_camif_data  camif_data;
 	struct timespec64                    error_ts;
 	struct cam_ife_csid_path_format      path_format[CAM_ISP_VC_DT_CFG];
 	struct cam_csid_secondary_evt_config sec_evt_config;
@@ -193,23 +180,25 @@ struct cam_ife_csid_ver2_path_cfg {
 	uint32_t                             qcfa_bin;
 	uint32_t                             hor_ver_bin;
 	uint32_t                             num_bytes_out;
+	uint32_t                             top_irq_handle;
 	uint32_t                             irq_handle;
 	uint32_t                             err_irq_handle;
 	uint32_t                             discard_irq_handle;
 	uint32_t                             irq_reg_idx;
 	uint32_t                             sof_cnt;
 	uint32_t                             num_frames_discard;
+	uint32_t                             epoch_cfg;
 	enum cam_isp_hw_sync_mode            sync_mode;
 	bool                                 vfr_en;
 	bool                                 frame_id_dec_en;
 	bool                                 crop_enable;
 	bool                                 drop_enable;
-	bool                                 handle_camif_irq;
 	bool                                 discard_init_frames;
 	bool                                 skip_discard_frame_cfg;
 	bool                                 sfe_shdr;
 	bool                                 lcr_en;
 	bool                                 csid_out_unpack_msb;
+	bool                                 handle_camif_irq;
 };
 
 struct cam_ife_csid_ver2_top_reg_info {
@@ -298,6 +287,9 @@ struct cam_ife_csid_ver2_path_reg_info {
 	uint32_t epoch1_cfg_batch_id4_addr;
 	uint32_t epoch0_cfg_batch_id5_addr;
 	uint32_t epoch1_cfg_batch_id5_addr;
+	uint32_t secure_mask_cfg0;
+	uint32_t path_batch_status;
+	uint32_t path_frame_id;
 
 	/*Shift Bit Configurations*/
 	uint32_t start_mode_master;
@@ -348,7 +340,11 @@ struct cam_ife_csid_ver2_path_reg_info {
 	uint32_t fatal_err_mask;
 	uint32_t non_fatal_err_mask;
 	uint32_t pix_pattern_shift;
-	uint32_t camif_irq_mask;
+	uint32_t rup_irq_mask;
+	uint32_t sof_irq_mask;
+	uint32_t eof_irq_mask;
+	uint32_t epoch0_irq_mask;
+	uint32_t epoch1_irq_mask;
 	uint32_t rup_aup_mask;
 	uint32_t top_irq_mask;
 	uint32_t epoch0_cfg_val;
@@ -380,6 +376,8 @@ struct cam_ife_csid_ver2_common_reg_info {
 	uint32_t buf_done_irq_set_addr;
 	uint32_t test_bus_ctrl;
 	uint32_t test_bus_debug;
+	uint32_t path_domain_id_cfg0;
+	uint32_t path_domain_id_cfg1;
 
 	/*Shift Bit Configurations*/
 	uint32_t rst_done_shift_val;
@@ -466,6 +464,7 @@ struct cam_ife_csid_ver2_common_reg_info {
 	uint32_t only_master_rup;
 	uint32_t sfe_ipp_input_rdi_res;
 	bool     timestamp_enabled_in_cfg0;
+	bool     camif_irq_support;
 
 	/* Masks */
 	uint32_t pxl_cnt_mask;
@@ -493,13 +492,16 @@ struct cam_ife_csid_ver2_common_reg_info {
 	uint32_t top_err_irq_mask;
 	uint32_t top_reset_irq_mask;
 	uint32_t top_buf_done_irq_mask;
-	uint32_t epoch_div_factor;
+	uint32_t epoch_factor;
 	uint32_t decode_format_payload_only;
 };
 
 struct cam_ife_csid_ver2_reg_info {
-	struct cam_irq_controller_reg_info               *irq_reg_info;
+	struct cam_irq_controller_reg_info               *top_irq_reg_info;
+	struct cam_irq_controller_reg_info               *rx_irq_reg_info;
 	struct cam_irq_controller_reg_info               *buf_done_irq_reg_info;
+	struct cam_irq_controller_reg_info               *path_irq_reg_info[
+		CAM_IFE_PIX_PATH_RES_MAX];
 	const struct cam_ife_csid_ver2_common_reg_info   *cmn_reg;
 	const struct cam_ife_csid_csi2_rx_reg_info       *csi2_reg;
 	const struct cam_ife_csid_ver2_path_reg_info     *path_reg[
@@ -572,7 +574,9 @@ struct cam_ife_csid_ver2_hw {
 	spinlock_t                             lock_state;
 	spinlock_t                             path_payload_lock;
 	spinlock_t                             rx_payload_lock;
-	void                                  *csid_irq_controller;
+	void                                  *top_irq_controller;
+	void                                  *rx_irq_controller;
+	void                                  *path_irq_controller[CAM_IFE_PIX_PATH_RES_MAX];
 	void                                  *buf_done_irq_controller;
 	struct cam_hw_intf                    *hw_intf;
 	struct cam_hw_info                    *hw_info;

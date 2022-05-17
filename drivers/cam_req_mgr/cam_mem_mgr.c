@@ -763,7 +763,6 @@ static int cam_mem_util_buffer_alloc(size_t len, uint32_t flags,
 	unsigned long *i_ino)
 {
 	int rc;
-	struct dma_buf *temp_dmabuf = NULL;
 
 	rc = cam_mem_util_get_dma_buf(len, flags, dmabuf, i_ino);
 	if (rc) {
@@ -772,6 +771,13 @@ static int cam_mem_util_buffer_alloc(size_t len, uint32_t flags,
 			len, flags);
 		return rc;
 	}
+
+	/*
+	 * increment the ref count so that ref count becomes 2 here
+	 * when we close fd, refcount becomes 1 and when we do
+	 * dmap_put_buf, ref count becomes 0 and memory will be freed.
+	 */
+	get_dma_buf(*dmabuf);
 
 	*fd = dma_buf_fd(*dmabuf, O_CLOEXEC);
 	if (*fd < 0) {
@@ -782,18 +788,6 @@ static int cam_mem_util_buffer_alloc(size_t len, uint32_t flags,
 
 	CAM_DBG(CAM_MEM, "Alloc success : len=%zu, *dmabuf=%pK, fd=%d, i_ino=%lu",
 		len, *dmabuf, *fd, *i_ino);
-
-	/*
-	 * increment the ref count so that ref count becomes 2 here
-	 * when we close fd, refcount becomes 1 and when we do
-	 * dmap_put_buf, ref count becomes 0 and memory will be freed.
-	 */
-	temp_dmabuf = dma_buf_get(*fd);
-	if (IS_ERR_OR_NULL(temp_dmabuf)) {
-		rc = PTR_ERR(temp_dmabuf);
-		CAM_ERR(CAM_MEM, "dma_buf_get failed, *fd=%d, i_ino=%lu, rc=%d", *fd, *i_ino, rc);
-		goto put_buf;
-	}
 
 	return rc;
 
@@ -1866,7 +1860,7 @@ struct dma_buf *cam_mem_mgr_get_dma_buf(int fd)
 	return dmabuf;
 }
 
-int cam_presil_put_dmabuf_from_fd(uint64_t input_dmabuf)
+int cam_mem_mgr_put_dmabuf_from_fd(uint64_t input_dmabuf)
 {
 	struct dma_buf *dmabuf = (struct dma_buf *)(uint64_t)input_dmabuf;
 	int idx = 0;
@@ -1895,9 +1889,8 @@ int cam_presil_put_dmabuf_from_fd(uint64_t input_dmabuf)
 
 	return 0;
 }
-EXPORT_SYMBOL(cam_presil_put_dmabuf_from_fd);
 
-int cam_presil_get_fd_from_dmabuf(uint64_t input_dmabuf)
+int cam_mem_mgr_get_fd_from_dmabuf(uint64_t input_dmabuf)
 {
 	int fd_for_dmabuf = -1;
 	struct dma_buf *dmabuf = (struct dma_buf *)(uint64_t)input_dmabuf;
@@ -1948,7 +1941,6 @@ int cam_presil_get_fd_from_dmabuf(uint64_t input_dmabuf)
 
 	return (int)fd_for_dmabuf;
 }
-EXPORT_SYMBOL(cam_presil_get_fd_from_dmabuf);
 
 int cam_mem_mgr_send_buffer_to_presil(int32_t iommu_hdl, int32_t buf_handle)
 {

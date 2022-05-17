@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_CPAS_API_H_
@@ -160,6 +160,21 @@ enum cam_cpas_hw_version {
 };
 
 /**
+ * enum cam_camnoc_slave_error_codes - Enum for camnoc slave error codes
+ *
+ */
+enum cam_camnoc_slave_error_codes {
+	CAM_CAMNOC_TARGET_ERROR,
+	CAM_CAMNOC_ADDRESS_DECODE_ERROR,
+	CAM_CAMNOC_UNSUPPORTED_REQUEST_ERROR,
+	CAM_CAMNOC_DISCONNECTED_TARGET_ERROR,
+	CAM_CAMNOC_SECURITY_VIOLATION,
+	CAM_CAMNOC_HIDDEN_SECURITY_VIOLATION,
+	CAM_CAMNOC_TIME_OUT,
+	CAM_CAMNOC_UNUSED,
+};
+
+/**
  * enum cam_camnoc_irq_type - Enum for camnoc irq types
  *
  * @CAM_CAMNOC_IRQ_SLAVE_ERROR: Each slave port in CAMNOC (3 QSB ports and
@@ -232,7 +247,11 @@ enum cam_camnoc_irq_type {
 enum cam_sys_cache_config_types {
 	CAM_LLCC_SMALL_1 = 0,
 	CAM_LLCC_SMALL_2 = 1,
-	CAM_LLCC_MAX = 2,
+	CAM_LLCC_LARGE_1 = 2,
+	CAM_LLCC_LARGE_2 = 3,
+	CAM_LLCC_LARGE_3 = 4,
+	CAM_LLCC_LARGE_4 = 5,
+	CAM_LLCC_MAX     = 6,
 };
 
 /**
@@ -412,6 +431,17 @@ struct cam_cpas_irq_data {
 	} u;
 };
 
+/*
+ * CPAS client callback
+ *
+ * @client_handle : CPAS client handle
+ * @userdata      : User data given at the time of register
+ * @irq_data      : Event data
+ */
+typedef bool (*cam_cpas_client_cb_func)(
+	uint32_t client_handle, void *userdata,
+	struct cam_cpas_irq_data *irq_data);
+
 /**
  * struct cam_cpas_register_params : Register params for cpas client
  *
@@ -426,11 +456,7 @@ struct cam_cpas_irq_data {
  *                      an argument while callback.
  * @cam_cpas_callback : Input callback pointer for triggering the
  *                      callbacks from CPAS driver.
- *                      @client_handle : CPAS client handle
- *                      @userdata    : User data given at the time of register
- *                      @event_type  : event type
- *                      @event_data  : event data
- * @client_handle       : Output Unique handle generated for this register
+ * @client_handle     : Output Unique handle generated for this register
  *
  */
 struct cam_cpas_register_params {
@@ -438,10 +464,7 @@ struct cam_cpas_register_params {
 	uint32_t        cell_index;
 	struct device  *dev;
 	void           *userdata;
-	bool          (*cam_cpas_client_cb)(
-			uint32_t                  client_handle,
-			void                     *userdata,
-			struct cam_cpas_irq_data *irq_data);
+	cam_cpas_client_cb_func cam_cpas_client_cb;
 	uint32_t        client_handle;
 };
 

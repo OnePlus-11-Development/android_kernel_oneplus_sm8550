@@ -209,6 +209,8 @@ struct cam_ife_csid_csi2_rx_reg_info {
 	uint32_t de_scramble_type1_cfg1_addr;
 	uint32_t de_scramble_type0_cfg0_addr;
 	uint32_t de_scramble_type0_cfg1_addr;
+	uint32_t secure_cfg0;
+	uint32_t secure_mask_cfg0;
 
 	/*configurations */
 	uint32_t rst_srb_all;
@@ -382,6 +384,7 @@ struct cam_ife_csid_rx_cfg  {
 	uint32_t                        tpg_num_sel;
 	uint32_t                        mup;
 	uint32_t                        epd_supported;
+	uint32_t                        top_irq_handle;
 	uint32_t                        irq_handle;
 	uint32_t                        err_irq_handle;
 	bool                            dynamic_sensor_switch_en;
