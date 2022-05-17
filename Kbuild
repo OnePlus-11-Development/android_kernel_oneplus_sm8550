@@ -6,11 +6,19 @@ ifeq ($(KGSL_PATH),)
 KGSL_PATH=$(src)
 endif
 
+# If we're not in an Android tree, select KGSL config
+ifeq ($(ANDROID_BUILD_TOP),)
+CONFIG_QCOM_KGSL = m
+endif
+
 ifeq ($(CONFIG_ARCH_WAIPIO), y)
 	include $(KGSL_PATH)/config/gki_waipiodisp.conf
 endif
 ifeq ($(CONFIG_ARCH_KALAMA), y)
 	include $(KGSL_PATH)/config/gki_waipiodisp.conf
+endif
+ifeq ($(CONFIG_ARCH_SA8155), y)
+	include $(KGSL_PATH)/config/gki_sa8155.conf
 endif
 
 ccflags-y += -I$(KGSL_PATH) -I$(KGSL_PATH)/include/linux -I$(KGSL_PATH)/include -I$(KERNEL_SRC)/drivers/devfreq -I$(KERNEL_SRC)/drivers/iommu

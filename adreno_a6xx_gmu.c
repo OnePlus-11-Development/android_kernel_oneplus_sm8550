@@ -203,7 +203,7 @@ void a6xx_load_rsc_ucode(struct adreno_device *adreno_dev)
 	if (adreno_is_a650_family(adreno_dev))
 		rscc = gmu->rscc_virt;
 	else
-		rscc = kgsl_regmap_virt(&device->regmap, 0x23000);
+		rscc = kgsl_regmap_virt(&device->regmap, RSCC_OFFSET_LEGACY);
 
 	/* Disable SDE clock gating */
 	_regwrite(rscc, A6XX_GPU_RSCC_RSC_STATUS0_DRV0, BIT(24));
@@ -2193,7 +2193,7 @@ int a6xx_gmu_enable_clks(struct adreno_device *adreno_dev)
 	}
 
 	ret = kgsl_clk_set_rate(gmu->clks, gmu->num_clks, "hub_clk",
-			150000000);
+			adreno_dev->gmu_hub_clk_freq);
 	if (ret && ret != -ENODEV) {
 		dev_err(&gmu->pdev->dev, "Unable to set the HUB clock\n");
 		return ret;

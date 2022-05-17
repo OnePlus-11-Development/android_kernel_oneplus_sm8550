@@ -101,6 +101,8 @@ struct adreno_gen7_core {
 	u32 highest_bank_bit;
 	/** @gen7_snapshot_block_list: Device-specific blocks dumped in the snapshot */
 	const struct gen7_snapshot_block_list *gen7_snapshot_block_list;
+	/** @gmu_hub_clk_freq: Gmu hub interface clock frequency */
+	u64 gmu_hub_clk_freq;
 };
 
 /**
