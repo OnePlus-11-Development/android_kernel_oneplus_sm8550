@@ -4004,7 +4004,6 @@ int msm_vidc_set_preprocess(void *instance,
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
 	u32 hfi_value;
 
-	d_vpr_e("%s: \n", __func__);
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
