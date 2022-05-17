@@ -12,7 +12,10 @@
 
 #define MMRM_VM_MAX_PKT_SZ  1024      // mmrm max gunyah packet size
 
-/* mmrm_vm_pkt_type: mmrm transfer type, for message valid check
+#define MMRM_VM_MSG_STATUS_NOTIFIER   0x01
+
+/**
+ * mmrm_vm_pkt_type: mmrm transfer type, for message valid check
  * @MMRM_VM_TYPE_DATA: request/response data
  */
 enum mmrm_vm_pkt_type {
@@ -45,7 +48,7 @@ struct mmrm_vm_msg_hdr {
 struct mmrm_vm_msg {
 	struct list_head link;
 	size_t msg_size;
-	unsigned char msg_buf[GH_MSGQ_MAX_MSG_SIZE_BYTES];
+	u8 msg_buf[GH_MSGQ_MAX_MSG_SIZE_BYTES];
 };
 
 /**
@@ -53,12 +56,14 @@ struct mmrm_vm_msg {
  * @peer_id: notification callback check if message is from SVM
  * @msgq_handle - registered msg queue handle with gunyah api
  * @msgq_label - message queue label
+ * @status: indicate init status
  * @pvt_nb - notifier info
  */
 struct mmrm_vm_gh_msgq_info {
 	int  peer_id;
 	void *msgq_handle;
 	int  msgq_label;
+	int status;
 	struct notifier_block pvt_nb;
 };
 

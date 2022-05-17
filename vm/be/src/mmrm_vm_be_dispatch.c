@@ -2,7 +2,6 @@
 /*
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
-
 #include "mmrm_vm_debug.h"
 #include "mmrm_vm_interface.h"
 #include "mmrm_vm_msgq.h"
@@ -62,8 +61,8 @@ static int mmrm_vm_be_client_register(struct mmrm_vm_driver_data *mmrm_vm,
 		mmrm_vm->clk_client_tbl[pClient->client_uid] = pClient;
 		pkt.msg.data.reg.client_id = pClient->client_uid;
 	} else {
-		pkt.msg.data.reg.client_id = 0;
-		d_mpr_e("%s: client:%p\n", __func__, pClient);
+		pkt.msg.data.reg.client_id = U32_MAX;
+		d_mpr_e("%s: client:%p client id:%d\n", __func__, pClient, pkt.msg.data.reg.client_id);
 	}
 
 	// prepare response packet & send to fe on SVM
@@ -96,6 +95,9 @@ static int mmrm_vm_be_client_setvalue(struct mmrm_vm_driver_data *mmrm_vm,
 	rc = mmrm_client_set_value(mmrm_vm->clk_client_tbl[req_param->client_id],
 			&req_param->data, req_param->val);
 
+	if (rc != 0) {
+		d_mpr_e("%s: set value rc:%d client id:%d\n", __func__, rc, req_param->client_id);
+	}
 	// prepare response packet & send to fe on SVM
 	pkt_resp.msg.hd.cmd_id = MMRM_VM_RESPONSE_SETVALUE;
 	pkt_resp.msg.hd.seq_no = req->hd.seq_no;
@@ -203,6 +205,28 @@ static int mmrm_vm_be_client_deregister(struct mmrm_vm_driver_data *mmrm_vm,
 	return rc;
 }
 
+/**
+ * mmrm_vm_be_client_noop - call none mmrm API to calculate msgq roundtrip time
+ * mmrm_vm: driver private data
+ * req: request parameters
+ */
+static int mmrm_vm_be_client_noop(struct mmrm_vm_driver_data *mmrm_vm,
+		struct mmrm_vm_api_request_msg *req)
+{
+	int rc = 0;
+	struct mmrm_vm_response_msg_pkt pkt;
+
+	pkt.msg.hd.cmd_id = MMRM_VM_RESPONSE_NOOP;
+	pkt.msg.hd.seq_no = req->hd.seq_no;
+
+	pkt.hdr.size = sizeof(pkt.msg.hd) + sizeof(pkt.msg.data.lptest);
+	pkt.msg.data.dereg.ret_code = rc;
+
+	rc = mmrm_vm_be_send_response(mmrm_vm, &pkt);
+	if (rc != 0)
+		d_mpr_e("%s: rc:%d\n", __func__, rc);
+	return rc;
+}
 
 /**
  * mmrm_vm_be_recv - be dispatch mmrm request to mmrm API call
@@ -235,6 +259,9 @@ int mmrm_vm_be_recv(struct mmrm_vm_driver_data *mmrm_vm, void *data, size_t size
 	case MMRM_VM_REQUEST_DEREGISTER:
 		rc = mmrm_vm_be_client_deregister(mmrm_vm, cmd);
 		break;
+	case MMRM_VM_REQUEST_NOOP:
+		rc = mmrm_vm_be_client_noop(mmrm_vm, cmd);
+		break;
 	default:
 		pr_err("%s: cmd_id:%d unknown!!!\n", __func__, cmd->hd.cmd_id);
 		break;
@@ -242,3 +269,24 @@ int mmrm_vm_be_recv(struct mmrm_vm_driver_data *mmrm_vm, void *data, size_t size
 	return rc;
 }
 
+/**
+ * mmrm_vm_be_wrong_request - deal with SVM wrong request
+ * mmrm_vm: driver private data
+ */
+int mmrm_vm_be_wrong_request(struct mmrm_vm_driver_data *mmrm_vm)
+{
+	int rc = 0;
+	struct mmrm_vm_response_msg_pkt pkt;
+
+	pkt.msg.hd.cmd_id = MMRM_VM_RESPONSE_INVALID_PKT;
+	pkt.msg.hd.seq_no = 0;
+
+	pkt.hdr.size = sizeof(pkt.msg.hd) + sizeof(pkt.msg.data.dereg);
+	pkt.msg.data.dereg.ret_code = rc;
+
+	d_mpr_e("%s: wrong request\n", __func__);
+	rc = mmrm_vm_be_send_response(mmrm_vm, &pkt);
+	if (rc != 0)
+		d_mpr_e("%s: rc:%d\n", __func__, rc);
+	return rc;
+}
