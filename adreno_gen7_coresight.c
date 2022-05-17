@@ -451,6 +451,13 @@ void gen7_coresight_init(struct adreno_device *adreno_dev)
 	funnel_gfx->funnel_ops = funnel_gfx->funnel_csdev->ops;
 	funnel_gfx->funnel_csdev->ops = NULL;
 
+	/*
+	 * The read-only sysfs node (funnel_ctrl) associated with gfx funnel reads the control
+	 * register and could cause a NOC error when gpu is in slumber. Since we do not require
+	 * such node, remove the attribute groups for the funnel.
+	 */
+	sysfs_remove_groups(&funnel_gfx->funnel_dev->kobj, funnel_gfx->funnel_csdev->dev.groups);
+
 	adreno_coresight_add_device(adreno_dev, "qcom,gpu-coresight-gx",
 		&gen7_coresight, &adreno_dev->gx_coresight);
 
