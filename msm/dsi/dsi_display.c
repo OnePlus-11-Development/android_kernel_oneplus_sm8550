@@ -6557,7 +6557,8 @@ int dsi_display_drm_ext_bridge_init(struct dsi_display *display,
 			ext_bridge->funcs = &ext_bridge_info->bridge_funcs;
 		}
 
-		rc = drm_bridge_attach(encoder, ext_bridge, prev_bridge, 0);
+		rc = drm_bridge_attach(encoder, ext_bridge, prev_bridge,
+					DRM_BRIDGE_ATTACH_NO_CONNECTOR);
 		if (rc) {
 			DSI_ERR("[%s] ext brige attach failed, %d\n",
 				display->name, rc);
