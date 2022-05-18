@@ -119,15 +119,23 @@ u64 msm_vidc_calc_freq_iris3(struct msm_vidc_inst *inst, u32 data_size)
 			inst->capabilities->cap[PIPE].value;
 		/* 21 / 20 is minimum overhead factor */
 		vpp_cycles += max(vpp_cycles / 20, fw_vpp_cycles);
-		/* 1.059 is multi-pipe overhead
-		 * 1.410 AV1 RECOMMENDED TILE 1080P_V2XH1, UHD_V2X2, 8KUHD_V8X2
-		 *       av1d_commer_tile_enable=0
-		 */
 		if (inst->capabilities->cap[PIPE].value > 1) {
-			if (inst->codec == MSM_VIDC_AV1)
-				vpp_cycles += div_u64(vpp_cycles * 410, 1000);
-			else
+			if (inst->codec == MSM_VIDC_AV1) {
+				/*
+				 * Additional vpp_cycles are required for bitstreams with
+				 * 128x128 superblock and non-recommended tile settings.
+				 * recommended tiles: 1080P_V2XH1, UHD_V2X2, 8KUHD_V8X2
+				 * non-recommended tiles: 1080P_V4XH2_V4X1, UHD_V8X4_V8X1,
+				 * 8KUHD_V8X8_V8X1
+				 */
+				if (inst->capabilities->cap[SUPER_BLOCK].value)
+					vpp_cycles += div_u64(vpp_cycles * 1464, 1000);
+				else
+					vpp_cycles += div_u64(vpp_cycles * 410, 1000);
+			} else {
+				/* 1.059 is multi-pipe overhead */
 				vpp_cycles += div_u64(vpp_cycles * 59, 1000);
+			}
 		}
 
 		/* VSP */
