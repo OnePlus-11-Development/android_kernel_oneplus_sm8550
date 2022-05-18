@@ -1107,11 +1107,8 @@ static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
 			return rc;
 	}
 
-	if (ctrl->id == V4L2_CID_MPEG_VIDC_CRITICAL_PRIORITY) {
-		inst->decode_batch.enable = msm_vidc_allow_decode_batch(inst);
-		msm_vidc_allow_dcvs(inst);
+	if (ctrl->id == V4L2_CID_MPEG_VIDC_CRITICAL_PRIORITY)
 		msm_vidc_update_cap_value(inst, PRIORITY, 0, __func__);
-	}
 
 	if (ctrl->id == V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER) {
 		u32 enable;
