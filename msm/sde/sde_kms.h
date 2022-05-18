@@ -318,6 +318,7 @@ struct sde_kms {
 	struct sde_vm *vm;
 
 	unsigned long ipcc_base_addr;
+	u32 debugfs_hw_fence;
 };
 
 struct vsync_info {

@@ -3801,22 +3801,23 @@ static bool _sde_crtc_wait_for_fences(struct drm_crtc *crtc)
 	int num_hw_fences = 0;
 	struct sde_hw_ctl *hw_ctl;
 	bool input_hw_fences_enable;
+	struct sde_kms *sde_kms = _sde_crtc_get_kms(crtc);
 	int ret;
 
 	SDE_DEBUG("\n");
 
-	if (!crtc || !crtc->state) {
+	if (!crtc || !crtc->state || !sde_kms) {
 		SDE_ERROR("invalid crtc/state %pK\n", crtc);
 		return false;
 	}
-
 	hw_ctl = _sde_crtc_get_hw_ctl(crtc);
 
 	SDE_ATRACE_BEGIN("plane_wait_input_fence");
 
 	/* update ctl hw to wait for ipcc input signal before fetch */
 	if (test_bit(HW_FENCE_IN_FENCES_ENABLE, sde_crtc->hwfence_features_mask) &&
-			!sde_fence_update_input_hw_fence_signal(hw_ctl))
+			!sde_fence_update_input_hw_fence_signal(hw_ctl, sde_kms->debugfs_hw_fence,
+			sde_kms->hw_mdp))
 		ipcc_input_signal_wait = true;
 
 	/* avoid hw-fences in first frame after timing engine enable */
@@ -4626,7 +4627,8 @@ void sde_crtc_commit_kickoff(struct drm_crtc *crtc,
 	 * condition between txq update and the hw signal during ctl-done for partial updates
 	 */
 	if (test_bit(HW_FENCE_OUT_FENCES_ENABLE, sde_crtc->hwfence_features_mask) && !is_vid)
-		sde_fence_update_hw_fences_txq(sde_crtc->output_fence, false, 0);
+		sde_fence_update_hw_fences_txq(sde_crtc->output_fence, false, 0,
+			sde_kms->debugfs_hw_fence);
 
 	list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
 		if (encoder->crtc != crtc)

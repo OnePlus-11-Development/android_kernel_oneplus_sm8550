@@ -593,6 +593,60 @@ static u32 sde_hw_get_autorefresh_status(struct sde_hw_mdp *mdp, u32 intf_idx)
 	return autorefresh_status;
 }
 
+static void sde_hw_hw_fence_timestamp_ctrl(struct sde_hw_mdp *mdp, bool enable, bool clear)
+{
+	struct sde_hw_blk_reg_map c;
+	u32 val;
+
+	if (!mdp) {
+		SDE_ERROR("invalid mdp, won't enable hw-fence timestamping\n");
+		return;
+	}
+
+	/* start from the base-address of the mdss */
+	c = mdp->hw;
+	c.blk_off = 0x0;
+
+	val = SDE_REG_READ(&c, MDP_CTL_HW_FENCE_ID_TIMESTAMP_CTRL);
+	if (enable)
+		val |= BIT(0);
+	else
+		val &= ~BIT(0);
+	if (clear)
+		val |= BIT(1);
+	else
+		val &= ~BIT(1);
+	SDE_REG_WRITE(&c, MDP_CTL_HW_FENCE_ID_TIMESTAMP_CTRL, val);
+}
+
+static void sde_hw_input_hw_fence_status(struct sde_hw_mdp *mdp, u64 *s_val, u64 *e_val)
+{
+	u32 start_h, start_l, end_h, end_l;
+	struct sde_hw_blk_reg_map c;
+
+	if (!mdp || IS_ERR_OR_NULL(s_val) || IS_ERR_OR_NULL(e_val)) {
+		SDE_ERROR("invalid mdp\n");
+		return;
+	}
+
+	/* start from the base-address of the mdss */
+	c = mdp->hw;
+	c.blk_off = 0x0;
+
+	start_l = SDE_REG_READ(&c, MDP_CTL_HW_FENCE_INPUT_START_TIMESTAMP0);
+	start_h = SDE_REG_READ(&c, MDP_CTL_HW_FENCE_INPUT_START_TIMESTAMP1);
+	*s_val = (u64)start_h << 32 | start_l;
+
+	end_l = SDE_REG_READ(&c, MDP_CTL_HW_FENCE_INPUT_END_TIMESTAMP0);
+	end_h = SDE_REG_READ(&c, MDP_CTL_HW_FENCE_INPUT_END_TIMESTAMP1);
+	*e_val = (u64)end_h << 32 | end_l;
+
+	/* clear the timestamps */
+	sde_hw_hw_fence_timestamp_ctrl(mdp, false, true);
+
+	wmb(); /* make sure the timestamps are cleared */
+}
+
 static void sde_hw_setup_hw_fences_config(struct sde_hw_mdp *mdp, u32 protocol_id,
 	unsigned long ipcc_base_addr)
 {
@@ -711,8 +765,11 @@ static void _setup_mdp_ops(struct sde_hw_mdp_ops *ops, unsigned long cap, u32 hw
 		ops->set_hdr_plus_metadata = sde_hw_set_hdr_plus_metadata;
 	ops->get_autorefresh_status = sde_hw_get_autorefresh_status;
 
-	if (hw_fence_rev)
+	if (hw_fence_rev) {
 		ops->setup_hw_fences = sde_hw_setup_hw_fences_config;
+		ops->hw_fence_input_timestamp_ctrl = sde_hw_hw_fence_timestamp_ctrl;
+		ops->hw_fence_input_status = sde_hw_input_hw_fence_status;
+	}
 }
 
 static const struct sde_mdp_cfg *_top_offset(enum sde_mdp mdp,

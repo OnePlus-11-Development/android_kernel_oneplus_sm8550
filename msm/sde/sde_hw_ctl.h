@@ -190,6 +190,23 @@ struct sde_hw_ctl_ops {
 	void (*hw_fence_trigger_sw_override)(struct sde_hw_ctl *ctx);
 
 	/**
+	 * enable or clear hw fence output fence timestamps
+	 * @ctx         : ctl path ctx pointer
+	 * @enable      : indicates if timestamps should be enabled
+	 * @clear       : indicates if timestamps should be cleared
+	 */
+	void (*hw_fence_output_timestamp_ctrl)(struct sde_hw_ctl *ctx, bool enable, bool clear);
+
+	/**
+	 * get hw fence output fence timestamps and clear them
+	 * @ctx              : ctl path ctx pointer
+	 * @val_start        : pointer to start timestamp value
+	 * @val_end          : pointer to end timestamp value
+	 * @Return: error code
+	 */
+	int (*hw_fence_output_status)(struct sde_hw_ctl *ctx, u64 *val_start, u64 *val_end);
+
+	/**
 	 * configure output hw fence trigger
 	 * @ctx         : ctl path ctx pointer
 	 * @trigger_sel : select upon which event the output trigger will happen

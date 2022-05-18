@@ -215,6 +215,21 @@ struct sde_hw_mdp_ops {
 	void (*setup_hw_fences)(struct sde_hw_mdp *mdp, u32 protocol_id,
 			unsigned long ipcc_base_addr);
 
+	/**
+	 * hw_fence_input_status - get hw_fence input fence timestamps and clear them
+	 * @mdp:       mdp top context driver
+	 * @s_val:     pointer to start timestamp value to populate
+	 * @e_val:     pointer to end timestamp value to populate
+	 */
+	void (*hw_fence_input_status)(struct sde_hw_mdp *mdp, u64 *s_val, u64 *e_val);
+
+	/**
+	 * hw_fence_input_timestamp_ctrl - enable or clear input fence timestamps
+	 * @mdp:       mdp top context driver
+	 * @enable:    indicates if timestamps should be enabled
+	 * @enable:    indicates if timestamps should be cleared
+	 */
+	void (*hw_fence_input_timestamp_ctrl)(struct sde_hw_mdp *mdp, bool enable, bool clear);
 };
 
 struct sde_hw_mdp {

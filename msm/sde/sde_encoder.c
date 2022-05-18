@@ -3433,6 +3433,35 @@ static enum sde_wb sde_encoder_get_wb(struct sde_mdss_cfg *catalog,
 	return WB_MAX;
 }
 
+void sde_encoder_hw_fence_status(struct sde_kms *sde_kms,
+	struct drm_crtc *crtc, struct sde_hw_ctl *hw_ctl)
+{
+	u64 start_timestamp, end_timestamp;
+
+	if (!sde_kms || !hw_ctl || !sde_kms->hw_mdp) {
+		SDE_ERROR("invalid inputs\n");
+		return;
+	}
+
+	if ((sde_kms->debugfs_hw_fence & SDE_INPUT_HW_FENCE_TIMESTAMP)
+		&& sde_kms->hw_mdp->ops.hw_fence_input_status) {
+
+		sde_kms->hw_mdp->ops.hw_fence_input_status(sde_kms->hw_mdp,
+			&start_timestamp, &end_timestamp);
+		trace_sde_hw_fence_status(crtc->base.id, "input",
+			start_timestamp, end_timestamp);
+	}
+
+	if ((sde_kms->debugfs_hw_fence & SDE_OUTPUT_HW_FENCE_TIMESTAMP)
+		&& hw_ctl->ops.hw_fence_output_status) {
+
+		hw_ctl->ops.hw_fence_output_status(hw_ctl,
+			&start_timestamp, &end_timestamp);
+		trace_sde_hw_fence_status(crtc->base.id, "output",
+			start_timestamp, end_timestamp);
+	}
+}
+
 void sde_encoder_perf_uidle_status(struct sde_kms *sde_kms,
 	struct drm_crtc *crtc)
 {
@@ -3492,7 +3521,7 @@ static void sde_encoder_vblank_callback(struct drm_encoder *drm_enc,
 	unsigned long lock_flags;
 	ktime_t ts = 0;
 
-	if (!drm_enc || !phy_enc)
+	if (!drm_enc || !phy_enc || !phy_enc->sde_kms)
 		return;
 
 	SDE_ATRACE_BEGIN("encoder_vblank_callback");
@@ -3502,8 +3531,7 @@ static void sde_encoder_vblank_callback(struct drm_encoder *drm_enc,
 	 * calculate accurate vsync timestamp when available
 	 * set current time otherwise
 	 */
-	if (phy_enc->sde_kms && test_bit(SDE_FEATURE_HW_VSYNC_TS,
-					 phy_enc->sde_kms->catalog->features))
+	if (test_bit(SDE_FEATURE_HW_VSYNC_TS, phy_enc->sde_kms->catalog->features))
 		ts = sde_encoder_calc_last_vsync_timestamp(drm_enc);
 	if (!ts)
 		ts = ktime_get();
@@ -3515,9 +3543,11 @@ static void sde_encoder_vblank_callback(struct drm_encoder *drm_enc,
 		sde_enc->crtc_vblank_cb(sde_enc->crtc_vblank_cb_data, ts);
 	spin_unlock_irqrestore(&sde_enc->enc_spinlock, lock_flags);
 
-	if (phy_enc->sde_kms &&
-			phy_enc->sde_kms->catalog->uidle_cfg.debugfs_perf)
+	if (phy_enc->sde_kms->catalog->uidle_cfg.debugfs_perf)
 		sde_encoder_perf_uidle_status(phy_enc->sde_kms, sde_enc->crtc);
+
+	if (phy_enc->sde_kms->debugfs_hw_fence)
+		sde_encoder_hw_fence_status(phy_enc->sde_kms, sde_enc->crtc, phy_enc->hw_ctl);
 
 	SDE_ATRACE_END("encoder_vblank_callback");
 }
@@ -3706,7 +3736,8 @@ int sde_encoder_idle_request(struct drm_encoder *drm_enc)
 * phys: Pointer to physical encoder structure
 *
 */
-static inline void _sde_encoder_update_retire_txq(struct sde_encoder_phys *phys)
+static inline void _sde_encoder_update_retire_txq(struct sde_encoder_phys *phys,
+	struct sde_kms *sde_kms)
 {
 	struct sde_connector *c_conn;
 	int line_count;
@@ -3720,7 +3751,8 @@ static inline void _sde_encoder_update_retire_txq(struct sde_encoder_phys *phys)
 	line_count = sde_connector_get_property(phys->connector->state,
 			CONNECTOR_PROP_EARLY_FENCE_LINE);
 	if (c_conn->hwfence_wb_retire_fences_enable)
-		sde_fence_update_hw_fences_txq(c_conn->retire_fence, false, line_count);
+		sde_fence_update_hw_fences_txq(c_conn->retire_fence, false, line_count,
+			sde_kms->debugfs_hw_fence);
 }
 
 /**
@@ -3933,16 +3965,23 @@ void sde_encoder_helper_hw_reset(struct sde_encoder_phys *phys_enc)
 void sde_encoder_helper_update_out_fence_txq(struct sde_encoder_virt *sde_enc, bool is_vid)
 {
 	struct sde_crtc *sde_crtc;
+	struct sde_kms *sde_kms = NULL;
 
 	if (!sde_enc || !sde_enc->crtc) {
 		SDE_ERROR("invalid encoder %d\n", !sde_enc);
+		return;
+	}
+	sde_kms = sde_encoder_get_kms(&sde_enc->base);
+	if (!sde_kms) {
+		SDE_ERROR("invalid kms\n");
 		return;
 	}
 
 	sde_crtc = to_sde_crtc(sde_enc->crtc);
 
 	SDE_EVT32(DRMID(sde_enc->crtc), is_vid);
-	sde_fence_update_hw_fences_txq(sde_crtc->output_fence, is_vid, 0);
+	sde_fence_update_hw_fences_txq(sde_crtc->output_fence, is_vid, 0, sde_kms ?
+		sde_kms->debugfs_hw_fence : 0);
 }
 
 /**
@@ -4594,6 +4633,7 @@ void sde_encoder_kickoff(struct drm_encoder *drm_enc, bool config_changed)
 {
 	struct sde_encoder_virt *sde_enc;
 	struct sde_encoder_phys *phys;
+	struct sde_kms *sde_kms;
 	unsigned int i;
 
 	if (!drm_enc) {
@@ -4619,8 +4659,9 @@ void sde_encoder_kickoff(struct drm_encoder *drm_enc, bool config_changed)
 	}
 
 	/* update txq for any output retire hw-fence (wb-path) */
+	sde_kms = sde_encoder_get_kms(&sde_enc->base);
 	if (sde_enc->cur_master)
-		_sde_encoder_update_retire_txq(sde_enc->cur_master);
+		_sde_encoder_update_retire_txq(sde_enc->cur_master, sde_kms);
 
 	/* All phys encs are ready to go, trigger the kickoff */
 	_sde_encoder_kickoff_phys(sde_enc, config_changed);

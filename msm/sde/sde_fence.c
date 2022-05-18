@@ -251,7 +251,7 @@ int sde_fence_register_hw_fences_wait(struct sde_hw_ctl *hw_ctl, struct dma_fenc
 	return ret;
 }
 
-static int _arm_output_hw_fence(struct sde_hw_ctl *hw_ctl, u32 line_count)
+static int _arm_output_hw_fence(struct sde_hw_ctl *hw_ctl, u32 line_count, u32 debugfs_hw_fence)
 {
 	struct sde_hw_fence_data *data;
 	u32 ipcc_out_signal;
@@ -279,6 +279,10 @@ static int _arm_output_hw_fence(struct sde_hw_ctl *hw_ctl, u32 line_count)
 	SDE_DEBUG("out-fence ctl_id:%d out_signal:%d hw_fence_client:%s\n",
 		ctl_id, ipcc_out_signal, _get_client_id_name(data->hw_fence_client_id));
 
+	if ((debugfs_hw_fence & SDE_OUTPUT_HW_FENCE_TIMESTAMP) &&
+			hw_ctl->ops.hw_fence_output_timestamp_ctrl)
+		hw_ctl->ops.hw_fence_output_timestamp_ctrl(hw_ctl, true, false);
+
 	/* update client/signal output fence */
 	hw_ctl->ops.hw_fence_update_output_fence(hw_ctl, data->ipcc_out_client, ipcc_out_signal);
 	SDE_EVT32_VERBOSE(ctl_id, ipcc_out_signal);
@@ -293,7 +297,8 @@ static int _arm_output_hw_fence(struct sde_hw_ctl *hw_ctl, u32 line_count)
 	return 0;
 }
 
-static int _sde_fence_arm_output_hw_fence(struct sde_fence_context *ctx, u32 line_count)
+static int _sde_fence_arm_output_hw_fence(struct sde_fence_context *ctx, u32 line_count,
+		u32 debugfs_hw_fence)
 {
 	struct sde_hw_ctl *hw_ctl = NULL;
 	struct sde_fence *fc, *next;
@@ -330,13 +335,14 @@ static int _sde_fence_arm_output_hw_fence(struct sde_fence_context *ctx, u32 lin
 
 	/* arm dpu to trigger output hw-fence ipcc signal upon completion */
 	if (hw_ctl)
-		_arm_output_hw_fence(hw_ctl, line_count);
+		_arm_output_hw_fence(hw_ctl, line_count, debugfs_hw_fence);
 
 	return 0;
 }
 
 /* update output hw_fences txq */
-int sde_fence_update_hw_fences_txq(struct sde_fence_context *ctx, bool vid_mode, u32 line_count)
+int sde_fence_update_hw_fences_txq(struct sde_fence_context *ctx, bool vid_mode, u32 line_count,
+		u32 debugfs_hw_fence)
 {
 	int ret = 0;
 	struct sde_hw_fence_data *data;
@@ -409,7 +415,7 @@ exit:
 
 	/* arm dpu to trigger output hw-fence ipcc signal upon completion in vid-mode */
 	if ((txq_updated && hw_ctl) || line_count)
-		_sde_fence_arm_output_hw_fence(ctx, line_count);
+		_sde_fence_arm_output_hw_fence(ctx, line_count, debugfs_hw_fence);
 
 	return ret;
 }
@@ -462,7 +468,8 @@ static int _reset_hw_fence_timeline(struct sde_hw_ctl *hw_ctl, u32 flags)
 	return ret;
 }
 
-int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *hw_ctl)
+int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *hw_ctl, u32 debugfs_hw_fence,
+		struct sde_hw_mdp *hw_mdp)
 {
 	struct sde_hw_fence_data *data;
 	u32 ipcc_signal_id;
@@ -470,7 +477,7 @@ int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *hw_ctl)
 	int ctl_id;
 
 	/* we must support sw_override as well, so check both functions */
-	if (!hw_ctl || !hw_ctl->ops.hw_fence_update_input_fence ||
+	if (!hw_mdp || !hw_ctl || !hw_ctl->ops.hw_fence_update_input_fence ||
 			!hw_ctl->ops.hw_fence_trigger_sw_override) {
 		SDE_ERROR("missing ctl/override/update fence %d\n", !hw_ctl);
 		return -EINVAL;
@@ -478,6 +485,10 @@ int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *hw_ctl)
 
 	ctl_id = hw_ctl->idx - CTL_0;
 	data = &hw_ctl->hwfence_data;
+
+	if ((debugfs_hw_fence & SDE_INPUT_HW_FENCE_TIMESTAMP)
+			&& hw_mdp->ops.hw_fence_input_timestamp_ctrl)
+		hw_mdp->ops.hw_fence_input_timestamp_ctrl(hw_mdp, true, false);
 
 	ipcc_signal_id = data->ipcc_in_signal;
 	ipcc_client_id = data->ipcc_in_client;

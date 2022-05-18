@@ -61,6 +61,11 @@
 #define CTL_OUTPUT_FENCE_ID           0x260
 #define CTL_HW_FENCE_STATUS           0x278
 #define CTL_OUTPUT_FENCE_SW_OVERRIDE  0x27C
+#define CTL_TIMESTAMP_CTRL            0x264
+#define CTL_OUTPUT_FENCE_START_TIMESTAMP0 0x268
+#define CTL_OUTPUT_FENCE_START_TIMESTAMP1 0x26C
+#define CTL_OUTPUT_FENCE_END_TIMESTAMP0 0x270
+#define CTL_OUTPUT_FENCE_END_TIMESTAMP1 0x274
 
 #define CTL_MIXER_BORDER_OUT            BIT(24)
 #define CTL_FLUSH_MASK_ROT              BIT(27)
@@ -375,6 +380,46 @@ static inline void sde_hw_ctl_trigger_sw_override(struct sde_hw_ctl *ctx)
 static inline void sde_hw_ctl_trigger_output_fence_override(struct sde_hw_ctl *ctx)
 {
 	SDE_REG_WRITE(&ctx->hw, CTL_OUTPUT_FENCE_SW_OVERRIDE, 0x1);
+}
+
+static inline void sde_hw_ctl_fence_timestamp_ctrl(struct sde_hw_ctl *ctx, bool enable, bool clear)
+{
+	u32 val;
+
+	val = SDE_REG_READ(&ctx->hw, CTL_TIMESTAMP_CTRL);
+	if (enable)
+		val |= BIT(0);
+	else
+		val &= ~BIT(0);
+	if (clear)
+		val |= BIT(1);
+	else
+		val &= ~BIT(1);
+
+	SDE_REG_WRITE(&ctx->hw, CTL_TIMESTAMP_CTRL, val);
+	wmb(); /* make sure the ctrl is written */
+}
+
+static inline int sde_hw_ctl_output_fence_timestamps(struct sde_hw_ctl *ctx,
+			u64 *val_start, u64 *val_end)
+{
+	u32 start_l, start_h, end_l, end_h;
+
+	if (!ctx || IS_ERR_OR_NULL(val_start) || IS_ERR_OR_NULL(val_end))
+		return -EINVAL;
+
+	start_l = SDE_REG_READ(&ctx->hw, CTL_OUTPUT_FENCE_START_TIMESTAMP0);
+	start_h = SDE_REG_READ(&ctx->hw, CTL_OUTPUT_FENCE_START_TIMESTAMP1);
+	*val_start = (u64)start_h << 32 | start_l;
+
+	end_l = SDE_REG_READ(&ctx->hw, CTL_OUTPUT_FENCE_END_TIMESTAMP0);
+	end_h = SDE_REG_READ(&ctx->hw, CTL_OUTPUT_FENCE_END_TIMESTAMP1);
+	*val_end = (u64)end_h << 32 | end_l;
+
+	/* clear timestamps */
+	sde_hw_ctl_fence_timestamp_ctrl(ctx, false, true);
+
+	return 0;
 }
 
 static inline int sde_hw_ctl_trigger_start(struct sde_hw_ctl *ctx)
@@ -1433,6 +1478,8 @@ static void _setup_ctl_ops(struct sde_hw_ctl_ops *ops,
 		ops->hw_fence_trigger_sw_override = sde_hw_ctl_trigger_sw_override;
 		ops->get_hw_fence_status = sde_hw_ctl_get_hw_fence_status;
 		ops->trigger_output_fence_override = sde_hw_ctl_trigger_output_fence_override;
+		ops->hw_fence_output_status = sde_hw_ctl_output_fence_timestamps;
+		ops->hw_fence_output_timestamp_ctrl = sde_hw_ctl_fence_timestamp_ctrl;
 	}
 
 	if (cap & BIT(SDE_CTL_UIDLE))

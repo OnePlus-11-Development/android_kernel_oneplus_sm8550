@@ -19,6 +19,9 @@
 #define HW_FENCE_TRIGGER_SEL_CTRL_DONE       0x0
 #define HW_FENCE_TRIGGER_SEL_PROG_LINE_COUNT 0x1
 
+#define SDE_INPUT_HW_FENCE_TIMESTAMP         BIT(0)
+#define SDE_OUTPUT_HW_FENCE_TIMESTAMP        BIT(1)
+
 #define SDE_FENCE_NAME_SIZE	24
 
 #define MAX_SDE_HFENCE_OUT_SIGNAL_PING_PONG 2
@@ -179,17 +182,21 @@ int sde_fence_register_hw_fences_wait(struct sde_hw_ctl *hw_ctl, struct dma_fenc
  *
  * Returns: Zero on success, otherwise returns an error code.
  */
-int sde_fence_update_hw_fences_txq(struct sde_fence_context *ctx, bool vid_mode, u32 line_count);
+int sde_fence_update_hw_fences_txq(struct sde_fence_context *ctx, bool vid_mode, u32 line_count,
+	u32 debugfs_hw_fence);
 
 /**
  * sde_fence_update_input_hw_fence_signal - updates input-fence ipcc signal in dpu and enables
  *                                  hw-fences for the ctl.
  *
  * @ctl: hw ctl to update the input-fence and enable hw-fences
+ * @debugfs_hw_fence: hw-fence timestamp debugfs value
+ * @hw_mdp: pointer to hw_mdp to get timestamp registers
  *
  * Returns: Zero on success, otherwise returns an error code.
  */
-int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *ctl);
+int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *ctl, u32 debugfs_hw_fence,
+	struct sde_hw_mdp *hw_mdp);
 
 /**
  * sde_fence_deinit - deinit fence container

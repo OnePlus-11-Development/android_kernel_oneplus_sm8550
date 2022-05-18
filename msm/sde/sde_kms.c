@@ -172,6 +172,8 @@ static int _sde_debugfs_init(struct sde_kms *sde_kms)
 
 	debugfs_create_u32("pm_suspend_clk_dump", 0600, debugfs_root,
 			(u32 *)&sde_kms->pm_suspend_clk_dump);
+	debugfs_create_u32("hw_fence_status", 0600, debugfs_root,
+			(u32 *)&sde_kms->debugfs_hw_fence);
 
 	return 0;
 }
