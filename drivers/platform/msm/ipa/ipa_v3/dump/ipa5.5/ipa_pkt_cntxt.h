@@ -97,7 +97,7 @@ struct ipa_pkt_ctntx_s {
 	u64	ff                               : 1; /* Word 2 Bit 44 */
 	u64	mf                               : 1; /* Word 2 Bit 45 */
 	u64	pkt_is_frag                      : 1; /* Word 2 Bit 46 */
-	u64	cs_disavle_trailer_valid_bit     : 1; /* Word 2 Bit 47 */
+	u64	cs_disable_trailer_valid_bit     : 1; /* Word 2 Bit 47 */
 	u64	exc_checksum                     : 1; /* Word 2 Bit 48 */
 	u64	trnseq_0                         : 3; /* Word 2 Bits 49-51 */
 	u64	trnseq_1                         : 3; /* Word 2 Bits 52-54 */
@@ -111,7 +111,7 @@ struct ipa_pkt_ctntx_s {
 	u64	dps_tx_push_cnt                  : 2; /* Word 3 Bits 27-28 */
 	u64	vol_ic_dcph_cfg                  : 1; /* Word 3 Bit 29 */
 	u64	vol_ic_tag_stts                  : 1; /* Word 3 Bit 30 */
-	u64	vol_ic_pxkt_init_ex              : 1; /* Word 3 Bit 31 */
+	u64	vol_ic_pkt_init_ex              : 1; /* Word 3 Bit 31 */
 	u64	vol_ic_pkt_init                  : 1; /* Word 3 Bit 32 */
 	u64	trnseq_0_preucp                  : 1; /* Word 3 Bit 33 */
 	u64	dest_pipe_overridden_ucp         : 1; /* Word 3 Bit 34 */
@@ -274,7 +274,7 @@ struct ipa_pkt_ctntx_s {
 	u64	bearer_context_index             : 2; /* Word 20 Bits 17-18 */
 	u64	ulso_ipv4_id_mode                : 2; /* Word 20 Bits 19-20 */
 	u64	ulso_frame_valid                 : 1; /* Word 20 Bit 21 */
-	u64	close_deafault                   : 1; /* Word 20 Bit 22 */
+	u64	close_default                   : 1; /* Word 20 Bit 22 */
 	u64	close_vp_after                   : 1; /* Word 20 Bit 23 */
 	u64	inc_ipv4_id                      : 1; /* Word 20 Bit 24 */
 	u64	open_vp                          : 1; /* Word 20 Bit 25 */

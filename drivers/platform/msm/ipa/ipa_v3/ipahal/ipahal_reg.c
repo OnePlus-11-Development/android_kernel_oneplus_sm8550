@@ -177,6 +177,7 @@ static const char *ipareg_name_to_str[IPA_REG_MAX] = {
 	__stringify(IPA_TSP_INGRESS_POLICING_CFG),
 	__stringify(IPA_TSP_EGRESS_POLICING_CFG),
 	__stringify(IPA_STAT_TSP_DROP_BASE),
+	__stringify(IPA_STATE_QMNGR_QUEUE_NONEMPTY),
 	__stringify(IPA_RAM_INGRESS_POLICER_DB_BASE_ADDR),
 	__stringify(IPA_RAM_EGRESS_SHAPING_PROD_DB_BASE_ADDR),
 	__stringify(IPA_RAM_EGRESS_SHAPING_TC_DB_BASE_ADDR),
@@ -5208,6 +5209,9 @@ static struct ipahal_reg_obj ipahal_reg_objs[IPA_HW_MAX][IPA_REG_MAX] = {
 	[IPA_HW_v5_5][IPA_STAT_TSP_DROP_BASE] = {
 		ipareg_construct_dummy, ipareg_parse_dummy,
 		0x00000A14, 0, 0, 0, 0, 0},
+	[IPA_HW_v5_5][IPA_STATE_QMNGR_QUEUE_NONEMPTY] = {
+		ipareg_construct_dummy, ipareg_parse_dummy,
+		0x00000A18, 0, 0, 0, 0, 0},
 	[IPA_HW_v5_5][IPA_ENDP_INIT_ULSO_CFG_n] = {
 		ipareg_construct_dummy, ipareg_parse_dummy,
 		0x00001070, 0x80, 0, 0, 0, 0},

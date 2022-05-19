@@ -2853,19 +2853,19 @@ static int ipa_fltrt_generate_hw_rule_bdy_from_eq_5_5(
 	} else if (extra_bytes > IPA3_0_HW_TBL_HDR_WIDTH) {
 		/* two extra words */
 		extra = *buf;
-		rest = *buf + IPA3_0_HW_TBL_HDR_WIDTH * 2;
+		rest = *buf + IPA3_0_HW_TBL_HDR_WIDTH * 2 - ext_hdr * 2;
 	} else if (extra_bytes > 0) {
 		/* single exra word */
 		extra = *buf;
 		/* With ext_hdr, 2 bytes are already occupied. */
 		if (ext_hdr && extra_bytes > (IPA3_0_HW_TBL_HDR_WIDTH - 2))
-			rest = *buf + IPA3_0_HW_TBL_HDR_WIDTH * 2;
+			rest = *buf + IPA3_0_HW_TBL_HDR_WIDTH * 2 - ext_hdr * 2;
 		else
-			rest = *buf + IPA3_0_HW_TBL_HDR_WIDTH;
+			rest = *buf + IPA3_0_HW_TBL_HDR_WIDTH - ext_hdr * 2;
 	} else {
 		/* no extra words */
-		extra = NULL;
-		rest = *buf;
+		extra = ext_hdr ? *buf : NULL;
+		rest = *buf - ext_hdr * 2 + ext_hdr * IPA3_0_HW_TBL_HDR_WIDTH;
 	}
 
 	/*
