@@ -25,6 +25,7 @@
 #define DATARMNET8fc07fbb24 ((0xeb7+1158-0x132d))
 #define DATARMNETeaf0945284 \
 	(const_ilog2(DATARMNET8fc07fbb24))
+extern void(*rmnet_wlan_ll_tuple_hook)(struct sk_buff*DATARMNET543491eb0f);
 struct DATARMNET4f49486833{struct hlist_node DATARMNETe8608dd267;struct rcu_head
  DATARMNET28bfe9e6ad;struct hrtimer DATARMNET9f31ce5d2d;struct 
 DATARMNET0ca9d8ead7 DATARMNET54338da2ff;struct DATARMNET8d3c2559ca 
@@ -116,8 +117,8 @@ daddr,sizeof(__be32));DATARMNET099aa93adc.flowi4_oif=DATARMNET813ca18d06->
 ifindex;DATARMNET099aa93adc.flowi4_flags=FLOWI_FLAG_KNOWN_NH;DATARMNET066b8bd537
 =ip_route_output_key(&init_net,&DATARMNET099aa93adc);if(IS_ERR(
 DATARMNET066b8bd537)){DATARMNET17f6bc1be5(DATARMNET666fc9a664);
-DATARMNET39542b437e=dev_get_by_name_rcu(&init_net,"\x64\x75\x6d\x6d\x79\x30");if
-(!DATARMNET39542b437e){DATARMNET17f6bc1be5(DATARMNET521b065310);goto 
+DATARMNET39542b437e=dev_get_by_name_rcu(&init_net,"dummy0");if(!
+DATARMNET39542b437e){DATARMNET17f6bc1be5(DATARMNET521b065310);goto 
 DATARMNETc1174a0f45;}DATARMNET099aa93adc.flowi4_oif=DATARMNET39542b437e->ifindex
 ;DATARMNET099aa93adc.flowi4_flags=FLOWI_FLAG_KNOWN_NH;DATARMNET066b8bd537=
 ip_route_output_key(&init_net,&DATARMNET099aa93adc);if(IS_ERR(
@@ -306,9 +307,33 @@ DATARMNET7ed5754a5c;}return NULL;}void DATARMNETf4e1a29dbc(void){struct
 DATARMNET4f49486833*DATARMNET63b1a086d5;int DATARMNET5c2fd31d7b;rcu_read_lock();
 hash_for_each_rcu(DATARMNET5413d6f8ec,DATARMNET5c2fd31d7b,DATARMNET63b1a086d5,
 DATARMNETe8608dd267)hrtimer_cancel(&DATARMNET63b1a086d5->DATARMNET9f31ce5d2d);
-rcu_read_unlock();}int DATARMNET9f106ed933(void){int DATARMNET268a8314cf;
-DATARMNET268a8314cf=register_netdevice_notifier(&DATARMNET61d0113123);if(
-DATARMNET268a8314cf)pr_err(
+rcu_read_unlock();}void DATARMNET6f73df41cd(struct sk_buff*DATARMNET543491eb0f){
+int protocol=-(0xd26+209-0xdf6);struct DATARMNETe117226f58*DATARMNET3396919a68=
+rcu_dereference(DATARMNETcde6e442f5);if(!DATARMNET3396919a68)return;if(
+DATARMNET543491eb0f->protocol==htons(ETH_P_IP)){struct iphdr*DATARMNET86f1f2cdc9
+,DATARMNETbf6548198e;DATARMNET86f1f2cdc9=skb_header_pointer(DATARMNET543491eb0f,
+(0xd2d+202-0xdf7),sizeof(*DATARMNET86f1f2cdc9),&DATARMNETbf6548198e);if(!
+DATARMNET86f1f2cdc9)return;if(DATARMNET86f1f2cdc9->version!=DATARMNET3396919a68
+->DATARMNET0d956cc77a&&DATARMNET86f1f2cdc9->saddr!=DATARMNET3396919a68->
+DATARMNETdfe430c2d6&&DATARMNET86f1f2cdc9->daddr!=DATARMNET3396919a68->
+DATARMNET2cb607d686)return;protocol=DATARMNET86f1f2cdc9->protocol;}else if(
+DATARMNET543491eb0f->protocol==htons(ETH_P_IPV6)){struct ipv6hdr*
+DATARMNETbf55123e5b,DATARMNETcf1d9e2c1e;DATARMNETbf55123e5b=skb_header_pointer(
+DATARMNET543491eb0f,(0xd2d+202-0xdf7),sizeof(*DATARMNETbf55123e5b),&
+DATARMNETcf1d9e2c1e);if(!DATARMNETbf55123e5b)return;if(DATARMNETbf55123e5b->
+version!=DATARMNET3396919a68->DATARMNET0d956cc77a&&ipv6_addr_cmp(&
+DATARMNETbf55123e5b->saddr,&DATARMNET3396919a68->DATARMNET815cbb4bf5)&&
+ipv6_addr_cmp(&DATARMNETbf55123e5b->daddr,&DATARMNET3396919a68->
+DATARMNETc3f31215b7))return;protocol=DATARMNETbf55123e5b->nexthdr;}if(protocol==
+IPPROTO_UDP){if(udp_hdr(DATARMNET543491eb0f)->source==DATARMNET3396919a68->
+DATARMNET08e913477e&&udp_hdr(DATARMNET543491eb0f)->dest==DATARMNET3396919a68->
+DATARMNETda7f7fa492)goto DATARMNET9573fcc9c6;}return;DATARMNET9573fcc9c6:
+DATARMNET543491eb0f->priority=2607612160;DATARMNET5ca94dbc3c(DATARMNETc2cade1d75
+);}void DATARMNET333c107558(void){rcu_assign_pointer(rmnet_wlan_ll_tuple_hook,
+DATARMNET6f73df41cd);}void DATARMNET4c08c7210c(void){rcu_assign_pointer(
+rmnet_wlan_ll_tuple_hook,NULL);synchronize_rcu();}int DATARMNET9f106ed933(void){
+int DATARMNET268a8314cf;DATARMNET268a8314cf=register_netdevice_notifier(&
+DATARMNET61d0113123);if(DATARMNET268a8314cf)pr_err(
 "\x25\x73\x28\x29\x3a\x20\x6e\x6f\x74\x69\x66\x69\x65\x72\x20\x66\x61\x69\x6c\x65\x64" "\n"
 ,__func__);return DATARMNET268a8314cf;}int DATARMNETf56cbaa2b1(void){int 
 DATARMNET268a8314cf;DATARMNET268a8314cf=unregister_netdevice_notifier(&
