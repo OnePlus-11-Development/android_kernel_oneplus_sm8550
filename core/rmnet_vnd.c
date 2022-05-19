@@ -47,6 +47,20 @@ typedef void (*rmnet_perf_egress_hook1_t)(struct sk_buff *skb);
 rmnet_perf_egress_hook1_t rmnet_perf_egress_hook1 __rcu __read_mostly;
 EXPORT_SYMBOL(rmnet_perf_egress_hook1);
 
+typedef void (*rmnet_aps_pre_queue_t)(struct net_device *dev,
+				      struct sk_buff *skb);
+rmnet_aps_pre_queue_t rmnet_aps_pre_queue __read_mostly;
+EXPORT_SYMBOL(rmnet_aps_pre_queue);
+
+typedef int (*rmnet_aps_post_queue_t)(struct net_device *dev,
+				      struct sk_buff *skb);
+rmnet_aps_post_queue_t rmnet_aps_post_queue __read_mostly;
+EXPORT_SYMBOL(rmnet_aps_post_queue);
+
+typedef void (*rmnet_wlan_ll_tuple_hook_t)(struct sk_buff *skb);
+rmnet_wlan_ll_tuple_hook_t rmnet_wlan_ll_tuple_hook __rcu __read_mostly;
+EXPORT_SYMBOL(rmnet_wlan_ll_tuple_hook);
+
 /* RX/TX Fixup */
 
 void rmnet_vnd_rx_fixup(struct net_device *dev, u32 skb_len)
@@ -85,10 +99,21 @@ static netdev_tx_t rmnet_vnd_start_xmit(struct sk_buff *skb,
 	u32 mark;
 	unsigned int len;
 	rmnet_perf_tether_egress_hook_t rmnet_perf_tether_egress;
+	rmnet_aps_post_queue_t aps_post_queue;
+	rmnet_wlan_ll_tuple_hook_t rmnet_wlan_ll_tuple;
 	bool low_latency = false;
 	bool need_to_drop = false;
 
 	priv = netdev_priv(dev);
+
+	aps_post_queue = rcu_dereference(rmnet_aps_post_queue);
+	if (aps_post_queue)
+		if (unlikely(aps_post_queue(dev, skb))) {
+			this_cpu_inc(priv->pcpu_stats->stats.tx_drops);
+			kfree_skb(skb);
+			return NETDEV_TX_OK;
+		}
+
 	if (priv->real_dev) {
 		ip_type = (ip_hdr(skb)->version == 4) ?
 					AF_INET : AF_INET6;
@@ -98,6 +123,11 @@ static netdev_tx_t rmnet_vnd_start_xmit(struct sk_buff *skb,
 		rmnet_perf_tether_egress = rcu_dereference(rmnet_perf_tether_egress_hook);
 		if (rmnet_perf_tether_egress) {
 			rmnet_perf_tether_egress(skb);
+		}
+
+		rmnet_wlan_ll_tuple = rcu_dereference(rmnet_wlan_ll_tuple_hook);
+		if (rmnet_wlan_ll_tuple) {
+			rmnet_wlan_ll_tuple(skb);
 		}
 
 		qmi_rmnet_get_flow_state(dev, skb, &need_to_drop, &low_latency);
@@ -262,9 +292,6 @@ static void rmnet_get_stats64(struct net_device *dev,
 	s->tx_dropped = total_stats.tx_drops;
 }
 
-void (*rmnet_aps_set_prio)(struct net_device *dev, struct sk_buff *skb);
-EXPORT_SYMBOL(rmnet_aps_set_prio);
-
 static u16 rmnet_vnd_select_queue(struct net_device *dev,
 				  struct sk_buff *skb,
 				  struct net_device *sb_dev)
@@ -274,7 +301,7 @@ static u16 rmnet_vnd_select_queue(struct net_device *dev,
 	int boost_trigger = 0;
 	int txq = 0;
 	rmnet_perf_egress_hook1_t rmnet_perf_egress1;
-	void (*aps_set_prio)(struct net_device *dev, struct sk_buff *skb);
+	rmnet_aps_pre_queue_t aps_pre_queue;
 
 	rmnet_perf_egress1 = rcu_dereference(rmnet_perf_egress_hook1);
 	if (rmnet_perf_egress1) {
@@ -355,6 +382,7 @@ skip_trace_print_icmp_tx:
 skip_trace_print_tcp_tx:
 	if (trace_print_udp_tx_enabled()) {
 		char saddr[INET6_ADDRSTRLEN], daddr[INET6_ADDRSTRLEN];
+		u16 ip_id = 0;
 
 		memset(saddr, 0, INET6_ADDRSTRLEN);
 		memset(daddr, 0, INET6_ADDRSTRLEN);
@@ -365,6 +393,7 @@ skip_trace_print_tcp_tx:
 
 			snprintf(saddr, INET6_ADDRSTRLEN, "%pI4", &ip_hdr(skb)->saddr);
 			snprintf(daddr, INET6_ADDRSTRLEN, "%pI4", &ip_hdr(skb)->daddr);
+			ip_id = ntohs(ip_hdr(skb)->id);
 		}
 
 		if (skb->protocol == htons(ETH_P_IPV6)) {
@@ -375,7 +404,7 @@ skip_trace_print_tcp_tx:
 			snprintf(daddr, INET6_ADDRSTRLEN, "%pI6", &ipv6_hdr(skb)->daddr);
 		}
 
-		trace_print_udp_tx(skb, saddr, daddr, udp_hdr(skb));
+		trace_print_udp_tx(skb, saddr, daddr, udp_hdr(skb), ip_id);
 	}
 
 skip_trace_print_udp_tx:
@@ -437,11 +466,9 @@ skip_trace:
 			(void) boost_period;
 	}
 
-	rcu_read_lock();
-	aps_set_prio = READ_ONCE(rmnet_aps_set_prio);
-	if (aps_set_prio)
-		aps_set_prio(dev, skb);
-	rcu_read_unlock();
+	aps_pre_queue = rcu_dereference(rmnet_aps_pre_queue);
+	if (aps_pre_queue)
+		aps_pre_queue(dev, skb);
 
 	return (txq < dev->real_num_tx_queues) ? txq : 0;
 }

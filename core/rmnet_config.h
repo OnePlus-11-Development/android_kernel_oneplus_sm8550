@@ -219,6 +219,7 @@ struct rmnet_priv {
 	struct gro_cells gro_cells;
 	struct rmnet_priv_stats stats;
 	void __rcu *qos_info;
+	char aps_cb[16];
 };
 
 enum rmnet_dl_marker_prio {
