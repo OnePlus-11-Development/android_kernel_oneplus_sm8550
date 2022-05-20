@@ -1128,9 +1128,13 @@ int msm_vidc_decide_quality_mode_iris3(struct msm_vidc_inst* inst)
 	max_hq_mbpf = core->capabilities[MAX_MBPF_HQ].value;;
 	max_hq_mbps = core->capabilities[MAX_MBPS_HQ].value;;
 
-	if (!is_realtime_session(inst) && mbpf <= max_hq_mbpf) {
-		mode = MSM_VIDC_MAX_QUALITY_MODE;
-		goto decision_done;
+	if (!is_realtime_session(inst)) {
+		if (((capability->cap[COMPLEXITY].flags & CAP_FLAG_CLIENT_SET) &&
+			(capability->cap[COMPLEXITY].value >= DEFAULT_COMPLEXITY)) ||
+			mbpf <= max_hq_mbpf) {
+			mode = MSM_VIDC_MAX_QUALITY_MODE;
+			goto decision_done;
+		}
 	}
 
 	if (mbpf <= max_hq_mbpf && mbps <= max_hq_mbps)
