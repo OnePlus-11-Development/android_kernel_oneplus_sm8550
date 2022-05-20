@@ -254,19 +254,19 @@ static inline bool is_all_parents_visited(
 
 static int add_node_list(struct list_head *list, enum msm_vidc_inst_capability_type cap_id)
 {
+	int rc = 0;
 	struct msm_vidc_inst_cap_entry *entry;
 
-	entry = kzalloc(sizeof(struct msm_vidc_inst_cap_entry), GFP_KERNEL);
-	if (!entry) {
-		d_vpr_e("%s: msm_vidc_inst_cap_entry alloc failed\n", __func__);
-		return -EINVAL;
-	}
+	rc = msm_vidc_vmem_alloc(sizeof(struct msm_vidc_inst_cap_entry),
+			(void **)&entry, __func__);
+	if (rc)
+		return rc;
 
 	INIT_LIST_HEAD(&entry->list);
 	entry->cap_id = cap_id;
 	list_add_tail(&entry->list, list);
 
-	return 0;
+	return rc;
 }
 
 static int add_node(
@@ -696,7 +696,7 @@ static int msm_vidc_adjust_dynamic_property(struct msm_vidc_inst *inst,
 		}
 
 		list_del_init(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 
 	/* expecting children_list to be empty */
@@ -711,12 +711,12 @@ error:
 	list_for_each_entry_safe(entry, temp, &inst->children_list, list) {
 		i_vpr_e(inst, "%s: child list: %s\n", __func__, cap_name(entry->cap_id));
 		list_del_init(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 	list_for_each_entry_safe(entry, temp, &inst->firmware_list, list) {
 		i_vpr_e(inst, "%s: fw list: %s\n", __func__, cap_name(entry->cap_id));
 		list_del_init(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 
 	return rc;
@@ -739,7 +739,7 @@ static int msm_vidc_set_dynamic_property(struct msm_vidc_inst *inst)
 			goto error;
 
 		list_del_init(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 
 	return 0;
@@ -747,7 +747,7 @@ error:
 	list_for_each_entry_safe(entry, temp, &inst->firmware_list, list) {
 		i_vpr_e(inst, "%s: fw list: %s\n", __func__, cap_name(entry->cap_id));
 		list_del_init(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 
 	return rc;
@@ -771,7 +771,7 @@ int msm_vidc_ctrl_deinit(struct msm_vidc_inst *inst)
 	i_vpr_h(inst, "%s(): num ctrls %d\n", __func__, inst->num_ctrls);
 	v4l2_ctrl_handler_free(&inst->ctrl_handler);
 	memset(&inst->ctrl_handler, 0, sizeof(struct v4l2_ctrl_handler));
-	kfree(inst->ctrls);
+	msm_vidc_vmem_free((void **)&inst->ctrls);
 	inst->ctrls = NULL;
 
 	return 0;
@@ -807,12 +807,10 @@ int msm_vidc_ctrl_init(struct msm_vidc_inst *inst)
 			__func__);
 		return -EINVAL;
 	}
-	inst->ctrls = kcalloc(num_ctrls,
-		sizeof(struct v4l2_ctrl *), GFP_KERNEL);
-	if (!inst->ctrls) {
-		i_vpr_e(inst, "%s: failed to allocate ctrl\n", __func__);
-		return -ENOMEM;
-	}
+	rc = msm_vidc_vmem_alloc(num_ctrls * sizeof(struct v4l2_ctrl *),
+			(void **)&inst->ctrls, __func__);
+	if (rc)
+		return rc;
 
 	rc = v4l2_ctrl_handler_init(&inst->ctrl_handler, num_ctrls);
 	if (rc) {
@@ -3165,12 +3163,12 @@ error:
 	list_for_each_entry_safe(entry, temp, &opt_list, list) {
 		i_vpr_e(inst, "%s: opt_list: %s\n", __func__, cap_name(entry->cap_id));
 		list_del_init(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 	list_for_each_entry_safe(entry, temp, &root_list, list) {
 		i_vpr_e(inst, "%s: root_list: %s\n", __func__, cap_name(entry->cap_id));
 		list_del_init(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 	return rc;
 }

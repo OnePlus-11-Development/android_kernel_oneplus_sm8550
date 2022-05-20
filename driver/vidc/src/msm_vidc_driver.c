@@ -1767,8 +1767,8 @@ static int msm_vidc_flush_pending_last_flag(struct msm_vidc_inst *inst)
 				return rc;
 			}
 			list_del(&resp_work->list);
-			kfree(resp_work->data);
-			kfree(resp_work);
+			msm_vidc_vmem_free((void **)&resp_work->data);
+			msm_vidc_vmem_free((void **)&resp_work);
 		}
 	}
 
@@ -1794,8 +1794,8 @@ static int msm_vidc_discard_pending_opsc(struct msm_vidc_inst *inst)
 			i_vpr_h(inst,
 				"%s: discard pending output psc\n", __func__);
 			list_del(&resp_work->list);
-			kfree(resp_work->data);
-			kfree(resp_work);
+			msm_vidc_vmem_free((void **)&resp_work->data);
+			msm_vidc_vmem_free((void **)&resp_work);
 		}
 	}
 
@@ -1825,8 +1825,8 @@ static int msm_vidc_discard_pending_ipsc(struct msm_vidc_inst *inst)
 			inst->ipsc_properties_set = false;
 
 			list_del(&resp_work->list);
-			kfree(resp_work->data);
-			kfree(resp_work);
+			msm_vidc_vmem_free((void **)&resp_work->data);
+			msm_vidc_vmem_free((void **)&resp_work);
 		}
 	}
 
@@ -1863,8 +1863,8 @@ static int msm_vidc_process_pending_ipsc(struct msm_vidc_inst *inst,
 				}
 			}
 			list_del(&resp_work->list);
-			kfree(resp_work->data);
-			kfree(resp_work);
+			msm_vidc_vmem_free((void **)&resp_work->data);
+			msm_vidc_vmem_free((void **)&resp_work);
 			/* list contains max only one ipsc at anytime */
 			break;
 		}
@@ -3236,11 +3236,9 @@ static void msm_vidc_update_input_cr(struct msm_vidc_inst *inst, u32 idx, u32 cr
 		}
 	}
 	if (!found) {
-		temp = kzalloc(sizeof(*temp), GFP_KERNEL);
-		if (!temp) {
-			i_vpr_e(inst, "%s: malloc failure.\n", __func__);
+		if (msm_vidc_vmem_alloc(sizeof(*temp), (void **)&temp, __func__))
 			return;
-		}
+
 		temp->index = idx;
 		temp->input_cr = cr;
 		list_add_tail(&temp->list, &inst->enc_input_crs);
@@ -3253,7 +3251,7 @@ static void msm_vidc_free_input_cr_list(struct msm_vidc_inst *inst)
 
 	list_for_each_entry_safe(temp, next, &inst->enc_input_crs, list) {
 		list_del(&temp->list);
-		kfree(temp);
+		msm_vidc_vmem_free((void **)&temp);
 	}
 	INIT_LIST_HEAD(&inst->enc_input_crs);
 }
@@ -4112,22 +4110,20 @@ int msm_vidc_vb2_queue_init(struct msm_vidc_inst *inst)
 	}
 	inst->event_handler.m2m_ctx = inst->m2m_ctx;
 
-	inst->bufq[INPUT_META_PORT].vb2q = kzalloc(sizeof(struct vb2_queue), GFP_KERNEL);
-	if (!inst->bufq[INPUT_META_PORT].vb2q) {
-		i_vpr_e(inst, "%s: queue allocation failed for input meta port\n", __func__);
+	rc = msm_vidc_vmem_alloc(sizeof(struct vb2_queue),
+			(void **)&inst->bufq[INPUT_META_PORT].vb2q, "input meta port");
+	if (rc)
 		goto fail_in_meta_alloc;
-	}
 
 	/* do input meta port queues initialization */
 	rc = vb2q_init(inst, inst->bufq[INPUT_META_PORT].vb2q, INPUT_META_PLANE);
 	if (rc)
 		goto fail_in_meta_vb2q_init;
 
-	inst->bufq[OUTPUT_META_PORT].vb2q = kzalloc(sizeof(struct vb2_queue), GFP_KERNEL);
-	if (!inst->bufq[OUTPUT_META_PORT].vb2q) {
-		i_vpr_e(inst, "%s: queue allocation failed for output meta port\n", __func__);
+	rc = msm_vidc_vmem_alloc(sizeof(struct vb2_queue),
+			(void **)&inst->bufq[OUTPUT_META_PORT].vb2q, "output meta port");
+	if (rc)
 		goto fail_out_meta_alloc;
-	}
 
 	/* do output meta port queues initialization */
 	rc = vb2q_init(inst, inst->bufq[OUTPUT_META_PORT].vb2q, OUTPUT_META_PLANE);
@@ -4138,12 +4134,12 @@ int msm_vidc_vb2_queue_init(struct msm_vidc_inst *inst)
 	return 0;
 
 fail_out_meta_vb2q_init:
-	kfree(inst->bufq[OUTPUT_META_PORT].vb2q);
+	msm_vidc_vmem_free((void **)&inst->bufq[OUTPUT_META_PORT].vb2q);
 	inst->bufq[OUTPUT_META_PORT].vb2q = NULL;
 fail_out_meta_alloc:
 	vb2_queue_release(inst->bufq[INPUT_META_PORT].vb2q);
 fail_in_meta_vb2q_init:
-	kfree(inst->bufq[INPUT_META_PORT].vb2q);
+	msm_vidc_vmem_free((void **)&inst->bufq[INPUT_META_PORT].vb2q);
 	inst->bufq[INPUT_META_PORT].vb2q = NULL;
 fail_in_meta_alloc:
 	v4l2_m2m_ctx_release(inst->m2m_ctx);
@@ -4169,10 +4165,10 @@ int msm_vidc_vb2_queue_deinit(struct msm_vidc_inst *inst)
 	}
 
 	vb2_queue_release(inst->bufq[OUTPUT_META_PORT].vb2q);
-	kfree(inst->bufq[OUTPUT_META_PORT].vb2q);
+	msm_vidc_vmem_free((void **)&inst->bufq[OUTPUT_META_PORT].vb2q);
 	inst->bufq[OUTPUT_META_PORT].vb2q = NULL;
 	vb2_queue_release(inst->bufq[INPUT_META_PORT].vb2q);
-	kfree(inst->bufq[INPUT_META_PORT].vb2q);
+	msm_vidc_vmem_free((void **)&inst->bufq[INPUT_META_PORT].vb2q);
 	inst->bufq[INPUT_META_PORT].vb2q = NULL;
 	/*
 	 * vb2_queue_release() for input and output queues
@@ -4296,11 +4292,9 @@ int msm_vidc_session_open(struct msm_vidc_inst *inst)
 	}
 
 	inst->packet_size = 4096;
-	inst->packet = kzalloc(inst->packet_size, GFP_KERNEL);
-	if (!inst->packet) {
-		i_vpr_e(inst, "%s(): inst packet allocation failed\n", __func__);
-		return -ENOMEM;
-	}
+	rc = msm_vidc_vmem_alloc(inst->packet_size, (void **)&inst->packet, __func__);
+	if (rc)
+		return rc;
 
 	rc = venus_hfi_session_open(inst);
 	if (rc)
@@ -4309,7 +4303,7 @@ int msm_vidc_session_open(struct msm_vidc_inst *inst)
 	return 0;
 error:
 	i_vpr_e(inst, "%s(): session open failed\n", __func__);
-	kfree(inst->packet);
+	msm_vidc_vmem_free((void **)&inst->packet);
 	inst->packet = NULL;
 	return rc;
 }
@@ -4494,7 +4488,7 @@ int msm_vidc_session_close(struct msm_vidc_inst *inst)
 
 	/* we are not supposed to send any more commands after close */
 	i_vpr_h(inst, "%s: free session packet data\n", __func__);
-	kfree(inst->packet);
+	msm_vidc_vmem_free((void **)&inst->packet);
 	inst->packet = NULL;
 
 	core = inst->core;
@@ -4573,7 +4567,7 @@ int msm_vidc_deinit_core_caps(struct msm_vidc_core *core)
 		return -EINVAL;
 	}
 
-	kfree(core->capabilities);
+	msm_vidc_vmem_free((void **)&core->capabilities);
 	core->capabilities = NULL;
 	d_vpr_h("%s: Core capabilities freed\n", __func__);
 
@@ -4600,15 +4594,10 @@ int msm_vidc_init_core_caps(struct msm_vidc_core *core)
 			goto exit;
 	}
 
-	core->capabilities = kcalloc(1,
-		(sizeof(struct msm_vidc_core_capability) *
-		(CORE_CAP_MAX + 1)), GFP_KERNEL);
-	if (!core->capabilities) {
-		d_vpr_e("%s: failed to allocate core capabilities\n",
-			__func__);
-		rc = -ENOMEM;
+	rc = msm_vidc_vmem_alloc((sizeof(struct msm_vidc_core_capability) *
+		(CORE_CAP_MAX + 1)), (void **)&core->capabilities, __func__);
+	if (rc)
 		goto exit;
-	}
 
 	num_platform_caps = core->platform->data.core_data_size;
 
@@ -4677,7 +4666,7 @@ int msm_vidc_deinit_instance_caps(struct msm_vidc_core *core)
 		return -EINVAL;
 	}
 
-	kfree(core->inst_caps);
+	msm_vidc_vmem_free((void **)&core->inst_caps);
 	core->inst_caps = NULL;
 	d_vpr_h("%s: core->inst_caps freed\n", __func__);
 
@@ -4727,15 +4716,10 @@ int msm_vidc_init_instance_caps(struct msm_vidc_core *core)
 	COUNT_BITS(count_bits, codecs_count);
 
 	core->codecs_count = codecs_count;
-	core->inst_caps = kcalloc(codecs_count,
-		sizeof(struct msm_vidc_inst_capability),
-		GFP_KERNEL);
-	if (!core->inst_caps) {
-		d_vpr_e("%s: failed to allocate core capabilities\n",
-			__func__);
-		rc = -ENOMEM;
+	rc = msm_vidc_vmem_alloc(codecs_count * sizeof(struct msm_vidc_inst_capability),
+		(void **)&core->inst_caps, __func__);
+	if (rc)
 		goto error;
-	}
 
 	check_bit = 0;
 	/* determine codecs for enc domain */
@@ -5572,25 +5556,25 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 
 	list_for_each_entry_safe(work, dummy_work, &inst->response_works, list) {
 		list_del(&work->list);
-		kfree(work->data);
-		kfree(work);
+		msm_vidc_vmem_free((void **)&work->data);
+		msm_vidc_vmem_free((void **)&work);
 	}
 
 	list_for_each_entry_safe(entry, dummy_entry, &inst->firmware_list, list) {
 		i_vpr_e(inst, "%s: fw list: %s\n", __func__, cap_name(entry->cap_id));
 		list_del(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 
 	list_for_each_entry_safe(entry, dummy_entry, &inst->children_list, list) {
 		i_vpr_e(inst, "%s: child list: %s\n", __func__, cap_name(entry->cap_id));
 		list_del(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 
 	list_for_each_entry_safe(entry, dummy_entry, &inst->caps_list, list) {
 		list_del(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 
 	list_for_each_entry_safe(fence, dummy_fence, &inst->fence_list, list) {
@@ -5622,8 +5606,8 @@ static void msm_vidc_close_helper(struct kref *kref)
 	msm_vidc_remove_dangling_session(inst);
 	mutex_destroy(&inst->request_lock);
 	mutex_destroy(&inst->lock);
-	kfree(inst->capabilities);
-	kfree(inst);
+	msm_vidc_vmem_free((void **)&inst->capabilities);
+	msm_vidc_vmem_free((void **)&inst);
 }
 
 struct msm_vidc_inst *get_inst_ref(struct msm_vidc_core *core,
