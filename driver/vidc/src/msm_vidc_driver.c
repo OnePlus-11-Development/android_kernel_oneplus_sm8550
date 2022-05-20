@@ -5991,7 +5991,7 @@ int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst)
 			continue;
 
 		/* ignore thumbnail, image, and non realtime sessions */
-		if (msm_vidc_ignore_session_load(inst))
+		if (msm_vidc_ignore_session_load(instance))
 			continue;
 
 		mbps = msm_vidc_get_inst_load(instance);
@@ -6016,10 +6016,10 @@ int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst)
 			core_lock(core, __func__);
 			list_for_each_entry(instance, &core->instances, list) {
 				/* reduce realtime decode sessions priority */
-				if (is_decode_session(inst) && is_realtime_session(inst)) {
+				if (is_decode_session(instance) && is_realtime_session(instance)) {
 					instance->adjust_priority = RT_DEC_DOWN_PRORITY_OFFSET;
 					i_vpr_h(inst, "%s: pending adjust priority by %d\n",
-						__func__, inst->adjust_priority);
+						__func__, instance->adjust_priority);
 				}
 			}
 			core_unlock(core, __func__);
@@ -6092,7 +6092,7 @@ int msm_vidc_check_core_mbpf(struct msm_vidc_inst *inst)
 	core_lock(core, __func__);
 	/* check real-time video sessions max limit */
 	list_for_each_entry(instance, &core->instances, list) {
-		if (msm_vidc_ignore_session_load(inst))
+		if (msm_vidc_ignore_session_load(instance))
 			continue;
 
 		video_rt_mbpf += msm_vidc_get_mbs_per_frame(instance);
@@ -6334,7 +6334,7 @@ static int msm_vidc_check_max_sessions(struct msm_vidc_inst *inst)
 	core_lock(core, __func__);
 	list_for_each_entry(i, &core->instances, list) {
 		/* skip image sessions count */
-		if (is_image_session(inst))
+		if (is_image_session(i))
 			continue;
 
 		if (is_decode_session(i)) {
