@@ -625,8 +625,10 @@ int gen7_hwsched_hfi_init(struct adreno_device *adreno_dev)
 		init_queues(hfi);
 	}
 
-	if (IS_ERR_OR_NULL(hw_hfi->f2h_task))
+	if (IS_ERR_OR_NULL(hw_hfi->f2h_task)) {
 		hw_hfi->f2h_task = kthread_run(hfi_f2h_main, adreno_dev, "gmu_f2h");
+		sched_set_fifo(hw_hfi->f2h_task);
+	}
 
 	return PTR_ERR_OR_ZERO(hw_hfi->f2h_task);
 }
