@@ -6151,7 +6151,6 @@ static u32 sde_crtc_get_vblank_counter(struct drm_crtc *crtc)
 		is_built_in = sde_encoder_is_built_in_display(encoder);
 		vblank_cnt = sde_encoder_get_frame_count(encoder);
 
-		SDE_EVT32(DRMID(crtc), DRMID(encoder), is_built_in, vblank_cnt);
 		SDE_DEBUG("crtc:%d enc:%d is_built_in:%d vblank_cnt:%d\n",
 				DRMID(crtc), DRMID(encoder), is_built_in, vblank_cnt);
 
