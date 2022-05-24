@@ -1357,6 +1357,8 @@ static int _sde_crtc_check_rois(struct drm_crtc *crtc,
 	struct sde_crtc *sde_crtc;
 	struct sde_crtc_state *sde_crtc_state;
 	struct msm_mode_info mode_info;
+	u32 crtc_width, crtc_height, mixer_width, mixer_height;
+	struct drm_display_mode *adj_mode;
 	int rc, lm_idx, i;
 
 	if (!crtc || !state)
@@ -1366,6 +1368,19 @@ static int _sde_crtc_check_rois(struct drm_crtc *crtc,
 
 	sde_crtc = to_sde_crtc(crtc);
 	sde_crtc_state = to_sde_crtc_state(state);
+
+	adj_mode = &state->adjusted_mode;
+	sde_crtc_get_resolution(crtc, state, adj_mode, &crtc_width, &crtc_height);
+	sde_crtc_get_mixer_resolution(crtc, state, adj_mode, &mixer_width, &mixer_height);
+	/* check cumulative mixer w/h is equal full crtc w/h */
+	if (sde_crtc->num_mixers
+			&& (((mixer_width * sde_crtc->num_mixers) != crtc_width)
+				|| (mixer_height != crtc_height))) {
+		SDE_ERROR("%s: invalid w/h crtc:%d,%d, mixer:%d,%d, num_mixers:%d\n",
+				sde_crtc->name, crtc_width, crtc_height, mixer_width, mixer_height,
+				sde_crtc->num_mixers);
+		return -EINVAL;
+	}
 
 	/*
 	 * check connector array cached at modeset time since incoming atomic
