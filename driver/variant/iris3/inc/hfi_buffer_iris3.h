@@ -1449,7 +1449,7 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		if (work_mode == HFI_WORKMODE_2) \
 		{ \
 			total_bitbin_buffers = 3; \
-			bitbin_size = bitstream_size * 17 / 10; \
+			bitbin_size = bitstream_size * 12 / 10; \
 			bitbin_size = HFI_ALIGN(bitbin_size, \
 				VENUS_DMA_ALIGNMENT); \
 		} \
