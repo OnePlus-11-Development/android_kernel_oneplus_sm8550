@@ -67,9 +67,8 @@ struct msm_vidc_fence *msm_vidc_fence_create(struct msm_vidc_inst *inst)
 	}
 
 	fence->fd = INVALID_FD;
-	spin_lock_init(&fence->lock);
 	dma_fence_init(&fence->dma_fence, &msm_vidc_dma_fence_ops,
-		&fence->lock, inst->fence_context.ctx_num,
+		&inst->fence_context.lock, inst->fence_context.ctx_num,
 		++inst->fence_context.seq_num);
 	snprintf(fence->name, sizeof(fence->name), "%s: %llu",
 		inst->fence_context.name, inst->fence_context.seq_num);
@@ -95,18 +94,6 @@ int msm_vidc_create_fence_fd(struct msm_vidc_inst *inst,
 		return -EINVAL;
 	}
 
-	/*
-	 * Acquire inst->lock for fence fd creation
-	 * to avoid sync_file_create() and sync_file_poll()
-	 * race conditions in e2e playback usecase.
-	 */
-	inst = get_inst_ref(g_core, inst);
-	if (!inst) {
-		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
-	inst_lock(inst, __func__);
-
 	fence->fd = get_unused_fd_flags(0);
 	if (fence->fd < 0) {
 		i_vpr_e(inst, "%s: getting fd (%d) failed\n", __func__,
@@ -125,15 +112,11 @@ int msm_vidc_create_fence_fd(struct msm_vidc_inst *inst,
 	i_vpr_l(inst, "%s: created fd %d for fence %s\n", __func__,
 		fence->fd, fence->name);
 
-	inst_unlock(inst, __func__);
-	put_inst(inst);
 	return 0;
 
 err_sync_file:
 	put_unused_fd(fence->fd);
 err_fd:
-	inst_unlock(inst, __func__);
-	put_inst(inst);
 	return rc;
 }
 
@@ -236,6 +219,7 @@ void msm_vidc_fence_deinit(struct msm_vidc_inst *inst)
 	}
 	i_vpr_h(inst, "%s: %s\n", __func__, inst->fence_context.name);
 	inst->fence_context.ctx_num = 0;
+	spin_lock_init(&inst->fence_context.lock);
 	snprintf(inst->fence_context.name, sizeof(inst->fence_context.name),
 		"%s", "");
 }
