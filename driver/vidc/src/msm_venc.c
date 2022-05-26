@@ -1227,11 +1227,8 @@ static int msm_venc_s_fmt_input(struct msm_vidc_inst *inst, struct v4l2_format *
 	height = f->fmt.pix_mp.height;
 
 	if (is_image_session(inst)) {
-		width = ALIGN(f->fmt.pix_mp.width, HEIC_GRID_DIMENSION);
-		height = ALIGN(f->fmt.pix_mp.height, HEIC_GRID_DIMENSION);
-		inst->crop.width = ALIGN(inst->crop.width, HEIC_GRID_DIMENSION);
-		inst->crop.height = ALIGN(inst->crop.height, HEIC_GRID_DIMENSION);
-		bytesperline = width * (is_10bit_colorformat(pix_fmt) ? 2 : 1);
+		bytesperline = ALIGN(f->fmt.pix_mp.width, HEIC_GRID_DIMENSION) *
+			(is_10bit_colorformat(pix_fmt) ? 2 : 1);
 	} else if (is_rgba_colorformat(pix_fmt)) {
 		bytesperline = VIDEO_RGB_STRIDE_BYTES(f->fmt.pix_mp.pixelformat,
 				f->fmt.pix_mp.width);
