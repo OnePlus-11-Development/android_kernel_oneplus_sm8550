@@ -204,6 +204,7 @@ int msm_vidc_start_streaming(struct vb2_queue *q, unsigned int count)
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	if (is_session_error(inst)) {
 		i_vpr_e(inst, "%s: inst in error state\n", __func__);
@@ -337,6 +338,7 @@ unlock:
 		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
 	}
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 	return rc;
 }
@@ -358,6 +360,7 @@ void msm_vidc_stop_streaming(struct vb2_queue *q)
 		return;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	if (q->type == INPUT_META_PLANE || q->type == OUTPUT_META_PLANE) {
 		i_vpr_h(inst, "%s: nothing to stop on %s\n",
@@ -420,6 +423,7 @@ unlock:
 		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
 	}
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 	return;
 }
@@ -443,6 +447,7 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 		return;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	if (is_session_error(inst)) {
 		i_vpr_e(inst, "%s: inst in error state\n", __func__);
@@ -525,6 +530,7 @@ unlock:
 		vb2_buffer_done(vb2, VB2_BUF_STATE_ERROR);
 	}
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 }
 

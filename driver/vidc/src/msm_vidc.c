@@ -899,6 +899,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	kref_init(&inst->kref);
 	mutex_init(&inst->lock);
 	mutex_init(&inst->request_lock);
+	mutex_init(&inst->client_lock);
 	msm_vidc_update_debug_str(inst);
 	i_vpr_h(inst, "Opening video instance: %d\n", session_type);
 
@@ -1035,6 +1036,7 @@ int msm_vidc_close(void *instance)
 	core = inst->core;
 
 	i_vpr_h(inst, "%s()\n", __func__);
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	/* print final stats */
 	msm_vidc_print_stats(inst);
@@ -1042,6 +1044,7 @@ int msm_vidc_close(void *instance)
 	msm_vidc_remove_session(inst);
 	msm_vidc_destroy_buffers(inst);
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	cancel_response_work_sync(inst);
 	cancel_stability_work_sync(inst);
 	cancel_stats_work_sync(inst);

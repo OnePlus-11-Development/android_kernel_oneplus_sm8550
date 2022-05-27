@@ -5620,6 +5620,7 @@ static void msm_vidc_close_helper(struct kref *kref)
 	if (inst->response_workq)
 		destroy_workqueue(inst->response_workq);
 	msm_vidc_remove_dangling_session(inst);
+	mutex_destroy(&inst->client_lock);
 	mutex_destroy(&inst->request_lock);
 	mutex_destroy(&inst->lock);
 	kfree(inst->capabilities);
@@ -5710,6 +5711,21 @@ void inst_lock(struct msm_vidc_inst *inst, const char *function)
 void inst_unlock(struct msm_vidc_inst *inst, const char *function)
 {
 	mutex_unlock(&inst->lock);
+}
+
+bool client_lock_check(struct msm_vidc_inst *inst, const char *func)
+{
+	return mutex_is_locked(&inst->client_lock);
+}
+
+void client_lock(struct msm_vidc_inst *inst, const char *function)
+{
+	mutex_lock(&inst->client_lock);
+}
+
+void client_unlock(struct msm_vidc_inst *inst, const char *function)
+{
+	mutex_unlock(&inst->client_lock);
 }
 
 int msm_vidc_update_bitstream_buffer_size(struct msm_vidc_inst *inst)

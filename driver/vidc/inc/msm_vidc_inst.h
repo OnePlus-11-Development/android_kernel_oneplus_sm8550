@@ -98,6 +98,7 @@ struct msm_vidc_inst {
 	struct list_head                   list;
 	struct mutex                       lock;
 	struct mutex                       request_lock;
+	struct mutex                       client_lock;
 	enum msm_vidc_inst_state           state;
 	enum msm_vidc_domain_type          domain;
 	enum msm_vidc_codec_type           codec;
