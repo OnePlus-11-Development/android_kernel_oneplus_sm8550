@@ -543,6 +543,8 @@ enum hfi_nal_length_field_type {
 
 #define HFI_PROP_AV1_OP_POINT                                   0x03000182
 
+#define HFI_PROP_SUBFRAME_INPUT                                 0x03000183
+
 #define HFI_PROP_OPB_ENABLE                                     0x03000184
 
 #define HFI_PROP_AV1_DRAP_CONFIG                                0x03000189
