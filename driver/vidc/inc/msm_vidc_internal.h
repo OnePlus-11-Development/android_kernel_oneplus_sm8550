@@ -383,6 +383,7 @@ enum msm_vidc_inst_capability_type {
 	META_EVA_STATS,
 	META_ROI_INFO,
 	META_SALIENCY_INFO,
+	META_TRANSCODING_STAT_INFO,
 	META_CAP_MAX,
 	/* end of metadata caps */
 	FRAME_WIDTH,

@@ -149,6 +149,8 @@ enum v4l2_mpeg_vidc_metadata_bits {
 	(V4L2_CID_MPEG_VIDC_BASE + 0x25)
 #define V4L2_CID_MPEG_VIDC_METADATA_SALIENCY_INFO                             \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x26)
+#define V4L2_CID_MPEG_VIDC_METADATA_TRANSCODE_STAT_INFO                       \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x27)
 
 /* Encoder Super frame control */
 #define V4L2_CID_MPEG_VIDC_SUPERFRAME           (V4L2_CID_MPEG_VIDC_BASE + 0x28)
@@ -401,6 +403,7 @@ enum v4l2_mpeg_vidc_metadata {
 	METADATA_MAX_NUM_REORDER_FRAMES       = 0x03000127,
 	METADATA_SALIENCY_INFO                = 0x0300018A,
 	METADATA_FENCE                        = 0x0300018B,
+	METADATA_TRANSCODING_STAT_INFO        = 0x03000191,
 };
 enum meta_interlace_info {
 	META_INTERLACE_INFO_NONE                            = 0x00000000,
