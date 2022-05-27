@@ -63,5 +63,6 @@ void msm_memory_pools_deinit(struct msm_vidc_inst *inst);
 void *msm_memory_pool_alloc(struct msm_vidc_inst *inst,
 	enum msm_memory_pool_type type);
 void msm_memory_pool_free(struct msm_vidc_inst *inst, void *vidc_buf);
-
+int msm_vidc_vmem_alloc(unsigned long size, void **mem, const char *msg);
+void msm_vidc_vmem_free(void **addr);
 #endif // _MSM_VIDC_MEMORY_H_

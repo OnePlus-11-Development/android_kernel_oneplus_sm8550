@@ -38,7 +38,7 @@ static void msm_vidc_dma_fence_release(struct dma_fence *df)
 	if (df) {
 		fence = container_of(df, struct msm_vidc_fence, dma_fence);
 		d_vpr_l("%s: name %s\n", __func__, fence->name);
-		kfree(fence);
+		msm_vidc_vmem_free((void **)&fence);
 	} else {
 		d_vpr_e("%s: invalid fence\n", __func__);
 	}
@@ -53,18 +53,16 @@ static const struct dma_fence_ops msm_vidc_dma_fence_ops = {
 struct msm_vidc_fence *msm_vidc_fence_create(struct msm_vidc_inst *inst)
 {
 	struct msm_vidc_fence *fence;
+	int rc = 0;
 
 	if (!inst) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return NULL;
 	}
 
-	fence = kzalloc(sizeof(*fence), GFP_KERNEL);
-	if (!fence) {
-		i_vpr_e(inst, "%s: failed to allocate memory for fence\n",
-			__func__);
+	rc = msm_vidc_vmem_alloc(sizeof(*fence), (void **)&fence, __func__);
+	if (rc)
 		return NULL;
-	}
 
 	fence->fd = INVALID_FD;
 	dma_fence_init(&fence->dma_fence, &msm_vidc_dma_fence_ops,
