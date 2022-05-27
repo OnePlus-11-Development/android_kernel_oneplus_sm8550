@@ -2061,9 +2061,10 @@ int msm_vidc_adjust_bitrate(void *instance, struct v4l2_ctrl *ctrl)
 	int i, rc = 0;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
 	struct msm_vidc_inst_capability *capability;
-	s32 adjusted_value, max_bitrate, enh_layer_count;
+	s32 adjusted_value, enh_layer_count;
 	u32 cumulative_bitrate = 0, cap_id = 0, cap_value = 0;
 	u32 layer_br_caps[6] = {L0_BR, L1_BR, L2_BR, L3_BR, L4_BR, L5_BR};
+	u32 max_bitrate = 0;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -2092,7 +2093,10 @@ int msm_vidc_adjust_bitrate(void *instance, struct v4l2_ctrl *ctrl)
 		ENH_LAYER_COUNT, &enh_layer_count, __func__))
 		return -EINVAL;
 
-	max_bitrate = inst->capabilities->cap[BIT_RATE].max;
+	/* get max bit rate for current session config*/
+	max_bitrate = msm_vidc_get_max_bitrate(inst);
+	if (inst->capabilities->cap[BIT_RATE].value > max_bitrate)
+		msm_vidc_update_cap_value(inst, BIT_RATE, max_bitrate, __func__);
 
 	/*
 	 * ENH_LAYER_COUNT cap max is positive only if
@@ -2566,6 +2570,7 @@ int msm_vidc_adjust_bitrate_boost(void *instance, struct v4l2_ctrl *ctrl)
 	s32 adjusted_value;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
 	s32 min_quality = -1, rc_type = -1;
+	u32 max_bitrate = 0, bitrate = 0;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -2597,6 +2602,17 @@ int msm_vidc_adjust_bitrate_boost(void *instance, struct v4l2_ctrl *ctrl)
 	if (min_quality) {
 		adjusted_value = MAX_BITRATE_BOOST;
 		goto adjust;
+	}
+
+	max_bitrate = msm_vidc_get_max_bitrate(inst);
+	bitrate = inst->capabilities->cap[BIT_RATE].value;
+	if (adjusted_value) {
+		if ((bitrate + bitrate / (100 / adjusted_value)) > max_bitrate) {
+			i_vpr_h(inst,
+				"%s: bitrate %d is beyond max bitrate %d, remove bitrate boost\n",
+				__func__, max_bitrate, bitrate);
+			adjusted_value = 0;
+		}
 	}
 
 adjust:

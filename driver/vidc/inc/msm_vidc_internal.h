@@ -490,6 +490,10 @@ enum msm_vidc_inst_capability_type {
 	INPUT_META_VIA_REQUEST,
 	ENC_IP_CR,
 	COMPLEXITY,
+	CABAC_MAX_BITRATE,
+	CAVLC_MAX_BITRATE,
+	ALLINTRA_MAX_BITRATE,
+	LOWLATENCY_MAX_BITRATE,
 	/* place all root(no parent) enums before this line */
 
 	PROFILE,

@@ -510,6 +510,7 @@ int msm_vidc_state_change_start(struct msm_vidc_inst *inst);
 int msm_vidc_state_change_input_psc(struct msm_vidc_inst *inst);
 int msm_vidc_state_change_last_flag(struct msm_vidc_inst *inst);
 int msm_vidc_get_mbs_per_frame(struct msm_vidc_inst *inst);
+u32 msm_vidc_get_max_bitrate(struct msm_vidc_inst* inst);
 int msm_vidc_get_fps(struct msm_vidc_inst *inst);
 int msm_vidc_num_buffers(struct msm_vidc_inst *inst,
 	enum msm_vidc_buffer_type type, enum msm_vidc_buffer_attributes attr);
