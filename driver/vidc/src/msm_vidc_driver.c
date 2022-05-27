@@ -2102,18 +2102,6 @@ int msm_vidc_get_fence_fd(struct msm_vidc_inst *inst, int *fence_fd)
 		return -EINVAL;
 	}
 
-	/*
-	 * Acquire inst->lock for fence fd creation
-	 * to avoid sync_file_create() and sync_file_poll()
-	 * race conditions in e2e playback usecase.
-	 */
-	inst = get_inst_ref(g_core, inst);
-	if (!inst) {
-		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
-	inst_lock(inst, __func__);
-
 	list_for_each_entry_safe(fence, dummy_fence, &inst->fence_list, list) {
 		if (fence->dma_fence.seqno ==
 			(u64)inst->capabilities->cap[FENCE_ID].value) {
@@ -2137,8 +2125,6 @@ int msm_vidc_get_fence_fd(struct msm_vidc_inst *inst, int *fence_fd)
 	*fence_fd = fence->fd;
 
 exit:
-	inst_unlock(inst, __func__);
-	put_inst(inst);
 	return rc;
 }
 
@@ -3914,7 +3900,6 @@ static int msm_vidc_vb2_buffer_done(struct msm_vidc_inst *inst,
 	vbuf->flags = buf->flags;
 	vb2->timestamp = buf->timestamp;
 	vb2->planes[0].bytesused = buf->data_size + vb2->planes[0].data_offset;
-	v4l2_ctrl_request_complete(vb2->req_obj.req, &inst->ctrl_handler);
 	vb2_buffer_done(vb2, state);
 
 	return 0;

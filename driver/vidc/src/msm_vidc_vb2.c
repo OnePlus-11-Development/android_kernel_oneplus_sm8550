@@ -447,8 +447,33 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 		return;
 	}
 
+	/*
+	 * As part of every qbuf initalise request to true.
+	 * If there are any dynamic controls associated with qbuf,
+	 * they will set as part s_ctrl() from v4l2_ctrl_request_setup().
+	 * Once v4l2_ctrl_request_setup() is done, reset request variable.
+	 * If the buffer does not have any requests with it, then
+	 * v4l2_ctrl_request_setup() will return 0.
+	 */
+	inst->request = true;
+	rc = v4l2_ctrl_request_setup(vb2->req_obj.req,
+			&inst->ctrl_handler);
+	inst->request = false;
+	v4l2_ctrl_request_complete(vb2->req_obj.req, &inst->ctrl_handler);
+	/*
+	 * call request_setup and request_complete without acquiring lock
+	 * to avoid deadlock issues because request_setup or request_complete
+	 * would call .s_ctrl and .g_volatile_ctrl respectively which acquire
+	 * lock too.
+	 */
 	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
+	if (rc) {
+		i_vpr_e(inst, "%s: request setup failed, error %d\n",
+			__func__, rc);
+		goto unlock;
+	}
+
 	if (is_session_error(inst)) {
 		i_vpr_e(inst, "%s: inst in error state\n", __func__);
 		rc = -EINVAL;
@@ -487,25 +512,6 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 			goto unlock;
 	}
 
-	/*
-	 * As part of every qbuf initalise request to true.
-	 * If there are any dynamic controls associated with qbuf,
-	 * they will set as part s_ctrl() from v4l2_ctrl_request_setup().
-	 * Once v4l2_ctrl_request_setup() is done, reset request variable.
-	 * If the buffer does not have any requests with it, then
-	 * v4l2_ctrl_request_setup() will return 0.
-	 */
-	inst->request = true;
-	rc = v4l2_ctrl_request_setup(vb2->req_obj.req,
-			&inst->ctrl_handler);
-	if (rc) {
-		inst->request = false;
-		i_vpr_e(inst, "%s: request setup failed, error %d\n",
-			__func__, rc);
-		goto unlock;
-	}
-	inst->request = false;
-
 	if (inst->capabilities->cap[INPUT_META_VIA_REQUEST].value) {
 		rc = msm_vidc_update_input_meta_buffer_index(inst, vb2);
 		if (rc)
@@ -526,7 +532,6 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 unlock:
 	if (rc) {
 		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
-		v4l2_ctrl_request_complete(vb2->req_obj.req, &inst->ctrl_handler);
 		vb2_buffer_done(vb2, VB2_BUF_STATE_ERROR);
 	}
 	inst_unlock(inst, __func__);

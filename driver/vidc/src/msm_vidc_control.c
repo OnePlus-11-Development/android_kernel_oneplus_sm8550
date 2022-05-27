@@ -19,6 +19,8 @@
 		(a) = 0;             \
 }
 
+extern struct msm_vidc_core *g_core;
+
 static bool is_priv_ctrl(u32 id)
 {
 	bool private = false;
@@ -1036,19 +1038,29 @@ int msm_v4l2_op_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 
 	inst = container_of(ctrl->handler,
 			    struct msm_vidc_inst, ctrl_handler);
+	inst = get_inst_ref(g_core, inst);
 	if (!inst) {
-		d_vpr_e("%s: could not find inst for ctrl %s id %#x\n", __func__, ctrl->name, ctrl->id);
+		d_vpr_e("%s: could not find inst for ctrl %s id %#x\n",
+			__func__, ctrl->name, ctrl->id);
 		return -EINVAL;
 	}
+	client_lock(inst, __func__);
+	inst_lock(inst, __func__);
 
 	rc = msm_vidc_get_control(inst, ctrl);
-	if (rc)
+	if (rc) {
 		i_vpr_e(inst, "%s: failed for ctrl %s id %#x\n",
 			__func__, ctrl->name, ctrl->id);
-	else
+		goto unlock;
+	} else {
 		i_vpr_h(inst, "%s: ctrl %s id %#x, value %d\n",
 			__func__, ctrl->name, ctrl->id, ctrl->val);
+	}
 
+unlock:
+	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
+	put_inst(inst);
 	return rc;
 }
 
@@ -1147,25 +1159,30 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	inst = container_of(ctrl->handler,
 		struct msm_vidc_inst, ctrl_handler);
-
+	inst = get_inst_ref(g_core, inst);
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid parameters for inst\n", __func__);
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
+	inst_lock(inst, __func__);
 	capability = inst->capabilities;
 
 	i_vpr_h(inst, FMT_STRING_SET_CTRL,
 		__func__, state_name(inst->state), ctrl->name, ctrl->id, ctrl->val);
 
-	if (!msm_vidc_allow_s_ctrl(inst, ctrl->id))
-		return -EINVAL;
+	if (!msm_vidc_allow_s_ctrl(inst, ctrl->id)) {
+		rc = -EINVAL;
+		goto unlock;
+	}
 
 	cap_id = msm_vidc_get_cap_id(inst, ctrl->id);
 	if (!is_valid_cap_id(cap_id)) {
 		i_vpr_e(inst, "%s: could not find cap_id for ctrl %s\n",
 			__func__, ctrl->name);
-		return -EINVAL;
+		rc = -EINVAL;
+		goto unlock;
 	}
 
 	if (ctrl->id == V4L2_CID_MPEG_VIDC_INPUT_METADATA_FD) {
@@ -1173,16 +1190,18 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 			i_vpr_e(inst,
 				"%s: client configured invalid input metadata fd %d\n",
 				__func__, ctrl->val);
-			return 0;
+			rc = 0;
+			goto unlock;
 		}
 		if (!capability->cap[INPUT_META_VIA_REQUEST].value) {
 			i_vpr_e(inst,
 				"%s: input metadata not enabled via request\n", __func__);
-			return -EINVAL;
+			rc = -EINVAL;
+			goto unlock;
 		}
 		rc = msm_vidc_create_input_metadata_buffer(inst, ctrl->val);
 		if (rc)
-			return rc;
+			goto unlock;
 	}
 
 	/* mark client set flag */
@@ -1193,18 +1212,22 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 		/* static case */
 		rc = msm_vidc_update_static_property(inst, cap_id, ctrl);
 		if (rc)
-			return rc;
+			goto unlock;
 	} else {
 		/* dynamic case */
 		rc = msm_vidc_adjust_dynamic_property(inst, cap_id, ctrl);
 		if (rc)
-			return rc;
+			goto unlock;
 
 		rc = msm_vidc_set_dynamic_property(inst);
 		if (rc)
-			return rc;
+			goto unlock;
 	}
 
+unlock:
+	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
+	put_inst(inst);
 	return rc;
 }
 
