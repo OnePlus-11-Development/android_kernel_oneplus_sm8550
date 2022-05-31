@@ -1713,14 +1713,14 @@ int msm_vidc_adjust_slice_count(void *instance, struct v4l2_ctrl *ctrl)
 	slice_mode = ctrl ? ctrl->val :
 		capability->cap[SLICE_MODE].value;
 
+	if (slice_mode == V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_SINGLE)
+		return 0;
+
 	if (msm_vidc_get_parent_value(inst, SLICE_MODE,
 		BITRATE_MODE, &rc_type, __func__) ||
 		msm_vidc_get_parent_value(inst, SLICE_MODE,
 		ALL_INTRA, &all_intra, __func__))
 		return -EINVAL;
-
-	if (slice_mode == V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_SINGLE)
-		return 0;
 
 	fps = capability->cap[FRAME_RATE].value >> 16;
 	if (fps > MAX_SLICES_FRAME_RATE ||

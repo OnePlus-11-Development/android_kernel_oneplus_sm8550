@@ -201,6 +201,7 @@ int msm_vidc_fence_init(struct msm_vidc_inst *inst)
 	}
 
 	inst->fence_context.ctx_num = dma_fence_context_alloc(1);
+	spin_lock_init(&inst->fence_context.lock);
 	snprintf(inst->fence_context.name, sizeof(inst->fence_context.name),
 		"msm_vidc_fence: %s: %llu", inst->debug_str,
 		inst->fence_context.ctx_num);
@@ -217,7 +218,6 @@ void msm_vidc_fence_deinit(struct msm_vidc_inst *inst)
 	}
 	i_vpr_h(inst, "%s: %s\n", __func__, inst->fence_context.name);
 	inst->fence_context.ctx_num = 0;
-	spin_lock_init(&inst->fence_context.lock);
 	snprintf(inst->fence_context.name, sizeof(inst->fence_context.name),
 		"%s", "");
 }
