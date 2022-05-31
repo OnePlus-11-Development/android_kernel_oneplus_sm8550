@@ -2036,7 +2036,7 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_2_0 = {
 		.compatible = "qcom,adreno-gpu-gen7-2-0",
 		.features = ADRENO_APRIV | ADRENO_IOCOHERENT | ADRENO_IFPC |
 				ADRENO_CONTENT_PROTECTION | ADRENO_ACD |
-				ADRENO_LPAC | ADRENO_BCL,
+				ADRENO_LPAC | ADRENO_BCL | ADRENO_L3_VOTE,
 		.gpudev = &adreno_gen7_hwsched_gpudev.base,
 		.perfcounters = &adreno_gen7_2_0_perfcounters,
 		.gmem_base = 0x1000000,
@@ -2068,7 +2068,7 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_2_1 = {
 		.compatible = "qcom,adreno-gpu-gen7-2-1",
 		.features = ADRENO_APRIV | ADRENO_IOCOHERENT | ADRENO_IFPC |
 				ADRENO_CONTENT_PROTECTION | ADRENO_LPAC |
-				ADRENO_BCL,
+				ADRENO_BCL | ADRENO_L3_VOTE,
 		.gpudev = &adreno_gen7_hwsched_gpudev.base,
 		.perfcounters = &adreno_gen7_2_0_perfcounters,
 		.gmem_base = 0x1000000,
