@@ -6002,7 +6002,7 @@ int dsi_display_dev_probe(struct platform_device *pdev)
 		panel_node = of_parse_phandle(node,
 				"qcom,dsi-default-panel", 0);
 		if (!panel_node)
-			DSI_WARN("%s default panel not found\n", display->display_type);
+			DSI_INFO("%s default panel not found\n", display->display_type);
 	}
 
 	boot_disp->node = pdev->dev.of_node;
