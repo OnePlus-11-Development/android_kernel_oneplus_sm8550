@@ -416,7 +416,7 @@ static struct device *msm_smmu_device_add(struct device *dev,
 
 	smmu->client = msm_smmu_get_smmu(compat);
 	if (IS_ERR_OR_NULL(smmu->client)) {
-		DRM_ERROR("unable to find domain %d compat: %s\n", domain,
+		DRM_DEBUG("unable to find domain %d compat: %s\n", domain,
 				compat);
 		return ERR_PTR(-ENODEV);
 	}
