@@ -195,6 +195,7 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{CAVLC_MAX_BITRATE,              "CAVLC_MAX_BITRATE"          },
 	{ALLINTRA_MAX_BITRATE,           "ALLINTRA_MAX_BITRATE"       },
 	{LOWLATENCY_MAX_BITRATE,         "LOWLATENCY_MAX_BITRATE"     },
+	{LAST_FLAG_EVENT_ENABLE,         "LAST_FLAG_EVENT_ENABLE"     },
 	{PROFILE,                        "PROFILE"                    },
 	{ENH_LAYER_COUNT,                "ENH_LAYER_COUNT"            },
 	{BIT_RATE,                       "BIT_RATE"                   },
@@ -314,41 +315,49 @@ exit:
 	return name;
 }
 
-struct msm_vidc_inst_state_name {
-	enum msm_vidc_inst_state state;
+struct msm_vidc_state_name {
+	enum msm_vidc_state state;
 	char *name;
 };
 
 /* do not modify the state names as it is used in test scripts */
-static const struct msm_vidc_inst_state_name inst_state_name_arr[] = {
-	{MSM_VIDC_OPEN,                  "OPEN"                       },
-	{MSM_VIDC_START_INPUT,           "START_INPUT"                },
-	{MSM_VIDC_START_OUTPUT,          "START_OUTPUT"               },
-	{MSM_VIDC_START,                 "START"                      },
-	{MSM_VIDC_DRC,                   "DRC"                        },
-	{MSM_VIDC_DRC_LAST_FLAG,         "DRC_LAST_FLAG"              },
-	{MSM_VIDC_DRAIN,                 "DRAIN"                      },
-	{MSM_VIDC_DRAIN_LAST_FLAG,       "DRAIN_LAST_FLAG"            },
-	{MSM_VIDC_DRC_DRAIN,             "DRC_DRAIN"                  },
-	{MSM_VIDC_DRC_DRAIN_LAST_FLAG,   "DRC_DRAIN_LAST_FLAG"        },
-	{MSM_VIDC_DRAIN_START_INPUT,     "DRAIN_START_INPUT"          },
-	{MSM_VIDC_ERROR,                 "ERROR"                      },
+static const struct msm_vidc_state_name state_name_arr[] = {
+	{MSM_VIDC_OPEN,                  "OPEN"                          },
+	{MSM_VIDC_INPUT_STREAMING,       "INPUT_STREAMING"               },
+	{MSM_VIDC_OUTPUT_STREAMING,      "OUTPUT_STREAMING"              },
+	{MSM_VIDC_STREAMING,             "STREAMING"                     },
+	{MSM_VIDC_CLOSE,                 "CLOSE"                         },
+	{MSM_VIDC_ERROR,                 "ERROR"                         },
 };
 
-const char *state_name(enum msm_vidc_inst_state state)
+const char *state_name(enum msm_vidc_state state)
 {
 	const char *name = "UNKNOWN STATE";
 
-	if (!state || state > ARRAY_SIZE(inst_state_name_arr))
+	if (!state || state > ARRAY_SIZE(state_name_arr))
 		goto exit;
 
-	if (inst_state_name_arr[state - 1].state != state)
+	if (state_name_arr[state - 1].state != state)
 		goto exit;
 
-	name = inst_state_name_arr[state - 1].name;
+	name = state_name_arr[state - 1].name;
 
 exit:
 	return name;
+}
+
+const char *sub_state_name(enum msm_vidc_sub_state sub_state)
+{
+	switch (sub_state) {
+	case MSM_VIDC_DRAIN:               return "DRAIN ";
+	case MSM_VIDC_DRC:                 return "DRC ";
+	case MSM_VIDC_DRAIN_LAST_BUFFER:   return "DRAIN_LAST_BUFFER ";
+	case MSM_VIDC_DRC_LAST_BUFFER:     return "DRC_LAST_BUFFER ";
+	case MSM_VIDC_INPUT_PAUSE:         return "INPUT_PAUSE ";
+	case MSM_VIDC_OUTPUT_PAUSE:        return "OUTPUT_PAUSE ";
+	}
+
+	return "SUB_STATE_NONE";
 }
 
 struct msm_vidc_core_state_name {
@@ -1228,6 +1237,14 @@ bool res_is_less_than_or_equal_to(u32 width, u32 height,
 		return false;
 }
 
+int signal_session_msg_receipt(struct msm_vidc_inst *inst,
+	enum signal_session_response cmd)
+{
+	if (cmd < MAX_SIGNAL)
+		complete(&inst->completions[cmd]);
+	return 0;
+}
+
 int msm_vidc_change_core_state(struct msm_vidc_core *core,
 	enum msm_vidc_core_state request_state, const char *func)
 {
@@ -1243,8 +1260,8 @@ int msm_vidc_change_core_state(struct msm_vidc_core *core,
 	return 0;
 }
 
-int msm_vidc_change_inst_state(struct msm_vidc_inst *inst,
-	enum msm_vidc_inst_state request_state, const char *func)
+int msm_vidc_change_state(struct msm_vidc_inst *inst,
+		enum msm_vidc_state request_state, const char *func)
 {
 	if (!inst) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -1278,6 +1295,58 @@ int msm_vidc_change_inst_state(struct msm_vidc_inst *inst,
 	return 0;
 }
 
+int msm_vidc_change_sub_state(struct msm_vidc_inst *inst,
+		enum msm_vidc_sub_state clear_sub_state,
+		enum msm_vidc_sub_state set_sub_state, const char *func)
+{
+	int i = 0;
+	enum msm_vidc_sub_state prev_sub_state;
+
+	if (!inst) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	if (is_session_error(inst)) {
+		i_vpr_h(inst,
+			"%s: inst is in bad state, can not change sub state\n", func);
+		return 0;
+	}
+
+	if (!clear_sub_state && !set_sub_state)
+		return 0;
+
+	if ((clear_sub_state & set_sub_state) ||
+		(set_sub_state > MSM_VIDC_MAX_SUB_STATE_VALUE) ||
+		(clear_sub_state > MSM_VIDC_MAX_SUB_STATE_VALUE)) {
+		i_vpr_e(inst, "%s: invalid sub states to clear %#x or set %#x\n",
+			func, clear_sub_state, set_sub_state);
+		return -EINVAL;
+	}
+
+	prev_sub_state = inst->sub_state;
+	inst->sub_state |= set_sub_state;
+	inst->sub_state &= ~clear_sub_state;
+
+	/* print substates only when there is a change */
+	if (inst->sub_state != prev_sub_state) {
+		strlcpy(inst->sub_state_name, "\0", sizeof(inst->sub_state_name));
+		for (i = 0; i < MSM_VIDC_MAX_SUB_STATES; i++) {
+			if (inst->sub_state == MSM_VIDC_SUB_STATE_NONE) {
+				strlcpy(inst->sub_state_name, "SUB_STATE_NONE",
+					sizeof(inst->sub_state_name));
+				break;
+			}
+			if (inst->sub_state & BIT(i))
+				strlcat(inst->sub_state_name, sub_state_name(BIT(i)),
+					sizeof(inst->sub_state_name));
+		}
+		i_vpr_h(inst, "%s: sub state changed to %s\n", func, inst->sub_state_name);
+	}
+
+	return 0;
+}
+
 bool msm_vidc_allow_s_fmt(struct msm_vidc_inst *inst, u32 type)
 {
 	bool allow = false;
@@ -1286,19 +1355,18 @@ bool msm_vidc_allow_s_fmt(struct msm_vidc_inst *inst, u32 type)
 		d_vpr_e("%s: invalid params\n", __func__);
 		return false;
 	}
-	if (inst->state == MSM_VIDC_OPEN) {
+	if (is_state(inst, MSM_VIDC_OPEN)) {
 		allow = true;
 		goto exit;
 	}
 	if (type == OUTPUT_MPLANE || type == OUTPUT_META_PLANE) {
-		if (inst->state == MSM_VIDC_START_INPUT ||
-		    inst->state == MSM_VIDC_DRAIN_START_INPUT) {
+		if (is_state(inst, MSM_VIDC_INPUT_STREAMING)) {
 			allow = true;
 			goto exit;
 		}
 	}
 	if (type == INPUT_MPLANE || type == INPUT_META_PLANE) {
-		if (inst->state == MSM_VIDC_START_OUTPUT) {
+		if (is_state(inst, MSM_VIDC_OUTPUT_STREAMING)) {
 			allow = true;
 			goto exit;
 		}
@@ -1319,7 +1387,7 @@ bool msm_vidc_allow_s_ctrl(struct msm_vidc_inst *inst, u32 id)
 		d_vpr_e("%s: invalid params\n", __func__);
 		return false;
 	}
-	if (inst->state == MSM_VIDC_OPEN) {
+	if (is_state(inst, MSM_VIDC_OPEN)) {
 		allow = true;
 		goto exit;
 	}
@@ -1535,19 +1603,18 @@ bool msm_vidc_allow_reqbufs(struct msm_vidc_inst *inst, u32 type)
 		d_vpr_e("%s: invalid params\n", __func__);
 		return false;
 	}
-	if (inst->state == MSM_VIDC_OPEN) {
+	if (is_state(inst, MSM_VIDC_OPEN)) {
 		allow = true;
 		goto exit;
 	}
 	if (type == OUTPUT_MPLANE || type == OUTPUT_META_PLANE) {
-		if (inst->state == MSM_VIDC_START_INPUT ||
-		    inst->state == MSM_VIDC_DRAIN_START_INPUT) {
+		if (is_state(inst, MSM_VIDC_INPUT_STREAMING)) {
 			allow = true;
 			goto exit;
 		}
 	}
 	if (type == INPUT_MPLANE || type == INPUT_META_PLANE) {
-		if (inst->state == MSM_VIDC_START_OUTPUT) {
+		if (is_state(inst, MSM_VIDC_OUTPUT_STREAMING)) {
 			allow = true;
 			goto exit;
 		}
@@ -1568,19 +1635,20 @@ enum msm_vidc_allow msm_vidc_allow_stop(struct msm_vidc_inst *inst)
 		d_vpr_e("%s: invalid params\n", __func__);
 		return allow;
 	}
-	if (inst->state == MSM_VIDC_START ||
-		inst->state == MSM_VIDC_DRC ||
-		inst->state == MSM_VIDC_DRC_LAST_FLAG ||
-		inst->state == MSM_VIDC_DRC_DRAIN) {
-		allow = MSM_VIDC_ALLOW;
-	} else if (inst->state == MSM_VIDC_START_INPUT ||
-		   inst->state == MSM_VIDC_OPEN) {
+
+	/* allow stop (drain) if input port is streaming */
+	if (is_state(inst, MSM_VIDC_INPUT_STREAMING) ||
+		is_state(inst, MSM_VIDC_STREAMING)) {
+		/* do not allow back to back drain */
+		if (!(is_sub_state(inst, MSM_VIDC_DRAIN)))
+			allow = MSM_VIDC_ALLOW;
+	} else if (is_state(inst, MSM_VIDC_OPEN)) {
 		allow = MSM_VIDC_IGNORE;
-		i_vpr_e(inst, "%s: stop ignored in state %s\n",
-			__func__, state_name(inst->state));
+		i_vpr_e(inst, "%s: ignored in state %s, sub state %s\n",
+			__func__, state_name(inst->state), inst->sub_state_name);
 	} else {
-		i_vpr_e(inst, "%s: stop not allowed in state %s\n",
-			__func__, state_name(inst->state));
+		i_vpr_e(inst, "%s: not allowed in state %s, sub state %s\n",
+			__func__, state_name(inst->state), inst->sub_state_name);
 	}
 
 	return allow;
@@ -1588,18 +1656,24 @@ enum msm_vidc_allow msm_vidc_allow_stop(struct msm_vidc_inst *inst)
 
 bool msm_vidc_allow_start(struct msm_vidc_inst *inst)
 {
+	bool allow = false;
+
 	if (!inst) {
 		d_vpr_e("%s: invalid params\n", __func__);
-		return false;
+		return allow;
 	}
-	if (inst->state == MSM_VIDC_DRAIN_LAST_FLAG ||
-		inst->state == MSM_VIDC_DRC_LAST_FLAG ||
-		inst->state == MSM_VIDC_DRC_DRAIN_LAST_FLAG)
-		return true;
 
-	i_vpr_e(inst, "%s: not allowed in state %s\n",
-			__func__, state_name(inst->state));
-	return false;
+	/* client would call start (resume) to complete DRC/drain sequence */
+	if ((is_sub_state(inst, MSM_VIDC_DRC) &&
+		is_sub_state(inst, MSM_VIDC_DRC_LAST_BUFFER)) ||
+		(is_sub_state(inst, MSM_VIDC_DRAIN) &&
+		is_sub_state(inst, MSM_VIDC_DRAIN_LAST_BUFFER)))
+		allow = true;
+
+	if (!allow)
+		i_vpr_e(inst, "%s: not allowed in state %s, sub state %s\n",
+			__func__, state_name(inst->state), inst->sub_state_name);
+	return allow;
 }
 
 bool msm_vidc_allow_streamon(struct msm_vidc_inst *inst, u32 type)
@@ -1609,13 +1683,12 @@ bool msm_vidc_allow_streamon(struct msm_vidc_inst *inst, u32 type)
 		return false;
 	}
 	if (type == INPUT_MPLANE || type == INPUT_META_PLANE) {
-		if (inst->state == MSM_VIDC_OPEN ||
-			inst->state == MSM_VIDC_START_OUTPUT)
+		if (is_state(inst, MSM_VIDC_OPEN) ||
+			is_state(inst, MSM_VIDC_OUTPUT_STREAMING))
 			return true;
 	} else if (type == OUTPUT_MPLANE || type == OUTPUT_META_PLANE) {
-		if (inst->state == MSM_VIDC_OPEN ||
-			inst->state == MSM_VIDC_START_INPUT ||
-			inst->state == MSM_VIDC_DRAIN_START_INPUT)
+		if (is_state(inst, MSM_VIDC_OPEN) ||
+			is_state(inst, MSM_VIDC_INPUT_STREAMING))
 			return true;
 	}
 
@@ -1678,15 +1751,14 @@ enum msm_vidc_allow msm_vidc_allow_qbuf(struct msm_vidc_inst *inst, u32 type)
 		return MSM_VIDC_DEFER;
 
 	if (type == INPUT_MPLANE) {
-		if (inst->state == MSM_VIDC_OPEN ||
-			inst->state == MSM_VIDC_START_OUTPUT)
+		if (is_state(inst, MSM_VIDC_OPEN) ||
+			is_state(inst, MSM_VIDC_OUTPUT_STREAMING))
 			return MSM_VIDC_DEFER;
 		else
 			return MSM_VIDC_ALLOW;
 	} else if (type == OUTPUT_MPLANE) {
-		if (inst->state == MSM_VIDC_OPEN ||
-			inst->state == MSM_VIDC_START_INPUT ||
-			inst->state == MSM_VIDC_DRAIN_START_INPUT)
+		if (is_state(inst, MSM_VIDC_OPEN) ||
+			is_state(inst, MSM_VIDC_INPUT_STREAMING))
 			return MSM_VIDC_DEFER;
 		else
 			return MSM_VIDC_ALLOW;
@@ -1700,269 +1772,130 @@ enum msm_vidc_allow msm_vidc_allow_qbuf(struct msm_vidc_inst *inst, u32 type)
 
 enum msm_vidc_allow msm_vidc_allow_input_psc(struct msm_vidc_inst *inst)
 {
-	enum msm_vidc_allow allow = MSM_VIDC_DISALLOW;
+	enum msm_vidc_allow allow = MSM_VIDC_ALLOW;
 
 	if (!inst) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return MSM_VIDC_DISALLOW;
 	}
-	if (inst->state == MSM_VIDC_START ||
-		inst->state == MSM_VIDC_START_INPUT ||
-		inst->state == MSM_VIDC_DRAIN) {
-		allow = MSM_VIDC_ALLOW;
-	} else if (inst->state == MSM_VIDC_DRC ||
-		inst->state == MSM_VIDC_DRC_LAST_FLAG ||
-		inst->state == MSM_VIDC_DRC_DRAIN ||
-		inst->state == MSM_VIDC_DRC_DRAIN_LAST_FLAG ||
-		inst->state == MSM_VIDC_DRAIN_START_INPUT) {
-		i_vpr_h(inst, "%s: defer input psc, inst state %s\n",
-				__func__, state_name(inst->state));
-		allow = MSM_VIDC_DEFER;
-	} else if (inst->state == MSM_VIDC_OPEN ||
-		inst->state == MSM_VIDC_START_OUTPUT) {
-		i_vpr_h(inst, "%s: discard input psc, inst state %s\n",
-				__func__, state_name(inst->state));
-		allow = MSM_VIDC_DISCARD;
-	} else {
-		i_vpr_e(inst, "%s: input psc in wrong state %s\n",
-				__func__, state_name(inst->state));
-		allow = MSM_VIDC_DISALLOW;
+
+	/*
+	 * if drc sequence is not completed by client, fw is not
+	 * expected to raise another ipsc
+	 */
+	if (is_sub_state(inst, MSM_VIDC_DRC)) {
+		i_vpr_e(inst, "%s: not allowed in sub state %s\n",
+			__func__, inst->sub_state_name);
+		return MSM_VIDC_DISALLOW;
 	}
 
 	return allow;
 }
 
-bool msm_vidc_allow_last_flag(struct msm_vidc_inst *inst)
+bool msm_vidc_allow_drain_last_flag(struct msm_vidc_inst *inst)
 {
 	if (!inst) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return false;
 	}
-	if (inst->state == MSM_VIDC_DRC ||
-		inst->state == MSM_VIDC_DRAIN ||
-		inst->state == MSM_VIDC_DRC_DRAIN)
+
+	/*
+	 * drain last flag is expected only when DRAIN, INPUT_PAUSE
+	 * is set and DRAIN_LAST_BUFFER is not set
+	 */
+	if (is_sub_state(inst, MSM_VIDC_DRAIN) &&
+		is_sub_state(inst, MSM_VIDC_INPUT_PAUSE) &&
+		!is_sub_state(inst, MSM_VIDC_DRAIN_LAST_BUFFER))
 		return true;
 
-	i_vpr_e(inst, "%s: not allowed in state %s\n",
-			__func__, state_name(inst->state));
+	i_vpr_e(inst, "%s: not allowed in sub state %s\n",
+			__func__, inst->sub_state_name);
 	return false;
 }
 
-static int msm_vidc_flush_pending_last_flag(struct msm_vidc_inst *inst)
+bool msm_vidc_allow_psc_last_flag(struct msm_vidc_inst *inst)
 {
-	int rc = 0;
-	struct response_work *resp_work, *dummy = NULL;
-
 	if (!inst) {
 		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
+		return false;
 	}
 
-	if (list_empty(&inst->response_works))
-		return 0;
+	/*
+	 * drc last flag is expected only when DRC, INPUT_PAUSE
+	 * is set and DRC_LAST_BUFFER is not set
+	 */
+	if (is_sub_state(inst, MSM_VIDC_DRC) &&
+		is_sub_state(inst, MSM_VIDC_INPUT_PAUSE) &&
+		!is_sub_state(inst, MSM_VIDC_DRC_LAST_BUFFER))
+		return true;
 
-	/* flush pending last flag buffers if any */
-	list_for_each_entry_safe(resp_work, dummy,
-				&inst->response_works, list) {
-		if (resp_work->type == RESP_WORK_LAST_FLAG) {
-			i_vpr_h(inst, "%s: flush pending last flag buffer\n",
-				__func__);
-			rc = handle_session_response_work(inst, resp_work);
-			if (rc) {
-				msm_vidc_change_inst_state(inst,
-						MSM_VIDC_ERROR, __func__);
-				return rc;
-			}
-			list_del(&resp_work->list);
-			msm_vidc_vmem_free((void **)&resp_work->data);
-			msm_vidc_vmem_free((void **)&resp_work);
-		}
-	}
+	i_vpr_e(inst, "%s: not allowed in sub state %s\n",
+			__func__, inst->sub_state_name);
 
-	return 0;
+	return false;
 }
 
-static int msm_vidc_discard_pending_opsc(struct msm_vidc_inst *inst)
-{
-	struct response_work *resp_work, *dummy = NULL;
-
-	if (!inst) {
-		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
-
-	if (list_empty(&inst->response_works))
-		return 0;
-
-	/* discard pending port settings change if any */
-	list_for_each_entry_safe(resp_work, dummy,
-				&inst->response_works, list) {
-		if (resp_work->type == RESP_WORK_OUTPUT_PSC) {
-			i_vpr_h(inst,
-				"%s: discard pending output psc\n", __func__);
-			list_del(&resp_work->list);
-			msm_vidc_vmem_free((void **)&resp_work->data);
-			msm_vidc_vmem_free((void **)&resp_work);
-		}
-	}
-
-	return 0;
-}
-
-static int msm_vidc_discard_pending_ipsc(struct msm_vidc_inst *inst)
-{
-	struct response_work *resp_work, *dummy = NULL;
-
-	if (!inst) {
-		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
-
-	if (list_empty(&inst->response_works))
-		return 0;
-
-	/* discard pending port settings change if any */
-	list_for_each_entry_safe(resp_work, dummy,
-			&inst->response_works, list) {
-		if (resp_work->type == RESP_WORK_INPUT_PSC) {
-			i_vpr_h(inst,
-				"%s: discard pending input psc\n", __func__);
-
-			/* override the psc properties again if ipsc discarded */
-			inst->ipsc_properties_set = false;
-
-			list_del(&resp_work->list);
-			msm_vidc_vmem_free((void **)&resp_work->data);
-			msm_vidc_vmem_free((void **)&resp_work);
-		}
-	}
-
-	return 0;
-}
-
-static int msm_vidc_process_pending_ipsc(struct msm_vidc_inst *inst,
-	enum msm_vidc_inst_state *new_state)
-{
-	struct response_work *resp_work, *dummy = NULL;
-	int rc = 0;
-
-	if (!inst || !new_state) {
-		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
-
-	if (list_empty(&inst->response_works))
-		return 0;
-
-	i_vpr_h(inst, "%s: state %s, ipsc pending\n", __func__, state_name(inst->state));
-	list_for_each_entry_safe(resp_work, dummy, &inst->response_works, list) {
-		if (resp_work->type == RESP_WORK_INPUT_PSC) {
-			rc = handle_session_response_work(inst, resp_work);
-			if (rc) {
-				i_vpr_e(inst, "%s: handle ipsc failed\n", __func__);
-				*new_state = MSM_VIDC_ERROR;
-			} else {
-				if (inst->state == MSM_VIDC_DRC_DRAIN_LAST_FLAG ||
-					inst->state == MSM_VIDC_DRAIN_START_INPUT) {
-					*new_state = MSM_VIDC_DRC_DRAIN;
-				} else if (inst->state == MSM_VIDC_DRC_LAST_FLAG) {
-					*new_state = MSM_VIDC_DRC;
-				}
-			}
-			list_del(&resp_work->list);
-			msm_vidc_vmem_free((void **)&resp_work->data);
-			msm_vidc_vmem_free((void **)&resp_work);
-			/* list contains max only one ipsc at anytime */
-			break;
-		}
-	}
-
-	return rc;
-}
-
-int msm_vidc_state_change_streamon(struct msm_vidc_inst *inst, u32 type)
+int msm_vidc_state_change_streamon(struct msm_vidc_inst *inst,
+		enum msm_vidc_port_type port)
 {
 	int rc = 0;
-	enum msm_vidc_inst_state new_state = MSM_VIDC_ERROR;
+	enum msm_vidc_state new_state = MSM_VIDC_ERROR;
 
 	if (!inst || !inst->core) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	if (type == INPUT_META_PLANE || type == OUTPUT_META_PLANE)
+	if (port == INPUT_META_PORT || port == OUTPUT_META_PORT)
 		return 0;
 
-	if (type == INPUT_MPLANE) {
-		if (inst->state == MSM_VIDC_OPEN)
-			new_state = MSM_VIDC_START_INPUT;
-		else if (inst->state == MSM_VIDC_START_OUTPUT)
-			new_state = MSM_VIDC_START;
-	} else if (type == OUTPUT_MPLANE) {
-		if (inst->state == MSM_VIDC_OPEN) {
-			new_state = MSM_VIDC_START_OUTPUT;
-		} else if (inst->state == MSM_VIDC_START_INPUT) {
-			new_state = MSM_VIDC_START;
-		} else if (inst->state == MSM_VIDC_DRAIN_START_INPUT) {
-			i_vpr_h(inst, "%s: streamon(output) in %s state\n",
-				__func__, state_name(inst->state));
-			new_state = MSM_VIDC_DRAIN;
-			rc = msm_vidc_process_pending_ipsc(inst, &new_state);
-			if (rc) {
-				i_vpr_e(inst, "%s: process pending ipsc failed\n", __func__);
-				goto state_change;
-			}
-		}
+	if (port == INPUT_PORT) {
+		if (is_state(inst, MSM_VIDC_OPEN))
+			new_state = MSM_VIDC_INPUT_STREAMING;
+		else if (is_state(inst, MSM_VIDC_OUTPUT_STREAMING))
+			new_state = MSM_VIDC_STREAMING;
+	} else if (port == OUTPUT_PORT) {
+		if (is_state(inst, MSM_VIDC_OPEN))
+			new_state = MSM_VIDC_OUTPUT_STREAMING;
+		else if (is_state(inst, MSM_VIDC_INPUT_STREAMING))
+			new_state = MSM_VIDC_STREAMING;
 	}
 
-state_change:
-	msm_vidc_change_inst_state(inst, new_state, __func__);
+	rc = msm_vidc_change_state(inst, new_state, __func__);
+	if (rc)
+		return rc;
 
 	return rc;
 }
 
-int msm_vidc_state_change_streamoff(struct msm_vidc_inst *inst, u32 type)
+int msm_vidc_state_change_streamoff(struct msm_vidc_inst *inst,
+		enum msm_vidc_port_type port)
 {
 	int rc = 0;
-	enum msm_vidc_inst_state new_state = MSM_VIDC_ERROR;
+	enum msm_vidc_state new_state = MSM_VIDC_ERROR;
 
 	if (!inst || !inst->core) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	if (type == INPUT_META_PLANE || type == OUTPUT_META_PLANE)
+	if (port == INPUT_META_PORT || port == OUTPUT_META_PORT)
 		return 0;
 
-	if (type == INPUT_MPLANE) {
-		if (inst->state == MSM_VIDC_START_INPUT) {
+	if (port == INPUT_PORT) {
+		if (is_state(inst, MSM_VIDC_INPUT_STREAMING)) {
 			new_state = MSM_VIDC_OPEN;
-		} else if (inst->state == MSM_VIDC_START) {
-			new_state = MSM_VIDC_START_OUTPUT;
-		} else if (inst->state == MSM_VIDC_DRC ||
-				   inst->state == MSM_VIDC_DRC_LAST_FLAG ||
-				   inst->state == MSM_VIDC_DRAIN ||
-				   inst->state == MSM_VIDC_DRAIN_LAST_FLAG ||
-				   inst->state == MSM_VIDC_DRC_DRAIN ||
-				   inst->state == MSM_VIDC_DRC_DRAIN_LAST_FLAG ||
-				   inst->state == MSM_VIDC_DRAIN_START_INPUT) {
-			new_state = MSM_VIDC_START_OUTPUT;
+		} else if (is_state(inst, MSM_VIDC_STREAMING)) {
+			new_state = MSM_VIDC_OUTPUT_STREAMING;
 		}
-	} else if (type == OUTPUT_MPLANE) {
-		if (inst->state == MSM_VIDC_START_OUTPUT) {
+	} else if (port == OUTPUT_PORT) {
+		if (is_state(inst, MSM_VIDC_OUTPUT_STREAMING)) {
 			new_state = MSM_VIDC_OPEN;
-		} else if (inst->state == MSM_VIDC_START ||
-				   inst->state == MSM_VIDC_DRAIN ||
-				   inst->state == MSM_VIDC_DRAIN_LAST_FLAG ||
-				   inst->state == MSM_VIDC_DRC ||
-				   inst->state == MSM_VIDC_DRC_LAST_FLAG ||
-				   inst->state == MSM_VIDC_DRC_DRAIN) {
-			new_state = MSM_VIDC_START_INPUT;
-		} else if (inst->state == MSM_VIDC_DRC_DRAIN_LAST_FLAG) {
-			new_state = MSM_VIDC_DRAIN_START_INPUT;
+		} else if (is_state(inst, MSM_VIDC_STREAMING)) {
+			new_state = MSM_VIDC_INPUT_STREAMING;
 		}
 	}
-	rc = msm_vidc_change_inst_state(inst, new_state, __func__);
+	rc = msm_vidc_change_state(inst, new_state, __func__);
 	if (rc)
 		goto exit;
 
@@ -1970,70 +1903,291 @@ exit:
 	return rc;
 }
 
-int msm_vidc_state_change_stop(struct msm_vidc_inst *inst)
+int msm_vidc_process_drain(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
-	enum msm_vidc_inst_state new_state = MSM_VIDC_ERROR;
 
-	if (!inst || !inst->core) {
+	if (!inst) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	if (inst->state == MSM_VIDC_START) {
-		new_state = MSM_VIDC_DRAIN;
-	} else if (inst->state == MSM_VIDC_DRC) {
-		new_state = MSM_VIDC_DRC_DRAIN;
-	} else if (inst->state == MSM_VIDC_DRC_DRAIN ||
-			   inst->state == MSM_VIDC_DRC_LAST_FLAG) {
-		new_state = MSM_VIDC_DRC_DRAIN_LAST_FLAG;
-	} else {
-		i_vpr_e(inst, "%s: wrong state %s\n",
-			__func__, state_name(inst->state));
-		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
-		return -EINVAL;
-	}
-	rc = msm_vidc_change_inst_state(inst, new_state, __func__);
+	rc = venus_hfi_session_drain(inst, INPUT_PORT);
+	if (rc)
+		return rc;
+	rc = msm_vidc_change_sub_state(inst, 0, MSM_VIDC_DRAIN, __func__);
 	if (rc)
 		return rc;
 
 	return rc;
 }
 
-int msm_vidc_state_change_start(struct msm_vidc_inst *inst)
+int msm_vidc_process_resume(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
-	enum msm_vidc_inst_state new_state = MSM_VIDC_ERROR;
+	enum msm_vidc_sub_state clear_sub_state = MSM_VIDC_SUB_STATE_NONE;
+	bool drain_pending = false;
 
-	if (!inst || !inst->core) {
+	if (!inst) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	if (inst->state == MSM_VIDC_DRAIN_LAST_FLAG ||
-		inst->state == MSM_VIDC_DRC_LAST_FLAG) {
-		new_state = MSM_VIDC_START;
-		rc = msm_vidc_process_pending_ipsc(inst, &new_state);
-		if (rc) {
-			i_vpr_e(inst, "%s: process pending ipsc failed\n", __func__);
-			goto state_change;
+	/* first check DRC pending else check drain pending */
+	if (is_sub_state(inst, MSM_VIDC_DRC) &&
+		is_sub_state(inst, MSM_VIDC_DRC_LAST_BUFFER)) {
+		clear_sub_state = MSM_VIDC_DRC | MSM_VIDC_DRC_LAST_BUFFER;
+		/*
+		 * if drain sequence is not completed then do not resume here.
+		 * client will eventually complete drain sequence in which ports
+		 * will be resumed.
+		 */
+		drain_pending = is_sub_state(inst, MSM_VIDC_DRAIN) &&
+			is_sub_state(inst, MSM_VIDC_DRAIN_LAST_BUFFER);
+		if (!drain_pending) {
+			if (is_sub_state(inst, MSM_VIDC_INPUT_PAUSE)) {
+				rc = venus_hfi_session_resume(inst, INPUT_PORT,
+						HFI_CMD_SETTINGS_CHANGE);
+				if (rc)
+					return rc;
+				clear_sub_state |= MSM_VIDC_INPUT_PAUSE;
+			}
+			if (is_sub_state(inst, MSM_VIDC_OUTPUT_PAUSE)) {
+				rc = venus_hfi_session_resume(inst, OUTPUT_PORT,
+						HFI_CMD_SETTINGS_CHANGE);
+				if (rc)
+					return rc;
+				clear_sub_state |= MSM_VIDC_OUTPUT_PAUSE;
+			}
 		}
-	} else if (inst->state == MSM_VIDC_DRC_DRAIN_LAST_FLAG) {
-		new_state = MSM_VIDC_DRAIN;
-		rc = msm_vidc_process_pending_ipsc(inst, &new_state);
-		if (rc) {
-			i_vpr_e(inst, "%s: process pending ipsc failed\n", __func__);
-			goto state_change;
+	} else if (is_sub_state(inst, MSM_VIDC_DRAIN) &&
+			   is_sub_state(inst, MSM_VIDC_DRAIN_LAST_BUFFER)) {
+		clear_sub_state = MSM_VIDC_DRAIN | MSM_VIDC_DRAIN_LAST_BUFFER;
+		if (is_sub_state(inst, MSM_VIDC_INPUT_PAUSE)) {
+			rc = venus_hfi_session_resume(inst, INPUT_PORT, HFI_CMD_DRAIN);
+			if (rc)
+				return rc;
+			clear_sub_state |= MSM_VIDC_INPUT_PAUSE;
 		}
-	} else {
-		i_vpr_e(inst, "%s: wrong state %s\n", __func__, state_name(inst->state));
-		new_state = MSM_VIDC_ERROR;
-		rc = -EINVAL;
-		goto state_change;
+		if (is_sub_state(inst, MSM_VIDC_OUTPUT_PAUSE)) {
+			rc = venus_hfi_session_resume(inst, OUTPUT_PORT, HFI_CMD_DRAIN);
+			if (rc)
+				return rc;
+			clear_sub_state |= MSM_VIDC_OUTPUT_PAUSE;
+		}
 	}
 
-state_change:
-	msm_vidc_change_inst_state(inst, new_state, __func__);
+	rc = msm_vidc_change_sub_state(inst, clear_sub_state, 0, __func__);
+	if (rc)
+		return rc;
+
+	return rc;
+}
+
+int msm_vidc_process_streamon(struct msm_vidc_inst *inst,
+		enum msm_vidc_port_type port)
+{
+	int rc = 0;
+	enum msm_vidc_sub_state clear_sub_state = MSM_VIDC_SUB_STATE_NONE;
+	enum msm_vidc_sub_state set_sub_state = MSM_VIDC_SUB_STATE_NONE;
+	bool drain_pending = false;
+
+	if (!inst) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	if (port == INPUT_META_PORT || port == OUTPUT_META_PORT)
+		return 0;
+
+	msm_vidc_scale_power(inst, true);
+
+	rc = venus_hfi_start(inst, port);
+	if (rc)
+		return rc;
+
+	/* clear input/output pause substate immediately */
+	if (port == INPUT_PORT && is_sub_state(inst, MSM_VIDC_INPUT_PAUSE)) {
+		rc = msm_vidc_change_sub_state(inst, MSM_VIDC_INPUT_PAUSE, 0, __func__);
+		if (rc)
+			return rc;
+	} else if (port == OUTPUT_PORT && is_sub_state(inst, MSM_VIDC_OUTPUT_PAUSE)) {
+		rc = msm_vidc_change_sub_state(inst, MSM_VIDC_OUTPUT_PAUSE, 0, __func__);
+		if (rc)
+			return rc;
+	}
+
+	if (port == INPUT_PORT) {
+		/*
+		 * if DRC sequence is not completed by the client then PAUSE
+		 * firmware input port to avoid firmware raising IPSC again.
+		 * When client completes DRC or DRAIN sequences, firmware
+		 * input port will be resumed.
+		 */
+		if (is_sub_state(inst, MSM_VIDC_DRC) ||
+			is_sub_state(inst, MSM_VIDC_DRAIN)) {
+			if (!is_sub_state(inst, MSM_VIDC_INPUT_PAUSE)) {
+				rc = venus_hfi_session_pause(inst, INPUT_PORT);
+				if (rc)
+					return rc;
+				set_sub_state = MSM_VIDC_INPUT_PAUSE;
+			}
+		}
+	} else if (port == OUTPUT_PORT) {
+		/*
+		 * client completed drc sequence, reset DRC and
+		 * MSM_VIDC_DRC_LAST_BUFFER substates
+		 */
+		if (is_sub_state(inst, MSM_VIDC_DRC) &&
+			is_sub_state(inst, MSM_VIDC_DRC_LAST_BUFFER)) {
+			clear_sub_state = MSM_VIDC_DRC | MSM_VIDC_DRC_LAST_BUFFER;
+		}
+		/*
+		 * fw input port is paused due to ipsc. now that client
+		 * completed drc sequence, resume fw input port provided
+		 * drain is not pending and input port is streaming.
+		 */
+		drain_pending = is_sub_state(inst, MSM_VIDC_DRAIN) &&
+			is_sub_state(inst, MSM_VIDC_DRAIN_LAST_BUFFER);
+		if (!drain_pending && is_state(inst, MSM_VIDC_INPUT_STREAMING)) {
+			if (is_sub_state(inst, MSM_VIDC_INPUT_PAUSE)) {
+				rc = venus_hfi_session_resume(inst, INPUT_PORT,
+						HFI_CMD_SETTINGS_CHANGE);
+				if (rc)
+					return rc;
+				clear_sub_state |= MSM_VIDC_INPUT_PAUSE;
+			}
+		}
+	}
+
+	rc = msm_vidc_state_change_streamon(inst, port);
+	if (rc)
+		return rc;
+
+	rc = msm_vidc_change_sub_state(inst, clear_sub_state, set_sub_state, __func__);
+	if (rc)
+		return rc;
+
+	return rc;
+}
+
+int msm_vidc_process_stop_done(struct msm_vidc_inst *inst,
+		enum signal_session_response signal_type)
+{
+	int rc = 0;
+	enum msm_vidc_sub_state set_sub_state = MSM_VIDC_SUB_STATE_NONE;
+
+	if (!inst) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	if (signal_type == SIGNAL_CMD_STOP_INPUT) {
+		set_sub_state = MSM_VIDC_INPUT_PAUSE;
+		/*
+		 * FW is expected to return DRC LAST flag before input
+		 * stop done if DRC sequence is pending
+		 */
+		if (is_sub_state(inst, MSM_VIDC_DRC) &&
+			!is_sub_state(inst, MSM_VIDC_DRC_LAST_BUFFER)) {
+			i_vpr_e(inst, "%s: drc last flag pkt not received\n", __func__);
+			msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
+		}
+		/*
+		 * FW is expected to return DRAIN LAST flag before input
+		 * stop done if DRAIN sequence is pending
+		 */
+		if (is_sub_state(inst, MSM_VIDC_DRAIN) &&
+			!is_sub_state(inst, MSM_VIDC_DRAIN_LAST_BUFFER)) {
+			i_vpr_e(inst, "%s: drain last flag pkt not received\n", __func__);
+			msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
+		}
+	} else if (signal_type == SIGNAL_CMD_STOP_OUTPUT) {
+		set_sub_state = MSM_VIDC_OUTPUT_PAUSE;
+	}
+
+	rc = msm_vidc_change_sub_state(inst, 0, set_sub_state, __func__);
+	if (rc)
+		return rc;
+
+	signal_session_msg_receipt(inst, signal_type);
+	return rc;
+}
+
+int msm_vidc_process_drain_done(struct msm_vidc_inst *inst)
+{
+	int rc = 0;
+
+	if (!inst) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	if (is_sub_state(inst, MSM_VIDC_DRAIN)) {
+		rc = msm_vidc_change_sub_state(inst, 0, MSM_VIDC_INPUT_PAUSE, __func__);
+		if (rc)
+			return rc;
+	} else {
+		i_vpr_e(inst, "%s: unexpected drain done\n", __func__);
+	}
+
+	return rc;
+}
+
+int msm_vidc_process_drain_last_flag(struct msm_vidc_inst *inst)
+{
+	int rc = 0;
+	struct v4l2_event event = {0};
+	struct v4l2_event_vidc_last_flag *event_data = NULL;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	rc = msm_vidc_state_change_drain_last_flag(inst);
+	if (rc)
+		return rc;
+
+	if (is_decode_session(inst) &&
+		!inst->capabilities->cap[LAST_FLAG_EVENT_ENABLE].value) {
+		i_vpr_h(inst, "%s: last flag event not enabled\n", __func__);
+		return 0;
+	}
+
+	event.type = V4L2_EVENT_VIDC_LAST_FLAG;
+	event_data = (struct v4l2_event_vidc_last_flag *)event.u.data;
+	event_data->flag_type = LAST_FLAG_DRAIN;
+	v4l2_event_queue_fh(&inst->event_handler, &event);
+
+	return rc;
+}
+
+int msm_vidc_process_psc_last_flag(struct msm_vidc_inst *inst)
+{
+	int rc = 0;
+	struct v4l2_event event = {0};
+	struct v4l2_event_vidc_last_flag *event_data = NULL;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	rc = msm_vidc_state_change_psc_last_flag(inst);
+	if (rc)
+		return rc;
+
+	if (is_decode_session(inst) &&
+		!inst->capabilities->cap[LAST_FLAG_EVENT_ENABLE].value) {
+		i_vpr_h(inst, "%s: last flag event not enabled\n", __func__);
+		return 0;
+	}
+
+	event.type = V4L2_EVENT_VIDC_LAST_FLAG;
+	event_data = (struct v4l2_event_vidc_last_flag *)event.u.data;
+	event_data->flag_type = LAST_FLAG_DRC;
+	v4l2_event_queue_fh(&inst->event_handler, &event);
 
 	return rc;
 }
@@ -2041,55 +2195,61 @@ state_change:
 int msm_vidc_state_change_input_psc(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
-	enum msm_vidc_inst_state new_state = MSM_VIDC_ERROR;
+	enum msm_vidc_sub_state set_sub_state = MSM_VIDC_SUB_STATE_NONE;
 
 	if (!inst || !inst->core) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
-	/* don't change state as output port is not started yet */
-	if (inst->state == MSM_VIDC_START_INPUT)
-		return 0;
 
-	if (inst->state == MSM_VIDC_START) {
-		new_state = MSM_VIDC_DRC;
-	} else if (inst->state == MSM_VIDC_DRAIN) {
-		new_state = MSM_VIDC_DRC_DRAIN;
-	} else {
-		i_vpr_e(inst, "%s: wrong state %s\n",
-				__func__, state_name(inst->state));
-		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
-		return -EINVAL;
-	}
-	rc = msm_vidc_change_inst_state(inst, new_state, __func__);
+	/*
+	 * if output port is not streaming, then do not set DRC substate
+	 * because DRC_LAST_FLAG is not going to be received. Update
+	 * INPUT_PAUSE substate only
+	 */
+	if (is_state(inst, MSM_VIDC_INPUT_STREAMING) ||
+		is_state(inst, MSM_VIDC_OPEN))
+		set_sub_state = MSM_VIDC_INPUT_PAUSE;
+	else
+		set_sub_state = MSM_VIDC_DRC | MSM_VIDC_INPUT_PAUSE;
+
+	rc = msm_vidc_change_sub_state(inst, 0, set_sub_state, __func__);
 	if (rc)
 		return rc;
 
 	return rc;
 }
 
-int msm_vidc_state_change_last_flag(struct msm_vidc_inst *inst)
+int msm_vidc_state_change_drain_last_flag(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
-	enum msm_vidc_inst_state new_state = MSM_VIDC_ERROR;
+	enum msm_vidc_sub_state set_sub_state = MSM_VIDC_SUB_STATE_NONE;
 
 	if (!inst || !inst->core) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
-	if (inst->state == MSM_VIDC_DRC) {
-		new_state = MSM_VIDC_DRC_LAST_FLAG;
-	} else if (inst->state == MSM_VIDC_DRAIN) {
-		new_state = MSM_VIDC_DRAIN_LAST_FLAG;
-	} else if (inst->state == MSM_VIDC_DRC_DRAIN) {
-		new_state = MSM_VIDC_DRC_DRAIN_LAST_FLAG;
-	} else {
-		i_vpr_e(inst, "%s: wrong state %s\n",
-				__func__, state_name(inst->state));
-		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
+
+	set_sub_state = MSM_VIDC_DRAIN_LAST_BUFFER | MSM_VIDC_OUTPUT_PAUSE;
+	rc = msm_vidc_change_sub_state(inst, 0, set_sub_state, __func__);
+	if (rc)
+		return rc;
+
+	return rc;
+}
+
+int msm_vidc_state_change_psc_last_flag(struct msm_vidc_inst *inst)
+{
+	int rc = 0;
+	enum msm_vidc_sub_state set_sub_state = MSM_VIDC_SUB_STATE_NONE;
+
+	if (!inst || !inst->core) {
+		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
-	rc = msm_vidc_change_inst_state(inst, new_state, __func__);
+
+	set_sub_state = MSM_VIDC_DRC_LAST_BUFFER | MSM_VIDC_OUTPUT_PAUSE;
+	rc = msm_vidc_change_sub_state(inst, 0, set_sub_state, __func__);
 	if (rc)
 		return rc;
 
@@ -3317,7 +3477,7 @@ int schedule_stats_work(struct msm_vidc_inst *inst)
 		return 0;
 	}
 	core = inst->core;
-	mod_delayed_work(inst->response_workq, &inst->stats_work,
+	mod_delayed_work(inst->workq, &inst->stats_work,
 		msecs_to_jiffies(core->capabilities[STATS_TIMEOUT_MS].value));
 
 	return 0;
@@ -4357,25 +4517,6 @@ int msm_vidc_session_set_default_header(struct msm_vidc_inst *inst)
 	return rc;
 }
 
-int msm_vidc_session_streamon(struct msm_vidc_inst *inst,
-		enum msm_vidc_port_type port)
-{
-	int rc = 0;
-
-	if (!inst || !inst->core) {
-		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
-
-	msm_vidc_scale_power(inst, true);
-
-	rc = venus_hfi_start(inst, port);
-	if (rc)
-		return rc;
-
-	return rc;
-}
-
 int msm_vidc_session_streamoff(struct msm_vidc_inst *inst,
 	enum msm_vidc_port_type port)
 {
@@ -4405,6 +4546,10 @@ int msm_vidc_session_streamoff(struct msm_vidc_inst *inst,
 	if (rc)
 		goto error;
 
+	rc = msm_vidc_state_change_streamoff(inst, port);
+	if (rc)
+		goto error;
+
 	core = inst->core;
 	i_vpr_h(inst, "%s: wait on port: %d for time: %d ms\n",
 		__func__, port, core->capabilities[HW_RESPONSE_TIMEOUT].value);
@@ -4427,18 +4572,8 @@ int msm_vidc_session_streamoff(struct msm_vidc_inst *inst,
 		goto error;
 
 	if (port == INPUT_PORT) {
-		/* discard pending input port settings change if any */
-		msm_vidc_discard_pending_ipsc(inst);
-
 		/* flush input timer list */
 		msm_vidc_flush_input_timer(inst);
-	}
-
-	if (port == OUTPUT_PORT) {
-		/* discard pending opsc if any*/
-		msm_vidc_discard_pending_opsc(inst);
-		/* flush out pending last flag buffers if any */
-		msm_vidc_flush_pending_last_flag(inst);
 	}
 
 	/* no more queued buffers after streamoff */
@@ -4502,6 +4637,9 @@ int msm_vidc_session_close(struct msm_vidc_inst *inst)
 	}
 	inst_lock(inst, __func__);
 
+	inst->state = MSM_VIDC_CLOSE;
+	inst->sub_state = MSM_VIDC_SUB_STATE_NONE;
+	strlcpy(inst->sub_state_name, "SUB_STATE_NONE", sizeof(inst->sub_state_name));
 	msm_vidc_remove_session(inst);
 
 	return rc;
@@ -4520,7 +4658,7 @@ int msm_vidc_kill_session(struct msm_vidc_inst *inst)
 
 	i_vpr_e(inst, "%s: killing session\n", __func__);
 	msm_vidc_session_close(inst);
-	msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
+	msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
 
 	return 0;
 }
@@ -4820,7 +4958,7 @@ int msm_vidc_core_deinit_locked(struct msm_vidc_core *core, bool force)
 
 	/* unlink all sessions from core, if any */
 	list_for_each_entry_safe(inst, dummy, &core->instances, list) {
-		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
+		msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
 		list_del_init(&inst->list);
 		list_add_tail(&inst->list, &core->dangling_instances);
 	}
@@ -5326,7 +5464,7 @@ void msm_vidc_batch_handler(struct work_struct *work)
 	rc = msm_vidc_queue_deferred_buffers(inst, MSM_VIDC_BUF_OUTPUT);
 	if (rc) {
 		i_vpr_e(inst, "%s: batch qbufs failed\n", __func__);
-		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
+		msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
 	}
 
 exit:
@@ -5434,7 +5572,7 @@ int msm_vidc_flush_delayed_unmap_buffers(struct msm_vidc_inst *inst,
 					i_vpr_e(inst,
 						"%s: unexpected map refcount: %u device addr %#x\n",
 						__func__, map->refcount, map->device_addr);
-					msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
+					msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
 				}
 				msm_vidc_memory_unmap_completely(inst, map);
 			}
@@ -5451,7 +5589,6 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 	struct msm_vidc_timestamp *ts, *dummy_ts;
 	struct msm_memory_dmabuf *dbuf, *dummy_dbuf;
 	struct msm_vidc_input_timer *timer, *dummy_timer;
-	struct response_work *work, *dummy_work = NULL;
 	struct msm_vidc_inst_cap_entry *entry, *dummy_entry;
 	struct msm_vidc_fence *fence, *dummy_fence;
 
@@ -5547,12 +5684,6 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 		msm_vidc_memory_put_dmabuf_completely(inst, dbuf);
 	}
 
-	list_for_each_entry_safe(work, dummy_work, &inst->response_works, list) {
-		list_del(&work->list);
-		msm_vidc_vmem_free((void **)&work->data);
-		msm_vidc_vmem_free((void **)&work);
-	}
-
 	list_for_each_entry_safe(entry, dummy_entry, &inst->firmware_list, list) {
 		i_vpr_e(inst, "%s: fw list: %s\n", __func__, cap_name(entry->cap_id));
 		list_del(&entry->list);
@@ -5594,8 +5725,8 @@ static void msm_vidc_close_helper(struct kref *kref)
 	else if (is_encode_session(inst))
 		msm_venc_inst_deinit(inst);
 	msm_vidc_free_input_cr_list(inst);
-	if (inst->response_workq)
-		destroy_workqueue(inst->response_workq);
+	if (inst->workq)
+		destroy_workqueue(inst->workq);
 	msm_vidc_remove_dangling_session(inst);
 	mutex_destroy(&inst->client_lock);
 	mutex_destroy(&inst->request_lock);

@@ -49,6 +49,10 @@ int venus_hfi_start(struct msm_vidc_inst *inst, enum msm_vidc_port_type port);
 int venus_hfi_stop(struct msm_vidc_inst *inst, enum msm_vidc_port_type port);
 int venus_hfi_session_close(struct msm_vidc_inst *inst);
 int venus_hfi_session_open(struct msm_vidc_inst *inst);
+int venus_hfi_session_pause(struct msm_vidc_inst *inst, enum msm_vidc_port_type port);
+int venus_hfi_session_resume(struct msm_vidc_inst *inst,
+	enum msm_vidc_port_type port, u32 payload);
+int venus_hfi_session_drain(struct msm_vidc_inst *inst, enum msm_vidc_port_type port);
 int venus_hfi_session_set_codec(struct msm_vidc_inst *inst);
 int venus_hfi_session_set_secure_mode(struct msm_vidc_inst *inst);
 int venus_hfi_core_init(struct msm_vidc_core *core);

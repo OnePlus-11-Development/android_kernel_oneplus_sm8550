@@ -75,19 +75,30 @@ struct msm_vidc_buffers_info {
 	struct msm_vidc_buffers        partial_data;
 };
 
-enum msm_vidc_inst_state {
+enum msm_vidc_state {
 	MSM_VIDC_OPEN                      = 1,
-	MSM_VIDC_START_INPUT               = 2,
-	MSM_VIDC_START_OUTPUT              = 3,
-	MSM_VIDC_START                     = 4,
-	MSM_VIDC_DRC                       = 5,
-	MSM_VIDC_DRC_LAST_FLAG             = 6,
-	MSM_VIDC_DRAIN                     = 7,
-	MSM_VIDC_DRAIN_LAST_FLAG           = 8,
-	MSM_VIDC_DRC_DRAIN                 = 9,
-	MSM_VIDC_DRC_DRAIN_LAST_FLAG       = 10,
-	MSM_VIDC_DRAIN_START_INPUT         = 11,
-	MSM_VIDC_ERROR                     = 12,
+	MSM_VIDC_INPUT_STREAMING           = 2,
+	MSM_VIDC_OUTPUT_STREAMING          = 3,
+	MSM_VIDC_STREAMING                 = 4,
+	MSM_VIDC_CLOSE                     = 5,
+	MSM_VIDC_ERROR                     = 6,
+};
+
+#define MSM_VIDC_SUB_STATE_NONE          0
+#define MSM_VIDC_MAX_SUB_STATES          6
+/*
+ * max value of inst->sub_state if all
+ * the 6 valid bits are set i.e 111111==>63
+ */
+#define MSM_VIDC_MAX_SUB_STATE_VALUE     ((1 << MSM_VIDC_MAX_SUB_STATES) - 1)
+
+enum msm_vidc_sub_state {
+	MSM_VIDC_DRAIN                     = BIT(0),
+	MSM_VIDC_DRC                       = BIT(1),
+	MSM_VIDC_DRAIN_LAST_BUFFER         = BIT(2),
+	MSM_VIDC_DRC_LAST_BUFFER           = BIT(3),
+	MSM_VIDC_INPUT_PAUSE               = BIT(4),
+	MSM_VIDC_OUTPUT_PAUSE              = BIT(5),
 };
 
 struct buf_queue {
@@ -99,7 +110,9 @@ struct msm_vidc_inst {
 	struct mutex                       lock;
 	struct mutex                       request_lock;
 	struct mutex                       client_lock;
-	enum msm_vidc_inst_state           state;
+	enum msm_vidc_state                state;
+	enum msm_vidc_sub_state            sub_state;
+	char                               sub_state_name[MAX_NAME_LENGTH];
 	enum msm_vidc_domain_type          domain;
 	enum msm_vidc_codec_type           codec;
 	void                              *core;
@@ -138,12 +151,10 @@ struct msm_vidc_inst {
 	struct msm_vidc_decode_batch       decode_batch;
 	struct msm_vidc_decode_vpp_delay   decode_vpp_delay;
 	struct msm_vidc_session_idle       session_idle;
-	struct delayed_work                response_work;
 	struct delayed_work                stats_work;
 	struct work_struct                 stability_work;
 	struct msm_vidc_stability          stability;
-	struct workqueue_struct           *response_workq;
-	struct list_head                   response_works; /* list of struct response_work */
+	struct workqueue_struct           *workq;
 	struct list_head                   enc_input_crs;
 	struct list_head                   dmabuf_tracker; /* list of struct msm_memory_dmabuf */
 	struct list_head                   input_timer_list; /* list of struct msm_vidc_input_timer */

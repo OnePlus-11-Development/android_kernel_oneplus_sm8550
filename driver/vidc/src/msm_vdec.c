@@ -1160,24 +1160,6 @@ static int msm_vdec_set_delivery_mode_property(struct msm_vidc_inst *inst,
 	return rc;
 }
 
-static int msm_vdec_session_resume(struct msm_vidc_inst *inst,
-	enum msm_vidc_port_type port)
-{
-	int rc = 0;
-
-	i_vpr_h(inst, "%s()\n", __func__);
-	rc = venus_hfi_session_command(inst,
-			HFI_CMD_RESUME,
-			port,
-			HFI_PAYLOAD_NONE,
-			NULL,
-			0);
-	if (rc)
-		return rc;
-
-	return rc;
-}
-
 int msm_vdec_init_input_subcr_params(struct msm_vidc_inst *inst)
 {
 	struct msm_vidc_subscription_params *subsc_params;
@@ -1330,7 +1312,7 @@ static int msm_vdec_read_input_subcr_params(struct msm_vidc_inst *inst)
 		if (inst->buffers.output.min_count != 1) {
 			i_vpr_e(inst, "%s: invalid min count %d in thumbnail case\n",
 				__func__, inst->buffers.output.min_count);
-			msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
+			msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
 		}
 	}
 	inst->crop.top = subsc_params.crop_offsets[0] & 0xFFFF;
@@ -1413,16 +1395,11 @@ int msm_vdec_input_port_settings_change(struct msm_vidc_inst *inst)
 	if (rc)
 		return rc;
 
-	rc = msm_vdec_session_resume(inst, INPUT_PORT);
-	if (rc)
-		return rc;
-
 	return rc;
 }
 
 int msm_vdec_output_port_settings_change(struct msm_vidc_inst *inst)
 {
-	//todo
 	return 0;
 }
 
@@ -1496,23 +1473,23 @@ int msm_vdec_streamon_input(struct msm_vidc_inst *inst)
 		rc = msm_vdec_subscribe_input_port_settings_change(
 			inst, INPUT_PORT);
 		if (rc)
-			return rc;
+			goto error;
 		inst->ipsc_properties_set = true;
 	}
 
 	rc = msm_vdec_subscribe_property(inst, INPUT_PORT);
 	if (rc)
-		return rc;
+		goto error;
 
 	rc = msm_vdec_subscribe_metadata(inst, INPUT_PORT);
 	if (rc)
-		return rc;
+		goto error;
 
 	rc = msm_vdec_set_delivery_mode_metadata(inst, INPUT_PORT);
 	if (rc)
-		return rc;
+		goto error;
 
-	rc = msm_vidc_session_streamon(inst, INPUT_PORT);
+	rc = msm_vidc_process_streamon(inst, INPUT_PORT);
 	if (rc)
 		goto error;
 
@@ -1788,11 +1765,11 @@ int msm_vdec_streamon_output(struct msm_vidc_inst *inst)
 
 	rc = msm_vidc_check_session_supported(inst);
 	if (rc)
-		return rc;
+		goto error;
 
 	rc = msm_vdec_update_max_map_output_count(inst);
 	if (rc)
-		return rc;
+		goto error;
 
 	rc = msm_vdec_set_output_properties(inst);
 	if (rc)
@@ -1800,8 +1777,8 @@ int msm_vdec_streamon_output(struct msm_vidc_inst *inst)
 
 	if (!inst->opsc_properties_set) {
 		memcpy(&inst->subcr_params[OUTPUT_PORT],
-			   &inst->subcr_params[INPUT_PORT],
-			   sizeof(inst->subcr_params[INPUT_PORT]));
+				&inst->subcr_params[INPUT_PORT],
+				sizeof(inst->subcr_params[INPUT_PORT]));
 		rc = msm_vdec_subscribe_output_port_settings_change(inst, OUTPUT_PORT);
 		if (rc)
 			goto error;
@@ -1810,7 +1787,7 @@ int msm_vdec_streamon_output(struct msm_vidc_inst *inst)
 
 	rc = msm_vdec_subscribe_property(inst, OUTPUT_PORT);
 	if (rc)
-		return rc;
+		goto error;
 
 	rc = msm_vdec_subscribe_metadata(inst, OUTPUT_PORT);
 	if (rc)
@@ -1818,11 +1795,11 @@ int msm_vdec_streamon_output(struct msm_vidc_inst *inst)
 
 	rc = msm_vdec_set_delivery_mode_property(inst, OUTPUT_PORT);
 	if (rc)
-		return rc;
+		goto error;
 
 	rc = msm_vdec_set_delivery_mode_metadata(inst, OUTPUT_PORT);
 	if (rc)
-		return rc;
+		goto error;
 
 	rc = msm_vdec_get_output_internal_buffers(inst);
 	if (rc)
@@ -1832,7 +1809,7 @@ int msm_vdec_streamon_output(struct msm_vidc_inst *inst)
 	if (rc)
 		goto error;
 
-	rc = msm_vidc_session_streamon(inst, OUTPUT_PORT);
+	rc = msm_vidc_process_streamon(inst, OUTPUT_PORT);
 	if (rc)
 		goto error;
 
@@ -1860,10 +1837,6 @@ static inline enum msm_vidc_allow msm_vdec_allow_queue_deferred_buffers(
 
 	/* do not defer buffers initially to avoid latency issues */
 	if (inst->power.buffer_counter <= SKIP_BATCH_WINDOW)
-		return MSM_VIDC_ALLOW;
-
-	/* do not defer, if client waiting for last flag FBD */
-	if (inst->state != MSM_VIDC_START)
 		return MSM_VIDC_ALLOW;
 
 	/* defer qbuf, if pending buffers count less than batch size */
@@ -2192,7 +2165,6 @@ int msm_vdec_process_cmd(struct msm_vidc_inst *inst, u32 cmd)
 {
 	int rc = 0;
 	enum msm_vidc_allow allow = MSM_VIDC_DISALLOW;
-	enum msm_vidc_port_type port;
 	struct msm_vidc_inst_capability *capability;
 
 	if (!inst || !inst->core || !inst->capabilities) {
@@ -2210,15 +2182,7 @@ int msm_vdec_process_cmd(struct msm_vidc_inst *inst, u32 cmd)
 			return 0;
 		else if (allow != MSM_VIDC_ALLOW)
 			return -EINVAL;
-		rc = venus_hfi_session_command(inst,
-				HFI_CMD_DRAIN,
-				INPUT_PORT,
-				HFI_PAYLOAD_NONE,
-				NULL,
-				0);
-		if (rc)
-			return rc;
-		rc = msm_vidc_state_change_stop(inst);
+		rc = msm_vidc_process_drain(inst);
 		if (rc)
 			return rc;
 	} else if (cmd == V4L2_DEC_CMD_START) {
@@ -2236,11 +2200,6 @@ int msm_vdec_process_cmd(struct msm_vidc_inst *inst, u32 cmd)
 
 		if (!msm_vidc_allow_start(inst))
 			return -EBUSY;
-		port = (inst->state == MSM_VIDC_DRAIN_LAST_FLAG) ? INPUT_PORT : OUTPUT_PORT;
-
-		rc = msm_vidc_state_change_start(inst);
-		if (rc)
-			return rc;
 
 		/* tune power features */
 		inst->decode_batch.enable = msm_vidc_allow_decode_batch(inst);
@@ -2252,10 +2211,15 @@ int msm_vdec_process_cmd(struct msm_vidc_inst *inst, u32 cmd)
 		if (rc)
 			return rc;
 
+		/* queue pending deferred buffers */
+		rc = msm_vidc_queue_deferred_buffers(inst, MSM_VIDC_BUF_OUTPUT);
+		if (rc)
+			return rc;
+
 		/* print final buffer counts & size details */
 		msm_vidc_print_buffer_info(inst);
 
-		rc = msm_vdec_session_resume(inst, port);
+		rc = msm_vidc_process_resume(inst);
 		if (rc)
 			return rc;
 
@@ -2592,6 +2556,7 @@ int msm_vdec_subscribe_event(struct msm_vidc_inst *inst,
 	switch (sub->type) {
 	case V4L2_EVENT_EOS:
 	case V4L2_EVENT_VIDC_METADATA:
+	case V4L2_EVENT_VIDC_LAST_FLAG:
 		rc = v4l2_event_subscribe(&inst->event_handler, sub, MAX_EVENTS, NULL);
 		break;
 	case V4L2_EVENT_SOURCE_CHANGE:

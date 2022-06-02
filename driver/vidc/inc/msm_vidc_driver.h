@@ -352,6 +352,17 @@ static inline bool is_enc_slice_delivery_mode(struct msm_vidc_inst *inst)
 			V4L2_MPEG_VIDC_HEVC_ENCODE_DELIVERY_MODE_SLICE_BASED)));
 }
 
+static inline bool is_state(struct msm_vidc_inst *inst, enum msm_vidc_state state)
+{
+	return inst->state == state;
+}
+
+static inline bool is_sub_state(struct msm_vidc_inst *inst,
+	enum msm_vidc_sub_state sub_state)
+{
+	return (inst->sub_state & sub_state);
+}
+
 const char *cap_name(enum msm_vidc_inst_capability_type cap_id);
 const char *v4l2_pixelfmt_name(u32 pixelfmt);
 const char *v4l2_type_name(u32 port);
@@ -382,10 +393,13 @@ u32 v4l2_matrix_coeff_from_driver(struct msm_vidc_inst *inst,
 int v4l2_type_to_driver_port(struct msm_vidc_inst *inst, u32 type,
 	const char *func);
 const char *allow_name(enum msm_vidc_allow allow);
-const char *state_name(enum msm_vidc_inst_state state);
+const char *state_name(enum msm_vidc_state state);
 const char *core_state_name(enum msm_vidc_core_state state);
-int msm_vidc_change_inst_state(struct msm_vidc_inst *inst,
-	enum msm_vidc_inst_state request_state, const char *func);
+int msm_vidc_change_state(struct msm_vidc_inst *inst,
+	enum msm_vidc_state request_state, const char *func);
+int msm_vidc_change_sub_state(struct msm_vidc_inst *inst,
+	enum msm_vidc_sub_state clear_sub_states,
+	enum msm_vidc_sub_state set_sub_states, const char *func);
 int msm_vidc_create_internal_buffer(struct msm_vidc_inst *inst,
 	enum msm_vidc_buffer_type buffer_type, u32 index);
 int msm_vidc_get_internal_buffers(struct msm_vidc_inst *inst,
@@ -406,8 +420,6 @@ int msm_vidc_session_open(struct msm_vidc_inst *inst);
 int msm_vidc_session_set_codec(struct msm_vidc_inst *inst);
 int msm_vidc_session_set_secure_mode(struct msm_vidc_inst *inst);
 int msm_vidc_session_set_default_header(struct msm_vidc_inst *inst);
-int msm_vidc_session_streamon(struct msm_vidc_inst *inst,
-		enum msm_vidc_port_type port);
 int msm_vidc_session_streamoff(struct msm_vidc_inst *inst,
 		enum msm_vidc_port_type port);
 int msm_vidc_session_close(struct msm_vidc_inst *inst);
@@ -502,13 +514,21 @@ bool msm_vidc_allow_streamon(struct msm_vidc_inst *inst, u32 type);
 enum msm_vidc_allow msm_vidc_allow_streamoff(struct msm_vidc_inst *inst, u32 type);
 enum msm_vidc_allow msm_vidc_allow_qbuf(struct msm_vidc_inst *inst, u32 type);
 enum msm_vidc_allow msm_vidc_allow_input_psc(struct msm_vidc_inst *inst);
-bool msm_vidc_allow_last_flag(struct msm_vidc_inst *inst);
+bool msm_vidc_allow_drain_last_flag(struct msm_vidc_inst *inst);
+bool msm_vidc_allow_psc_last_flag(struct msm_vidc_inst *inst);
 int msm_vidc_state_change_streamon(struct msm_vidc_inst *inst, u32 type);
 int msm_vidc_state_change_streamoff(struct msm_vidc_inst *inst, u32 type);
-int msm_vidc_state_change_stop(struct msm_vidc_inst *inst);
-int msm_vidc_state_change_start(struct msm_vidc_inst *inst);
 int msm_vidc_state_change_input_psc(struct msm_vidc_inst *inst);
-int msm_vidc_state_change_last_flag(struct msm_vidc_inst *inst);
+int msm_vidc_state_change_drain_last_flag(struct msm_vidc_inst *inst);
+int msm_vidc_state_change_psc_last_flag(struct msm_vidc_inst *inst);
+int msm_vidc_process_drain(struct msm_vidc_inst *inst);
+int msm_vidc_process_resume(struct msm_vidc_inst *inst);
+int msm_vidc_process_streamon(struct msm_vidc_inst *inst, u32 type);
+int msm_vidc_process_stop_done(struct msm_vidc_inst *inst,
+	enum signal_session_response signal_type);
+int msm_vidc_process_drain_done(struct msm_vidc_inst *inst);
+int msm_vidc_process_drain_last_flag(struct msm_vidc_inst *inst);
+int msm_vidc_process_psc_last_flag(struct msm_vidc_inst *inst);
 int msm_vidc_get_mbs_per_frame(struct msm_vidc_inst *inst);
 u32 msm_vidc_get_max_bitrate(struct msm_vidc_inst* inst);
 int msm_vidc_get_fps(struct msm_vidc_inst *inst);
@@ -557,6 +577,8 @@ bool res_is_less_than(u32 width, u32 height,
 	u32 ref_width, u32 ref_height);
 bool res_is_less_than_or_equal_to(u32 width, u32 height,
 	u32 ref_width, u32 ref_height);
+int signal_session_msg_receipt(struct msm_vidc_inst *inst,
+	enum signal_session_response cmd);
 int msm_vidc_get_properties(struct msm_vidc_inst *inst);
 int msm_vidc_create_input_metadata_buffer(struct msm_vidc_inst *inst, int buf_fd);
 int msm_vidc_update_input_meta_buffer_index(struct msm_vidc_inst *inst, struct vb2_buffer *vb2);

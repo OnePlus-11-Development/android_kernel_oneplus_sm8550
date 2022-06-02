@@ -889,6 +889,8 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	inst->domain = session_type;
 	inst->session_id = hash32_ptr(inst);
 	inst->state = MSM_VIDC_OPEN;
+	inst->sub_state = MSM_VIDC_SUB_STATE_NONE;
+	strlcpy(inst->sub_state_name, "SUB_STATE_NONE", sizeof(inst->sub_state_name));
 	inst->active = true;
 	inst->request = false;
 	inst->ipsc_properties_set = false;
@@ -908,7 +910,6 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 		msm_vidc_vmem_free((void **)&inst);
 		return NULL;
 	}
-	INIT_LIST_HEAD(&inst->response_works);
 	INIT_LIST_HEAD(&inst->caps_list);
 	INIT_LIST_HEAD(&inst->timestamps.list);
 	INIT_LIST_HEAD(&inst->ts_reorder.list);
@@ -959,13 +960,12 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	for (i = 0; i < MAX_SIGNAL; i++)
 		init_completion(&inst->completions[i]);
 
-	inst->response_workq = create_singlethread_workqueue("response_workq");
-	if (!inst->response_workq) {
-		i_vpr_e(inst, "%s: create input_psc_workq failed\n", __func__);
+	inst->workq = create_singlethread_workqueue("workq");
+	if (!inst->workq) {
+		i_vpr_e(inst, "%s: create workq failed\n", __func__);
 		goto error;
 	}
 
-	INIT_DELAYED_WORK(&inst->response_work, handle_session_response_work_handler);
 	INIT_DELAYED_WORK(&inst->stats_work, msm_vidc_stats_handler);
 	INIT_WORK(&inst->stability_work, msm_vidc_stability_handler);
 
@@ -1042,7 +1042,6 @@ int msm_vidc_close(void *instance)
 	msm_vidc_destroy_buffers(inst);
 	inst_unlock(inst, __func__);
 	client_unlock(inst, __func__);
-	cancel_response_work_sync(inst);
 	cancel_stability_work_sync(inst);
 	cancel_stats_work_sync(inst);
 	msm_vidc_show_stats(inst);
