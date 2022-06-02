@@ -189,6 +189,10 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{INPUT_META_VIA_REQUEST,         "INPUT_META_VIA_REQUEST"     },
 	{ENC_IP_CR,                      "ENC_IP_CR"                  },
 	{COMPLEXITY,                     "COMPLEXITY"                 },
+	{CABAC_MAX_BITRATE,              "CABAC_MAX_BITRATE"          },
+	{CAVLC_MAX_BITRATE,              "CAVLC_MAX_BITRATE"          },
+	{ALLINTRA_MAX_BITRATE,           "ALLINTRA_MAX_BITRATE"       },
+	{LOWLATENCY_MAX_BITRATE,         "LOWLATENCY_MAX_BITRATE"     },
 	{PROFILE,                        "PROFILE"                    },
 	{ENH_LAYER_COUNT,                "ENH_LAYER_COUNT"            },
 	{BIT_RATE,                       "BIT_RATE"                   },
@@ -6135,6 +6139,43 @@ static int msm_vidc_check_inst_mbpf(struct msm_vidc_inst *inst)
 	}
 
 	return 0;
+}
+
+u32 msm_vidc_get_max_bitrate(struct msm_vidc_inst* inst)
+{
+	struct msm_vidc_inst_capability *capability;
+	u32 max_bitrate = 0x7fffffff;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	capability = inst->capabilities;
+
+	if (inst->capabilities->cap[LOWLATENCY_MODE].value)
+		max_bitrate = min(max_bitrate,
+			(u32)inst->capabilities->cap[LOWLATENCY_MAX_BITRATE].max);
+
+	if (inst->capabilities->cap[ALL_INTRA].value)
+		max_bitrate = min(max_bitrate,
+			(u32)inst->capabilities->cap[ALLINTRA_MAX_BITRATE].max);
+
+	if (inst->codec == MSM_VIDC_HEVC) {
+		max_bitrate = min(max_bitrate,
+			(u32)inst->capabilities->cap[CABAC_MAX_BITRATE].max);
+	} else if (inst->codec == MSM_VIDC_H264) {
+		if (inst->capabilities->cap[ENTROPY_MODE].value ==
+			V4L2_MPEG_VIDEO_H264_ENTROPY_MODE_CAVLC)
+			max_bitrate = min(max_bitrate,
+				(u32)inst->capabilities->cap[CAVLC_MAX_BITRATE].max);
+		else
+			max_bitrate = min(max_bitrate,
+				(u32)inst->capabilities->cap[CABAC_MAX_BITRATE].max);
+	}
+	if (max_bitrate == 0x7fffffff || !max_bitrate)
+		max_bitrate = min(max_bitrate, (u32)inst->capabilities->cap[BIT_RATE].max);
+
+	return max_bitrate;
 }
 
 static bool msm_vidc_allow_image_encode_session(struct msm_vidc_inst *inst)
