@@ -1360,7 +1360,7 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 	} while (0)
 
 #define SIZE_BIN_BITSTREAM_ENC(_size, rc_type, frame_width, frame_height, \
-		work_mode, lcu_size) \
+		work_mode, lcu_size, profile) \
 	do \
 	{ \
 		HFI_U32 size_aligned_width = 0, size_aligned_height = 0; \
@@ -1391,7 +1391,8 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 				{ \
 					bitstream_size_eval >>= 2; \
 				} \
-				if (lcu_size == 32) \
+				if (profile == HFI_H265_PROFILE_MAIN_10 || \
+					profile == HFI_H265_PROFILE_MAIN_10_STILL_PICTURE) \
 				{ \
 					bitstream_size_eval = (bitstream_size_eval * 5 >> 2); \
 				} \
@@ -1443,13 +1444,13 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 	} while (0)
 
 #define HFI_BUFFER_BIN_ENC(_size, rc_type, frame_width, frame_height, lcu_size, \
-				work_mode, num_vpp_pipes)           \
+				work_mode, num_vpp_pipes, profile)           \
 	do \
 	{ \
 		HFI_U32 bitstream_size = 0, total_bitbin_buffers = 0, \
 			size_single_pipe = 0, bitbin_size = 0; \
 		SIZE_BIN_BITSTREAM_ENC(bitstream_size, rc_type, frame_width, \
-			frame_height, work_mode, lcu_size);         \
+			frame_height, work_mode, lcu_size, profile);         \
 		if (work_mode == HFI_WORKMODE_2) \
 		{ \
 			total_bitbin_buffers = 3; \
@@ -1478,19 +1479,19 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 	} while (0)
 
 #define HFI_BUFFER_BIN_H264E(_size, rc_type, frame_width, frame_height, \
-				work_mode, num_vpp_pipes)    \
+				work_mode, num_vpp_pipes, profile)    \
 	do \
 	{ \
 		HFI_BUFFER_BIN_ENC(_size, rc_type, frame_width, frame_height, 16, \
-				work_mode, num_vpp_pipes); \
+				work_mode, num_vpp_pipes, profile); \
 	} while (0)
 
 #define HFI_BUFFER_BIN_H265E(_size, rc_type, frame_width, frame_height, \
-				work_mode, num_vpp_pipes)    \
+				work_mode, num_vpp_pipes, profile)    \
 	do \
 	{ \
 		HFI_BUFFER_BIN_ENC(_size, rc_type, frame_width, frame_height, 32,\
-				work_mode, num_vpp_pipes); \
+				work_mode, num_vpp_pipes, profile); \
 	} while (0)
 
 #define SIZE_ENC_SLICE_INFO_BUF(num_lcu_in_frame) HFI_ALIGN((256 + \
