@@ -563,6 +563,8 @@ enum hfi_saliency_type {
 
 #define HFI_PROP_TRANSCODING_STAT_INFO                          0x03000191
 
+#define HFI_PROP_DOLBY_RPU_METADATA                             0x03000192
+
 #define HFI_PROP_END                                            0x03FFFFFF
 
 #define HFI_SESSION_ERROR_BEGIN                                 0x04000000

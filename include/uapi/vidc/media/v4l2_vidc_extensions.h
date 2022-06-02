@@ -262,6 +262,9 @@ enum v4l2_h264_encode_delivery_mode {
 #define V4L2_CID_MPEG_VIDC_RESERVE_DURATION                                  \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x3F)
 
+#define V4L2_CID_MPEG_VIDC_METADATA_DOLBY_RPU                                 \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x40)
+
 /* add new controls above this line */
 /* Deprecate below controls once availble in gki and gsi bionic header */
 #ifndef V4L2_CID_MPEG_VIDEO_BASELAYER_PRIORITY_ID
@@ -404,6 +407,7 @@ enum v4l2_mpeg_vidc_metadata {
 	METADATA_SALIENCY_INFO                = 0x0300018A,
 	METADATA_FENCE                        = 0x0300018B,
 	METADATA_TRANSCODING_STAT_INFO        = 0x03000191,
+	METADATA_DV_RPU                       = 0x03000192,
 };
 enum meta_interlace_info {
 	META_INTERLACE_INFO_NONE                            = 0x00000000,
@@ -460,5 +464,6 @@ struct v4l2_event_vidc_metadata {
 #define MSM_VIDC_METADATA_SIZE           (4 * 4096) /* 16 KB */
 #define ENCODE_INPUT_METADATA_SIZE       (512 * 4096) /* 2 MB */
 #define DECODE_INPUT_METADATA_SIZE       MSM_VIDC_METADATA_SIZE
+#define MSM_VIDC_METADATA_DOLBY_RPU_SIZE  (41 * 1024) /* 41 KB */
 
 #endif
