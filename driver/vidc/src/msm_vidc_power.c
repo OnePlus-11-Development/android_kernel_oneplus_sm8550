@@ -270,6 +270,15 @@ int msm_vidc_scale_buses(struct msm_vidc_inst *inst)
 				vote_data->color_formats[0] = MSM_VIDC_FMT_NV12;
 			}
 			vote_data->color_formats[1] = color_format;
+		} else if (inst->codec == MSM_VIDC_AV1 &&
+			inst->capabilities->cap[FILM_GRAIN].value) {
+			/*
+			 * UBWC formats with AV1 film grain requires dpb-opb
+			 * split mode
+			 */
+			vote_data->num_formats = 2;
+			vote_data->color_formats[0] =
+				vote_data->color_formats[1] = color_format;
 		} else {
 			vote_data->num_formats = 1;
 			vote_data->color_formats[0] = color_format;
