@@ -878,10 +878,6 @@ struct adreno_gpudev {
 	 * @set_isdb_breakpoint_registers - Program isdb registers to issue break command
 	 */
 	void (*set_isdb_breakpoint_registers)(struct adreno_device *adreno_dev);
-	/**
-	 * @reset_and_snapshot - Target specific function to do reset and snapshot
-	 */
-	void (*reset_and_snapshot) (struct adreno_device *adreno_dev, int fault);
 };
 
 /**
