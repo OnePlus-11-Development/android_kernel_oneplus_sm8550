@@ -10,10 +10,11 @@
 #include <net/tcp.h>
 #include "rmnet_descriptor.h"
 #include "rmnet_map.h"
+#include "rmnet_qmap.h"
 MODULE_LICENSE("\x47\x50\x4c\x20\x76\x32");static char*verinfo[]={
-"\x37\x34\x31\x35\x39\x32\x31\x63","\x34\x39\x61\x66\x39\x62\x64\x34"};
-module_param_array(verinfo,charp,NULL,(0xcb7+5769-0x221c));MODULE_PARM_DESC(
-verinfo,
+"\x36\x34\x38\x62\x37\x30\x39\x35","\x37\x34\x31\x35\x39\x32\x31\x63",
+"\x34\x39\x61\x66\x39\x62\x64\x34"};module_param_array(verinfo,charp,NULL,
+(0xcb7+5769-0x221c));MODULE_PARM_DESC(verinfo,
 "\x56\x65\x72\x73\x69\x6f\x6e\x20\x6f\x66\x20\x74\x68\x65\x20\x64\x72\x69\x76\x65\x72"
 );extern void(*rmnet_perf_tether_ingress_hook)(struct tcphdr*DATARMNET2e7cc88971
 ,struct rmnet_frag_descriptor*DATARMNET9d1b321642,struct iphdr*
@@ -176,13 +177,13 @@ DATARMNETcd32395e82=(struct DATARMNETb0eda9d28e*)(DATARMNET543491eb0f->data+
 sizeof(*DATARMNETf937c77d8f)+sizeof(*DATARMNETb87c07b92a));DATARMNETcd32395e82->
 DATARMNETba8c503d04=DATARMNET7bd625a8c0;DATARMNETcd32395e82->DATARMNETc59f891d69
 =!DATARMNETcc6099cb14;DATARMNET543491eb0f->dev=dev;DATARMNET543491eb0f->protocol
-=htons(ETH_P_MAP);dev_queue_xmit(DATARMNET543491eb0f);}DATARMNETaabe3a05f8:
-dev_put(dev);}void DATARMNET5fe3ffe2ab(void){rcu_assign_pointer(
-rmnet_perf_tether_ingress_hook,DATARMNETe70d5ec61a);rcu_assign_pointer(
-rmnet_perf_tether_egress_hook,DATARMNET6ab362e985);rcu_assign_pointer(
-rmnet_perf_tether_cmd_hook,DATARMNET136e008d70);}void DATARMNET229327cbd2(void){
-rcu_assign_pointer(rmnet_perf_tether_ingress_hook,NULL);rcu_assign_pointer(
-rmnet_perf_tether_egress_hook,NULL);rcu_assign_pointer(
+=htons(ETH_P_MAP);rmnet_qmap_send(DATARMNET543491eb0f,RMNET_CH_CTL,false);}
+DATARMNETaabe3a05f8:dev_put(dev);}void DATARMNET5fe3ffe2ab(void){
+rcu_assign_pointer(rmnet_perf_tether_ingress_hook,DATARMNETe70d5ec61a);
+rcu_assign_pointer(rmnet_perf_tether_egress_hook,DATARMNET6ab362e985);
+rcu_assign_pointer(rmnet_perf_tether_cmd_hook,DATARMNET136e008d70);}void 
+DATARMNET229327cbd2(void){rcu_assign_pointer(rmnet_perf_tether_ingress_hook,NULL
+);rcu_assign_pointer(rmnet_perf_tether_egress_hook,NULL);rcu_assign_pointer(
 rmnet_perf_tether_cmd_hook,NULL);}static int DATARMNETaa549ce89a(void){int 
 DATARMNETefc9df3df2;DATARMNET8a1e9920bf=kzalloc(sizeof(*DATARMNET8a1e9920bf),
 GFP_KERNEL);if(!DATARMNET8a1e9920bf){pr_err(
