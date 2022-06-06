@@ -12,6 +12,7 @@
 #include "msm_vidc_internal.h"
 #include "msm_vidc_control.h"
 #include "hfi_property.h"
+#include "hfi_command.h"
 
 #define DEFAULT_VIDEO_CONCEAL_COLOR_BLACK 0x8020010
 #define MAX_LTR_FRAME_COUNT     2
@@ -46,12 +47,12 @@ static struct msm_platform_core_capability core_data_waipio[] = {
 	{DEC_CODECS, H264|HEVC|VP9|HEIC},
 	{MAX_SESSION_COUNT, 16},
 	{MAX_NUM_720P_SESSIONS, 16},
-	{MAX_NUM_1080P_SESSIONS, 8},
-	{MAX_NUM_4K_SESSIONS, 4},
+	{MAX_NUM_1080P_SESSIONS, 16},
+	{MAX_NUM_4K_SESSIONS, 8},
 	{MAX_NUM_8K_SESSIONS, 2},
 	{MAX_SECURE_SESSION_COUNT, 3},
-	{MAX_RT_MBPF, 173056},	/* (8192x4320)/256 + (4096x2176)/256*/
-	{MAX_MBPF, 276480}, /* ((8192x4320)/256) * 2 */
+	{MAX_RT_MBPF, 174080},	/* (8192x4352)/256 + (4096x2176)/256*/
+	{MAX_MBPF, 278528}, /* ((8192x4352)/256) * 2 */
 	{MAX_MBPS, 7833600},	/* max_load
 					 * 7680x4320@60fps or 3840x2176@240fps
 					 * which is greater than 4096x2176@120fps,
@@ -320,6 +321,14 @@ static struct msm_platform_inst_capability instance_cap_data_waipio[] = {
 		V4L2_CID_MPEG_VIDC_SECURE,
 		HFI_PROP_SECURE,
 		CAP_FLAG_NONE},
+
+	{META_OUTBUF_FENCE, DEC, H264|HEVC|VP9,
+		V4L2_MPEG_VIDC_META_DISABLE,
+		V4L2_MPEG_VIDC_META_DISABLE,
+		0, V4L2_MPEG_VIDC_META_DISABLE,
+		0,
+		0,
+		CAP_FLAG_BITMASK},
 
 	{TS_REORDER, DEC, H264|HEVC,
 		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,
@@ -1244,7 +1253,9 @@ static struct msm_platform_inst_capability instance_cap_data_waipio[] = {
 		0,
 		HFI_PROP_PIPE},
 
-	{POC, DEC, H264, 0, 18, 1, 1},
+	{POC, DEC, H264, 0, 2, 1, 1,
+		0,
+		HFI_PROP_PIC_ORDER_CNT_TYPE},
 
 	{QUALITY_MODE, ENC, CODECS_ALL,
 		MSM_VIDC_MAX_QUALITY_MODE,
@@ -1296,7 +1307,7 @@ static struct msm_platform_inst_capability instance_cap_data_waipio[] = {
 		CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED},
 
 	{PRIORITY, DEC|ENC, CODECS_ALL,
-		0, 2, 1, 1,
+		0, 1 + NRT_PRIORITY_OFFSET, 1, 1 + NRT_PRIORITY_OFFSET,
 		V4L2_CID_MPEG_VIDC_PRIORITY,
 		HFI_PROP_SESSION_PRIORITY,
 		CAP_FLAG_DYNAMIC_ALLOWED},
@@ -1420,7 +1431,8 @@ static struct msm_platform_inst_capability instance_cap_data_waipio[] = {
 
 	{META_SEI_MASTERING_DISP, DEC, HEVC|HEIC,
 		V4L2_MPEG_VIDC_META_DISABLE,
-		V4L2_MPEG_VIDC_META_ENABLE | V4L2_MPEG_VIDC_META_RX_OUTPUT,
+		V4L2_MPEG_VIDC_META_ENABLE | V4L2_MPEG_VIDC_META_RX_INPUT |
+			V4L2_MPEG_VIDC_META_RX_OUTPUT,
 		0, V4L2_MPEG_VIDC_META_DISABLE,
 		V4L2_CID_MPEG_VIDC_METADATA_SEI_MASTERING_DISPLAY_COLOUR,
 		HFI_PROP_SEI_MASTERING_DISPLAY_COLOUR,
@@ -1436,7 +1448,8 @@ static struct msm_platform_inst_capability instance_cap_data_waipio[] = {
 
 	{META_SEI_CLL, DEC, HEVC|HEIC,
 		V4L2_MPEG_VIDC_META_DISABLE,
-		V4L2_MPEG_VIDC_META_ENABLE | V4L2_MPEG_VIDC_META_RX_OUTPUT,
+		V4L2_MPEG_VIDC_META_ENABLE | V4L2_MPEG_VIDC_META_RX_INPUT |
+			V4L2_MPEG_VIDC_META_RX_OUTPUT,
 		0, V4L2_MPEG_VIDC_META_DISABLE,
 		V4L2_CID_MPEG_VIDC_METADATA_SEI_CONTENT_LIGHT_LEVEL,
 		HFI_PROP_SEI_CONTENT_LIGHT_LEVEL,
@@ -1452,7 +1465,8 @@ static struct msm_platform_inst_capability instance_cap_data_waipio[] = {
 
 	{META_HDR10PLUS, DEC, HEVC|HEIC,
 		V4L2_MPEG_VIDC_META_DISABLE,
-		V4L2_MPEG_VIDC_META_ENABLE | V4L2_MPEG_VIDC_META_RX_OUTPUT,
+		V4L2_MPEG_VIDC_META_ENABLE | V4L2_MPEG_VIDC_META_RX_INPUT |
+			V4L2_MPEG_VIDC_META_RX_OUTPUT,
 		0, V4L2_MPEG_VIDC_META_DISABLE,
 		V4L2_CID_MPEG_VIDC_METADATA_HDR10PLUS,
 		HFI_PROP_SEI_HDR10PLUS_USERDATA,
@@ -1478,7 +1492,8 @@ static struct msm_platform_inst_capability instance_cap_data_waipio[] = {
 	{META_BUF_TAG, DEC, CODECS_ALL,
 		V4L2_MPEG_VIDC_META_DISABLE,
 		V4L2_MPEG_VIDC_META_ENABLE | V4L2_MPEG_VIDC_META_TX_INPUT |
-			V4L2_MPEG_VIDC_META_TX_OUTPUT | V4L2_MPEG_VIDC_META_RX_OUTPUT,
+			V4L2_MPEG_VIDC_META_TX_OUTPUT | V4L2_MPEG_VIDC_META_RX_INPUT |
+			V4L2_MPEG_VIDC_META_RX_OUTPUT,
 		0, V4L2_MPEG_VIDC_META_DISABLE,
 		V4L2_CID_MPEG_VIDC_METADATA_BUFFER_TAG,
 		HFI_PROP_BUFFER_TAG,
@@ -1607,6 +1622,12 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_waip
 		NULL,
 		msm_vidc_set_u32},
 
+	{META_OUTBUF_FENCE, DEC, H264|HEVC|VP9,
+		{OUTPUT_ORDER},
+		{LOWLATENCY_MODE},
+		NULL,
+		NULL},
+
 	{HFLIP, ENC, CODECS_ALL,
 		{0},
 		{0},
@@ -1712,7 +1733,8 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_waip
 		msm_vidc_set_u32},
 
 	{BLUR_TYPES, ENC, H264|HEVC,
-		{PIX_FMTS, BITRATE_MODE, CONTENT_ADAPTIVE_CODING, MIN_QUALITY},
+		{PIX_FMTS, BITRATE_MODE, MIN_QUALITY,
+			CONTENT_ADAPTIVE_CODING, META_ROI_INFO},
 		{BLUR_RESOLUTION},
 		msm_vidc_adjust_blur_type_iris2,
 		msm_vidc_set_u32_enum},
@@ -1732,7 +1754,13 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_waip
 	{LOWLATENCY_MODE, ENC, H264 | HEVC,
 		{BITRATE_MODE},
 		{STAGE},
-		msm_vidc_adjust_lowlatency_mode,
+		msm_vidc_adjust_enc_lowlatency_mode,
+		NULL},
+
+	{LOWLATENCY_MODE, DEC, H264|HEVC|VP9,
+		{META_OUTBUF_FENCE},
+		{STAGE},
+		msm_vidc_adjust_dec_lowlatency_mode,
 		NULL},
 
 	{LTR_COUNT, ENC, H264|HEVC,
@@ -1754,7 +1782,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_waip
 		msm_vidc_set_use_and_mark_ltr},
 
 	{IR_PERIOD, ENC, H264|HEVC,
-		{BITRATE_MODE, ALL_INTRA},
+		{BITRATE_MODE, ALL_INTRA, META_ROI_INFO, PIX_FMTS},
 		{0},
 		msm_vidc_adjust_ir_period,
 		msm_vidc_set_ir_period},
@@ -1773,9 +1801,15 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_waip
 
 	{CONTENT_ADAPTIVE_CODING, ENC, H264|HEVC,
 		{BITRATE_MODE, LAYER_ENABLE, LAYER_TYPE},
-		{BLUR_TYPES},
+		{REQUEST_PREPROCESS},
 		msm_vidc_adjust_brs,
 		msm_vidc_set_vbr_related_properties},
+
+	{REQUEST_PREPROCESS, ENC, H264|HEVC,
+		{CONTENT_ADAPTIVE_CODING, META_EVA_STATS},
+		{0},
+		msm_vidc_adjust_preprocess,
+		NULL},
 
 	{BITRATE_BOOST, ENC, H264|HEVC,
 		{BITRATE_MODE, MIN_QUALITY},
@@ -1785,14 +1819,14 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_waip
 
 	{MIN_QUALITY, ENC, H264,
 		{BITRATE_MODE, ENH_LAYER_COUNT, META_ROI_INFO},
-		{CONTENT_ADAPTIVE_CODING, BITRATE_BOOST, BLUR_TYPES},
+		{BLUR_TYPES},
 		msm_vidc_adjust_min_quality,
 		msm_vidc_set_vbr_related_properties},
 
 	{MIN_QUALITY, ENC, HEVC,
 		{BITRATE_MODE, PIX_FMTS, ENH_LAYER_COUNT,
 			META_ROI_INFO},
-		{CONTENT_ADAPTIVE_CODING, BITRATE_BOOST, BLUR_TYPES},
+		{BLUR_TYPES},
 		msm_vidc_adjust_min_quality,
 		msm_vidc_set_vbr_related_properties},
 
@@ -1974,7 +2008,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_waip
 
 	{SLICE_MODE, ENC, H264|HEVC,
 		{BITRATE_MODE, ALL_INTRA},
-		{0},
+		{STAGE},
 		msm_vidc_adjust_slice_count,
 		msm_vidc_set_slice_count},
 
@@ -2010,7 +2044,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_waip
 
 	{OUTPUT_ORDER, DEC, H264|HEVC|VP9,
 		{THUMBNAIL_MODE, DISPLAY_DELAY, DISPLAY_DELAY_ENABLE},
-		{0},
+		{META_OUTBUF_FENCE},
 		msm_vidc_adjust_output_order,
 		msm_vidc_set_u32},
 
@@ -2050,13 +2084,19 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_waip
 		NULL,
 		msm_vidc_set_u32_packed},
 
-	{STAGE, DEC|ENC, CODECS_ALL,
+	{STAGE, ENC|DEC, CODECS_ALL,
 		{0},
 		{0},
 		NULL,
 		msm_vidc_set_stage},
 
 	{STAGE, ENC, H264|HEVC,
+		{LOWLATENCY_MODE, SLICE_MODE},
+		{0},
+		NULL,
+		msm_vidc_set_stage},
+
+	{STAGE, DEC, H264|HEVC|VP9,
 		{LOWLATENCY_MODE},
 		{0},
 		NULL,
@@ -2130,7 +2170,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_waip
 
 	{META_EVA_STATS, ENC, CODECS_ALL,
 		{0},
-		{ENH_LAYER_COUNT}},
+		{ENH_LAYER_COUNT, REQUEST_PREPROCESS}},
 
 	{META_ROI_INFO, ENC, H264|HEVC,
 		{BITRATE_MODE, PIX_FMTS},
