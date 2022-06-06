@@ -5034,7 +5034,8 @@ void reg_dmav1_setup_spr_init_cfgv1(struct sde_hw_dspp *ctx, void *cfg)
 
 	if (spr_bypass)
 		reg[0] = APPLY_MASK_AND_SHIFT(payload->cfg1, 1, 1) |
-				APPLY_MASK_AND_SHIFT(payload->cfg2, 1, 2);
+				APPLY_MASK_AND_SHIFT(payload->cfg2, 1, 2) |
+				APPLY_MASK_AND_SHIFT(payload->cfg3, 1, 24);
 
 	reg[1] = 0;
 	if (hw_cfg->num_of_mixers == 2)
