@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2014 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -256,7 +257,8 @@ msm_disable_outputs(struct drm_device *dev, struct drm_atomic_state *old_state)
 		if (!old_crtc_state->active)
 			continue;
 
-		if (_msm_seamless_for_crtc(old_state, crtc->state, false))
+		if (!crtc->state->active_changed &&
+				_msm_seamless_for_crtc(old_state, crtc->state, false))
 			continue;
 
 		funcs = crtc->helper_private;
@@ -410,7 +412,8 @@ static void msm_atomic_helper_commit_modeset_enables(struct drm_device *dev,
 		if (!new_crtc_state->active)
 			continue;
 
-		if (_msm_seamless_for_crtc(old_state, crtc->state, true))
+		if (!crtc->state->active_changed &&
+				_msm_seamless_for_crtc(old_state, crtc->state, true))
 			continue;
 
 		funcs = crtc->helper_private;
