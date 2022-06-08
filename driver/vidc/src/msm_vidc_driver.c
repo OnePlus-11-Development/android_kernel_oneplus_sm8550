@@ -2419,7 +2419,7 @@ int msm_vidc_update_input_rate(struct msm_vidc_inst *inst, u64 time_us)
 		prev_timer = input_timer;
 	}
 
-	if (input_timer_sum_us)
+	if (input_timer_sum_us && counter >= INPUT_TIMER_LIST_SIZE)
 		inst->capabilities->cap[INPUT_RATE].value =
 			(s32)(DIV64_U64_ROUND_CLOSEST(counter * 1000000,
 				input_timer_sum_us) << 16);
