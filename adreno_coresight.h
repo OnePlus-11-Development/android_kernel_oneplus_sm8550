@@ -8,6 +8,7 @@
 #define _ADRENO_CORESIGHT_H_
 
 #include <linux/device.h>
+#include <linux/coresight.h>
 
 struct adreno_device;
 
@@ -103,6 +104,18 @@ struct adreno_coresight_device {
 	bool enabled;
 	/** @atid: The unique ATID value of the coresight device */
 	unsigned int atid;
+};
+
+/**
+ * struct adreno_funnel_device - Container for a coresight gfx funnel
+ */
+struct adreno_funnel_device {
+	/** @funnel_dev: Pointer to the gfx funnel device */
+	struct device *funnel_dev;
+	/** @funnel_csdev: Point to the gfx funnel coresight definition */
+	struct coresight_device *funnel_csdev;
+	/** @funnel_ops: Function pointers to enable/disable the coresight funnel */
+	const struct coresight_ops *funnel_ops;
 };
 
 #ifdef CONFIG_QCOM_KGSL_CORESIGHT
