@@ -505,7 +505,14 @@ void a6xx_gmu_disable_gdsc(struct adreno_device *adreno_dev)
 	struct a6xx_gmu_device *gmu = to_a6xx_gmu(adreno_dev);
 
 	reinit_completion(&gmu->gdsc_gate);
+
+	if (ADRENO_QUIRK(adreno_dev, ADRENO_QUIRK_CX_GDSC))
+		regulator_set_mode(gmu->cx_gdsc, REGULATOR_MODE_IDLE);
+
 	regulator_disable(gmu->cx_gdsc);
+
+	if (ADRENO_QUIRK(adreno_dev, ADRENO_QUIRK_CX_GDSC))
+		regulator_set_mode(gmu->cx_gdsc, REGULATOR_MODE_NORMAL);
 }
 
 int a6xx_gmu_device_start(struct adreno_device *adreno_dev)
@@ -1865,13 +1872,7 @@ void a6xx_gmu_suspend(struct adreno_device *adreno_dev)
 
 	clk_bulk_disable_unprepare(gmu->num_clks, gmu->clks);
 
-	if (ADRENO_QUIRK(adreno_dev, ADRENO_QUIRK_CX_GDSC))
-		regulator_set_mode(gmu->cx_gdsc, REGULATOR_MODE_IDLE);
-
 	a6xx_gmu_disable_gdsc(adreno_dev);
-
-	if (ADRENO_QUIRK(adreno_dev, ADRENO_QUIRK_CX_GDSC))
-		regulator_set_mode(gmu->cx_gdsc, REGULATOR_MODE_NORMAL);
 
 	a6xx_rdpm_cx_freq_update(gmu, 0);
 
