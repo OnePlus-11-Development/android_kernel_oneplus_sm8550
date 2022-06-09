@@ -3377,6 +3377,12 @@ static int sde_dnsc_blur_parse_dt(struct device_node *np, struct sde_mdss_cfg *s
 	if (rc)
 		goto end;
 
+	if (off_count > DNSC_BLUR_MAX_COUNT) {
+		SDE_ERROR("invalid dnsc_blur block count:%d\n", off_count);
+		rc = -EINVAL;
+		goto end;
+	}
+
 	sde_cfg->dnsc_blur_count = off_count;
 
 	rc = _read_dt_entry(np, dnsc_blur_prop, ARRAY_SIZE(dnsc_blur_prop), prop_count,

@@ -1101,6 +1101,7 @@ static void _sde_encoder_phys_wb_setup_sys_cache(struct sde_encoder_phys *phys_e
 	struct sde_sc_cfg *sc_cfg;
 	struct sde_hw_wb_sc_cfg *cfg  = &wb_enc->sc_cfg;
 	u32 cache_enable, cache_flag, cache_rd_type, cache_wr_type;
+	int i;
 
 	if (!fb) {
 		SDE_ERROR("invalid fb on wb %d\n", WBID(wb_enc));
@@ -1162,9 +1163,13 @@ static void _sde_encoder_phys_wb_setup_sys_cache(struct sde_encoder_phys *phys_e
 	 * avoid llcc_active reset for crtc while in clone mode as it will reset it for
 	 * primary display as well
 	 */
-	if (cache_enable || !phys_enc->in_clone_mode) {
-		sde_crtc->new_perf.llcc_active[cache_wr_type] = cache_enable;
-		sde_crtc->new_perf.llcc_active[cache_rd_type] = cache_enable;
+	if (cache_enable) {
+		sde_crtc->new_perf.llcc_active[cache_wr_type] = true;
+		sde_crtc->new_perf.llcc_active[cache_rd_type] = true;
+		sde_core_perf_crtc_update_llcc(wb_enc->crtc);
+	} else if (!phys_enc->in_clone_mode) {
+		for (i = 0; i < SDE_SYS_CACHE_MAX; i++)
+			sde_crtc->new_perf.llcc_active[i] = false;
 		sde_core_perf_crtc_update_llcc(wb_enc->crtc);
 	}
 
