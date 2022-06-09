@@ -139,38 +139,87 @@ u64 msm_vidc_calc_freq_iris3(struct msm_vidc_inst *inst, u32 data_size)
 		}
 
 		/* VSP */
-		base_cycles = inst->has_bframe ?
-				80 : inst->capabilities->cap[MB_CYCLES_VSP].value;
-		bitrate = fps * data_size * 8;
-		vsp_cycles = bitrate;
+		if (inst->codec == MSM_VIDC_AV1) {
+			/*
+			 * For AV1: Use VSP calculations from Kalama perf model.
+			 * For legacy codecs, use vsp_cycles based on legacy MB_CYCLES_VSP.
+			 */
+			u32 decoder_vsp_fw_overhead = 105;
+			u32 fw_sw_vsp_offset = 1055;
+			u64 vsp_hw_min_frequency = 0;
+			u32 input_bitrate_mbps = 0;
+			u32 bitrate_2stage[2] = {130, 120};
+			u32 bitrate_1stage = 100;
+			u32 width, height;
+			u32 bitrate_entry, freq_entry, frequency_table_value;
+			struct allowed_clock_rates_table *allowed_clks_tbl;
+			struct v4l2_format *out_f = &inst->fmts[OUTPUT_PORT];
 
-		if (inst->codec == MSM_VIDC_VP9) {
-			vsp_cycles = div_u64(vsp_cycles * 170, 100);
-		} else if (inst->capabilities->cap[ENTROPY_MODE].value ==
-			V4L2_MPEG_VIDEO_H264_ENTROPY_MODE_CABAC) {
-			vsp_cycles = div_u64(vsp_cycles * 135, 100);
+			width = out_f->fmt.pix_mp.width;
+			height = out_f->fmt.pix_mp.height;
+
+			bitrate_entry = 1;
+			/* 8KUHD60, UHD240, 1080p960 */
+			if (width * height * fps >= 3840 * 2160 * 240)
+				bitrate_entry = 0;
+
+			freq_entry = bitrate_entry;
+
+			allowed_clks_tbl = core->dt->allowed_clks_tbl;
+			frequency_table_value = allowed_clks_tbl[freq_entry].clock_rate / 1000000;
+
+			input_bitrate_mbps = fps * data_size * 8 / (1024 * 1024);
+			vsp_hw_min_frequency = frequency_table_value * 1000 * input_bitrate_mbps;
+
+			if (inst->capabilities->cap[STAGE].value == MSM_VIDC_STAGE_2) {
+				vsp_hw_min_frequency +=
+					(bitrate_2stage[bitrate_entry] * fw_sw_vsp_offset - 1);
+				vsp_hw_min_frequency = div_u64(vsp_hw_min_frequency,
+					(bitrate_2stage[bitrate_entry] * fw_sw_vsp_offset));
+				/* VSP fw overhead 1.05 */
+				vsp_hw_min_frequency = div_u64(vsp_hw_min_frequency *
+					decoder_vsp_fw_overhead + 99, 100);
+			} else {
+				vsp_hw_min_frequency += (bitrate_1stage * fw_sw_vsp_offset - 1);
+				vsp_hw_min_frequency = div_u64(vsp_hw_min_frequency,
+					(bitrate_1stage * fw_sw_vsp_offset));
+			}
+
+			vsp_cycles = vsp_hw_min_frequency * 1000000;
 		} else {
-			base_cycles = 0;
-			vsp_cycles = div_u64(vsp_cycles, 2);
+			base_cycles = inst->has_bframe ?
+					80 : inst->capabilities->cap[MB_CYCLES_VSP].value;
+			bitrate = fps * data_size * 8;
+			vsp_cycles = bitrate;
+
+			if (inst->codec == MSM_VIDC_VP9) {
+				vsp_cycles = div_u64(vsp_cycles * 170, 100);
+			} else if (inst->capabilities->cap[ENTROPY_MODE].value ==
+				V4L2_MPEG_VIDEO_H264_ENTROPY_MODE_CABAC) {
+				vsp_cycles = div_u64(vsp_cycles * 135, 100);
+			} else {
+				base_cycles = 0;
+				vsp_cycles = div_u64(vsp_cycles, 2);
+			}
+			/* VSP FW overhead 1.05 */
+			vsp_cycles = div_u64(vsp_cycles * 21, 20);
+
+			if (inst->capabilities->cap[STAGE].value == MSM_VIDC_STAGE_1)
+				vsp_cycles = vsp_cycles * 3;
+
+			vsp_cycles += mbs_per_second * base_cycles;
+
+			/* Add 25 percent extra for 960fps use case */
+			if (fps >= 960)
+				vsp_cycles += div_u64(vpp_cycles * 25, 100);
+
+			if (inst->codec == MSM_VIDC_VP9 &&
+					inst->capabilities->cap[STAGE].value ==
+						MSM_VIDC_STAGE_2 &&
+					inst->capabilities->cap[PIPE].value == 4 &&
+					bitrate > 90000000)
+				vsp_cycles = msm_vidc_max_freq(inst);
 		}
-		/* VSP FW overhead 1.05 */
-		vsp_cycles = div_u64(vsp_cycles * 21, 20);
-
-		if (inst->capabilities->cap[STAGE].value == MSM_VIDC_STAGE_1)
-			vsp_cycles = vsp_cycles * 3;
-
-		vsp_cycles += mbs_per_second * base_cycles;
-
-		/* Add 25 percent extra for 960fps use case */
-		if (fps >= 960)
-			vsp_cycles += div_u64(vpp_cycles * 25, 100);
-
-		if (inst->codec == MSM_VIDC_VP9 &&
-				inst->capabilities->cap[STAGE].value ==
-					MSM_VIDC_STAGE_2 &&
-				inst->capabilities->cap[PIPE].value == 4 &&
-				bitrate > 90000000)
-			vsp_cycles = msm_vidc_max_freq(inst);
 	} else {
 		i_vpr_e(inst, "%s: Unknown session type\n", __func__);
 		return msm_vidc_max_freq(inst);
