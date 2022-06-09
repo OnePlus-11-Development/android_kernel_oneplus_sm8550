@@ -173,6 +173,7 @@ struct dsi_pll_resource {
 	 * DSI PHY type DPHY/CPHY
 	 */
 	enum dsi_phy_type type;
+	bool in_trusted_vm;
 };
 
 struct dsi_pll_clk {
