@@ -507,7 +507,7 @@ static int ipa_pm_notify(struct notifier_block *b, unsigned long event, void *p)
 	switch (event) {
 		case PM_POST_SUSPEND:
 #ifdef CONFIG_DEEPSLEEP
-			if (mem_sleep_current == PM_SUSPEND_MEM && ipa3_ctx->deepsleep) {
+			if (pm_suspend_via_firmware() && ipa3_ctx->deepsleep) {
 				IPADBG("Enter deepsleep resume\n");
 				ipa3_deepsleep_resume();
 				IPADBG("Exit deepsleep resume\n");
@@ -11686,7 +11686,7 @@ int ipa3_ap_suspend(struct device *dev)
 	}
 
 #ifdef CONFIG_DEEPSLEEP
-	if (mem_sleep_current == PM_SUSPEND_MEM) {
+	if (pm_suspend_via_firmware()) {
 		IPADBG("Enter deepsleep suspend\n");
 		ipa3_deepsleep_suspend();
 		IPADBG("Exit deepsleep suspend\n");
