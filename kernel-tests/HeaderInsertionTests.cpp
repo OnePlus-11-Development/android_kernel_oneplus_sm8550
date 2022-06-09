@@ -828,13 +828,9 @@ public:
 	virtual bool TestLogic() {
 
 		// Try to add headers with invalid values.
-		// Valid values are between 1 to IPA_HDR_MAX_SIZE (64).
-		// We expect the below functions to fail.
-		if (AddSingleHeaderAndCheck(0)) {
-			LOG_MSG_ERROR("This is unexpected, this can't succeed");
-			return false;
-		}
+		// Valid values are between 0 to IPA_HDR_MAX_SIZE (64).
 
+		// We expect the below function to fail.
 		if (AddSingleHeaderAndCheck(MAX_HEADER_SIZE + 1)) {
 			LOG_MSG_ERROR("This is unexpected, this can't succeed");
 			return false;
