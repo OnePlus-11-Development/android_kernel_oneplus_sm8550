@@ -313,7 +313,7 @@ u32 msm_vidc_encoder_input_size(struct msm_vidc_inst *inst)
 	return size;
 }
 
-static u32 msm_vidc_enc_delivery_mode_based_output_buf_size(struct msm_vidc_inst *inst,
+u32 msm_vidc_enc_delivery_mode_based_output_buf_size(struct msm_vidc_inst *inst,
 	u32 frame_size)
 {
 	u32 slice_size;
