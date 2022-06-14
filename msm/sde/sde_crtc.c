@@ -5685,18 +5685,20 @@ static int _sde_crtc_check_get_pstates(struct drm_crtc *crtc,
 
 		(*cnt)++;
 
-		if (CHECK_LAYER_BOUNDS(pstate->crtc_y, pstate->crtc_h, crtc_height) ||
+		/* for demura layers, validate against mode resolution */
+		if (blend_type == SDE_DRM_BLEND_OP_SKIP) {
+			if (CHECK_LAYER_BOUNDS(pstate->crtc_y, pstate->crtc_h, mode->vdisplay) ||
+			    CHECK_LAYER_BOUNDS(pstate->crtc_x, pstate->crtc_w, mode->hdisplay)) {
+				SDE_ERROR("invalid dest - y:%d h:%d vdisp:%d x:%d w:%d hdisp:%d\n",
+						pstate->crtc_y, pstate->crtc_h, mode->vdisplay,
+						pstate->crtc_x, pstate->crtc_w, mode->hdisplay);
+				return -E2BIG;
+			}
+		} else if (CHECK_LAYER_BOUNDS(pstate->crtc_y, pstate->crtc_h, crtc_height) ||
 				CHECK_LAYER_BOUNDS(pstate->crtc_x, pstate->crtc_w, crtc_width)) {
 			SDE_ERROR("invalid dest - y:%d h:%d crtc_h:%d x:%d w:%d crtc_w:%d\n",
 				pstate->crtc_y, pstate->crtc_h, crtc_height,
 				pstate->crtc_x, pstate->crtc_w, crtc_width);
-			return -E2BIG;
-		}
-
-		if (blend_type != SDE_DRM_BLEND_OP_SKIP && cstate->num_ds_enabled &&
-			    ((pstate->crtc_h > crtc_height) || (pstate->crtc_w > crtc_width))) {
-			SDE_ERROR("plane w/h:%x*%x > mixer w/h:%x*%x\n",
-				pstate->crtc_w, pstate->crtc_h, crtc_width, crtc_height);
 			return -E2BIG;
 		}
 	}
