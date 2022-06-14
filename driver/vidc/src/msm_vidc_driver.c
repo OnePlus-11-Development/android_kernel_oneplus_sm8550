@@ -3217,7 +3217,7 @@ exit:
 
 static void msm_vidc_update_input_cr(struct msm_vidc_inst *inst, u32 idx, u32 cr)
 {
-	struct msm_vidc_input_cr_data *temp, *next;
+	struct msm_vidc_input_cr_data *temp = NULL, *next = NULL;
 	bool found = false;
 
 	list_for_each_entry_safe(temp, next, &inst->enc_input_crs, list) {
@@ -3228,6 +3228,7 @@ static void msm_vidc_update_input_cr(struct msm_vidc_inst *inst, u32 idx, u32 cr
 		}
 	}
 	if (!found) {
+		temp = NULL;
 		if (msm_vidc_vmem_alloc(sizeof(*temp), (void **)&temp, __func__))
 			return;
 
