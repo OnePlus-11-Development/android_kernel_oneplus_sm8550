@@ -189,29 +189,23 @@ static int ipa3_eth_config_uc(bool init,
 		cmd.base = dma_alloc_coherent(ipa3_ctx->uc_pdev, cmd.size,
 			&cmd.phys_base, GFP_KERNEL);
 		if (cmd.base == NULL) {
-			IPAERR("fail to get DMA memory.\n");
+			IPAERR("dma_alloc_coherent failed\n");
 			return -ENOMEM;
 		}
-		cmd_data =
-			(struct IpaHwOffloadSetUpCmdData_t_v4_0 *)cmd.base;
+		cmd_data = (struct IpaHwOffloadSetUpCmdData_t_v4_0 *)cmd.base;
 		cmd_data->protocol = protocol;
 		switch (protocol) {
 		case IPA_HW_PROTOCOL_AQC:
-			cmd_data->SetupCh_params.AqcSetupCh_params.dir =
-				dir;
-			cmd_data->SetupCh_params.AqcSetupCh_params.gsi_ch =
-				gsi_ch;
-			cmd_data->SetupCh_params.AqcSetupCh_params.aqc_ch =
-				peripheral_ch;
+			cmd_data->SetupCh_params.aqc_params.dir = dir;
+			cmd_data->SetupCh_params.aqc_params.gsi_ch = gsi_ch;
+			cmd_data->SetupCh_params.aqc_params.aqc_ch = peripheral_ch;
 			break;
 		case IPA_HW_PROTOCOL_RTK:
-			cmd_data->SetupCh_params.RtkSetupCh_params.dir =
-				dir;
-			cmd_data->SetupCh_params.RtkSetupCh_params.gsi_ch =
-				gsi_ch;
+			cmd_data->SetupCh_params.rtk_params.dir = dir;
+			cmd_data->SetupCh_params.rtk_params.gsi_ch = gsi_ch;
 			break;
 		default:
-			IPAERR("invalid protocol%d\n", protocol);
+			IPAERR("Unsupported protocol%d\n", protocol);
 		}
 		command = IPA_CPU_2_HW_CMD_OFFLOAD_CHANNEL_SET_UP;
 
@@ -222,44 +216,36 @@ static int ipa3_eth_config_uc(bool init,
 		cmd.base = dma_alloc_coherent(ipa3_ctx->uc_pdev, cmd.size,
 			&cmd.phys_base, GFP_KERNEL);
 		if (cmd.base == NULL) {
-			IPAERR("fail to get DMA memory.\n");
+			IPAERR("dma_alloc_coherent failed\n");
 			return -ENOMEM;
 		}
 
-		cmd_data =
-			(struct IpaHwOffloadCommonChCmdData_t_v4_0 *)cmd.base;
+		cmd_data = (struct IpaHwOffloadCommonChCmdData_t_v4_0 *)cmd.base;
 
 		cmd_data->protocol = protocol;
 		switch (protocol) {
 		case IPA_HW_PROTOCOL_AQC:
-			cmd_data->CommonCh_params.AqcCommonCh_params.gsi_ch =
-				gsi_ch;
+			cmd_data->CommonCh_params.aqc_params.gsi_ch = gsi_ch;
 			break;
 		case IPA_HW_PROTOCOL_RTK:
-			cmd_data->CommonCh_params.RtkCommonCh_params.gsi_ch =
-				gsi_ch;
+			cmd_data->CommonCh_params.rtk_params.gsi_ch = gsi_ch;
 			break;
 		default:
-			IPAERR("invalid protocol%d\n", protocol);
+			IPAERR("Unsupported protocol%d\n", protocol);
 		}
-		cmd_data->CommonCh_params.RtkCommonCh_params.gsi_ch = gsi_ch;
-		command = IPA_CPU_2_HW_CMD_OFFLOAD_TEAR_DOWN;
+		cmd_data->CommonCh_params.rtk_params.gsi_ch = gsi_ch;
+		command = IPA_CPU_2_HW_CMD_OFFLOAD_CHANNEL_TEAR_DOWN;
 	}
 
 	IPA_ACTIVE_CLIENTS_INC_SIMPLE();
 
-	result = ipa3_uc_send_cmd((u32)(cmd.phys_base),
-		command,
-		IPA_HW_2_CPU_OFFLOAD_CMD_STATUS_SUCCESS,
-		false, 10 * HZ);
-	if (result) {
+	result = ipa3_uc_send_cmd((u32)(cmd.phys_base), command,
+		IPA_HW_2_CPU_OFFLOAD_CMD_STATUS_SUCCESS, false, 10 * HZ);
+	if (result)
 		IPAERR("fail to %s uc for %s gsi channel %d\n",
-			init ? "init" : "deinit",
-			dir == IPA_ETH_RX ? "Rx" : "Tx", gsi_ch);
-	}
+			init ? "init" : "deinit", dir == IPA_ETH_RX ? "Rx" : "Tx", gsi_ch);
 
-	dma_free_coherent(ipa3_ctx->uc_pdev,
-		cmd.size, cmd.base, cmd.phys_base);
+	dma_free_coherent(ipa3_ctx->uc_pdev, cmd.size, cmd.base, cmd.phys_base);
 	IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
 
 	IPADBG("exit\n");

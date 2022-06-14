@@ -888,13 +888,13 @@ static int ipa3_wigig_config_uc(bool init,
 			(struct IpaHwOffloadSetUpCmdData_t_v4_0 *)cmd.base;
 
 		cmd_data->protocol = IPA_HW_PROTOCOL_11ad;
-		cmd_data->SetupCh_params.W11AdSetupCh_params.dir =
+		cmd_data->SetupCh_params.w11ad_params.dir =
 			Rx ? W11AD_RX : W11AD_TX;
-		cmd_data->SetupCh_params.W11AdSetupCh_params.gsi_ch = gsi_ch;
-		cmd_data->SetupCh_params.W11AdSetupCh_params.wifi_ch = wifi_ch;
-		cmd_data->SetupCh_params.W11AdSetupCh_params.wifi_hp_addr_msb =
+		cmd_data->SetupCh_params.w11ad_params.gsi_ch = gsi_ch;
+		cmd_data->SetupCh_params.w11ad_params.wifi_ch = wifi_ch;
+		cmd_data->SetupCh_params.w11ad_params.wifi_hp_addr_msb =
 			IPA_WIGIG_MSB(HWHEAD);
-		cmd_data->SetupCh_params.W11AdSetupCh_params.wifi_hp_addr_lsb =
+		cmd_data->SetupCh_params.w11ad_params.wifi_hp_addr_lsb =
 			IPA_WIGIG_LSB(HWHEAD);
 		command = IPA_CPU_2_HW_CMD_OFFLOAD_CHANNEL_SET_UP;
 
@@ -913,8 +913,8 @@ static int ipa3_wigig_config_uc(bool init,
 			(struct IpaHwOffloadCommonChCmdData_t_v4_0 *)cmd.base;
 
 		cmd_data->protocol = IPA_HW_PROTOCOL_11ad;
-		cmd_data->CommonCh_params.W11AdCommonCh_params.gsi_ch = gsi_ch;
-		command = IPA_CPU_2_HW_CMD_OFFLOAD_TEAR_DOWN;
+		cmd_data->CommonCh_params.w11ad_params.gsi_ch = gsi_ch;
+		command = IPA_CPU_2_HW_CMD_OFFLOAD_CHANNEL_TEAR_DOWN;
 	}
 
 	IPA_ACTIVE_CLIENTS_INC_SIMPLE();
