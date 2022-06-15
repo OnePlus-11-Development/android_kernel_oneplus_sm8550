@@ -39,7 +39,7 @@
 #define VP9     MSM_VIDC_VP9
 #define HEIC    MSM_VIDC_HEIC
 #define CODECS_ALL     (H264 | HEVC | VP9 | HEIC)
-#define MAXIMUM_OVERRIDE_VP9_FPS 120
+#define MAXIMUM_OVERRIDE_VP9_FPS 180
 
 static struct msm_platform_core_capability core_data_waipio[] = {
 	/* {type, value} */
