@@ -257,7 +257,7 @@ static inline bool is_all_parents_visited(
 static int add_node_list(struct list_head *list, enum msm_vidc_inst_capability_type cap_id)
 {
 	int rc = 0;
-	struct msm_vidc_inst_cap_entry *entry;
+	struct msm_vidc_inst_cap_entry *entry = NULL;
 
 	rc = msm_vidc_vmem_alloc(sizeof(struct msm_vidc_inst_cap_entry),
 			(void **)&entry, __func__);

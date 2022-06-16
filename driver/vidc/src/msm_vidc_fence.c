@@ -52,7 +52,7 @@ static const struct dma_fence_ops msm_vidc_dma_fence_ops = {
 
 struct msm_vidc_fence *msm_vidc_fence_create(struct msm_vidc_inst *inst)
 {
-	struct msm_vidc_fence *fence;
+	struct msm_vidc_fence *fence = NULL;
 	int rc = 0;
 
 	if (!inst) {

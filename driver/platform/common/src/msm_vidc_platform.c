@@ -349,7 +349,7 @@ int msm_vidc_deinit_platform(struct platform_device *pdev)
 int msm_vidc_init_platform(struct platform_device *pdev)
 {
 	int rc = 0;
-	struct msm_vidc_platform *platform;
+	struct msm_vidc_platform *platform = NULL;
 	struct msm_vidc_core *core;
 
 	if (!pdev) {

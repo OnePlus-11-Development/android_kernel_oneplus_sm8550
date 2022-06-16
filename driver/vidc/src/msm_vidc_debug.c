@@ -165,7 +165,7 @@ static ssize_t core_info_read(struct file* file, char __user* buf,
 	size_t count, loff_t* ppos)
 {
 	struct msm_vidc_core *core = file->private_data;
-	char* dbuf, * cur, * end;
+	char *cur, *end, *dbuf = NULL;
 	ssize_t len = 0;
 	int rc = 0;
 
@@ -432,7 +432,7 @@ static ssize_t inst_info_read(struct file *file, char __user *buf,
 	struct core_inst_pair *idata = file->private_data;
 	struct msm_vidc_core *core;
 	struct msm_vidc_inst *inst;
-	char *dbuf, *cur, *end;
+	char *cur, *end, *dbuf = NULL;
 	int i, j;
 	ssize_t len = 0;
 	struct v4l2_format *f;
@@ -452,7 +452,7 @@ static ssize_t inst_info_read(struct file *file, char __user *buf,
 		return 0;
 	}
 
-	if (msm_vidc_vmem_alloc(MAX_DBG_BUF_SIZE, (void **) &dbuf, __func__)) {
+	if (msm_vidc_vmem_alloc(MAX_DBG_BUF_SIZE, (void **)&dbuf, __func__)) {
 		len = -ENOMEM;
 		goto failed_alloc;
 	}

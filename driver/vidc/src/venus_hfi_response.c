@@ -1882,7 +1882,7 @@ void handle_session_response_work_handler(struct work_struct *work)
 static int queue_response_work(struct msm_vidc_inst *inst,
 	enum response_work_type type, void *hdr, u32 hdr_size)
 {
-	struct response_work *work;
+	struct response_work *work = NULL;
 
 	if (msm_vidc_vmem_alloc(sizeof(struct response_work), (void **)&work, __func__))
 		return -ENOMEM;

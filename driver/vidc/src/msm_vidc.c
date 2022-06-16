@@ -855,7 +855,7 @@ EXPORT_SYMBOL(msm_vidc_dqevent);
 void *msm_vidc_open(void *vidc_core, u32 session_type)
 {
 	int rc = 0;
-	struct msm_vidc_inst *inst;
+	struct msm_vidc_inst *inst = NULL;
 	struct msm_vidc_core *core;
 	int i = 0;
 
