@@ -84,8 +84,7 @@ static struct kgsl_iommu_pt *to_iommu_pt(struct kgsl_pagetable *pagetable)
 static u32 get_llcc_flags(struct kgsl_mmu *mmu)
 {
 	if (mmu->subtype == KGSL_IOMMU_SMMU_V500)
-		return (test_bit(KGSL_MMU_IO_COHERENT, &mmu->features)) ?
-			0 : IOMMU_USE_LLC_NWA;
+		return IOMMU_USE_LLC_NWA;
 	else
 		return IOMMU_USE_UPSTREAM_HINT;
 }
