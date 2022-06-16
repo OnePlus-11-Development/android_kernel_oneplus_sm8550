@@ -1946,6 +1946,11 @@ int sde_cp_crtc_check_properties(struct drm_crtc *crtc,
 		DRM_ERROR("invalid sde_crtc_state %pK\n", sde_crtc_state);
 		return -EINVAL;
 	}
+
+	/* force revalidation of some properties when there is a mode switch */
+	if (state->mode_changed)
+		sde_cp_crtc_res_change(crtc);
+
 	mutex_lock(&sde_crtc->crtc_cp_lock);
 
 	ret = _sde_cp_crtc_check_pu_features(crtc);
@@ -4701,10 +4706,13 @@ void sde_cp_crtc_res_change(struct drm_crtc *crtc_drm)
 	list_for_each_entry_safe(prop_node, n, &crtc->cp_active_list,
 				 cp_active_list) {
 		if (prop_node->feature == SDE_CP_CRTC_DSPP_LTM_INIT ||
-			prop_node->feature == SDE_CP_CRTC_DSPP_LTM_VLUT) {
+			prop_node->feature == SDE_CP_CRTC_DSPP_LTM_VLUT ||
+			prop_node->feature == SDE_CP_CRTC_DSPP_RC_MASK) {
 			list_del_init(&prop_node->cp_active_list);
 			list_add_tail(&prop_node->cp_dirty_list,
 				&crtc->cp_dirty_list);
+
+			SDE_EVT32(prop_node->feature);
 		}
 	}
 	mutex_unlock(&crtc->crtc_cp_lock);
