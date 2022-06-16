@@ -69,7 +69,9 @@ static struct sde_hw_rc_state rc_state[RC_MAX - RC_0] = {
 		.roi_programmed = false,
 	},
 };
-#define RC_STATE(hw_dspp) rc_state[hw_dspp->cap->sblk->rc.idx]
+
+#define RC_IDX(hw_dspp) hw_dspp->cap->sblk->rc.idx
+#define RC_STATE(hw_dspp) rc_state[RC_IDX(hw_dspp)]
 
 enum rc_param_r {
 	RC_PARAM_R0     = 0x0,
@@ -253,7 +255,7 @@ static inline void _sde_hw_rc_reg_write(
 	u32 address = hw_dspp->cap->sblk->rc.base + offset;
 
 	SDE_DEBUG("rc:%u, address:0x%08X, value:0x%08X\n",
-			hw_dspp->cap->sblk->rc.idx,
+			RC_IDX(hw_dspp),
 			hw_dspp->hw.blk_off + address, value);
 	SDE_REG_WRITE(&hw_dspp->hw, address, value);
 }
@@ -430,7 +432,7 @@ static int _sde_hw_rc_program_enable_bits(
 {
 	int rc = 0;
 	u32 val = 0, param_c = 0, rc_merge_mode = 0, ystart = 0;
-	u64 flags = 0;
+	u64 flags = 0, mask_w = 0, mask_h = 0;
 	bool r1_valid = false, r2_valid = false;
 	bool pu_in_r1 = false, pu_in_r2 = false;
 	bool r1_enable = false, r2_enable = false;
@@ -448,6 +450,8 @@ static int _sde_hw_rc_program_enable_bits(
 	}
 
 	flags = rc_mask_cfg->flags;
+	mask_w = rc_mask_cfg->width;
+	mask_h = rc_mask_cfg->height;
 	r1_valid = ((flags & SDE_HW_RC_DISABLE_R1) != SDE_HW_RC_DISABLE_R1);
 	r2_valid = ((flags & SDE_HW_RC_DISABLE_R2) != SDE_HW_RC_DISABLE_R2);
 	pu_in_r1 = (param_r == RC_PARAM_R1 || param_r == RC_PARAM_R1R2);
@@ -465,9 +469,11 @@ static int _sde_hw_rc_program_enable_bits(
 	if (!r1_enable && r2_enable)
 		ystart = rc_roi->y;
 
-	SDE_DEBUG("flags:%x, R1 valid:%d, R2 valid:%d, PU in R1:%d, PU in R2:%d, Y_START:%d\n",
-			flags, r1_valid, r2_valid, pu_in_r1, pu_in_r2, ystart);
-	SDE_EVT32(flags, r1_valid, r2_valid, pu_in_r1, pu_in_r2, ystart);
+	SDE_DEBUG("idx:%d w:%d h:%d flags:%x, R1:%d, R2:%d, PU R1:%d, PU R2:%d, Y_START:%d\n",
+			RC_IDX(hw_dspp), mask_w, mask_h, flags, r1_valid, r2_valid, pu_in_r1,
+			pu_in_r2, ystart);
+	SDE_EVT32(RC_IDX(hw_dspp), mask_w, mask_h, flags, r1_valid, r2_valid, pu_in_r1, pu_in_r2,
+			ystart);
 
 	val |= param_c;
 	_sde_hw_rc_reg_write(hw_dspp, SDE_HW_RC_REG1, val);
@@ -577,12 +583,13 @@ static int sde_hw_rc_check_mask_cfg(
 {
 	int rc = 0;
 	u32 i = 0;
-	u32 half_panel_width;
+	u32 panel_width, panel_height, half_panel_width;
 	u32 mem_total_size, min_region_width;
 	u64 flags;
 	u32 cfg_param_01, cfg_param_02, cfg_param_03;
 	u32 cfg_param_07, cfg_param_08;
 	u32 *cfg_param_04, *cfg_param_05, *cfg_param_06;
+	u32 mask_width, mask_height;
 	bool r1_enable, r2_enable;
 
 	if (!hw_dspp || !hw_cfg || !rc_mask_cfg) {
@@ -590,13 +597,6 @@ static int sde_hw_rc_check_mask_cfg(
 		return -EINVAL;
 	}
 
-	if (hw_cfg->panel_height != rc_mask_cfg->height ||
-		rc_mask_cfg->width != hw_cfg->panel_width) {
-		SDE_ERROR("RC mask Layer: h %d w %d panel: h %d w %d mismatch\n",
-				rc_mask_cfg->height, rc_mask_cfg->width,
-				hw_cfg->panel_height, hw_cfg->panel_width);
-		return -EINVAL;
-	}
 	flags = rc_mask_cfg->flags;
 	cfg_param_01 = rc_mask_cfg->cfg_param_01;
 	cfg_param_02 = rc_mask_cfg->cfg_param_02;
@@ -606,11 +606,28 @@ static int sde_hw_rc_check_mask_cfg(
 	cfg_param_06 = rc_mask_cfg->cfg_param_06;
 	cfg_param_07 = rc_mask_cfg->cfg_param_07;
 	cfg_param_08 = rc_mask_cfg->cfg_param_08;
+	mask_width = rc_mask_cfg->width;
+	mask_height = rc_mask_cfg->height;
 	r1_enable = ((flags & SDE_HW_RC_DISABLE_R1) != SDE_HW_RC_DISABLE_R1);
 	r2_enable = ((flags & SDE_HW_RC_DISABLE_R2) != SDE_HW_RC_DISABLE_R2);
 
 	mem_total_size = hw_dspp->cap->sblk->rc.mem_total_size;
 	min_region_width = hw_dspp->cap->sblk->rc.min_region_width;
+	panel_width =  hw_cfg->panel_width;
+	panel_height = hw_cfg->panel_height;
+	half_panel_width = panel_width / cfg_param_03 * 2;
+
+	SDE_EVT32(RC_IDX(hw_dspp), mask_width, mask_height, panel_width, panel_height,
+			half_panel_width);
+	SDE_EVT32(RC_IDX(hw_dspp), flags, cfg_param_01, cfg_param_02, cfg_param_03, cfg_param_04,
+			cfg_param_05, cfg_param_06, cfg_param_07, cfg_param_08);
+	SDE_EVT32(RC_IDX(hw_dspp), r1_enable, r2_enable, mem_total_size, min_region_width);
+
+	if (mask_width != panel_width || mask_height != panel_height) {
+		SDE_ERROR("RC mask Layer: w %d h %d panel: w %d h %d mismatch\n",
+				mask_width, mask_height, panel_width, panel_height);
+		return -EINVAL;
+	}
 
 	if (cfg_param_07 > mem_total_size) {
 		SDE_ERROR("invalid cfg_param_07:%d\n", cfg_param_07);
@@ -641,7 +658,6 @@ static int sde_hw_rc_check_mask_cfg(
 		}
 	}
 
-	half_panel_width = hw_cfg->panel_width / cfg_param_03 * 2;
 	for (i = 0; i < cfg_param_03; i += 2) {
 		if (cfg_param_04[i] + cfg_param_04[i+1] != half_panel_width) {
 			SDE_ERROR("invalid ratio [%d]:%d, [%d]:%d, %d\n",
