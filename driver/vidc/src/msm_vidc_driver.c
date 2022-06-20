@@ -6233,7 +6233,7 @@ static bool msm_vidc_allow_image_encode_session(struct msm_vidc_inst *inst)
 	}
 
 	/* is bitrate mode CQ */
-	allow = capability->cap[BITRATE_MODE].value == HFI_RC_CQ;
+	allow = capability->cap[BITRATE_MODE].value == V4L2_MPEG_VIDEO_BITRATE_MODE_CQ;
 	if (!allow) {
 		i_vpr_e(inst, "%s: bitrate mode is not CQ: %#x\n", __func__,
 			capability->cap[BITRATE_MODE].value);
