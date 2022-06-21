@@ -481,8 +481,6 @@ int gen7_hfi_process_queue(struct gen7_gmu_device *gmu,
 
 int gen7_hfi_send_bcl_feature_ctrl(struct adreno_device *adreno_dev)
 {
-	const struct adreno_gen7_core *gen7_core = to_gen7_core(adreno_dev);
-
 	if (!adreno_dev->bcl_enabled)
 		return 0;
 
@@ -493,7 +491,7 @@ int gen7_hfi_send_bcl_feature_ctrl(struct adreno_device *adreno_dev)
 	 * BIT[8:14] - Throttle level 2 (optional)
 	 * BIT[15:21] - Throttle level 3 (optional)
 	 */
-	return gen7_hfi_send_feature_ctrl(adreno_dev, HFI_FEATURE_BCL, 1, gen7_core->bcl_data);
+	return gen7_hfi_send_feature_ctrl(adreno_dev, HFI_FEATURE_BCL, 1, adreno_dev->bcl_data);
 }
 
 #define EVENT_PWR_ACD_THROTTLE_PROF 44
