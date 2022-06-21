@@ -154,16 +154,16 @@ int msm_vidc_fence_signal(struct msm_vidc_inst *inst, u32 fence_id)
 
 	fence = msm_vidc_get_fence_from_id(inst, fence_id);
 	if (!fence) {
-		i_vpr_e(inst, "%s: no fence available to signal with id: %u",
+		i_vpr_e(inst, "%s: no fence available to signal with id: %u\n",
 			__func__, fence_id);
 		rc = -EINVAL;
 		goto exit;
 	}
 
 	i_vpr_l(inst, "%s: fence %s\n", __func__, fence->name);
+	list_del_init(&fence->list);
 	dma_fence_signal(&fence->dma_fence);
 	dma_fence_put(&fence->dma_fence);
-	list_del_init(&fence->list);
 
 exit:
 	return rc;
@@ -185,10 +185,10 @@ void msm_vidc_fence_destroy(struct msm_vidc_inst *inst, u32 fence_id)
 	}
 
 	i_vpr_e(inst, "%s: fence %s\n", __func__, fence->name);
+	list_del_init(&fence->list);
 	dma_fence_set_error(&fence->dma_fence, -EINVAL);
 	dma_fence_signal(&fence->dma_fence);
 	dma_fence_put(&fence->dma_fence);
-	list_del_init(&fence->list);
 }
 
 int msm_vidc_fence_init(struct msm_vidc_inst *inst)
