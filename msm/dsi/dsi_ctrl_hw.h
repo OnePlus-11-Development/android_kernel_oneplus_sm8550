@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -40,6 +41,29 @@
  * flag is valed for kickoff_command() and kickoff_fifo_command() operations.
  */
 #define DSI_CTRL_HW_CMD_WAIT_FOR_TRIGGER            0x1
+
+/**
+ * enum dsi_ctrl_tpg_pattern - type of TPG pattern
+ * @DSI_CTRL_TPG_COUNTER:
+ * @DSI_CTRL_TPG_FIXED:
+ * @DSI_CTRL_TPG_COLOR_RAMP_64L_64P:
+ * @DSI_CTRL_TPG_COLOR_RAMP_64L_256P:
+ * @DSI_CTRL_TPG_GRAYSCALE_RAMP:
+ * @DSI_CTRL_TPG_COLOR_SQUARE:
+ * @DSI_CTRL_TPG_CHECKERED_RECTANGLE:
+ * @DSI_CTRL_TPG_BASIC_COLOR_CHANGING:
+ */
+enum dsi_ctrl_tpg_pattern {
+	DSI_CTRL_TPG_COUNTER = 0,
+	DSI_CTRL_TPG_FIXED,
+	DSI_CTRL_TPG_COLOR_RAMP_64L_64P,
+	DSI_CTRL_TPG_COLOR_RAMP_64L_256P,
+	DSI_CTRL_TPG_BLACK_WHITE_VERTICAL_LINES,
+	DSI_CTRL_TPG_GRAYSCALE_RAMP,
+	DSI_CTRL_TPG_COLOR_SQUARE,
+	DSI_CTRL_TPG_CHECKERED_RECTANGLE,
+	DSI_CTRL_TPG_BASIC_COLOR_CHANGING
+};
 
 /**
  * enum dsi_ctrl_version - version of the dsi host controller
@@ -92,12 +116,14 @@ enum dsi_ctrl_hw_features {
  * @DSI_TEST_PATTERN_FIXED:     Test pattern is fixed, based on init value.
  * @DSI_TEST_PATTERN_INC:       Incremental test pattern, base on init value.
  * @DSI_TEST_PATTERN_POLY:      Pattern generated from polynomial and init val.
+ * @DSI_TEST_PATTERN_GENERAL:   MDSS general test pattern.
  * @DSI_TEST_PATTERN_MAX:
  */
 enum dsi_test_pattern {
 	DSI_TEST_PATTERN_FIXED = 0,
 	DSI_TEST_PATTERN_INC,
 	DSI_TEST_PATTERN_POLY,
+	DSI_TEST_PATTERN_GENERAL,
 	DSI_TEST_PATTERN_MAX
 };
 
@@ -727,8 +753,12 @@ struct dsi_ctrl_hw_ops {
 	 * test_pattern_enable() - enable test pattern engine
 	 * @ctrl:          Pointer to the controller host hardware.
 	 * @enable:        Enable/Disable test pattern engine.
+	 * @pattern:       Type of TPG pattern
+	 * @panel_mode:    DSI operation mode
 	 */
-	void (*test_pattern_enable)(struct dsi_ctrl_hw *ctrl, bool enable);
+	void (*test_pattern_enable)(struct dsi_ctrl_hw *ctrl, bool enable,
+					   enum dsi_ctrl_tpg_pattern pattern,
+					   enum dsi_op_mode panel_mode);
 
 	/**
 	 * clear_phy0_ln_err() - clear DSI PHY lane-0 errors

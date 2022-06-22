@@ -1516,19 +1516,22 @@ void dsi_ctrl_hw_cmn_video_test_pattern_setup(struct dsi_ctrl_hw *ctrl,
 					     enum dsi_test_pattern type,
 					     u32 init_val)
 {
-	u32 reg = 0;
+	u32 reg = 0, pattern_sel_shift = 4;
 
 	DSI_W32(ctrl, DSI_TEST_PATTERN_GEN_VIDEO_INIT_VAL, init_val);
 
 	switch (type) {
 	case DSI_TEST_PATTERN_FIXED:
-		reg |= (0x2 << 4);
+		reg |= (0x2 << pattern_sel_shift);
 		break;
 	case DSI_TEST_PATTERN_INC:
-		reg |= (0x1 << 4);
+		reg |= (0x1 << pattern_sel_shift);
 		break;
 	case DSI_TEST_PATTERN_POLY:
 		DSI_W32(ctrl, DSI_TEST_PATTERN_GEN_VIDEO_POLY, 0xF0F0F);
+		break;
+	case DSI_TEST_PATTERN_GENERAL:
+		reg |= (0x3 << pattern_sel_shift);
 		break;
 	default:
 		break;
@@ -1590,6 +1593,9 @@ void dsi_ctrl_hw_cmn_cmd_test_pattern_setup(struct dsi_ctrl_hw *ctrl,
 	case DSI_TEST_PATTERN_POLY:
 		DSI_W32(ctrl, poly_offset, 0xF0F0F);
 		break;
+	case DSI_TEST_PATTERN_GENERAL:
+		reg |= (0x3 << pattern_sel_shift);
+		break;
 	default:
 		break;
 	}
@@ -1602,11 +1608,28 @@ void dsi_ctrl_hw_cmn_cmd_test_pattern_setup(struct dsi_ctrl_hw *ctrl,
  * test_pattern_enable() - enable test pattern engine
  * @ctrl:          Pointer to the controller host hardware.
  * @enable:        Enable/Disable test pattern engine.
+ * @pattern:       Type of TPG pattern
+ * @panel_mode:    DSI operation mode
  */
 void dsi_ctrl_hw_cmn_test_pattern_enable(struct dsi_ctrl_hw *ctrl,
-					bool enable)
+					bool enable, enum dsi_ctrl_tpg_pattern pattern,
+					enum dsi_op_mode panel_mode)
 {
 	u32 reg = DSI_R32(ctrl, DSI_TEST_PATTERN_GEN_CTRL);
+	u32 reg_tpg_main_control = 0;
+	u32 reg_tpg_video_config = BIT(0);
+
+	reg_tpg_video_config |= BIT(2);
+
+	if (panel_mode == DSI_OP_CMD_MODE) {
+		reg_tpg_main_control = BIT(pattern);
+		DSI_W32(ctrl, DSI_TPG_MAIN_CONTROL2, reg_tpg_main_control);
+	} else {
+		reg_tpg_main_control = BIT(pattern + 1);
+		DSI_W32(ctrl, DSI_TPG_MAIN_CONTROL, reg_tpg_main_control);
+	}
+
+	DSI_W32(ctrl, DSI_TPG_VIDEO_CONFIG, reg_tpg_video_config);
 
 	if (enable)
 		reg |= BIT(0);

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -633,7 +634,10 @@ int dsi_pre_clkon_cb(void *priv, enum dsi_clk_type clk_type,
  */
 int dsi_display_unprepare(struct dsi_display *display);
 
-int dsi_display_set_tpg_state(struct dsi_display *display, bool enable);
+int dsi_display_set_tpg_state(struct dsi_display *display, bool enable,
+		enum dsi_test_pattern type,
+		u32 init_val,
+		enum dsi_ctrl_tpg_pattern pattern);
 
 int dsi_display_clock_gate(struct dsi_display *display, bool enable);
 int dsi_dispaly_static_frame(struct dsi_display *display, bool enable);
