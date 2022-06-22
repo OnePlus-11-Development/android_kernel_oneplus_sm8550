@@ -300,7 +300,6 @@ static inline int hwsched_dispatcher_requeue_cmdobj(
 
 	/* Reset the command queue head to reflect the newly requeued change */
 	drawctxt->drawqueue_head = prev;
-	cmdobj->requeue_cnt++;
 	spin_unlock(&drawctxt->lock);
 	return 0;
 }
@@ -498,6 +497,7 @@ static int hwsched_sendcmds(struct adreno_device *adreno_dev,
 					drawctxt, cmdobj);
 				if (r)
 					ret = r;
+				cmdobj->requeue_cnt++;
 			}
 
 			break;
