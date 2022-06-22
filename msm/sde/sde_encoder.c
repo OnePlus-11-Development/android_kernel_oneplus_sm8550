@@ -2534,7 +2534,8 @@ static int sde_encoder_virt_modeset_rc(struct drm_encoder *drm_enc,
 			res_switch = !drm_mode_match(old_adj_mode, adj_mode,
 					DRM_MODE_MATCH_TIMINGS);
 
-		if (res_switch && sde_enc->disp_info.is_te_using_watchdog_timer) {
+		if ((res_switch && sde_enc->disp_info.is_te_using_watchdog_timer) ||
+			sde_encoder_is_cwb_disabling(drm_enc, drm_enc->crtc)) {
 			/*
 			 * add tx wait for sim panel to avoid wd timer getting
 			 * updated in middle of frame to avoid early vsync
