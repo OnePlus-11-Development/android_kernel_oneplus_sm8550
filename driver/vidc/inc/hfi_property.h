@@ -543,6 +543,8 @@ enum hfi_nal_length_field_type {
 
 #define HFI_PROP_AV1_OP_POINT                                   0x03000182
 
+#define HFI_PROP_SUBFRAME_INPUT                                 0x03000183
+
 #define HFI_PROP_OPB_ENABLE                                     0x03000184
 
 #define HFI_PROP_AV1_DRAP_CONFIG                                0x03000189
@@ -558,6 +560,10 @@ enum hfi_saliency_type {
 #define HFI_PROP_REQUEST_PREPROCESS                             0x0300018E
 
 #define HFI_PROP_UBWC_STRIDE_SCANLINE                           0x03000190
+
+#define HFI_PROP_TRANSCODING_STAT_INFO                          0x03000191
+
+#define HFI_PROP_DOLBY_RPU_METADATA                             0x03000192
 
 #define HFI_PROP_END                                            0x03FFFFFF
 

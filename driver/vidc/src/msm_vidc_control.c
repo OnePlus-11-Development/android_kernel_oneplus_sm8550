@@ -19,6 +19,8 @@
 		(a) = 0;             \
 }
 
+extern struct msm_vidc_core *g_core;
+
 static bool is_priv_ctrl(u32 id)
 {
 	bool private = false;
@@ -254,19 +256,19 @@ static inline bool is_all_parents_visited(
 
 static int add_node_list(struct list_head *list, enum msm_vidc_inst_capability_type cap_id)
 {
+	int rc = 0;
 	struct msm_vidc_inst_cap_entry *entry;
 
-	entry = kzalloc(sizeof(struct msm_vidc_inst_cap_entry), GFP_KERNEL);
-	if (!entry) {
-		d_vpr_e("%s: msm_vidc_inst_cap_entry alloc failed\n", __func__);
-		return -EINVAL;
-	}
+	rc = msm_vidc_vmem_alloc(sizeof(struct msm_vidc_inst_cap_entry),
+			(void **)&entry, __func__);
+	if (rc)
+		return rc;
 
 	INIT_LIST_HEAD(&entry->list);
 	entry->cap_id = cap_id;
 	list_add_tail(&entry->list, list);
 
-	return 0;
+	return rc;
 }
 
 static int add_node(
@@ -696,7 +698,7 @@ static int msm_vidc_adjust_dynamic_property(struct msm_vidc_inst *inst,
 		}
 
 		list_del_init(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 
 	/* expecting children_list to be empty */
@@ -711,12 +713,12 @@ error:
 	list_for_each_entry_safe(entry, temp, &inst->children_list, list) {
 		i_vpr_e(inst, "%s: child list: %s\n", __func__, cap_name(entry->cap_id));
 		list_del_init(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 	list_for_each_entry_safe(entry, temp, &inst->firmware_list, list) {
 		i_vpr_e(inst, "%s: fw list: %s\n", __func__, cap_name(entry->cap_id));
 		list_del_init(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 
 	return rc;
@@ -739,7 +741,7 @@ static int msm_vidc_set_dynamic_property(struct msm_vidc_inst *inst)
 			goto error;
 
 		list_del_init(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 
 	return 0;
@@ -747,7 +749,7 @@ error:
 	list_for_each_entry_safe(entry, temp, &inst->firmware_list, list) {
 		i_vpr_e(inst, "%s: fw list: %s\n", __func__, cap_name(entry->cap_id));
 		list_del_init(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 
 	return rc;
@@ -771,7 +773,7 @@ int msm_vidc_ctrl_deinit(struct msm_vidc_inst *inst)
 	i_vpr_h(inst, "%s(): num ctrls %d\n", __func__, inst->num_ctrls);
 	v4l2_ctrl_handler_free(&inst->ctrl_handler);
 	memset(&inst->ctrl_handler, 0, sizeof(struct v4l2_ctrl_handler));
-	kfree(inst->ctrls);
+	msm_vidc_vmem_free((void **)&inst->ctrls);
 	inst->ctrls = NULL;
 
 	return 0;
@@ -807,12 +809,10 @@ int msm_vidc_ctrl_init(struct msm_vidc_inst *inst)
 			__func__);
 		return -EINVAL;
 	}
-	inst->ctrls = kcalloc(num_ctrls,
-		sizeof(struct v4l2_ctrl *), GFP_KERNEL);
-	if (!inst->ctrls) {
-		i_vpr_e(inst, "%s: failed to allocate ctrl\n", __func__);
-		return -ENOMEM;
-	}
+	rc = msm_vidc_vmem_alloc(num_ctrls * sizeof(struct v4l2_ctrl *),
+			(void **)&inst->ctrls, __func__);
+	if (rc)
+		return rc;
 
 	rc = v4l2_ctrl_handler_init(&inst->ctrl_handler, num_ctrls);
 	if (rc) {
@@ -1038,19 +1038,29 @@ int msm_v4l2_op_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 
 	inst = container_of(ctrl->handler,
 			    struct msm_vidc_inst, ctrl_handler);
+	inst = get_inst_ref(g_core, inst);
 	if (!inst) {
-		d_vpr_e("%s: could not find inst for ctrl %s id %#x\n", __func__, ctrl->name, ctrl->id);
+		d_vpr_e("%s: could not find inst for ctrl %s id %#x\n",
+			__func__, ctrl->name, ctrl->id);
 		return -EINVAL;
 	}
+	client_lock(inst, __func__);
+	inst_lock(inst, __func__);
 
 	rc = msm_vidc_get_control(inst, ctrl);
-	if (rc)
+	if (rc) {
 		i_vpr_e(inst, "%s: failed for ctrl %s id %#x\n",
 			__func__, ctrl->name, ctrl->id);
-	else
+		goto unlock;
+	} else {
 		i_vpr_h(inst, "%s: ctrl %s id %#x, value %d\n",
 			__func__, ctrl->name, ctrl->id, ctrl->val);
+	}
 
+unlock:
+	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
+	put_inst(inst);
 	return rc;
 }
 
@@ -1107,11 +1117,8 @@ static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
 			return rc;
 	}
 
-	if (ctrl->id == V4L2_CID_MPEG_VIDC_CRITICAL_PRIORITY) {
-		inst->decode_batch.enable = msm_vidc_allow_decode_batch(inst);
-		msm_vidc_allow_dcvs(inst);
+	if (ctrl->id == V4L2_CID_MPEG_VIDC_CRITICAL_PRIORITY)
 		msm_vidc_update_cap_value(inst, PRIORITY, 0, __func__);
-	}
 
 	if (ctrl->id == V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER) {
 		u32 enable;
@@ -1152,25 +1159,30 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	inst = container_of(ctrl->handler,
 		struct msm_vidc_inst, ctrl_handler);
-
+	inst = get_inst_ref(g_core, inst);
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid parameters for inst\n", __func__);
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
+	inst_lock(inst, __func__);
 	capability = inst->capabilities;
 
 	i_vpr_h(inst, FMT_STRING_SET_CTRL,
 		__func__, state_name(inst->state), ctrl->name, ctrl->id, ctrl->val);
 
-	if (!msm_vidc_allow_s_ctrl(inst, ctrl->id))
-		return -EINVAL;
+	if (!msm_vidc_allow_s_ctrl(inst, ctrl->id)) {
+		rc = -EINVAL;
+		goto unlock;
+	}
 
 	cap_id = msm_vidc_get_cap_id(inst, ctrl->id);
 	if (!is_valid_cap_id(cap_id)) {
 		i_vpr_e(inst, "%s: could not find cap_id for ctrl %s\n",
 			__func__, ctrl->name);
-		return -EINVAL;
+		rc = -EINVAL;
+		goto unlock;
 	}
 
 	if (ctrl->id == V4L2_CID_MPEG_VIDC_INPUT_METADATA_FD) {
@@ -1178,16 +1190,18 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 			i_vpr_e(inst,
 				"%s: client configured invalid input metadata fd %d\n",
 				__func__, ctrl->val);
-			return 0;
+			rc = 0;
+			goto unlock;
 		}
 		if (!capability->cap[INPUT_META_VIA_REQUEST].value) {
 			i_vpr_e(inst,
 				"%s: input metadata not enabled via request\n", __func__);
-			return -EINVAL;
+			rc = -EINVAL;
+			goto unlock;
 		}
 		rc = msm_vidc_create_input_metadata_buffer(inst, ctrl->val);
 		if (rc)
-			return rc;
+			goto unlock;
 	}
 
 	/* mark client set flag */
@@ -1198,18 +1212,22 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 		/* static case */
 		rc = msm_vidc_update_static_property(inst, cap_id, ctrl);
 		if (rc)
-			return rc;
+			goto unlock;
 	} else {
 		/* dynamic case */
 		rc = msm_vidc_adjust_dynamic_property(inst, cap_id, ctrl);
 		if (rc)
-			return rc;
+			goto unlock;
 
 		rc = msm_vidc_set_dynamic_property(inst);
 		if (rc)
-			return rc;
+			goto unlock;
 	}
 
+unlock:
+	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
+	put_inst(inst);
 	return rc;
 }
 
@@ -1718,14 +1736,14 @@ int msm_vidc_adjust_slice_count(void *instance, struct v4l2_ctrl *ctrl)
 	slice_mode = ctrl ? ctrl->val :
 		capability->cap[SLICE_MODE].value;
 
+	if (slice_mode == V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_SINGLE)
+		return 0;
+
 	if (msm_vidc_get_parent_value(inst, SLICE_MODE,
 		BITRATE_MODE, &rc_type, __func__) ||
 		msm_vidc_get_parent_value(inst, SLICE_MODE,
 		ALL_INTRA, &all_intra, __func__))
 		return -EINVAL;
-
-	if (slice_mode == V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_SINGLE)
-		return 0;
 
 	fps = capability->cap[FRAME_RATE].value >> 16;
 	if (fps > MAX_SLICES_FRAME_RATE ||
@@ -2061,9 +2079,10 @@ int msm_vidc_adjust_bitrate(void *instance, struct v4l2_ctrl *ctrl)
 	int i, rc = 0;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
 	struct msm_vidc_inst_capability *capability;
-	s32 adjusted_value, max_bitrate, enh_layer_count;
+	s32 adjusted_value, enh_layer_count;
 	u32 cumulative_bitrate = 0, cap_id = 0, cap_value = 0;
 	u32 layer_br_caps[6] = {L0_BR, L1_BR, L2_BR, L3_BR, L4_BR, L5_BR};
+	u32 max_bitrate = 0;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -2092,7 +2111,10 @@ int msm_vidc_adjust_bitrate(void *instance, struct v4l2_ctrl *ctrl)
 		ENH_LAYER_COUNT, &enh_layer_count, __func__))
 		return -EINVAL;
 
-	max_bitrate = inst->capabilities->cap[BIT_RATE].max;
+	/* get max bit rate for current session config*/
+	max_bitrate = msm_vidc_get_max_bitrate(inst);
+	if (inst->capabilities->cap[BIT_RATE].value > max_bitrate)
+		msm_vidc_update_cap_value(inst, BIT_RATE, max_bitrate, __func__);
 
 	/*
 	 * ENH_LAYER_COUNT cap max is positive only if
@@ -2566,6 +2588,7 @@ int msm_vidc_adjust_bitrate_boost(void *instance, struct v4l2_ctrl *ctrl)
 	s32 adjusted_value;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
 	s32 min_quality = -1, rc_type = -1;
+	u32 max_bitrate = 0, bitrate = 0;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -2597,6 +2620,17 @@ int msm_vidc_adjust_bitrate_boost(void *instance, struct v4l2_ctrl *ctrl)
 	if (min_quality) {
 		adjusted_value = MAX_BITRATE_BOOST;
 		goto adjust;
+	}
+
+	max_bitrate = msm_vidc_get_max_bitrate(inst);
+	bitrate = inst->capabilities->cap[BIT_RATE].value;
+	if (adjusted_value) {
+		if ((bitrate + bitrate / (100 / adjusted_value)) > max_bitrate) {
+			i_vpr_h(inst,
+				"%s: bitrate %d is beyond max bitrate %d, remove bitrate boost\n",
+				__func__, max_bitrate, bitrate);
+			adjusted_value = 0;
+		}
 	}
 
 adjust:
@@ -3165,12 +3199,12 @@ error:
 	list_for_each_entry_safe(entry, temp, &opt_list, list) {
 		i_vpr_e(inst, "%s: opt_list: %s\n", __func__, cap_name(entry->cap_id));
 		list_del_init(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 	list_for_each_entry_safe(entry, temp, &root_list, list) {
 		i_vpr_e(inst, "%s: root_list: %s\n", __func__, cap_name(entry->cap_id));
 		list_del_init(&entry->list);
-		kfree(entry);
+		msm_vidc_vmem_free((void **)&entry);
 	}
 	return rc;
 }
@@ -4004,7 +4038,6 @@ int msm_vidc_set_preprocess(void *instance,
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
 	u32 hfi_value;
 
-	d_vpr_e("%s: \n", __func__);
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;

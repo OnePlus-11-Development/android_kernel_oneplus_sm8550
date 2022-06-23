@@ -76,6 +76,7 @@ int msm_v4l2_querycap(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	rc = msm_vidc_querycap((void *)inst, cap);
 	if (rc)
@@ -83,6 +84,7 @@ int msm_v4l2_querycap(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -100,6 +102,7 @@ int msm_v4l2_enum_fmt(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	rc = msm_vidc_enum_fmt((void *)inst, f);
 	if (rc)
@@ -107,6 +110,7 @@ int msm_v4l2_enum_fmt(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -123,6 +127,7 @@ int msm_v4l2_try_fmt(struct file *filp, void *fh, struct v4l2_format *f)
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	if (is_session_error(inst)) {
 		i_vpr_e(inst, "%s: inst in error state\n", __func__);
@@ -135,6 +140,7 @@ int msm_v4l2_try_fmt(struct file *filp, void *fh, struct v4l2_format *f)
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -152,6 +158,7 @@ int msm_v4l2_s_fmt(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	if (is_session_error(inst)) {
 		i_vpr_e(inst, "%s: inst in error state\n", __func__);
@@ -164,6 +171,7 @@ int msm_v4l2_s_fmt(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -181,6 +189,7 @@ int msm_v4l2_g_fmt(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	rc = msm_vidc_g_fmt((void *)inst, f);
 	if (rc)
@@ -188,6 +197,7 @@ int msm_v4l2_g_fmt(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -205,6 +215,7 @@ int msm_v4l2_s_selection(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	if (is_session_error(inst)) {
 		i_vpr_e(inst, "%s: inst in error state\n", __func__);
@@ -217,6 +228,7 @@ int msm_v4l2_s_selection(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -234,6 +246,7 @@ int msm_v4l2_g_selection(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	rc = msm_vidc_g_selection((void *)inst, s);
 	if (rc)
@@ -241,6 +254,7 @@ int msm_v4l2_g_selection(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -258,6 +272,7 @@ int msm_v4l2_s_parm(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	if (is_session_error(inst)) {
 		i_vpr_e(inst, "%s: inst in error state\n", __func__);
@@ -270,6 +285,7 @@ int msm_v4l2_s_parm(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -287,6 +303,7 @@ int msm_v4l2_g_parm(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	rc = msm_vidc_g_param((void *)inst, a);
 	if (rc)
@@ -294,6 +311,7 @@ int msm_v4l2_g_parm(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -311,6 +329,7 @@ int msm_v4l2_reqbufs(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	rc = msm_vidc_reqbufs((void *)inst, b);
 	if (rc)
@@ -318,6 +337,7 @@ int msm_v4l2_reqbufs(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -335,6 +355,7 @@ int msm_v4l2_querybuf(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	rc = msm_vidc_querybuf((void *)inst, b);
 	if (rc)
@@ -342,6 +363,7 @@ int msm_v4l2_querybuf(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -360,12 +382,14 @@ int msm_v4l2_create_bufs(struct file *filp, void *fh,
 	}
 
 	inst_lock(inst, __func__);
+	client_lock(inst, __func__);
 	rc = msm_vidc_create_bufs((void *)inst, b);
 	if (rc)
 		goto unlock;
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -384,6 +408,7 @@ int msm_v4l2_prepare_buf(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	rc = msm_vidc_prepare_buf((void *)inst, vdev->v4l2_dev->mdev, b);
 	if (rc)
@@ -391,6 +416,7 @@ int msm_v4l2_prepare_buf(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -439,6 +465,7 @@ int msm_v4l2_dqbuf(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	rc = msm_vidc_dqbuf(inst, b);
 	if (rc)
@@ -446,6 +473,7 @@ int msm_v4l2_dqbuf(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -508,6 +536,7 @@ int msm_v4l2_subscribe_event(struct v4l2_fh *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	if (is_session_error(inst)) {
 		i_vpr_e(inst, "%s: inst in error state\n", __func__);
@@ -520,6 +549,7 @@ int msm_v4l2_subscribe_event(struct v4l2_fh *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -538,6 +568,7 @@ int msm_v4l2_unsubscribe_event(struct v4l2_fh *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	rc = msm_vidc_unsubscribe_event((void *)inst, sub);
 	if (rc)
@@ -545,6 +576,7 @@ int msm_v4l2_unsubscribe_event(struct v4l2_fh *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -562,6 +594,7 @@ int msm_v4l2_try_decoder_cmd(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	if (is_session_error(inst)) {
 		i_vpr_e(inst, "%s: inst in error state\n", __func__);
@@ -574,6 +607,7 @@ int msm_v4l2_try_decoder_cmd(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -591,6 +625,7 @@ int msm_v4l2_decoder_cmd(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	if (is_session_error(inst)) {
 		i_vpr_e(inst, "%s: inst in error state\n", __func__);
@@ -603,6 +638,7 @@ int msm_v4l2_decoder_cmd(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -620,6 +656,7 @@ int msm_v4l2_try_encoder_cmd(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	if (is_session_error(inst)) {
 		i_vpr_e(inst, "%s: inst in error state\n", __func__);
@@ -632,6 +669,7 @@ int msm_v4l2_try_encoder_cmd(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -649,6 +687,7 @@ int msm_v4l2_encoder_cmd(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	if (is_session_error(inst)) {
 		i_vpr_e(inst, "%s: inst in error state\n", __func__);
@@ -661,6 +700,7 @@ int msm_v4l2_encoder_cmd(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -678,6 +718,7 @@ int msm_v4l2_enum_framesizes(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	rc = msm_vidc_enum_framesizes((void *)inst, fsize);
 	if (rc)
@@ -685,6 +726,7 @@ int msm_v4l2_enum_framesizes(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -702,6 +744,7 @@ int msm_v4l2_enum_frameintervals(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	rc = msm_vidc_enum_frameintervals((void *)inst, fival);
 	if (rc)
@@ -709,6 +752,7 @@ int msm_v4l2_enum_frameintervals(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -726,6 +770,7 @@ int msm_v4l2_queryctrl(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	rc = msm_vidc_query_ctrl((void *)inst, ctrl);
 	if (rc)
@@ -733,6 +778,7 @@ int msm_v4l2_queryctrl(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;
@@ -750,6 +796,7 @@ int msm_v4l2_querymenu(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
+	client_lock(inst, __func__);
 	inst_lock(inst, __func__);
 	rc = msm_vidc_query_menu((void *)inst, qmenu);
 	if (rc)
@@ -757,6 +804,7 @@ int msm_v4l2_querymenu(struct file *filp, void *fh,
 
 unlock:
 	inst_unlock(inst, __func__);
+	client_unlock(inst, __func__);
 	put_inst(inst);
 
 	return rc;

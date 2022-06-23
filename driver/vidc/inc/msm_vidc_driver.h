@@ -510,6 +510,7 @@ int msm_vidc_state_change_start(struct msm_vidc_inst *inst);
 int msm_vidc_state_change_input_psc(struct msm_vidc_inst *inst);
 int msm_vidc_state_change_last_flag(struct msm_vidc_inst *inst);
 int msm_vidc_get_mbs_per_frame(struct msm_vidc_inst *inst);
+u32 msm_vidc_get_max_bitrate(struct msm_vidc_inst* inst);
 int msm_vidc_get_fps(struct msm_vidc_inst *inst);
 int msm_vidc_num_buffers(struct msm_vidc_inst *inst,
 	enum msm_vidc_buffer_type type, enum msm_vidc_buffer_attributes attr);
@@ -519,6 +520,9 @@ bool core_lock_check(struct msm_vidc_core *core, const char *function);
 void inst_lock(struct msm_vidc_inst *inst, const char *function);
 void inst_unlock(struct msm_vidc_inst *inst, const char *function);
 bool inst_lock_check(struct msm_vidc_inst *inst, const char *function);
+bool client_lock_check(struct msm_vidc_inst *inst, const char *func);
+void client_lock(struct msm_vidc_inst *inst, const char *function);
+void client_unlock(struct msm_vidc_inst *inst, const char *function);
 int msm_vidc_update_bitstream_buffer_size(struct msm_vidc_inst *inst);
 int msm_vidc_update_meta_port_settings(struct msm_vidc_inst *inst);
 int msm_vidc_update_buffer_count(struct msm_vidc_inst *inst, u32 port);

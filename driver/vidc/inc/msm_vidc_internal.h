@@ -70,6 +70,8 @@
 #define DEC_FPS_WINDOW 10
 #define INPUT_TIMER_LIST_SIZE 30
 
+#define DEFAULT_COMPLEXITY 50
+
 #define INPUT_MPLANE V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE
 #define OUTPUT_MPLANE V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE
 #define INPUT_META_PLANE V4L2_BUF_TYPE_META_OUTPUT
@@ -381,6 +383,8 @@ enum msm_vidc_inst_capability_type {
 	META_EVA_STATS,
 	META_ROI_INFO,
 	META_SALIENCY_INFO,
+	META_TRANSCODING_STAT_INFO,
+	META_DOLBY_RPU,
 	META_CAP_MAX,
 	/* end of metadata caps */
 	FRAME_WIDTH,
@@ -488,6 +492,10 @@ enum msm_vidc_inst_capability_type {
 	INPUT_META_VIA_REQUEST,
 	ENC_IP_CR,
 	COMPLEXITY,
+	CABAC_MAX_BITRATE,
+	CAVLC_MAX_BITRATE,
+	ALLINTRA_MAX_BITRATE,
+	LOWLATENCY_MAX_BITRATE,
 	/* place all root(no parent) enums before this line */
 
 	PROFILE,
@@ -760,6 +768,7 @@ struct msm_vidc_subscription_params {
 struct msm_vidc_hfi_frame_info {
 	u32                    picture_type;
 	u32                    no_output;
+	u32                    subframe_input;
 	u32                    cr;
 	u32                    cf;
 	u32                    data_corrupt;
@@ -825,16 +834,16 @@ struct msm_vidc_power {
 };
 
 struct msm_vidc_fence_context {
-        char name[MAX_NAME_LENGTH];
-        u64 ctx_num;
-        u64 seq_num;
+	char                      name[MAX_NAME_LENGTH];
+	u64                       ctx_num;
+	u64                       seq_num;
+	spinlock_t                lock;
 };
 
 struct msm_vidc_fence {
 	struct list_head            list;
 	struct dma_fence            dma_fence;
 	char                        name[MAX_NAME_LENGTH];
-	spinlock_t                  lock;
 	struct sync_file            *sync_file;
 	int                         fd;
 };

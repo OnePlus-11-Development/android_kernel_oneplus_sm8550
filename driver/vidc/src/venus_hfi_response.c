@@ -338,6 +338,10 @@ static int handle_session_info(struct msm_vidc_inst *inst,
 		info = "data corrupt";
 		inst->hfi_frame_info.data_corrupt = 1;
 		break;
+	case HFI_INFO_BUFFER_OVERFLOW:
+		info = "buffer overflow";
+		inst->hfi_frame_info.overflow = 1;
+		break;
 	default:
 		info = "unknown";
 		break;
@@ -606,6 +610,10 @@ static int get_driver_buffer_flags(struct msm_vidc_inst *inst, u32 hfi_flags)
 			!(hfi_flags & HFI_BUF_FW_FLAG_CODEC_CONFIG))
 			driver_flags |= MSM_VIDC_BUF_FLAG_ERROR;
 	}
+
+	if (inst->hfi_frame_info.subframe_input)
+		if (inst->capabilities->cap[META_BUF_TAG].value)
+			driver_flags |= MSM_VIDC_BUF_FLAG_ERROR;
 
 	if (hfi_flags & HFI_BUF_FW_FLAG_CODEC_CONFIG)
 		driver_flags |= MSM_VIDC_BUF_FLAG_CODECCONFIG;
@@ -1499,6 +1507,15 @@ static int handle_property_with_payload(struct msm_vidc_inst *inst,
 		if (inst->hfi_frame_info.picture_type & HFI_PICTURE_B)
 			inst->has_bframe = true;
 		break;
+	case HFI_PROP_SUBFRAME_INPUT:
+		if (port != INPUT_PORT) {
+			i_vpr_e(inst,
+				"%s: invalid port: %d for property %#x\n",
+				__func__, pkt->port, pkt->type);
+			break;
+		}
+		inst->hfi_frame_info.subframe_input = 1;
+		break;
 	case HFI_PROP_WORST_COMPRESSION_RATIO:
 		inst->hfi_frame_info.cr = payload_ptr[0];
 		break;
@@ -1854,8 +1871,8 @@ void handle_session_response_work_handler(struct work_struct *work)
 			break;
 		}
 		list_del(&resp_work->list);
-		kfree(resp_work->data);
-		kfree(resp_work);
+		msm_vidc_vmem_free((void **)&resp_work->data);
+		msm_vidc_vmem_free((void **)&resp_work);
 	}
 	inst_unlock(inst, __func__);
 
@@ -1867,14 +1884,12 @@ static int queue_response_work(struct msm_vidc_inst *inst,
 {
 	struct response_work *work;
 
-	work = kzalloc(sizeof(struct response_work), GFP_KERNEL);
-	if (!work)
+	if (msm_vidc_vmem_alloc(sizeof(struct response_work), (void **)&work, __func__))
 		return -ENOMEM;
 	INIT_LIST_HEAD(&work->list);
 	work->type = type;
 	work->data_size = hdr_size;
-	work->data = kzalloc(hdr_size, GFP_KERNEL);
-	if (!work->data)
+	if (msm_vidc_vmem_alloc(hdr_size, (void **)&work->data, "Work data"))
 		return -ENOMEM;
 	memcpy(work->data, hdr, hdr_size);
 	list_add_tail(&work->list, &inst->response_works);
@@ -1895,8 +1910,8 @@ int cancel_response_work(struct msm_vidc_inst *inst)
 
 	list_for_each_entry_safe(work, dummy_work, &inst->response_works, list) {
 		list_del(&work->list);
-		kfree(work->data);
-		kfree(work);
+		msm_vidc_vmem_free((void **)&work->data);
+		msm_vidc_vmem_free((void **)&work);
 	}
 
 	return 0;

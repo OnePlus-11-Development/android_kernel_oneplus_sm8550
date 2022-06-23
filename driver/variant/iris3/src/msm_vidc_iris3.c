@@ -1110,14 +1110,15 @@ int msm_vidc_decide_quality_mode_iris3(struct msm_vidc_inst* inst)
 	if (!is_encode_session(inst))
 		return 0;
 
-	/* image session or lossless encode always runs at quality mode */
-	if (is_image_session(inst) || capability->cap[LOSSLESS].value) {
+	/* image or lossless or all intra runs at quality mode */
+	if (is_image_session(inst) || capability->cap[LOSSLESS].value ||
+		capability->cap[ALL_INTRA].value) {
 		mode = MSM_VIDC_MAX_QUALITY_MODE;
 		goto decision_done;
 	}
 
-	/* for least complexity, make LP for all resolution */
-	if (!capability->cap[COMPLEXITY].value) {
+	/* for lesser complexity, make LP for all resolution */
+	if (capability->cap[COMPLEXITY].value < DEFAULT_COMPLEXITY) {
 		mode = MSM_VIDC_POWER_SAVE_MODE;
 		goto decision_done;
 	}
@@ -1128,9 +1129,13 @@ int msm_vidc_decide_quality_mode_iris3(struct msm_vidc_inst* inst)
 	max_hq_mbpf = core->capabilities[MAX_MBPF_HQ].value;;
 	max_hq_mbps = core->capabilities[MAX_MBPS_HQ].value;;
 
-	if (!is_realtime_session(inst) && mbpf <= max_hq_mbpf) {
-		mode = MSM_VIDC_MAX_QUALITY_MODE;
-		goto decision_done;
+	if (!is_realtime_session(inst)) {
+		if (((capability->cap[COMPLEXITY].flags & CAP_FLAG_CLIENT_SET) &&
+			(capability->cap[COMPLEXITY].value >= DEFAULT_COMPLEXITY)) ||
+			mbpf <= max_hq_mbpf) {
+			mode = MSM_VIDC_MAX_QUALITY_MODE;
+			goto decision_done;
+		}
 	}
 
 	if (mbpf <= max_hq_mbpf && mbps <= max_hq_mbps)
@@ -1150,6 +1155,7 @@ int msm_vidc_adjust_bitrate_boost_iris3(void* instance, struct v4l2_ctrl *ctrl)
 	s32 rc_type = -1;
 	u32 width, height, frame_rate;
 	struct v4l2_format *f;
+	u32 max_bitrate = 0, bitrate = 0;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -1197,6 +1203,16 @@ int msm_vidc_adjust_bitrate_boost_iris3(void* instance, struct v4l2_ctrl *ctrl)
 			adjusted_value = 0;
 	}
 
+	max_bitrate = msm_vidc_get_max_bitrate(inst);
+	bitrate = inst->capabilities->cap[BIT_RATE].value;
+	if (adjusted_value) {
+		if ((bitrate + bitrate / (100 / adjusted_value)) > max_bitrate) {
+			i_vpr_h(inst,
+				"%s: bitrate %d is beyond max bitrate %d, remove bitrate boost\n",
+				__func__, max_bitrate, bitrate);
+			adjusted_value = 0;
+		}
+	}
 adjust:
 	msm_vidc_update_cap_value(inst, BITRATE_BOOST, adjusted_value, __func__);
 
