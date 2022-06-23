@@ -63,6 +63,8 @@
 #define MAX_SUPPORTED_MIN_QUALITY            70
 #define MIN_CHROMA_QP_OFFSET                -12
 #define MAX_CHROMA_QP_OFFSET                  0
+#define MIN_QP_10BIT                        -11
+#define MIN_QP_8BIT                           1
 #define INVALID_FD                           -1
 
 #define DCVS_WINDOW 16
