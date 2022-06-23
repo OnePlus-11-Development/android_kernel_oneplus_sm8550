@@ -168,7 +168,7 @@ struct dp_panel {
 	int (*read_sink_caps)(struct dp_panel *dp_panel,
 		struct drm_connector *connector, bool multi_func);
 	u32 (*get_mode_bpp)(struct dp_panel *dp_panel, u32 mode_max_bpp,
-			u32 mode_pclk_khz);
+			u32 mode_pclk_khz, bool dsc_en);
 	int (*get_modes)(struct dp_panel *dp_panel,
 		struct drm_connector *connector, struct dp_display_mode *mode);
 	void (*handle_sink_request)(struct dp_panel *dp_panel);

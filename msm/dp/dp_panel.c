@@ -436,7 +436,7 @@ static void dp_panel_update_tu_timings(struct dp_tu_calc_input *in,
 	tot_num_dummy_bytes = (nlanes - eoc_bytes) * dsc_num_slices;
 
 	if (dsc_num_bytes == 0)
-		DP_DEBUG("incorrect no of bytes per slice=%d\n", dsc_num_bytes);
+		DP_WARN("incorrect no of bytes per slice=%d\n", dsc_num_bytes);
 
 	dwidth_dsc_bytes = (tot_num_hor_bytes +
 				tot_num_eoc_symbols +
@@ -1113,7 +1113,7 @@ static void dp_panel_calc_tu_parameters(struct dp_panel *dp_panel,
 	in.nlanes = panel->link->link_params.lane_count;
 	in.bpp = pinfo->bpp;
 	in.pixel_enc = 444;
-	in.dsc_en = dp_panel->dsc_en;
+	in.dsc_en = pinfo->comp_info.enabled;
 	in.async_en = 0;
 	in.fec_en = dp_panel->fec_en;
 	in.num_of_dsc_slices = pinfo->comp_info.dsc_info.slice_per_pkt;
@@ -1907,7 +1907,7 @@ end:
 }
 
 static u32 dp_panel_get_supported_bpp(struct dp_panel *dp_panel,
-		u32 mode_edid_bpp, u32 mode_pclk_khz)
+		u32 mode_edid_bpp, u32 mode_pclk_khz, bool dsc_en)
 {
 	struct dp_link_params *link_params;
 	struct dp_panel_private *panel;
@@ -1918,7 +1918,7 @@ static u32 dp_panel_get_supported_bpp(struct dp_panel *dp_panel,
 
 	panel = container_of(dp_panel, struct dp_panel_private, dp_panel);
 
-	if (dp_panel->dsc_en)
+	if (dsc_en)
 		min_supported_bpp = 24;
 
 	bpp = min_t(u32, mode_edid_bpp, max_supported_bpp);
@@ -1934,7 +1934,7 @@ static u32 dp_panel_get_supported_bpp(struct dp_panel *dp_panel,
 	link_bitrate = drm_fixp2int(rate_fp);
 
 	for (; bpp > min_supported_bpp; bpp -= 6) {
-		if (dp_panel->dsc_en) {
+		if (dsc_en) {
 			if (bpp == 30 && !(dp_panel->sink_dsc_caps.color_depth & DP_DSC_10_BPC))
 				continue;
 			else if (bpp == 24 && !(dp_panel->sink_dsc_caps.color_depth & DP_DSC_8_BPC))
@@ -1959,7 +1959,7 @@ static u32 dp_panel_get_supported_bpp(struct dp_panel *dp_panel,
 }
 
 static u32 dp_panel_get_mode_bpp(struct dp_panel *dp_panel,
-		u32 mode_edid_bpp, u32 mode_pclk_khz)
+		u32 mode_edid_bpp, u32 mode_pclk_khz, bool dsc_en)
 {
 	struct dp_panel_private *panel;
 	u32 bpp = mode_edid_bpp;
@@ -1976,7 +1976,7 @@ static u32 dp_panel_get_mode_bpp(struct dp_panel *dp_panel,
 				panel->link->test_video.test_bit_depth);
 	else
 		bpp = dp_panel_get_supported_bpp(dp_panel, mode_edid_bpp,
-				mode_pclk_khz);
+				mode_pclk_khz, dsc_en);
 
 	return bpp;
 }
@@ -2730,9 +2730,11 @@ static void dp_panel_config_ctrl(struct dp_panel *dp_panel)
 	u8 *dpcd = dp_panel->dpcd;
 	struct dp_panel_private *panel;
 	struct dp_catalog_panel *catalog;
+	struct msm_compression_info *comp_info;
 
 	panel = container_of(dp_panel, struct dp_panel_private, dp_panel);
 	catalog = panel->catalog;
+	comp_info = &dp_panel->pinfo.comp_info;
 
 	config |= (2 << 13); /* Default-> LSCLK DIV: 1/4 LCLK  */
 	config |= (0 << 11); /* RGB */
@@ -2740,7 +2742,7 @@ static void dp_panel_config_ctrl(struct dp_panel *dp_panel)
 	tbd = panel->link->get_test_bits_depth(panel->link,
 			dp_panel->pinfo.bpp);
 
-	if (tbd == DP_TEST_BIT_DEPTH_UNKNOWN || dp_panel->dsc_en)
+	if (tbd == DP_TEST_BIT_DEPTH_UNKNOWN || comp_info->enabled)
 		tbd = (DP_TEST_BIT_DEPTH_8 >> DP_TEST_BIT_DEPTH_SHIFT);
 
 	config |= tbd << 8;
@@ -2950,8 +2952,7 @@ static void dp_panel_convert_to_dp_mode(struct dp_panel *dp_panel,
 {
 	const u32 num_components = 3, default_bpp = 24;
 	struct msm_compression_info *comp_info;
-	bool dsc_cap = (dp_mode->capabilities & DP_PANEL_CAPS_DSC) ?
-				true : false;
+	bool dsc_en = (dp_mode->capabilities & DP_PANEL_CAPS_DSC) ? true : false;
 	int rc;
 
 	dp_mode->timing.h_active = drm_mode->hdisplay;
@@ -3010,9 +3011,9 @@ static void dp_panel_convert_to_dp_mode(struct dp_panel *dp_panel,
 	}
 
 	dp_mode->timing.bpp = dp_panel_get_mode_bpp(dp_panel,
-			dp_mode->timing.bpp, dp_mode->timing.pixel_clk_khz);
+			dp_mode->timing.bpp, dp_mode->timing.pixel_clk_khz, dsc_en);
 
-	if (dp_panel->dsc_en && dsc_cap) {
+	if (dp_panel->dsc_en && dsc_en) {
 		if (dp_panel_dsc_prepare_basic_params(comp_info,
 					dp_mode, dp_panel)) {
 			DP_DEBUG("prepare DSC basic params failed\n");
