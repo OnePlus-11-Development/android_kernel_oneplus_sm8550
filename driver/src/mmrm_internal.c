@@ -11,10 +11,6 @@
 
 static struct mmrm_common_data common_pt_data[] = {
 	{
-		.key = "qcom,mmrm_clk_threshold",
-		.value = 9000,
-	},
-	{
 		.key = "qcom,mmrm_clk_mgr_scheme",
 		.value = CLK_MGR_SCHEME_SW,
 	},

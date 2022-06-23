@@ -35,11 +35,6 @@ static int mmrm_read_clk_pltfrm_rsrc_frm_drv_data(
 	pdata = ddata->platform_data;
 	cres = &ddata->clk_res;
 
-	cres->threshold = mmrm_find_key_value(pdata,
-						"qcom,mmrm_clk_threshold");
-	d_mpr_h("%s: configured mmrm clk threshold %d\n",
-		__func__, cres->threshold);
-
 	cres->scheme = mmrm_find_key_value(pdata,
 					"qcom,mmrm_clk_mgr_scheme");
 	d_mpr_h("%s: configured mmrm scheme %d\n",
@@ -133,6 +128,16 @@ static int mmrm_load_nom_clk_src_table(
 
 	struct platform_device *pdev = cres->pdev;
 	struct nom_clk_src_set *clk_srcs = &cres->nom_clk_set;
+
+	rc = of_property_read_u32(pdev->dev.of_node, "mmrm-peak-threshold", &cres->peak_threshold);
+	if (rc < 0) {
+		d_mpr_e("%s: invalid or missing mmrm-peak-threshold DT property\n", __func__);
+		rc = -ENODEV;
+		goto err_load_clk_src_tbl;
+	}
+
+	d_mpr_h("%s: mmrm-peak-threshold threshold:%d\n",
+		__func__, cres->peak_threshold);
 
 	of_find_property(pdev->dev.of_node, "mmrm-client-info", &size_clk_src);
 	if ((size_clk_src < sizeof(*clk_srcs->clk_src_tbl)) ||

@@ -401,8 +401,13 @@ static ssize_t dump_clk_res_info_show(struct device *dev,
 	struct nom_clk_src_info *pclk;
 	int left_spaces = MMRM_SYSFS_ENTRY_MAX_LEN;
 
+	len = scnprintf(buf, left_spaces, "threshold: %d\n",
+		cres->peak_threshold);
+	left_spaces -= len;
+	buf += len;
+
 	for (i=0, pclk=clk_set->clk_src_tbl; i < clk_set->count && left_spaces > 1; i++, pclk++) {
-		len = scnprintf(buf, left_spaces, "%d  %d   %d  %d  %d\n",
+		len = scnprintf(buf, left_spaces, "%d\t%d\t% 8d\t%d\t%d\n",
 			pclk->domain,
 			pclk->clk_src_id,
 			pclk->nom_dyn_pwr,
