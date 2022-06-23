@@ -234,6 +234,9 @@ static int cam_vfe_bus_ver3_process_cmd(
 	struct cam_isp_resource_node *priv,
 	uint32_t cmd_type, void *cmd_args, uint32_t arg_size);
 
+static int cam_vfe_bus_ver3_config_ubwc_regs(
+	struct cam_vfe_bus_ver3_wm_resource_data *wm_data);
+
 static int cam_vfe_bus_ver3_get_evt_payload(
 	struct cam_vfe_bus_ver3_common_data  *common_data,
 	struct cam_vfe_bus_irq_evt_payload  **evt_payload)
@@ -305,13 +308,19 @@ static bool cam_vfe_bus_ver3_can_be_secure(uint32_t out_type)
 	case CAM_VFE_BUS_VER3_VFE_OUT_RDI0:
 	case CAM_VFE_BUS_VER3_VFE_OUT_RDI1:
 	case CAM_VFE_BUS_VER3_VFE_OUT_RDI2:
+	case CAM_VFE_BUS_VER3_VFE_OUT_RDI3:
 	case CAM_VFE_BUS_VER3_VFE_OUT_FULL_DISP:
 	case CAM_VFE_BUS_VER3_VFE_OUT_DS4_DISP:
 	case CAM_VFE_BUS_VER3_VFE_OUT_DS16_DISP:
-		return true;
-
 	case CAM_VFE_BUS_VER3_VFE_OUT_2PD:
 	case CAM_VFE_BUS_VER3_VFE_OUT_LCR:
+	case CAM_VFE_BUS_VER3_VFE_OUT_PDAF:
+	case CAM_VFE_BUS_VER3_VFE_OUT_SPARSE_PD:
+	case CAM_VFE_BUS_VER3_VFE_OUT_PREPROCESS_2PD:
+	case CAM_VFE_BUS_VER3_VFE_OUT_PDAF_PARSED:
+	case CAM_VFE_BUS_VER3_VFE_OUT_PREPROCESS_RAW:
+		return true;
+
 	case CAM_VFE_BUS_VER3_VFE_OUT_STATS_HDR_BE:
 	case CAM_VFE_BUS_VER3_VFE_OUT_STATS_HDR_BHIST:
 	case CAM_VFE_BUS_VER3_VFE_OUT_STATS_TL_BG:
@@ -324,6 +333,11 @@ static bool cam_vfe_bus_ver3_can_be_secure(uint32_t out_type)
 	case CAM_VFE_BUS_VER3_VFE_OUT_STATS_CAF:
 	case CAM_VFE_BUS_VER3_VFE_OUT_STATS_BAYER_RS:
 	case CAM_VFE_BUS_VER3_VFE_OUT_STATS_ALSC:
+	case CAM_VFE_BUS_VER3_VFE_OUT_AWB_BFW:
+	case CAM_VFE_BUS_VER3_VFE_OUT_STATS_AEC_BE:
+	case CAM_VFE_BUS_VER3_VFE_OUT_LTM_STATS:
+	case CAM_VFE_BUS_VER3_VFE_OUT_STATS_GTM_BHIST:
+	case CAM_VFE_BUS_VER3_VFE_OUT_STATS_BG:
 	default:
 		return false;
 	}
@@ -1430,6 +1444,12 @@ static int cam_vfe_bus_ver3_start_wm(struct cam_isp_resource_node *wm_res)
 				rsrc_data->index, rsrc_data->en_ubwc);
 			return -EINVAL;
 		}
+
+		if (rsrc_data->ubwc_updated) {
+			cam_vfe_bus_ver3_config_ubwc_regs(rsrc_data);
+			rsrc_data->ubwc_updated = false;
+		}
+
 		val = cam_io_r_mb(common_data->mem_base + ubwc_regs->mode_cfg);
 		val |= 0x1;
 		if (disable_ubwc_comp) {

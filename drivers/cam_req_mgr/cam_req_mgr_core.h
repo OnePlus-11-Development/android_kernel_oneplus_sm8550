@@ -90,7 +90,7 @@ enum crm_workq_task_type {
 struct crm_task_payload {
 	enum crm_workq_task_type type;
 	union {
-		struct cam_req_mgr_sched_request        sched_req;
+		struct cam_req_mgr_sched_request_v2     sched_req;
 		struct cam_req_mgr_flush_info           flush_info;
 		struct cam_req_mgr_add_request          dev_req;
 		struct cam_req_mgr_send_request         send_req;
@@ -148,6 +148,19 @@ enum cam_req_mgr_link_state {
 	CAM_CRM_LINK_STATE_READY,
 	CAM_CRM_LINK_STATE_ERR,
 	CAM_CRM_LINK_STATE_MAX,
+};
+
+/**
+ * enum cam_req_mgr_sync_type
+ * Sync type for syncing info
+ * DELAY_AT_SOF  : inject delay at SOF
+ * DELAY_AT_EOF  : inject delay at EOF
+ * APPLY_AT_EOF  : apply at EOF
+ */
+enum cam_req_mgr_sync_type {
+	CAM_SYNC_TYPE_DELAY_AT_SOF,
+	CAM_SYNC_TYPE_DELAY_AT_EOF,
+	CAM_SYNC_TYPE_APPLY_AT_EOF,
 };
 
 /**
@@ -272,6 +285,8 @@ struct cam_req_mgr_req_tbl {
  * @additional_timeout : Adjusted watchdog timeout value associated with
  * this request
  * @recovery_counter   : Internal recovery counter
+ * @num_sync_links     : Num of sync links
+ * @sync_link_hdls     : Array of sync link handles
  */
 struct cam_req_mgr_slot {
 	int32_t               idx;
@@ -282,6 +297,8 @@ struct cam_req_mgr_slot {
 	int32_t               sync_mode;
 	int32_t               additional_timeout;
 	int32_t               recovery_counter;
+	int32_t               num_sync_links;
+	int32_t               sync_link_hdls[MAXIMUM_LINKS_PER_SESSION - 1];
 };
 
 /**
@@ -393,6 +410,7 @@ struct cam_req_mgr_connected_device {
  * @last_sof_trigger_jiffies : Record the jiffies of last sof trigger jiffies
  * @wq_congestion        : Indicates if WQ congestion is detected or not
  * @try_for_internal_recovery : If the link stalls try for RT internal recovery
+ * @properties_mask      : Indicates if current link enables some special properties
  */
 struct cam_req_mgr_core_link {
 	int32_t                              link_hdl;
@@ -432,6 +450,7 @@ struct cam_req_mgr_core_link {
 	uint64_t                             last_sof_trigger_jiffies;
 	bool                                 wq_congestion;
 	bool                                 try_for_internal_recovery;
+	uint32_t                             properties_mask;
 };
 
 /**
@@ -622,16 +641,9 @@ int cam_req_mgr_unlink(struct cam_req_mgr_unlink_info *unlink_info);
 /**
  * cam_req_mgr_schedule_request()
  * @brief: Request is scheduled
- * @sched_req: request id, session and link id info, bubble recovery info
+ * @sched_req: request id, session, link id info, bubble recovery info and sync info
  */
-int cam_req_mgr_schedule_request(struct cam_req_mgr_sched_request *sched_req);
-
-/**
- * cam_req_mgr_sync_mode_setup()
- * @brief: sync for links in a session
- * @sync_info: session, links info and master link info
- */
-int cam_req_mgr_sync_config(struct cam_req_mgr_sync_mode *sync_info);
+int cam_req_mgr_schedule_request(struct cam_req_mgr_sched_request_v2 *sched_req);
 
 /**
  * cam_req_mgr_flush_requests()
@@ -671,4 +683,12 @@ int cam_req_mgr_link_control(struct cam_req_mgr_link_control *control);
  * @dump_req: Dump request
  */
 int cam_req_mgr_dump_request(struct cam_dump_req_cmd *dump_req);
+
+/**
+ * cam_req_mgr_link_properties()
+ * @brief:   Handles link properties
+ * @properties: Link properties
+ */
+int cam_req_mgr_link_properties(struct cam_req_mgr_link_properties *properties);
+
 #endif

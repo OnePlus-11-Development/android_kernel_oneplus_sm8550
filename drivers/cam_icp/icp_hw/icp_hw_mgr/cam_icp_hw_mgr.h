@@ -170,7 +170,7 @@ struct cam_icp_clk_bw_req_internal_v2 {
 	uint32_t rt_flag;
 	uint32_t reserved;
 	uint32_t num_paths;
-	struct cam_axi_per_path_bw_vote axi_path[CAM_ICP_MAX_PER_PATH_VOTES];
+	struct cam_cpas_axi_per_path_bw_vote axi_path[CAM_ICP_MAX_PER_PATH_VOTES];
 };
 
 #define HANG_DUMP_REGIONS_MAX 10
@@ -244,7 +244,7 @@ struct cam_ctx_clk_info {
 	uint64_t compressed_bw;
 	int32_t clk_rate[CAM_MAX_VOTE];
 	uint32_t num_paths;
-	struct cam_axi_per_path_bw_vote axi_path[CAM_ICP_MAX_PER_PATH_VOTES];
+	struct cam_cpas_axi_per_path_bw_vote axi_path[CAM_ICP_MAX_PER_PATH_VOTES];
 	bool bw_included;
 };
 
@@ -271,6 +271,8 @@ struct cam_ctx_clk_info {
  * @icp_dev_io_info: io config resource
  * @last_flush_req: last flush req for this ctx
  * @err_inject_params: Error injection data for hw_mgr_ctx
+ * @unified_dev_type: Unified dev type which does not hold any priority info.
+ *                    It's either IPE/BPS
  * @abort_timed_out: Indicates if abort timed out
  */
 struct cam_icp_hw_ctx_data {
@@ -296,6 +298,7 @@ struct cam_icp_hw_ctx_data {
 	uint64_t last_flush_req;
 	char ctx_id_string[128];
 	struct cam_hw_err_param err_inject_params;
+	uint32_t unified_dev_type;
 	bool abort_timed_out;
 };
 
@@ -335,7 +338,7 @@ struct cam_icp_clk_info {
 	uint64_t uncompressed_bw;
 	uint64_t compressed_bw;
 	uint32_t num_paths;
-	struct cam_axi_per_path_bw_vote axi_path[CAM_ICP_MAX_PER_PATH_VOTES];
+	struct cam_cpas_axi_per_path_bw_vote axi_path[CAM_ICP_MAX_PER_PATH_VOTES];
 	uint32_t hw_type;
 	struct cam_req_mgr_timer *watch_dog;
 	uint32_t watch_dog_reset_counter;
@@ -442,6 +445,7 @@ struct cam_icp_hw_mgr {
 	bool bps_clk_state;
 	bool disable_ubwc_comp;
 	atomic_t recovery;
+	uint64_t icp_svs_clk;
 };
 
 /**

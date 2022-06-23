@@ -12,7 +12,41 @@
 #include "cam_trace.h"
 #include "cam_common_util.h"
 #include "cam_packet_util.h"
+#include "cam_req_mgr_dev.h"
 
+extern struct completion *cam_sensor_get_i3c_completion(uint32_t index);
+
+static int cam_sensor_notify_v4l2_error_event(
+	struct cam_sensor_ctrl_t *s_ctrl,
+	uint32_t error_type, uint32_t error_code)
+{
+	int                        rc = 0;
+	struct cam_req_mgr_message req_msg;
+
+	req_msg.session_hdl = s_ctrl->bridge_intf.session_hdl;
+	req_msg.u.err_msg.device_hdl = s_ctrl->bridge_intf.device_hdl;
+	req_msg.u.err_msg.link_hdl = s_ctrl->bridge_intf.link_hdl;
+	req_msg.u.err_msg.error_type = error_type;
+	req_msg.u.err_msg.request_id = s_ctrl->last_applied_req;
+	req_msg.u.err_msg.resource_size = 0x0;
+	req_msg.u.err_msg.error_code = error_code;
+
+	CAM_DBG(CAM_SENSOR,
+		"v4l2 error event [type: %u code: %u] for req: %llu on %s",
+		error_type, error_code, s_ctrl->last_applied_req,
+		s_ctrl->sensor_name);
+
+	rc = cam_req_mgr_notify_message(&req_msg,
+		V4L_EVENT_CAM_REQ_MGR_ERROR,
+		V4L_EVENT_CAM_REQ_MGR_EVENT);
+	if (rc)
+		CAM_ERR(CAM_SENSOR,
+			"Notifying v4l2 error [type: %u code: %u] failed for req id:%llu on %s",
+			error_type, error_code, s_ctrl->last_applied_req,
+			s_ctrl->sensor_name);
+
+	return rc;
+}
 
 static int cam_sensor_update_req_mgr(
 	struct cam_sensor_ctrl_t *s_ctrl,
@@ -767,8 +801,8 @@ int cam_sensor_match_id(struct cam_sensor_ctrl_t *s_ctrl)
 	rc = camera_io_dev_read(
 		&(s_ctrl->io_master_info),
 		slave_info->sensor_id_reg_addr,
-		&chipid, CAMERA_SENSOR_I2C_TYPE_WORD,
-		CAMERA_SENSOR_I2C_TYPE_WORD, true);
+		&chipid, s_ctrl->sensor_probe_addr_type,
+		s_ctrl->sensor_probe_data_type, true);
 
 	CAM_DBG(CAM_SENSOR, "%s read id: 0x%x expected id 0x%x:",
 		s_ctrl->sensor_name, chipid, slave_info->sensor_id);
@@ -779,6 +813,48 @@ int cam_sensor_match_id(struct cam_sensor_ctrl_t *s_ctrl)
 				slave_info->sensor_id);
 		return -ENODEV;
 	}
+	return rc;
+}
+
+int cam_sensor_stream_off(struct cam_sensor_ctrl_t *s_ctrl)
+{
+	int               rc = 0;
+	struct timespec64 ts;
+	uint64_t          ms, sec, min, hrs;
+
+	if (s_ctrl->sensor_state != CAM_SENSOR_START) {
+		rc = -EINVAL;
+		CAM_WARN(CAM_SENSOR,
+			"Not in right state to stop %s state: %d",
+			s_ctrl->sensor_name, s_ctrl->sensor_state);
+		goto end;
+	}
+
+	if (s_ctrl->i2c_data.streamoff_settings.is_settings_valid &&
+		(s_ctrl->i2c_data.streamoff_settings.request_id == 0)) {
+		rc = cam_sensor_apply_settings(s_ctrl, 0,
+			CAM_SENSOR_PACKET_OPCODE_SENSOR_STREAMOFF);
+		if (rc < 0)
+			CAM_ERR(CAM_SENSOR,
+				"cannot apply streamoff settings for %s",
+				s_ctrl->sensor_name);
+	}
+
+	cam_sensor_release_per_frame_resource(s_ctrl);
+	s_ctrl->last_flush_req = 0;
+	s_ctrl->sensor_state = CAM_SENSOR_ACQUIRE;
+
+	CAM_GET_TIMESTAMP(ts);
+	CAM_CONVERT_TIMESTAMP_FORMAT(ts, hrs, min, sec, ms);
+
+	CAM_INFO(CAM_SENSOR,
+		"%llu:%llu:%llu.%llu CAM_STOP_DEV Success for %s sensor_id:0x%x,sensor_slave_addr:0x%x",
+		hrs, min, sec, ms,
+		s_ctrl->sensor_name,
+		s_ctrl->sensordata->slave_info.sensor_id,
+		s_ctrl->sensordata->slave_info.sensor_slave_addr);
+
+end:
 	return rc;
 }
 
@@ -865,6 +941,7 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 				);
 			goto free_power_settings;
 		}
+
 		if (s_ctrl->i2c_data.reg_bank_unlock_settings.is_settings_valid) {
 			rc = cam_sensor_apply_settings(s_ctrl, 0,
 				CAM_SENSOR_PACKET_OPCODE_SENSOR_REG_BANK_UNLOCK);
@@ -879,6 +956,7 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 				goto free_power_settings;
 			}
 		}
+
 		/* Match sensor ID */
 		rc = cam_sensor_match_id(s_ctrl);
 		if (rc < 0) {
@@ -999,6 +1077,7 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 
 		s_ctrl->sensor_state = CAM_SENSOR_ACQUIRE;
 		s_ctrl->last_flush_req = 0;
+		s_ctrl->is_flushed = false;
 		CAM_INFO(CAM_SENSOR,
 			"CAM_ACQUIRE_DEV Success for %s sensor_id:0x%x,sensor_slave_addr:0x%x",
 			s_ctrl->sensor_name,
@@ -1132,38 +1211,15 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 	}
 		break;
 	case CAM_STOP_DEV: {
-		if (s_ctrl->sensor_state != CAM_SENSOR_START) {
-			rc = -EINVAL;
-			CAM_WARN(CAM_SENSOR,
-			"Not in right state to stop %s state: %d",
-			s_ctrl->sensor_name, s_ctrl->sensor_state);
+		if ((s_ctrl->stream_off_after_eof) && (!s_ctrl->is_flushed)) {
+			CAM_DBG(CAM_SENSOR, "Ignore stop dev cmd for VFPS feature");
 			goto release_mutex;
 		}
 
-		if (s_ctrl->i2c_data.streamoff_settings.is_settings_valid &&
-			(s_ctrl->i2c_data.streamoff_settings.request_id == 0)) {
-			rc = cam_sensor_apply_settings(s_ctrl, 0,
-				CAM_SENSOR_PACKET_OPCODE_SENSOR_STREAMOFF);
-			if (rc < 0) {
-				CAM_ERR(CAM_SENSOR,
-				"cannot apply streamoff settings for %s",
-				s_ctrl->sensor_name);
-			}
-		}
-
-		cam_sensor_release_per_frame_resource(s_ctrl);
-		s_ctrl->last_flush_req = 0;
-		s_ctrl->sensor_state = CAM_SENSOR_ACQUIRE;
-
-		CAM_GET_TIMESTAMP(ts);
-		CAM_CONVERT_TIMESTAMP_FORMAT(ts, hrs, min, sec, ms);
-
-		CAM_INFO(CAM_SENSOR,
-			"%llu:%llu:%llu.%llu CAM_STOP_DEV Success for %s sensor_id:0x%x,sensor_slave_addr:0x%x",
-			hrs, min, sec, ms,
-			s_ctrl->sensor_name,
-			s_ctrl->sensordata->slave_info.sensor_id,
-			s_ctrl->sensordata->slave_info.sensor_slave_addr);
+		rc = cam_sensor_stream_off(s_ctrl);
+		if (rc)
+			goto release_mutex;
+		s_ctrl->is_flushed = false;
 	}
 		break;
 	case CAM_CONFIG_DEV: {
@@ -1357,9 +1413,9 @@ int cam_sensor_power_up(struct cam_sensor_ctrl_t *s_ctrl)
 {
 	int rc;
 	struct cam_sensor_power_ctrl_t *power_info;
-	struct cam_camera_slave_info *slave_info;
-	struct cam_hw_soc_info *soc_info =
-		&s_ctrl->soc_info;
+	struct cam_camera_slave_info   *slave_info;
+	struct cam_hw_soc_info         *soc_info = &s_ctrl->soc_info;
+	struct completion              *i3c_probe_completion = NULL;
 
 	if (!s_ctrl) {
 		CAM_ERR(CAM_SENSOR, "failed: %pK", s_ctrl);
@@ -1398,7 +1454,10 @@ int cam_sensor_power_up(struct cam_sensor_ctrl_t *s_ctrl)
 		}
 	}
 
-	rc = cam_sensor_core_power_up(power_info, soc_info);
+	if (s_ctrl->io_master_info.master_type == I3C_MASTER)
+		i3c_probe_completion = cam_sensor_get_i3c_completion(s_ctrl->soc_info.index);
+
+	rc = cam_sensor_core_power_up(power_info, soc_info, i3c_probe_completion);
 	if (rc < 0) {
 		CAM_ERR(CAM_SENSOR, "core power up failed:%d", rc);
 		return rc;
@@ -1559,6 +1618,8 @@ int cam_sensor_apply_settings(struct cam_sensor_ctrl_t *s_ctrl,
 			CAM_DBG(CAM_SENSOR,
 				"Invalid/NOP request to apply: %lld", req_id);
 		}
+
+		s_ctrl->last_applied_req = req_id;
 
 		/* Change the logic dynamically */
 		for (i = 0; i < MAX_PER_FRAME_ARRAY; i++) {
@@ -1751,6 +1812,60 @@ int32_t cam_sensor_flush_request(struct cam_req_mgr_flush_request *flush_req)
 		CAM_DBG(CAM_SENSOR,
 			"Flush request id:%lld not found in the pending list",
 			flush_req->req_id);
+
+	if (s_ctrl->stream_off_after_eof)
+		s_ctrl->is_flushed = true;
+
 	mutex_unlock(&(s_ctrl->cam_sensor_mutex));
+	return rc;
+}
+
+int cam_sensor_process_evt(struct cam_req_mgr_link_evt_data *evt_data)
+{
+	int                       rc = 0;
+	struct cam_sensor_ctrl_t *s_ctrl = NULL;
+
+	if (!evt_data)
+		return -EINVAL;
+
+	s_ctrl = (struct cam_sensor_ctrl_t *)
+		cam_get_device_priv(evt_data->dev_hdl);
+	if (!s_ctrl) {
+		CAM_ERR(CAM_SENSOR, "Device data is NULL");
+		return -EINVAL;
+	}
+
+	CAM_DBG(CAM_SENSOR, "Received evt:%d", evt_data->evt_type);
+
+	mutex_lock(&(s_ctrl->cam_sensor_mutex));
+
+	switch (evt_data->evt_type) {
+	case CAM_REQ_MGR_LINK_EVT_EOF:
+		if (s_ctrl->stream_off_after_eof) {
+			rc = cam_sensor_stream_off(s_ctrl);
+			if (rc) {
+				CAM_ERR(CAM_SENSOR, "Failed to stream off %s",
+					s_ctrl->sensor_name);
+
+				cam_sensor_notify_v4l2_error_event(s_ctrl,
+					CAM_REQ_MGR_ERROR_TYPE_FULL_RECOVERY,
+					CAM_REQ_MGR_SENSOR_STREAM_OFF_FAILED);
+			}
+		}
+		break;
+	case CAM_REQ_MGR_LINK_EVT_UPDATE_PROPERTIES:
+		if (evt_data->u.properties_mask &
+			CAM_LINK_PROPERTY_SENSOR_STANDBY_AFTER_EOF)
+			s_ctrl->stream_off_after_eof = true;
+		else
+			s_ctrl->stream_off_after_eof = false;
+		break;
+	default:
+		/* No handling */
+		break;
+	}
+
+	mutex_unlock(&(s_ctrl->cam_sensor_mutex));
+
 	return rc;
 }
