@@ -82,7 +82,7 @@
 #define VIDC_IFACEQ_MIN_PKT_SIZE                8
 #define VIDC_IFACEQ_VAR_SMALL_PKT_SIZE          100
 #define VIDC_IFACEQ_VAR_LARGE_PKT_SIZE          512
-#define VIDC_IFACEQ_VAR_HUGE_PKT_SIZE          (1024*12)
+#define VIDC_IFACEQ_VAR_HUGE_PKT_SIZE          (1024*4)
 
 #define NUM_MBS_PER_SEC(__height, __width, __fps) \
 	(NUM_MBS_PER_FRAME(__height, __width) * __fps)
