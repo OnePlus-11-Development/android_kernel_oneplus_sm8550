@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -315,6 +316,9 @@ struct sde_kms {
 	struct irq_affinity_notify affinity_notify;
 
 	struct sde_vm *vm;
+
+	unsigned long ipcc_base_addr;
+	u32 debugfs_hw_fence;
 };
 
 struct vsync_info {

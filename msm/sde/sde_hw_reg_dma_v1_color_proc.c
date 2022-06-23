@@ -103,6 +103,9 @@
 #define QSEED3_COEF_LUT_SWAP_BIT           0
 #define QSEED3_COEF_LUT_CTRL_OFF               0x4C
 
+#define QSEED5_DE_LPF_OFFSET                   0x64
+#define QSEED5_DEFAULT_DE_LPF_BLEND            0x3FF00000
+
 /* SDE_SCALER_QSEED3LITE */
 #define QSEED3L_COEF_LUT_SWAP_BIT          0
 #define QSEED3L_COEF_LUT_Y_SEP_BIT         4
@@ -3264,11 +3267,13 @@ void reg_dmav1_setup_scaler3lite_lut(
 }
 
 static int reg_dmav1_setup_scaler3_de(struct sde_reg_dma_setup_ops_cfg *buf,
-	struct sde_hw_scaler3_de_cfg *de_cfg, u32 offset)
+	struct sde_hw_scaler3_cfg *scaler3_cfg, u32 offset, bool de_lpf)
 {
 	u32 de_config[7];
 	struct sde_hw_reg_dma_ops *dma_ops;
 	int rc;
+	struct sde_hw_scaler3_de_cfg *de_cfg = &scaler3_cfg->de;
+	u32 de_lpf_config;
 
 	dma_ops = sde_reg_dma_get_ops();
 	de_config[0] = (de_cfg->sharpen_level1 & 0x1FF) |
@@ -3297,14 +3302,31 @@ static int reg_dmav1_setup_scaler3_de(struct sde_reg_dma_setup_ops_cfg *buf,
 		((de_cfg->adjust_c[1] & 0x3FF) << 10) |
 		((de_cfg->adjust_c[2] & 0x3FF) << 20);
 
-	offset += QSEED3_DE_OFFSET;
-	REG_DMA_SETUP_OPS(*buf, offset,
+	REG_DMA_SETUP_OPS(*buf, offset + QSEED3_DE_OFFSET,
 		de_config, sizeof(de_config), REG_BLK_WRITE_SINGLE, 0, 0, 0);
 	rc = dma_ops->setup_payload(buf);
 	if (rc) {
 		DRM_ERROR("de write failed ret %d\n", rc);
 		return rc;
 	}
+
+	if (de_lpf) {
+		if (scaler3_cfg->de_lpf_flags & SDE_DE_LPF_BLEND_FLAG_EN)
+			de_lpf_config = (scaler3_cfg->de_lpf_l & 0x3FF) |
+				((scaler3_cfg->de_lpf_m & 0x3FF) << 10) |
+				((scaler3_cfg->de_lpf_h & 0x3FF) << 20);
+		else
+			de_lpf_config = QSEED5_DEFAULT_DE_LPF_BLEND;
+
+		REG_DMA_SETUP_OPS(*buf, offset + QSEED5_DE_LPF_OFFSET,
+			&de_lpf_config, sizeof(u32), REG_SINGLE_WRITE, 0, 0, 0);
+		rc = dma_ops->setup_payload(buf);
+		if (rc) {
+			DRM_ERROR("de lpf write failed ret %d\n", rc);
+			return rc;
+		}
+	}
+
 	return 0;
 }
 
@@ -3322,6 +3344,7 @@ void reg_dmav1_setup_vig_qseed3(struct sde_hw_pipe *ctx,
 	u32 preload, src_y_rgb, src_uv, dst, dir_weight;
 	u32 cache[4];
 	enum sde_sspp_multirect_index idx = SDE_SSPP_RECT_0;
+	bool de_lpf_cap = false;
 
 	if (!ctx || !pe || !scaler_cfg) {
 		DRM_ERROR("invalid params ctx %pK pe %pK scaler_cfg %pK",
@@ -3387,8 +3410,10 @@ void reg_dmav1_setup_vig_qseed3(struct sde_hw_pipe *ctx,
 		((scaler3_cfg->dst_height & 0xFFFF) << 16);
 
 	if (scaler3_cfg->de.enable) {
+		if (test_bit(SDE_SSPP_SCALER_DE_LPF_BLEND, &ctx->cap->features))
+			de_lpf_cap = true;
 		rc = reg_dmav1_setup_scaler3_de(&dma_write_cfg,
-			&scaler3_cfg->de, offset);
+			scaler3_cfg, offset, de_lpf_cap);
 		if (!rc)
 			op_mode |= BIT(8);
 	}
@@ -5009,7 +5034,8 @@ void reg_dmav1_setup_spr_init_cfgv1(struct sde_hw_dspp *ctx, void *cfg)
 
 	if (spr_bypass)
 		reg[0] = APPLY_MASK_AND_SHIFT(payload->cfg1, 1, 1) |
-				APPLY_MASK_AND_SHIFT(payload->cfg2, 1, 2);
+				APPLY_MASK_AND_SHIFT(payload->cfg2, 1, 2) |
+				APPLY_MASK_AND_SHIFT(payload->cfg3, 1, 24);
 
 	reg[1] = 0;
 	if (hw_cfg->num_of_mixers == 2)
@@ -5441,10 +5467,6 @@ static int __reg_dmav1_setup_demurav1_cfg1(struct sde_hw_dspp *ctx,
 	u32 width = 0;
 	u32 demura_base = ctx->cap->sblk->demura.base + ctx->hw.blk_off;
 
-	if (!dcfg->cfg1_en) {
-		DRM_DEBUG_DRIVER("dcfg->cfg1_en is disabled\n");
-		return 0;
-	}
 	len = ARRAY_SIZE(dcfg->cfg1_param0_c0);
 	cfg1_data = kvzalloc((len * sizeof(u32)), GFP_KERNEL);
 	if (!cfg1_data)
@@ -5503,24 +5525,26 @@ static int __reg_dmav1_setup_demurav1_cfg1(struct sde_hw_dspp *ctx,
 		goto quit;
 	}
 
-	cfg1_data[0] = (dcfg->cfg1_param0_c0[0] & REG_MASK(10)) |
-		((dcfg->cfg1_param0_c1[0] & REG_MASK(10)) << 10) |
-		((dcfg->cfg1_param0_c2[0] & REG_MASK(10)) << 20) | BIT(31);
-	DRM_DEBUG_DRIVER("0x64: value %x\n", cfg1_data[0]);
-	for (i = 1; i < len; i++) {
-		cfg1_data[i] = (dcfg->cfg1_param0_c0[i] & REG_MASK(10)) |
-			((dcfg->cfg1_param0_c1[i] & REG_MASK(10)) << 10) |
-			((dcfg->cfg1_param0_c2[i] & REG_MASK(10)) << 20);
-			DRM_DEBUG_DRIVER("0x64 index %d value %x\n", i,
-					cfg1_data[i]);
-	}
-	REG_DMA_SETUP_OPS(*dma_write_cfg, demura_base + 0x64,
-		cfg1_data, len * sizeof(u32), REG_BLK_WRITE_INC, 0,
-		0, 0);
-	rc = dma_ops->setup_payload(dma_write_cfg);
-	if (rc) {
-		DRM_ERROR("lut write failed ret %d\n", rc);
-		goto quit;
+	if (dcfg->cfg1_en) {
+		cfg1_data[0] = (dcfg->cfg1_param0_c0[0] & REG_MASK(10)) |
+			((dcfg->cfg1_param0_c1[0] & REG_MASK(10)) << 10) |
+			((dcfg->cfg1_param0_c2[0] & REG_MASK(10)) << 20) | BIT(31);
+		DRM_DEBUG_DRIVER("0x64: value %x\n", cfg1_data[0]);
+		for (i = 1; i < len; i++) {
+			cfg1_data[i] = (dcfg->cfg1_param0_c0[i] & REG_MASK(10)) |
+				((dcfg->cfg1_param0_c1[i] & REG_MASK(10)) << 10) |
+				((dcfg->cfg1_param0_c2[i] & REG_MASK(10)) << 20);
+				DRM_DEBUG_DRIVER("0x64 index %d value %x\n", i,
+						cfg1_data[i]);
+		}
+		REG_DMA_SETUP_OPS(*dma_write_cfg, demura_base + 0x64,
+			cfg1_data, len * sizeof(u32), REG_BLK_WRITE_INC, 0,
+			0, 0);
+		rc = dma_ops->setup_payload(dma_write_cfg);
+		if (rc) {
+			DRM_ERROR("lut write failed ret %d\n", rc);
+			goto quit;
+		}
 	}
 
 quit:

@@ -243,6 +243,22 @@ struct sde_opr_value {
 };
 
 /**
+ * enum sde_crtc_hw_fence_flags - flags to enable/disable hw fence features
+ * @HW_FENCE_OUT_FENCES_ENABLE: enables creation of hw fences for crtc output fences
+ * @HW_FENCE_IN_FENCES_ENABLE: enables hw fences for input-fences that are candidates for hw wait
+ *                   (i.e. they have the dma-fence flag for dma-fences set), this allows to
+ *                   selectively enable/disable input-fences, regardless of the dma-fence flags.
+ * @HW_FENCE-IN_FENCES_NO_OVERRIDE: skip the sw-override of the input hw-fences signal.
+ * @HW_FENCE_FEATURES_MAX: max number of features.
+ */
+enum sde_crtc_hw_fence_flags {
+	HW_FENCE_OUT_FENCES_ENABLE,
+	HW_FENCE_IN_FENCES_ENABLE,
+	HW_FENCE_IN_FENCES_NO_OVERRIDE,
+	HW_FENCE_FEATURES_MAX,
+};
+
+/**
  * struct sde_crtc - virtualized CRTC data structure
  * @base          : Base drm crtc structure
  * @name          : ASCII description of this crtc
@@ -329,6 +345,10 @@ struct sde_opr_value {
  * @frame_data      : Framedata data structure
  * @previous_opr_value : store previous opr values
  * @opr_event_notify_enabled : Flag to indicate if opr event notify is enabled or not
+ * @hwfence_features_mask : u32 mask to enable/disable hw fence features. See enum
+ *                          sde_crtc_hw_fence_flags for available fields.
+ * @hwfence_out_fences_skip: number of frames to skip before create a new hw-fence, this can be
+ *                   used to slow-down creation of output hw-fences for debugging purposes.
  */
 struct sde_crtc {
 	struct drm_crtc base;
@@ -438,6 +458,9 @@ struct sde_crtc {
 
 	struct sde_opr_value previous_opr_value;
 	bool opr_event_notify_enabled;
+
+	DECLARE_BITMAP(hwfence_features_mask, HW_FENCE_FEATURES_MAX);
+	u32 hwfence_out_fences_skip;
 };
 
 enum sde_crtc_dirty_flags {
@@ -499,6 +522,7 @@ struct sde_line_insertion_param {
  * @cp_range_payload: array storing state user_data passed via range props
  * @cont_splash_populated: State was populated as part of cont. splash
  * @param: sde line insertion parameters
+ * @hwfence_in_fences_set: input hw fences are configured for the commit
  */
 struct sde_crtc_state {
 	struct drm_crtc_state base;
@@ -539,6 +563,7 @@ struct sde_crtc_state {
 		cp_range_payload[SDE_CP_CRTC_MAX_FEATURES];
 	bool cont_splash_populated;
 	struct sde_line_insertion_param line_insertion;
+	bool hwfence_in_fences_set;
 };
 
 enum sde_crtc_irq_state {

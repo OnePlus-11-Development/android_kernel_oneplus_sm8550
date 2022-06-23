@@ -11,6 +11,7 @@
 #include "msm_drv.h"
 #include "msm_mmu.h"
 #include "sde_dbg.h"
+#include "sde_vbif.h"
 
 #define GUARD_BYTES (BIT(8) - 1)
 #define ALIGNED_OFFSET (U32_MAX & ~(GUARD_BYTES))
@@ -66,6 +67,8 @@
 #define LUTBUS_BLOCK_SEL_MASK 0xffff
 #define LUTBUS_TRANS_SZ_MASK 0xff0000
 #define LUTBUS_LUT_SIZE_MASK 0x3fff
+
+#define PMU_CLK_CTRL  0x1F0
 
 static uint32_t reg_dma_register_count;
 static uint32_t reg_dma_decode_sel;
@@ -741,6 +744,30 @@ static int write_kick_off_v1(struct sde_reg_dma_kickoff_cfg *cfg)
 	return 0;
 }
 
+static bool setup_clk_force_ctrl(struct sde_hw_blk_reg_map *hw,
+		enum sde_clk_ctrl_type clk_ctrl, bool enable)
+{
+	u32 reg_val, new_val;
+
+	if (!hw)
+		return false;
+
+	if (!SDE_CLK_CTRL_LUTDMA_VALID(clk_ctrl))
+		return false;
+
+	reg_val = SDE_REG_READ(hw, PMU_CLK_CTRL);
+
+	if (enable)
+		new_val = reg_val | (BIT(0) | BIT(16));
+	else
+		new_val = reg_val & ~(BIT(0) | BIT(16));
+
+	SDE_REG_WRITE(hw, PMU_CLK_CTRL, new_val);
+	wmb(); /* ensure write finished before progressing */
+
+	return !(reg_val & (BIT(0) | BIT(16)));
+}
+
 int init_v1(struct sde_hw_reg_dma *cfg)
 {
 	int i = 0, rc = 0;
@@ -888,6 +915,42 @@ int init_v12(struct sde_hw_reg_dma *cfg)
 	return 0;
 }
 
+static int init_reg_dma_vbif(struct sde_hw_reg_dma *cfg)
+{
+	int ret = 0;
+	struct sde_hw_blk_reg_map *hw;
+	struct sde_vbif_clk_client clk_client;
+	struct msm_drm_private *priv = cfg->drm_dev->dev_private;
+	struct msm_kms *kms = priv->kms;
+	struct sde_kms *sde_kms = to_sde_kms(kms);
+
+	if (cfg->caps->clk_ctrl != SDE_CLK_CTRL_LUTDMA) {
+		SDE_ERROR("invalid lutdma clk ctrl type %d\n", cfg->caps->clk_ctrl);
+		return -EINVAL;
+	}
+
+	hw = kzalloc(sizeof(*hw), GFP_KERNEL);
+	if (!hw) {
+		SDE_ERROR("failed to create hw block\n");
+		return -ENOMEM;
+	}
+
+	hw->base_off = cfg->addr;
+	hw->blk_off = cfg->caps->reg_dma_blks[REG_DMA_TYPE_DB].base;
+
+	clk_client.hw = hw;
+	clk_client.clk_ctrl = cfg->caps->clk_ctrl;
+	clk_client.ops.setup_clk_force_ctrl = setup_clk_force_ctrl;
+
+	ret = sde_vbif_clk_register(sde_kms, &clk_client);
+	if (ret) {
+		SDE_ERROR("failed to register vbif client %d\n", cfg->caps->clk_ctrl);
+		kfree(hw);
+	}
+
+	return ret;
+}
+
 int init_v2(struct sde_hw_reg_dma *cfg)
 {
 	int ret = 0, i = 0;
@@ -913,7 +976,10 @@ int init_v2(struct sde_hw_reg_dma *cfg)
 	if (cfg->caps->reg_dma_blks[REG_DMA_TYPE_SB].valid == true)
 		reg_dma->ops.last_command_sb = last_cmd_sb_v2;
 
-	return 0;
+	if (cfg->caps->split_vbif_supported)
+		ret = init_reg_dma_vbif(cfg);
+
+	return ret;
 }
 
 static int check_support_v1(enum sde_reg_dma_features feature,

@@ -54,6 +54,19 @@
 #define CTL_INTF_MASTER               0x134
 #define CTL_UIDLE_ACTIVE              0x138
 
+#define CTL_HW_FENCE_CTRL             0x250
+#define CTL_FENCE_READY_SW_OVERRIDE   0x254
+#define CTL_INPUT_FENCE_ID            0x258
+#define CTL_OUTPUT_FENCE_CTRL         0x25C
+#define CTL_OUTPUT_FENCE_ID           0x260
+#define CTL_HW_FENCE_STATUS           0x278
+#define CTL_OUTPUT_FENCE_SW_OVERRIDE  0x27C
+#define CTL_TIMESTAMP_CTRL            0x264
+#define CTL_OUTPUT_FENCE_START_TIMESTAMP0 0x268
+#define CTL_OUTPUT_FENCE_START_TIMESTAMP1 0x26C
+#define CTL_OUTPUT_FENCE_END_TIMESTAMP0 0x270
+#define CTL_OUTPUT_FENCE_END_TIMESTAMP1 0x274
+
 #define CTL_MIXER_BORDER_OUT            BIT(24)
 #define CTL_FLUSH_MASK_ROT              BIT(27)
 #define CTL_FLUSH_MASK_CTL              BIT(17)
@@ -316,6 +329,97 @@ static inline bool _is_dspp_flush_pending(struct sde_hw_ctl *ctx)
 	}
 
 	return false;
+}
+
+static inline void sde_hw_ctl_update_input_fence(struct sde_hw_ctl *ctx,
+					u32 client_id, u32 signal_id)
+{
+	u32 val = (client_id << 16) | (0xFFFF & signal_id);
+
+	SDE_REG_WRITE(&ctx->hw, CTL_INPUT_FENCE_ID, val);
+}
+
+static inline void sde_hw_ctl_update_output_fence(struct sde_hw_ctl *ctx,
+					u32 client_id, u32 signal_id)
+{
+	u32 val = (client_id << 16) | (0xFFFF & signal_id);
+
+	SDE_REG_WRITE(&ctx->hw, CTL_OUTPUT_FENCE_ID, val);
+}
+
+static inline int sde_hw_ctl_get_hw_fence_status(struct sde_hw_ctl *ctx)
+{
+	return SDE_REG_READ(&ctx->hw, CTL_HW_FENCE_STATUS);
+}
+
+static inline void sde_hw_ctl_trigger_output_fence(struct sde_hw_ctl *ctx, u32 trigger_sel)
+{
+	u32 val = ((trigger_sel & 0xF) << 4) | 0x1;
+
+	SDE_REG_WRITE(&ctx->hw, CTL_OUTPUT_FENCE_CTRL, val);
+}
+
+static inline void sde_hw_ctl_hw_fence_ctrl(struct sde_hw_ctl *ctx, bool sw_override_set,
+	bool  sw_override_clear, u32 mode)
+{
+	u32 val;
+
+	val = SDE_REG_READ(&ctx->hw, CTL_HW_FENCE_CTRL);
+	val |= (0x1 & mode) | (sw_override_set ? BIT(5) : 0) | (sw_override_clear ? BIT(4) : 0);
+	SDE_REG_WRITE(&ctx->hw, CTL_HW_FENCE_CTRL, val);
+}
+
+static inline void sde_hw_ctl_trigger_sw_override(struct sde_hw_ctl *ctx)
+{
+	/* clear input fence before override */
+	sde_hw_ctl_update_input_fence(ctx, 0, 0);
+
+	SDE_REG_WRITE(&ctx->hw, CTL_FENCE_READY_SW_OVERRIDE, 0x1);
+}
+
+static inline void sde_hw_ctl_trigger_output_fence_override(struct sde_hw_ctl *ctx)
+{
+	SDE_REG_WRITE(&ctx->hw, CTL_OUTPUT_FENCE_SW_OVERRIDE, 0x1);
+}
+
+static inline void sde_hw_ctl_fence_timestamp_ctrl(struct sde_hw_ctl *ctx, bool enable, bool clear)
+{
+	u32 val;
+
+	val = SDE_REG_READ(&ctx->hw, CTL_TIMESTAMP_CTRL);
+	if (enable)
+		val |= BIT(0);
+	else
+		val &= ~BIT(0);
+	if (clear)
+		val |= BIT(1);
+	else
+		val &= ~BIT(1);
+
+	SDE_REG_WRITE(&ctx->hw, CTL_TIMESTAMP_CTRL, val);
+	wmb(); /* make sure the ctrl is written */
+}
+
+static inline int sde_hw_ctl_output_fence_timestamps(struct sde_hw_ctl *ctx,
+			u64 *val_start, u64 *val_end)
+{
+	u32 start_l, start_h, end_l, end_h;
+
+	if (!ctx || IS_ERR_OR_NULL(val_start) || IS_ERR_OR_NULL(val_end))
+		return -EINVAL;
+
+	start_l = SDE_REG_READ(&ctx->hw, CTL_OUTPUT_FENCE_START_TIMESTAMP0);
+	start_h = SDE_REG_READ(&ctx->hw, CTL_OUTPUT_FENCE_START_TIMESTAMP1);
+	*val_start = (u64)start_h << 32 | start_l;
+
+	end_l = SDE_REG_READ(&ctx->hw, CTL_OUTPUT_FENCE_END_TIMESTAMP0);
+	end_h = SDE_REG_READ(&ctx->hw, CTL_OUTPUT_FENCE_END_TIMESTAMP1);
+	*val_end = (u64)end_h << 32 | end_l;
+
+	/* clear timestamps */
+	sde_hw_ctl_fence_timestamp_ctrl(ctx, false, true);
+
+	return 0;
 }
 
 static inline int sde_hw_ctl_trigger_start(struct sde_hw_ctl *ctx)
@@ -1366,9 +1470,21 @@ static void _setup_ctl_ops(struct sde_hw_ctl_ops *ops,
 				sde_hw_ctl_update_bitmask_dspp_pavlut;
 	}
 
+	if (cap & BIT(SDE_CTL_HW_FENCE)) {
+		ops->hw_fence_update_input_fence = sde_hw_ctl_update_input_fence;
+		ops->hw_fence_update_output_fence = sde_hw_ctl_update_output_fence;
+		ops->hw_fence_trigger_output_fence = sde_hw_ctl_trigger_output_fence;
+		ops->hw_fence_ctrl = sde_hw_ctl_hw_fence_ctrl;
+		ops->hw_fence_trigger_sw_override = sde_hw_ctl_trigger_sw_override;
+		ops->get_hw_fence_status = sde_hw_ctl_get_hw_fence_status;
+		ops->trigger_output_fence_override = sde_hw_ctl_trigger_output_fence_override;
+		ops->hw_fence_output_status = sde_hw_ctl_output_fence_timestamps;
+		ops->hw_fence_output_timestamp_ctrl = sde_hw_ctl_fence_timestamp_ctrl;
+	}
+
 	if (cap & BIT(SDE_CTL_UIDLE))
 		ops->uidle_enable = sde_hw_ctl_uidle_enable;
-};
+}
 
 struct sde_hw_blk_reg_map *sde_hw_ctl_init(enum sde_ctl idx,
 		void __iomem *addr,

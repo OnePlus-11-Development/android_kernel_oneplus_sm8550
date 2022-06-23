@@ -54,6 +54,7 @@
 #include "sde_reg_dma.h"
 #include "sde_connector.h"
 #include "sde_vm.h"
+#include "sde_fence.h"
 
 #include <linux/qcom_scm.h>
 #include <linux/qcom-iommu-util.h>
@@ -171,6 +172,8 @@ static int _sde_debugfs_init(struct sde_kms *sde_kms)
 
 	debugfs_create_u32("pm_suspend_clk_dump", 0600, debugfs_root,
 			(u32 *)&sde_kms->pm_suspend_clk_dump);
+	debugfs_create_u32("hw_fence_status", 0600, debugfs_root,
+			(u32 *)&sde_kms->debugfs_hw_fence);
 
 	return 0;
 }
@@ -780,6 +783,37 @@ static int _sde_kms_release_shared_buffer(unsigned int mem_addr,
 
 	return ret;
 
+}
+
+static int _sde_kms_one2one_mem_map_ipcc_reg(struct sde_kms *sde_kms, u32 buf_size,
+		unsigned long buf_base)
+{
+	struct msm_mmu *mmu = NULL;
+	int ret = 0;
+
+	if (!sde_kms->aspace[MSM_SMMU_DOMAIN_UNSECURE]
+		|| !sde_kms->aspace[MSM_SMMU_DOMAIN_UNSECURE]->mmu) {
+		SDE_ERROR("aspace not found for sde kms node\n");
+		return -EINVAL;
+	}
+
+	mmu = sde_kms->aspace[MSM_SMMU_DOMAIN_UNSECURE]->mmu;
+	if (!mmu) {
+		SDE_ERROR("mmu not found for aspace\n");
+		return -EINVAL;
+	}
+
+	if (!mmu->funcs || !mmu->funcs->one_to_one_map) {
+		SDE_ERROR("invalid input params for map\n");
+		return -EINVAL;
+	}
+
+	ret = mmu->funcs->one_to_one_map(mmu, buf_base, buf_base, buf_size,
+		IOMMU_READ | IOMMU_WRITE);
+	if (ret)
+		SDE_ERROR("one2one memory smmu map failed:%d\n", ret);
+
+	return ret;
 }
 
 static int _sde_kms_splash_mem_get(struct sde_kms *sde_kms,
@@ -2508,6 +2542,7 @@ static int sde_kms_set_crtc_for_conn(struct drm_device *dev,
 	}
 
 	crtc_state->active = true;
+	crtc_state->enable = true;
 	ret = drm_atomic_set_crtc_for_connector(conn_state, enc->crtc);
 	if (ret)
 		SDE_ERROR("error %d setting the crtc\n", ret);
@@ -3766,7 +3801,7 @@ static int sde_kms_get_dsc_count(const struct msm_kms *kms,
 	return 0;
 }
 
-static void _sde_kms_null_commit(struct drm_device *dev,
+static int _sde_kms_null_commit(struct drm_device *dev,
 		struct drm_encoder *enc)
 {
 	struct drm_modeset_acquire_ctx ctx;
@@ -3809,6 +3844,8 @@ end:
 
 	drm_modeset_drop_locks(&ctx);
 	drm_modeset_acquire_fini(&ctx);
+
+	return ret;
 }
 
 
@@ -3836,6 +3873,36 @@ void sde_kms_display_early_wakeup(struct drm_device *dev,
 	}
 
 	drm_connector_list_iter_end(&conn_iter);
+}
+static int sde_kms_trigger_null_flush(struct msm_kms *kms)
+{
+	struct sde_kms *sde_kms;
+	struct sde_splash_display *splash_display;
+	int i, rc = 0;
+
+	if (!kms) {
+		SDE_ERROR("invalid kms\n");
+		return -EINVAL;
+	}
+
+	sde_kms = to_sde_kms(kms);
+
+	if (!sde_kms->splash_data.num_splash_displays ||
+		sde_kms->dsi_display_count == sde_kms->splash_data.num_splash_displays)
+		return rc;
+
+	for (i = 0; i < MAX_DSI_DISPLAYS; i++) {
+		splash_display = &sde_kms->splash_data.splash_display[i];
+
+		if (splash_display->cont_splash_enabled && splash_display->encoder) {
+			SDE_DEBUG("triggering null commit on enc:%d\n",
+					DRMID(splash_display->encoder));
+			SDE_EVT32(DRMID(splash_display->encoder), SDE_EVTLOG_FUNC_ENTRY);
+			rc = _sde_kms_null_commit(sde_kms->dev, splash_display->encoder);
+		}
+	}
+
+	return rc;
 }
 
 static void _sde_kms_pm_suspend_idle_helper(struct sde_kms *sde_kms,
@@ -4146,6 +4213,7 @@ static const struct msm_kms_funcs kms_funcs = {
 	.get_address_space_device = _sde_kms_get_address_space_device,
 	.postopen = _sde_kms_post_open,
 	.check_for_splash = sde_kms_check_for_splash,
+	.trigger_null_flush = sde_kms_trigger_null_flush,
 	.get_mixer_count = sde_kms_get_mixer_count,
 	.get_dsc_count = sde_kms_get_dsc_count,
 };
@@ -4168,6 +4236,8 @@ static int _sde_kms_mmu_destroy(struct sde_kms *sde_kms)
 static int _sde_kms_mmu_init(struct sde_kms *sde_kms)
 {
 	struct msm_mmu *mmu;
+	struct resource *res;
+	struct platform_device *pdev;
 	int i, ret;
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
@@ -4206,6 +4276,25 @@ static int _sde_kms_mmu_init(struct sde_kms *sde_kms)
 			if (ret) {
 				SDE_ERROR("failed to map ret:%d\n", ret);
 				goto enable_trans_fail;
+			}
+		}
+
+		if (i == MSM_SMMU_DOMAIN_UNSECURE && sde_kms->catalog->hw_fence_rev) {
+			pdev = to_platform_device(sde_kms->dev->dev);
+			res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ipcc_reg");
+			if (!res) {
+				SDE_DEBUG("failed to get resource ipcc_reg, cannot map ipcc\n");
+				sde_kms->catalog->hw_fence_rev = 0;
+			} else {
+				sde_kms->ipcc_base_addr = res->start;
+
+				ret = _sde_kms_one2one_mem_map_ipcc_reg(sde_kms, resource_size(res),
+					HW_FENCE_IPCC_PROTOCOLp_CLIENTc(res->start,
+					sde_kms->catalog->ipcc_protocol_id,
+					HW_FENCE_IPCC_CLIENT_DPU));
+				/* if mapping fails disable hw-fences */
+				if (ret)
+					sde_kms->catalog->hw_fence_rev = 0;
 			}
 		}
 
@@ -4249,6 +4338,16 @@ static void sde_kms_init_rot_sid_hw(struct sde_kms *sde_kms)
 		return;
 
 	sde_hw_set_rotator_sid(sde_kms->hw_sid);
+}
+
+static void sde_kms_init_hw_fences(struct sde_kms *sde_kms)
+{
+	if (!sde_kms || !sde_kms->hw_mdp)
+		return;
+
+	if (sde_kms->hw_mdp->ops.setup_hw_fences)
+		sde_kms->hw_mdp->ops.setup_hw_fences(sde_kms->hw_mdp,
+			sde_kms->catalog->ipcc_protocol_id, sde_kms->ipcc_base_addr);
 }
 
 static void sde_kms_init_shared_hw(struct sde_kms *sde_kms)
@@ -4410,10 +4509,11 @@ static void sde_kms_handle_power_event(u32 event_type, void *usr)
 		sde_kms->first_kickoff = true;
 
 		/**
-		 * Rotator sid needs to be programmed since uefi doesn't
-		 * configure it during continuous splash
+		 * Rotator sid and hw fences need to be programmed since uefi doesn't
+		 * configure them during continuous splash
 		 */
 		sde_kms_init_rot_sid_hw(sde_kms);
+		sde_kms_init_hw_fences(sde_kms);
 		if (sde_kms->splash_data.num_splash_displays ||
 				sde_in_trusted_vm(sde_kms))
 			return;

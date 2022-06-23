@@ -557,6 +557,7 @@ enum {
  *                              blocks
  * @SDE_CTL_UIDLE               CTL supports uidle
  * @SDE_CTL_UNIFIED_DSPP_FLUSH  CTL supports only one flush bit for DSPP
+ * @SDE_CTL_HW_FENCE            CTL supports hw fencing
  * @SDE_CTL_MAX
  */
 enum {
@@ -566,6 +567,7 @@ enum {
 	SDE_CTL_ACTIVE_CFG,
 	SDE_CTL_UIDLE,
 	SDE_CTL_UNIFIED_DSPP_FLUSH,
+	SDE_CTL_HW_FENCE,
 	SDE_CTL_MAX
 };
 
@@ -721,6 +723,7 @@ enum {
  * @SDE_FEATURE_VBIF_CLK_SPLIT VBIF clock split supported
  * @SDE_FEATURE_CTL_DONE       Support for CTL DONE irq
  * @SDE_FEATURE_SYS_CACHE_NSE  Support for no-self-evict feature
+ * @SDE_FEATURE_HW_FENCE_IPCC  HW fence supports ipcc signaling in dpu
  * @SDE_FEATURE_MAX:             MAX features value
  */
 enum sde_mdss_features {
@@ -761,6 +764,7 @@ enum sde_mdss_features {
 	SDE_FEATURE_VBIF_CLK_SPLIT,
 	SDE_FEATURE_CTL_DONE,
 	SDE_FEATURE_SYS_CACHE_NSE,
+	SDE_FEATURE_HW_FENCE_IPCC,
 	SDE_FEATURE_MAX
 };
 
@@ -1603,6 +1607,7 @@ struct sde_reg_dma_blk_info {
  * @version            version of lutdma hw blocks
  * @trigger_sel_off    offset to trigger select registers of lutdma
  * @broadcast_disabled flag indicating if broadcast usage should be avoided
+ * @split_vbif_supported indicates if VBIF clock split is supported
  * @xin_id             VBIF xin client-id for LUTDMA
  * @vbif_idx           VBIF id (RT/NRT)
  * @base_off           Base offset of LUTDMA from the MDSS root
@@ -1613,6 +1618,7 @@ struct sde_reg_dma_cfg {
 	u32 version;
 	u32 trigger_sel_off;
 	u32 broadcast_disabled;
+	u32 split_vbif_supported;
 	u32 xin_id;
 	u32 vbif_idx;
 	u32 base_off;
@@ -1752,6 +1758,7 @@ struct sde_perf_cfg {
  * @ts_prefill_rev      prefill traffic shaper feature revision
  * @true_inline_rot_rev inline rotator feature revision
  * @dnsc_blur_rev       downscale blur HW block version
+ * @hw_fence_rev        hw fence feature revision
  * @mdss_count          number of valid MDSS HW blocks
  * @mdss                array of pointers to MDSS HW blocks
  * @mdss_hw_block_size  max offset of MDSS_HW block (0 offset), used for debug
@@ -1842,6 +1849,7 @@ struct sde_perf_cfg {
  * @inline_rot_restricted_formats       restricted formats for inline rotation
  * @dnsc_blur_filters        supported filters for downscale blur
  * @dnsc_blur_filter_count   supported filter count for downscale blur
+ * @ipcc_protocol_id    ipcc protocol id for the hw
  */
 struct sde_mdss_cfg {
 	/* Block Revisions */
@@ -1857,6 +1865,7 @@ struct sde_mdss_cfg {
 	u32 ts_prefill_rev;
 	u32 true_inline_rot_rev;
 	u32 dnsc_blur_rev;
+	u32 hw_fence_rev;
 
 	/* HW Blocks */
 	u32 mdss_count;
@@ -1958,6 +1967,8 @@ struct sde_mdss_cfg {
 	struct sde_format_extended *inline_rot_restricted_formats;
 	struct sde_dnsc_blur_filter_info *dnsc_blur_filters;
 	u32 dnsc_blur_filter_count;
+
+	u32 ipcc_protocol_id;
 };
 
 struct sde_mdss_hw_cfg_handler {

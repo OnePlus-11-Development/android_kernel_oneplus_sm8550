@@ -1637,6 +1637,7 @@ static int _sde_connector_set_prop_retire_fence(struct drm_connector *connector,
 	struct sde_connector *c_conn;
 	uint64_t fence_user_fd;
 	uint64_t __user prev_user_fd;
+	struct sde_hw_ctl *hw_ctl = NULL;
 
 	c_conn = to_sde_connector(connector);
 
@@ -1662,8 +1663,13 @@ static int _sde_connector_set_prop_retire_fence(struct drm_connector *connector,
 		 * commit completion
 		 */
 		offset++;
+
+		/* get hw_ctl for a wb connector */
+		if (c_conn->connector_type == DRM_MODE_CONNECTOR_VIRTUAL)
+			hw_ctl = sde_encoder_get_hw_ctl(c_conn);
+
 		rc = sde_fence_create(c_conn->retire_fence,
-					&fence_user_fd, offset);
+					&fence_user_fd, offset, hw_ctl);
 		if (rc) {
 			SDE_ERROR("fence create failed rc:%d\n", rc);
 			goto end;
@@ -1890,19 +1896,26 @@ void sde_connector_complete_commit(struct drm_connector *connector,
 
 	/* signal connector's retire fence */
 	sde_fence_signal(to_sde_connector(connector)->retire_fence,
-			ts, fence_event);
+			ts, fence_event, NULL);
 }
 
 void sde_connector_commit_reset(struct drm_connector *connector, ktime_t ts)
 {
+	struct sde_hw_ctl *hw_ctl = NULL;
+	struct sde_connector *c_conn;
+
 	if (!connector) {
 		SDE_ERROR("invalid connector\n");
 		return;
 	}
+	c_conn = to_sde_connector(connector);
+
+	/* get hw_ctl for a wb connector */
+	if (c_conn->connector_type == DRM_MODE_CONNECTOR_VIRTUAL)
+		hw_ctl = sde_encoder_get_hw_ctl(c_conn);
 
 	/* signal connector's retire fence */
-	sde_fence_signal(to_sde_connector(connector)->retire_fence,
-			ts, SDE_FENCE_RESET_TIMELINE);
+	sde_fence_signal(c_conn->retire_fence, ts, SDE_FENCE_RESET_TIMELINE, hw_ctl);
 }
 
 static void sde_connector_update_hdr_props(struct drm_connector *connector)
@@ -2098,6 +2111,13 @@ static int _sde_connector_lm_preference(struct sde_connector *sde_conn,
 	sde_hw_mixer_set_preference(sde_kms->catalog, num_lm, disp_type);
 
 	return ret;
+}
+
+static void _sde_connector_init_hw_fence(struct sde_connector *c_conn, struct sde_kms *sde_kms)
+{
+	/* Enable hw-fences for wb retire-fence */
+	if (c_conn->connector_type == DRM_MODE_CONNECTOR_VIRTUAL && sde_kms->catalog->hw_fence_rev)
+		c_conn->hwfence_wb_retire_fences_enable = true;
 }
 
 int sde_connector_get_panel_vfp(struct drm_connector *connector,
@@ -2453,9 +2473,16 @@ static int sde_connector_init_debugfs(struct drm_connector *connector)
 {
 	struct sde_connector *sde_connector;
 	struct msm_display_info info;
+	struct sde_kms *sde_kms;
 
 	if (!connector || !connector->debugfs_entry) {
 		SDE_ERROR("invalid connector\n");
+		return -EINVAL;
+	}
+
+	sde_kms = sde_connector_get_kms(connector);
+	if (!sde_kms) {
+		SDE_ERROR("invalid kms\n");
 		return -EINVAL;
 	}
 
@@ -2486,6 +2513,11 @@ static int sde_connector_init_debugfs(struct drm_connector *connector)
 			return -ENOMEM;
 		}
 	}
+
+	if (sde_connector->connector_type == DRM_MODE_CONNECTOR_VIRTUAL &&
+			sde_kms->catalog->hw_fence_rev)
+		debugfs_create_bool("wb_hw_fence_enable", 0600, connector->debugfs_entry,
+			&sde_connector->hwfence_wb_retire_fences_enable);
 
 	return 0;
 }
@@ -3353,8 +3385,11 @@ struct drm_connector *sde_connector_init(struct drm_device *dev,
 	_sde_connector_lm_preference(c_conn, sde_kms,
 			display_info.display_type);
 
-	SDE_DEBUG("connector %d attach encoder %d\n",
-			c_conn->base.base.id, encoder->base.id);
+	_sde_connector_init_hw_fence(c_conn, sde_kms);
+
+	SDE_DEBUG("connector %d attach encoder %d, wb hwfences:%d\n",
+			DRMID(&c_conn->base), DRMID(encoder),
+			c_conn->hwfence_wb_retire_fences_enable);
 
 	INIT_DELAYED_WORK(&c_conn->status_work,
 			sde_connector_check_status_work);

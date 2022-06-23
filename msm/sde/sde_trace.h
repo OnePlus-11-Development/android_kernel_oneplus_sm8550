@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2014-2020, The Linux Foundation. All rights reserved.
  */
 
@@ -417,6 +418,34 @@ TRACE_EVENT(sde_perf_uidle_status,
 			__entry->uidle_fal_status_1,
 			__entry->uidle_status,
 			__entry->uidle_en_fal10
+			)
+);
+
+TRACE_EVENT(sde_hw_fence_status,
+	TP_PROTO(u32 crtc,
+			char *fence,
+			u32 hw_fence_start_timestamp,
+			u32 hw_fence_end_timestamp),
+	TP_ARGS(crtc,
+			fence,
+			hw_fence_start_timestamp,
+			hw_fence_end_timestamp),
+	TP_STRUCT__entry(
+			__field(u32, crtc)
+			__field(char *, fence)
+			__field(u32, hw_fence_start_timestamp)
+			__field(u32, hw_fence_end_timestamp)),
+	TP_fast_assign(
+			__entry->crtc = crtc;
+			__entry->fence = fence;
+			__entry->hw_fence_start_timestamp = hw_fence_start_timestamp;
+			__entry->hw_fence_end_timestamp = hw_fence_end_timestamp;),
+	TP_printk(
+		"crtc:%d %s hw-fence start timestamp:%llu end timestamp:%llu",
+			__entry->crtc,
+			__entry->fence,
+			__entry->hw_fence_start_timestamp,
+			__entry->hw_fence_end_timestamp
 			)
 );
 

@@ -491,6 +491,7 @@ static void sde_encoder_phys_vid_vblank_irq(void *arg, int irq_idx)
 	int new_cnt = -1, old_cnt = -1;
 	u32 event = 0;
 	int pend_ret_fence_cnt = 0;
+	u32 fence_ready = -1;
 
 	if (!phys_enc)
 		return;
@@ -510,7 +511,7 @@ static void sde_encoder_phys_vid_vblank_irq(void *arg, int irq_idx)
 
 	old_cnt = atomic_read(&phys_enc->pending_kickoff_cnt);
 
-	if (hw_ctl && hw_ctl->ops.get_flush_register)
+	if (hw_ctl->ops.get_flush_register)
 		flush_register = hw_ctl->ops.get_flush_register(hw_ctl);
 
 	if (flush_register)
@@ -528,7 +529,7 @@ static void sde_encoder_phys_vid_vblank_irq(void *arg, int irq_idx)
 	}
 
 not_flushed:
-	if (hw_ctl && hw_ctl->ops.get_reset)
+	if (hw_ctl->ops.get_reset)
 		reset_status = hw_ctl->ops.get_reset(hw_ctl);
 
 	spin_unlock_irqrestore(phys_enc->enc_spinlock, lock_flags);
@@ -545,12 +546,16 @@ not_flushed:
 		phys_enc->hw_intf->ops.get_status(phys_enc->hw_intf,
 			&intf_status);
 
+	if (flush_register && hw_ctl->ops.get_hw_fence_status)
+		fence_ready = hw_ctl->ops.get_hw_fence_status(hw_ctl);
+
 	SDE_EVT32_IRQ(DRMID(phys_enc->parent), phys_enc->hw_intf->idx - INTF_0,
 			old_cnt, atomic_read(&phys_enc->pending_kickoff_cnt),
 			reset_status ? SDE_EVTLOG_ERROR : 0,
 			flush_register, event,
 			atomic_read(&phys_enc->pending_retire_fence_cnt),
-			intf_status.frame_count, intf_status.line_count);
+			intf_status.frame_count, intf_status.line_count,
+			fence_ready);
 
 	/* Signal any waiting atomic commit thread */
 	wake_up_all(&phys_enc->pending_kickoff_wq);
@@ -927,6 +932,21 @@ static int sde_encoder_phys_vid_wait_for_vblank(
 	return _sde_encoder_phys_vid_wait_for_vblank(phys_enc, true);
 }
 
+static void sde_encoder_phys_vid_update_txq(struct sde_encoder_phys *phys_enc)
+{
+	struct sde_encoder_virt *sde_enc;
+
+	if (!phys_enc)
+		return;
+
+	sde_enc = to_sde_encoder_virt(phys_enc->parent);
+	if (!sde_enc)
+		return;
+
+	SDE_EVT32(DRMID(phys_enc->parent));
+	sde_encoder_helper_update_out_fence_txq(sde_enc, true);
+}
+
 static int sde_encoder_phys_vid_wait_for_commit_done(
 		struct sde_encoder_phys *phys_enc)
 {
@@ -935,6 +955,9 @@ static int sde_encoder_phys_vid_wait_for_commit_done(
 	rc =  _sde_encoder_phys_vid_wait_for_vblank(phys_enc, true);
 	if (rc)
 		sde_encoder_helper_phys_reset(phys_enc);
+
+	/* Update TxQ for the incoming frame */
+	sde_encoder_phys_vid_update_txq(phys_enc);
 
 	return rc;
 }

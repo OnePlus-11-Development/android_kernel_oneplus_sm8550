@@ -11,6 +11,9 @@
 #include "sde_hw_mdss.h"
 #include "sde_hw_util.h"
 
+#define HW_FENCE_IPCC_CLIENT_DPU   25
+#define HW_FENCE_IPCC_PROTOCOLp_CLIENTc(ba, p, c)   (ba + (0x40000*p) + (0x1000*c))
+
 struct sde_hw_mdp;
 struct sde_hw_sid;
 
@@ -202,6 +205,31 @@ struct sde_hw_mdp_ops {
 	 */
 	u32 (*get_autorefresh_status)(struct sde_hw_mdp *mdp,
 			u32 intf_idx);
+
+	/**
+	 * setup_hw_fences - configure hw fences top registers
+	 * @mdp:     mdp top context driver
+	 * @protocol_id:    ipcc protocol id
+	 * @ipcc_base_addr: base address for ipcc reg block
+	 */
+	void (*setup_hw_fences)(struct sde_hw_mdp *mdp, u32 protocol_id,
+			unsigned long ipcc_base_addr);
+
+	/**
+	 * hw_fence_input_status - get hw_fence input fence timestamps and clear them
+	 * @mdp:       mdp top context driver
+	 * @s_val:     pointer to start timestamp value to populate
+	 * @e_val:     pointer to end timestamp value to populate
+	 */
+	void (*hw_fence_input_status)(struct sde_hw_mdp *mdp, u64 *s_val, u64 *e_val);
+
+	/**
+	 * hw_fence_input_timestamp_ctrl - enable or clear input fence timestamps
+	 * @mdp:       mdp top context driver
+	 * @enable:    indicates if timestamps should be enabled
+	 * @enable:    indicates if timestamps should be cleared
+	 */
+	void (*hw_fence_input_timestamp_ctrl)(struct sde_hw_mdp *mdp, bool enable, bool clear);
 };
 
 struct sde_hw_mdp {

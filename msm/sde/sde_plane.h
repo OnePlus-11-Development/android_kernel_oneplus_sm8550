@@ -50,6 +50,55 @@
 		SDE_PLANE_DIRTY_FP16_UNMULT)
 #define SDE_PLANE_DIRTY_ALL	(0xFFFFFFFF & ~(SDE_PLANE_DIRTY_CP))
 
+struct sde_plane {
+	struct drm_plane base;
+
+	struct mutex lock;
+
+	enum sde_sspp pipe;
+	uint64_t features;      /* capabilities from catalog */
+	uint32_t perf_features; /* perf capabilities from catalog */
+	uint32_t nformats;
+	uint32_t formats[64];
+
+	struct sde_hw_pipe *pipe_hw;
+	struct sde_hw_pipe_cfg pipe_cfg;
+	struct sde_hw_sharp_cfg sharp_cfg;
+	struct sde_hw_pipe_qos_cfg pipe_qos_cfg;
+	uint32_t color_fill;
+	bool is_error;
+	bool is_rt_pipe;
+	enum sde_wb_usage_type wb_usage_type;
+	bool is_virtual;
+	struct list_head mplane_list;
+	struct sde_mdss_cfg *catalog;
+	bool revalidate;
+	bool xin_halt_forced_clk;
+
+	struct sde_csc_cfg csc_cfg;
+	struct sde_csc_cfg *csc_usr_ptr;
+	struct sde_csc_cfg *csc_ptr;
+
+	uint32_t cached_lut_flag;
+	struct sde_hw_scaler3_cfg scaler3_cfg;
+	struct sde_hw_pixel_ext pixel_ext;
+
+	const struct sde_sspp_sub_blks *pipe_sblk;
+
+	char pipe_name[SDE_NAME_SIZE];
+
+	struct msm_property_info property_info;
+	struct msm_property_data property_data[PLANE_PROP_COUNT];
+	struct drm_property_blob *blob_info;
+	struct drm_property_blob *blob_rot_caps;
+
+	/* debugfs related stuff */
+	struct dentry *debugfs_root;
+	bool debugfs_default_scale;
+};
+
+#define to_sde_plane(x) container_of(x, struct sde_plane, base)
+
 /**
  * enum sde_layout
  * Describes SSPP to LM staging layout when using more than 1 pair of LMs

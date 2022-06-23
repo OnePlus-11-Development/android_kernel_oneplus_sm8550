@@ -41,6 +41,11 @@
 		dp_display_state_name(dp->state)); \
 	SDE_EVT32_EXTERNAL(dp->state); }
 
+#define dp_display_state_warn(x) { \
+	DP_WARN("%s: state (0x%x): %s\n", x, dp->state, \
+		dp_display_state_name(dp->state)); \
+	SDE_EVT32_EXTERNAL(dp->state); }
+
 #define dp_display_state_log(x) { \
 	DP_DEBUG("%s: state (0x%x): %s\n", x, dp->state, \
 		dp_display_state_name(dp->state)); \
@@ -1140,7 +1145,7 @@ static int dp_display_host_ready(struct dp_display_private *dp)
 static void dp_display_host_unready(struct dp_display_private *dp)
 {
 	if (!dp_display_state_is(DP_STATE_INITIALIZED)) {
-		dp_display_state_show("[not initialized]");
+		dp_display_state_warn("[not initialized]");
 		return;
 	}
 
@@ -1476,29 +1481,11 @@ static int dp_display_usbpd_configure_cb(struct device *dev)
 	return 0;
 }
 
-static void dp_display_update_dsc_resources(struct dp_display_private *dp,
-		struct dp_panel *panel, bool enable)
+static void dp_display_clear_dsc_resources(struct dp_display_private *dp,
+		struct dp_panel *panel)
 {
-	int rc;
-	u32 dsc_blk_cnt = 0;
-	struct msm_drm_private *priv = dp->priv;
-
-	if (enable) {
-		if (panel->pinfo.comp_info.comp_type == MSM_DISPLAY_COMPRESSION_DSC &&
-				(panel->pinfo.comp_info.enabled)) {
-			rc = msm_get_dsc_count(priv, panel->pinfo.h_active,
-					&dsc_blk_cnt);
-			if (rc) {
-				DP_ERR("error getting dsc count. rc:%d\n", rc);
-				return;
-			}
-		}
-		dp->tot_dsc_blks_in_use += dsc_blk_cnt;
-		panel->dsc_blks_in_use += dsc_blk_cnt;
-	} else {
-		dp->tot_dsc_blks_in_use -= panel->dsc_blks_in_use;
-		panel->dsc_blks_in_use = 0;
-	}
+	dp->tot_dsc_blks_in_use -= panel->dsc_blks_in_use;
+	panel->dsc_blks_in_use = 0;
 }
 
 static int dp_display_stream_pre_disable(struct dp_display_private *dp,
@@ -1530,7 +1517,7 @@ static void dp_display_stream_disable(struct dp_display_private *dp,
 		return;
 	}
 
-	dp_display_update_dsc_resources(dp, dp_panel, false);
+	dp_display_clear_dsc_resources(dp, dp_panel);
 
 	DP_DEBUG("stream_id=%d, active_stream_cnt=%d, tot_dsc_blks_in_use=%d\n",
 			dp_panel->stream_id, dp->active_stream_cnt,
@@ -1695,15 +1682,14 @@ static int dp_display_stream_enable(struct dp_display_private *dp,
 
 	rc = dp->ctrl->stream_on(dp->ctrl, dp_panel);
 
-	if (dp->debug->tpg_state)
-		dp_panel->tpg_config(dp_panel, true);
+	if (dp->debug->tpg_pattern)
+		dp_panel->tpg_config(dp_panel, dp->debug->tpg_pattern);
 
 	if (!rc) {
 		dp->active_panels[dp_panel->stream_id] = dp_panel;
 		dp->active_stream_cnt++;
 	}
 
-	dp_display_update_dsc_resources(dp, dp_panel, true);
 
 	DP_DEBUG("dp active_stream_cnt:%d, tot_dsc_blks_in_use=%d\n",
 			dp->active_stream_cnt, dp->tot_dsc_blks_in_use);
@@ -2390,10 +2376,10 @@ static int dp_display_prepare(struct dp_display *dp_display, void *panel)
 
 	/*
 	 * If DP_STATE_ENABLED, there is nothing left to do.
-	 * However, this should not happen ideally. So, log this.
+	 * This would happen during MST flow. So, log this.
 	 */
 	if (dp_display_state_is(DP_STATE_ENABLED)) {
-		dp_display_state_show("[already enabled]");
+		dp_display_state_warn("[already enabled]");
 		goto end;
 	}
 
@@ -3050,7 +3036,7 @@ static void dp_display_convert_to_dp_mode(struct dp_display *dp_display,
 	int rc;
 	struct dp_display_private *dp;
 	struct dp_panel *dp_panel;
-	u32 free_dsc_blks = 0, required_dsc_blks = 0;
+	u32 free_dsc_blks = 0, required_dsc_blks = 0, curr_dsc = 0, new_dsc = 0;
 
 	if (!dp_display || !drm_mode || !dp_mode || !panel) {
 		DP_ERR("invalid input\n");
@@ -3065,6 +3051,9 @@ static void dp_display_convert_to_dp_mode(struct dp_display *dp_display,
 	free_dsc_blks = dp_display->max_dsc_count -
 				dp->tot_dsc_blks_in_use +
 				dp_panel->dsc_blks_in_use;
+	DP_DEBUG("Before: in_use:%d, max:%d, free:%d\n",
+				dp->tot_dsc_blks_in_use,
+				dp_display->max_dsc_count, free_dsc_blks);
 
 	rc = msm_get_dsc_count(dp->priv, drm_mode->hdisplay,
 			&required_dsc_blks);
@@ -3073,11 +3062,19 @@ static void dp_display_convert_to_dp_mode(struct dp_display *dp_display,
 		return;
 	}
 
-	if (free_dsc_blks >= required_dsc_blks)
+	curr_dsc = dp_panel->dsc_blks_in_use;
+	dp->tot_dsc_blks_in_use -= dp_panel->dsc_blks_in_use;
+	dp_panel->dsc_blks_in_use = 0;
+
+	if (free_dsc_blks >= required_dsc_blks) {
 		dp_mode->capabilities |= DP_PANEL_CAPS_DSC;
+		new_dsc = max(curr_dsc, required_dsc_blks);
+		dp_panel->dsc_blks_in_use = new_dsc;
+		dp->tot_dsc_blks_in_use += new_dsc;
+	}
 
 	if (dp_mode->capabilities & DP_PANEL_CAPS_DSC)
-		DP_DEBUG("in_use:%d, max:%d, free:%d, req:%d, caps:0x%x\n",
+		DP_DEBUG("After: in_use:%d, max:%d, free:%d, req:%d, caps:0x%x\n",
 				dp->tot_dsc_blks_in_use,
 				dp_display->max_dsc_count,
 				free_dsc_blks, required_dsc_blks,

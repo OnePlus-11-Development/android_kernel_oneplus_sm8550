@@ -747,62 +747,18 @@ static int _sde_enc_phys_wb_validate_dnsc_blur_filter(
 	return 0;
 }
 
-static int _sde_enc_phys_wb_validate_dnsc_blur_ds(struct drm_crtc_state *crtc_state,
-			struct drm_connector_state *conn_state, const struct sde_format *fmt)
+static int _sde_enc_phys_wb_validate_dnsc_blur_filters(struct drm_crtc_state *crtc_state,
+		struct drm_connector_state *conn_state)
 {
-	struct sde_crtc_state *cstate = to_sde_crtc_state(crtc_state);
 	struct sde_connector_state *sde_conn_state = to_sde_connector_state(conn_state);
-	struct sde_kms *sde_kms;
-	struct sde_drm_dnsc_blur_cfg *cfg;
 	struct sde_dnsc_blur_filter_info *filter_info;
-	struct sde_io_res ds_res = {0, }, dnsc_blur_res = {0, };
-	u32 ds_tap_pt = sde_crtc_get_property(cstate, CRTC_PROP_CAPTURE_OUTPUT);
+	struct sde_drm_dnsc_blur_cfg *cfg;
+	struct sde_kms *sde_kms;
 	int ret = 0, i, j;
 
 	sde_kms = sde_connector_get_kms(conn_state->connector);
 	if (!sde_kms) {
 		SDE_ERROR("invalid kms\n");
-		return -EINVAL;
-	}
-
-	sde_crtc_get_ds_io_res(crtc_state, &ds_res);
-	sde_connector_get_dnsc_blur_io_res(conn_state, &dnsc_blur_res);
-
-	if ((ds_res.enabled && (!ds_res.src_w || !ds_res.src_h
-					|| !ds_res.dst_w || !ds_res.dst_h))) {
-		SDE_ERROR("invalid ds cfg src:%ux%u dst:%ux%u\n",
-				ds_res.src_w, ds_res.src_h, ds_res.dst_w, ds_res.dst_h);
-		return -EINVAL;
-	}
-
-	if (!dnsc_blur_res.enabled)
-		return 0;
-
-	if (!dnsc_blur_res.src_w || !dnsc_blur_res.src_h
-			|| !dnsc_blur_res.dst_w || !dnsc_blur_res.dst_h) {
-		SDE_ERROR("invalid dnsc_blur cfg src:%ux%u dst:%ux%u\n",
-				dnsc_blur_res.src_w, dnsc_blur_res.src_h,
-				dnsc_blur_res.dst_w, dnsc_blur_res.dst_h);
-		return -EINVAL;
-	} else if (ds_res.enabled && (ds_tap_pt == CAPTURE_DSPP_OUT)
-			&& ((ds_res.dst_w  != dnsc_blur_res.src_w)
-				|| (ds_res.dst_h != dnsc_blur_res.src_h))) {
-		SDE_ERROR("invalid DSPP OUT cfg: ds dst:%ux%u dnsc_blur src:%ux%u\n",
-				ds_res.dst_w, ds_res.dst_h,
-				dnsc_blur_res.src_w, dnsc_blur_res.src_h);
-		return -EINVAL;
-	} else if (ds_res.enabled && (ds_tap_pt == CAPTURE_MIXER_OUT)
-			&& ((ds_res.src_w  != dnsc_blur_res.src_w)
-				|| (ds_res.src_h != dnsc_blur_res.src_h))) {
-		SDE_ERROR("invalid MIXER OUT cfg: ds src:%ux%u dnsc_blur src:%ux%u\n",
-				ds_res.dst_w, ds_res.dst_h,
-				dnsc_blur_res.src_w, dnsc_blur_res.src_h);
-		return -EINVAL;
-	} else if (cstate->user_roi_list.num_rects) {
-		SDE_ERROR("PU with dnsc_blur not supported\n");
-		return -EINVAL;
-	} else if (SDE_FORMAT_IS_YUV(fmt)) {
-		SDE_ERROR("YUV output not supported with dnsc_blur\n");
 		return -EINVAL;
 	}
 
@@ -827,6 +783,66 @@ static int _sde_enc_phys_wb_validate_dnsc_blur_ds(struct drm_crtc_state *crtc_st
 	}
 
 	return ret;
+}
+
+static int _sde_enc_phys_wb_validate_dnsc_blur_ds(struct drm_crtc_state *crtc_state,
+			struct drm_connector_state *conn_state, const struct sde_format *fmt,
+			struct sde_rect *wb_roi)
+{
+	struct sde_crtc_state *cstate = to_sde_crtc_state(crtc_state);
+	struct sde_io_res ds_res = {0, }, dnsc_blur_res = {0, };
+	u32 ds_tap_pt = sde_crtc_get_property(cstate, CRTC_PROP_CAPTURE_OUTPUT);
+
+	sde_crtc_get_ds_io_res(crtc_state, &ds_res);
+	sde_connector_get_dnsc_blur_io_res(conn_state, &dnsc_blur_res);
+
+	if ((ds_res.enabled && (!ds_res.src_w || !ds_res.src_h
+					|| !ds_res.dst_w || !ds_res.dst_h))) {
+		SDE_ERROR("invalid ds cfg src:%ux%u dst:%ux%u\n",
+				ds_res.src_w, ds_res.src_h, ds_res.dst_w, ds_res.dst_h);
+		return -EINVAL;
+	}
+
+	if (!dnsc_blur_res.enabled)
+		return 0;
+
+	if (!dnsc_blur_res.src_w || !dnsc_blur_res.src_h
+			|| !dnsc_blur_res.dst_w || !dnsc_blur_res.dst_h
+			|| (dnsc_blur_res.src_w < dnsc_blur_res.dst_w)
+			|| (dnsc_blur_res.src_h < dnsc_blur_res.dst_h)) {
+		SDE_ERROR("invalid dnsc_blur cfg src:%ux%u dst:%ux%u\n",
+				dnsc_blur_res.src_w, dnsc_blur_res.src_h,
+				dnsc_blur_res.dst_w, dnsc_blur_res.dst_h);
+		return -EINVAL;
+	} else if (ds_res.enabled && (ds_tap_pt == CAPTURE_DSPP_OUT)
+			&& ((ds_res.dst_w  != dnsc_blur_res.src_w)
+				|| (ds_res.dst_h != dnsc_blur_res.src_h))) {
+		SDE_ERROR("invalid DSPP OUT cfg: ds dst:%ux%u dnsc_blur src:%ux%u\n",
+				ds_res.dst_w, ds_res.dst_h,
+				dnsc_blur_res.src_w, dnsc_blur_res.src_h);
+		return -EINVAL;
+	} else if (ds_res.enabled && (ds_tap_pt == CAPTURE_MIXER_OUT)
+			&& ((ds_res.src_w  != dnsc_blur_res.src_w)
+				|| (ds_res.src_h != dnsc_blur_res.src_h))) {
+		SDE_ERROR("invalid MIXER OUT cfg: ds src:%ux%u dnsc_blur src:%ux%u\n",
+				ds_res.dst_w, ds_res.dst_h,
+				dnsc_blur_res.src_w, dnsc_blur_res.src_h);
+		return -EINVAL;
+	} else if (cstate->user_roi_list.num_rects) {
+		SDE_ERROR("PU with dnsc_blur not supported\n");
+		return -EINVAL;
+	} else if (SDE_FORMAT_IS_YUV(fmt)) {
+		SDE_ERROR("YUV output not supported with dnsc_blur\n");
+		return -EINVAL;
+	} else if ((wb_roi->w && (wb_roi->w != dnsc_blur_res.dst_w)) ||
+			(wb_roi->h && (wb_roi->h != dnsc_blur_res.dst_h))) {
+		SDE_ERROR("invalid WB ROI with dnsc_blur, roi:{%d,%d,%d,%d}, dnsc_blur dst:%ux%u\n",
+				wb_roi->x, wb_roi->y, wb_roi->w, wb_roi->h,
+				dnsc_blur_res.dst_w, dnsc_blur_res.dst_h);
+		return -EINVAL;
+	}
+
+	return _sde_enc_phys_wb_validate_dnsc_blur_filters(crtc_state, conn_state);
 }
 
 static int _sde_enc_phys_wb_validate_cwb(struct sde_encoder_phys *phys_enc,
@@ -1024,7 +1040,7 @@ static int sde_encoder_phys_wb_atomic_check(struct sde_encoder_phys *phys_enc,
 	if (SDE_FORMAT_IS_YUV(fmt) != !!phys_enc->hw_cdm)
 		crtc_state->mode_changed = true;
 
-	rc = _sde_enc_phys_wb_validate_dnsc_blur_ds(crtc_state, conn_state, fmt);
+	rc = _sde_enc_phys_wb_validate_dnsc_blur_ds(crtc_state, conn_state, fmt, &wb_roi);
 	if (rc) {
 		SDE_ERROR("[enc:%d wb:%d] failed dnsc_blur/ds validation; ret:%d\n",
 				DRMID(phys_enc->parent), WBID(wb_enc), rc);
@@ -1085,6 +1101,7 @@ static void _sde_encoder_phys_wb_setup_sys_cache(struct sde_encoder_phys *phys_e
 	struct sde_sc_cfg *sc_cfg;
 	struct sde_hw_wb_sc_cfg *cfg  = &wb_enc->sc_cfg;
 	u32 cache_enable, cache_flag, cache_rd_type, cache_wr_type;
+	int i;
 
 	if (!fb) {
 		SDE_ERROR("invalid fb on wb %d\n", WBID(wb_enc));
@@ -1146,9 +1163,13 @@ static void _sde_encoder_phys_wb_setup_sys_cache(struct sde_encoder_phys *phys_e
 	 * avoid llcc_active reset for crtc while in clone mode as it will reset it for
 	 * primary display as well
 	 */
-	if (cache_enable || !phys_enc->in_clone_mode) {
-		sde_crtc->new_perf.llcc_active[cache_wr_type] = cache_enable;
-		sde_crtc->new_perf.llcc_active[cache_rd_type] = cache_enable;
+	if (cache_enable) {
+		sde_crtc->new_perf.llcc_active[cache_wr_type] = true;
+		sde_crtc->new_perf.llcc_active[cache_rd_type] = true;
+		sde_core_perf_crtc_update_llcc(wb_enc->crtc);
+	} else if (!phys_enc->in_clone_mode) {
+		for (i = 0; i < SDE_SYS_CACHE_MAX; i++)
+			sde_crtc->new_perf.llcc_active[i] = false;
 		sde_core_perf_crtc_update_llcc(wb_enc->crtc);
 	}
 

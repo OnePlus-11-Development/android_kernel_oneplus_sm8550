@@ -247,7 +247,6 @@ int dsi_pll_init(struct platform_device *pdev, struct dsi_pll_resource **pll)
 	int rc = 0;
 	const char *label;
 	struct dsi_pll_resource *pll_res = NULL;
-	bool in_trusted_vm = false;
 
 	if (!pdev->dev.of_node) {
 		pr_err("Invalid DSI PHY node\n");
@@ -327,9 +326,10 @@ int dsi_pll_init(struct platform_device *pdev, struct dsi_pll_resource **pll)
 	if (dsi_pll_get_ioresources(pdev, &pll_res->gdsc_base, "gdsc_base"))
 		DSI_PLL_DBG(pll_res, "Unable to remap gdsc base resources\n");
 
-	in_trusted_vm = of_property_read_bool(pdev->dev.of_node,
+	pll_res->in_trusted_vm = of_property_read_bool(pdev->dev.of_node,
 						"qcom,dsi-pll-in-trusted-vm");
-	if (in_trusted_vm) {
+
+	if (pll_res->in_trusted_vm) {
 		DSI_PLL_INFO(pll_res,
 			"Bypassing PLL clock register for Trusted VM\n");
 		return rc;
@@ -346,7 +346,7 @@ int dsi_pll_init(struct platform_device *pdev, struct dsi_pll_resource **pll)
 
 void dsi_pll_parse_dfps_data(struct platform_device *pdev, struct dsi_pll_resource *pll_res)
 {
-	if (!(pll_res->index)) {
+	if (!(pll_res->index) && !(pll_res->in_trusted_vm)) {
 		if (dsi_pll_parse_dfps_from_dt(pdev, pll_res))
 			dsi_pll_parse_dfps(pdev, pll_res);
 	}
