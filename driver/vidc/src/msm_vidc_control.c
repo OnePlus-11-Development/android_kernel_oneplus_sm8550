@@ -1749,7 +1749,8 @@ int msm_vidc_adjust_slice_count(void *instance, struct v4l2_ctrl *ctrl)
 	if (fps > MAX_SLICES_FRAME_RATE ||
 		(rc_type != HFI_RC_OFF &&
 		rc_type != HFI_RC_CBR_CFR &&
-		rc_type != HFI_RC_CBR_VFR) ||
+		rc_type != HFI_RC_CBR_VFR &&
+		rc_type != HFI_RC_VBR_CFR) ||
 		all_intra) {
 		adjusted_value = V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_SINGLE;
 		update_cap = SLICE_MODE;
