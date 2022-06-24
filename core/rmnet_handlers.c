@@ -29,6 +29,8 @@
 #include "rmnet_handlers.h"
 #include "rmnet_descriptor.h"
 #include "rmnet_ll.h"
+#include "rmnet_module.h"
+
 
 #include "rmnet_qmi.h"
 #include "qmi_rmnet.h"
@@ -135,6 +137,9 @@ rmnet_deliver_skb(struct sk_buff *skb, struct rmnet_port *port)
 	rcu_read_unlock();
 
 skip_shs:
+	if (rmnet_module_hook_shs_skb_ll_entry(NULL, skb, &port->shs_cfg))
+		return;
+
 	netif_receive_skb(skb);
 }
 EXPORT_SYMBOL(rmnet_deliver_skb);
