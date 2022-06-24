@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -24,7 +25,7 @@ static struct rmnet_ctl_client_if *rmnet_ctl;
 
 int rmnet_qmap_send(struct sk_buff *skb, u8 ch, bool flush)
 {
-	trace_dfc_qmap(skb->data, skb->len, false);
+	trace_dfc_qmap(skb->data, skb->len, false, ch);
 
 	if (ch != RMNET_CH_CTL && real_data_dev) {
 		skb->protocol = htons(ETH_P_MAP);
@@ -43,6 +44,7 @@ int rmnet_qmap_send(struct sk_buff *skb, u8 ch, bool flush)
 
 	return 0;
 }
+EXPORT_SYMBOL(rmnet_qmap_send);
 
 static void rmnet_qmap_cmd_handler(struct sk_buff *skb)
 {
@@ -52,7 +54,7 @@ static void rmnet_qmap_cmd_handler(struct sk_buff *skb)
 	if (!skb)
 		return;
 
-	trace_dfc_qmap(skb->data, skb->len, true);
+	trace_dfc_qmap(skb->data, skb->len, true, RMNET_CH_CTL);
 
 	if (skb->len < sizeof(struct qmap_cmd_hdr))
 		goto free_skb;

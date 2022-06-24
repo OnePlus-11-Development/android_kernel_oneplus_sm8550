@@ -797,7 +797,7 @@ static void rmnet_frag_partial_csum(struct sk_buff *skb,
 	skb->csum_start = (u8 *)iph + frag_desc->ip_len - skb->head;
 }
 
-#define PFN_ENTRY_MAX (256)
+#define PFN_ENTRY_MAX (128)
 #define PFNI (count++ % PFN_ENTRY_MAX)
 static void rmnet_descriptor_trace_pfn(struct sk_buff *skb)
 {
