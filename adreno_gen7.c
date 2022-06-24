@@ -1564,7 +1564,7 @@ static void gen7_set_isdb_breakpoint_registers(struct adreno_device *adreno_dev)
 
 	if (!device->set_isdb_breakpoint || device->ftbl->is_hwcg_on(device)
 			|| device->qdss_gfx_virt == NULL || !device->force_panic)
-		goto err;
+		return;
 
 	clk = clk_get(&device->pdev->dev, "apb_pclk");
 
