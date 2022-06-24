@@ -306,7 +306,7 @@ static int msm_vidc_initialize_core(struct msm_vidc_core *core)
 		goto exit;
 	}
 
-	core->packet_size = 4096;
+	core->packet_size = VIDC_IFACEQ_VAR_HUGE_PKT_SIZE;
 	rc = msm_vidc_vmem_alloc(core->packet_size,
 			(void **)&core->packet, "core packet");
 	if (rc)
