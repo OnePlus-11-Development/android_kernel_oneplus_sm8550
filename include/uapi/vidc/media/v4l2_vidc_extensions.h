@@ -265,6 +265,9 @@ enum v4l2_h264_encode_delivery_mode {
 #define V4L2_CID_MPEG_VIDC_METADATA_DOLBY_RPU                                 \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x40)
 
+#define V4L2_CID_MPEG_VIDC_CLIENT_ID                                          \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x41)
+
 /* add new controls above this line */
 /* Deprecate below controls once availble in gki and gsi bionic header */
 #ifndef V4L2_CID_MPEG_VIDEO_BASELAYER_PRIORITY_ID

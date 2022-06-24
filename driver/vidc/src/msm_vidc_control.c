@@ -1077,6 +1077,12 @@ static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
 	/* update value to db */
 	msm_vidc_update_cap_value(inst, cap_id, ctrl->val, __func__);
 
+	if (ctrl->id == V4L2_CID_MPEG_VIDC_CLIENT_ID) {
+		rc = msm_vidc_update_debug_str(inst);
+		if (rc)
+			return rc;
+	}
+
 	if (ctrl->id == V4L2_CID_MPEG_VIDC_SECURE) {
 		if (ctrl->val) {
 			rc = msm_vidc_allow_secure_session(inst);
