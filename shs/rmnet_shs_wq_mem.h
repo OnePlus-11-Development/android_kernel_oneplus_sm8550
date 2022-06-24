@@ -32,7 +32,9 @@
 #define DATARMNET29d29f44cf ((0xd2d+202-0xdf7))
 struct __attribute__((__packed__))DATARMNET33582f7450{u64 DATARMNET18b7a5b761;
 u64 DATARMNET4da6031170;u64 DATARMNET4df302dbd6;u16 DATARMNET42a992465f;};struct
- __attribute__((__packed__))DATARMNETf44cda1bf2{u64 DATARMNET324c1a8f98;u64 
+ __attribute__((__packed__))DATARMNET661e7a8566{int DATARMNET68a58889b0[
+(0xd18+223-0xdf4)];int DATARMNET1c7c913c7b[(0xd18+223-0xdf4)];};struct 
+__attribute__((__packed__))DATARMNETf44cda1bf2{u64 DATARMNET324c1a8f98;u64 
 DATARMNET253a9fc708;u64 DATARMNETbb80fccd97;u32 hash;u16 DATARMNET42a992465f;};
 struct __attribute__((__packed__))DATARMNET3a84fbfeae{u64 DATARMNET324c1a8f98;
 u64 DATARMNET253a9fc708;u64 DATARMNETbb80fccd97;u32 hash;u16 DATARMNET42a992465f

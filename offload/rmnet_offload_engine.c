@@ -1,4 +1,5 @@
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +15,7 @@
 #include <linux/list.h>
 #include <linux/hashtable.h>
 #include "rmnet_descriptor.h"
+#include "rmnet_module.h"
 #include "rmnet_offload_state.h"
 #include "rmnet_offload_engine.h"
 #include "rmnet_offload_main.h"
@@ -94,20 +96,24 @@ DATARMNETa00cda79d0(DATARMNETf3f92fc0b9);DATARMNETa3055c21f2(DATARMNET6745427f98
 DATARMNET6745427f98;}static void DATARMNETbe30d096c6(void){LIST_HEAD(
 DATARMNET6f9bfa17e6);DATARMNET664568fcd0();if(DATARMNETae70636c90(&
 DATARMNET6f9bfa17e6))DATARMNETa00cda79d0(DATARMNET5727f095ec);
-DATARMNET6a76048590();DATARMNETc70e73c8d4(&DATARMNET6f9bfa17e6);}void 
+DATARMNET6a76048590();DATARMNETc70e73c8d4(&DATARMNET6f9bfa17e6);}static const 
+struct rmnet_module_hook_register_info DATARMNETcbc211d052={.hooknum=
+RMNET_MODULE_HOOK_OFFLOAD_CHAIN_END,.func=DATARMNETbe30d096c6,};void 
 DATARMNETd4230b6bfe(void){rcu_assign_pointer(rmnet_perf_chain_end,
-DATARMNETbe30d096c6);}void DATARMNET560e127137(void){rcu_assign_pointer(
-rmnet_perf_chain_end,NULL);}int DATARMNET241493ab9a(u64 DATARMNET0470698d6c,u64 
-DATARMNETfeff65e096){LIST_HEAD(DATARMNET6f9bfa17e6);u32 DATARMNET737bbd41c3=
-(0xd2d+202-0xdf7);if(DATARMNET0470698d6c==DATARMNET5fe3af8828||
-DATARMNETfeff65e096==DATARMNET2d89680280)return(0xd2d+202-0xdf7);switch(
-DATARMNETfeff65e096){case DATARMNET03daf91a60:DATARMNET737bbd41c3=
-DATARMNET1993bae165(DATARMNETa656f324b2,&DATARMNET6f9bfa17e6);break;case 
-DATARMNET88a9920663:DATARMNET737bbd41c3=DATARMNET1993bae165(DATARMNETfd5c3d30e5,
-&DATARMNET6f9bfa17e6);break;case DATARMNET5fe3af8828:DATARMNET737bbd41c3=
-DATARMNETae70636c90(&DATARMNET6f9bfa17e6);break;}DATARMNETbad3b5165e(
-DATARMNETddf572458d,DATARMNET737bbd41c3);DATARMNETc70e73c8d4(&
-DATARMNET6f9bfa17e6);return(0xd2d+202-0xdf7);}void DATARMNETa3055c21f2(struct 
+DATARMNETbe30d096c6);rmnet_module_hook_register(&DATARMNETcbc211d052,
+(0xd26+209-0xdf6));}void DATARMNET560e127137(void){rcu_assign_pointer(
+rmnet_perf_chain_end,NULL);rmnet_module_hook_unregister_no_sync(&
+DATARMNETcbc211d052,(0xd26+209-0xdf6));}int DATARMNET241493ab9a(u64 
+DATARMNET0470698d6c,u64 DATARMNETfeff65e096){LIST_HEAD(DATARMNET6f9bfa17e6);u32 
+DATARMNET737bbd41c3=(0xd2d+202-0xdf7);if(DATARMNET0470698d6c==
+DATARMNET5fe3af8828||DATARMNETfeff65e096==DATARMNET2d89680280)return
+(0xd2d+202-0xdf7);switch(DATARMNETfeff65e096){case DATARMNET03daf91a60:
+DATARMNET737bbd41c3=DATARMNET1993bae165(DATARMNETa656f324b2,&DATARMNET6f9bfa17e6
+);break;case DATARMNET88a9920663:DATARMNET737bbd41c3=DATARMNET1993bae165(
+DATARMNETfd5c3d30e5,&DATARMNET6f9bfa17e6);break;case DATARMNET5fe3af8828:
+DATARMNET737bbd41c3=DATARMNETae70636c90(&DATARMNET6f9bfa17e6);break;}
+DATARMNETbad3b5165e(DATARMNETddf572458d,DATARMNET737bbd41c3);DATARMNETc70e73c8d4
+(&DATARMNET6f9bfa17e6);return(0xd2d+202-0xdf7);}void DATARMNETa3055c21f2(struct 
 DATARMNETd7c9631acd*DATARMNETaa568481cf,struct list_head*DATARMNET6f9bfa17e6){
 struct DATARMNET70f3b87b5d*DATARMNETe05748b000=DATARMNETc2a630b113();struct 
 rmnet_frag_descriptor*DATARMNETd74aeaa49a,*DATARMNETa1625e27e2,*

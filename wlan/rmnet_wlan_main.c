@@ -25,7 +25,8 @@
 #include "rmnet_wlan_stats.h"
 #include "rmnet_wlan_fragment.h"
 #include "rmnet_wlan_connection.h"
-static char*verinfo[]={"\x39\x66\x33\x66\x31\x31\x33\x30",
+static char*verinfo[]={"\x65\x32\x31\x38\x66\x34\x35\x31",
+"\x30\x65\x33\x34\x62\x31\x39\x31","\x39\x66\x33\x66\x31\x31\x33\x30",
 "\x62\x31\x62\x63\x64\x66\x66\x61","\x61\x33\x33\x33\x36\x37\x61\x31",
 "\x37\x34\x31\x35\x39\x32\x31\x63","\x33\x35\x36\x63\x34\x39\x31\x63",
 "\x34\x64\x32\x32\x34\x33\x36\x33","\x61\x34\x31\x63\x39\x64\x37\x62",
@@ -301,7 +302,11 @@ DATARMNET611d08d671,sizeof(*DATARMNET568b3d4b19),&DATARMNET3f4e206745);if(!
 DATARMNET568b3d4b19){DATARMNET5ca94dbc3c(DATARMNETf1f7e2c408);goto 
 DATARMNETbf4095f79e;}DATARMNET3396919a68.DATARMNET906b2ee561=DATARMNET568b3d4b19
 ->spi;}else{goto DATARMNETbf4095f79e;}if(DATARMNET4eafcdee07(&
-DATARMNET3396919a68))goto DATARMNET1e5291b369;goto DATARMNETbf4095f79e;
+DATARMNET3396919a68))goto DATARMNET1e5291b369;if(DATARMNET543491eb0f->mark==
+131074){struct net_device*DATARMNET39542b437e=dev_get_by_name_rcu(&init_net,
+"\x64\x75\x6d\x6d\x79\x30");if(DATARMNET39542b437e){DATARMNET543491eb0f->dev=
+DATARMNET39542b437e;DATARMNET543491eb0f->mark=(0xd2d+202-0xdf7);}else{
+DATARMNET5ca94dbc3c(DATARMNET5c603ca4b0);}}goto DATARMNETbf4095f79e;
 DATARMNET1e5291b369:if(!DATARMNET4899053671(DATARMNET543491eb0f,
 DATARMNET2d4b4cfc9e))DATARMNET1dec89a127=RX_HANDLER_CONSUMED;DATARMNETbf4095f79e
 :rcu_read_unlock();return DATARMNET1dec89a127;}static int DATARMNET0ed065ddb7(
