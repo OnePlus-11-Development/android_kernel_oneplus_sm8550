@@ -25,6 +25,40 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted (subject to the limitations in the
+ * disclaimer below) provided that the following conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *
+ *     * Redistributions in binary form must reproduce the above
+ *       copyright notice, this list of conditions and the following
+ *       disclaimer in the documentation and/or other materials provided
+ *       with the distribution.
+ *
+ *     * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+ *       contributors may be used to endorse or promote products derived
+ *       from this software without specific prior written permission.
+ *
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
  */
 #include <errno.h>
 #include <pthread.h>
@@ -249,8 +283,8 @@ int ipa_nati_add_ipv4_tbl(
 	uint32_t*   tbl_hdl)
 {
 	arb_t* args[] = {
-		(arb_t*) public_ip_addr,
-		(arb_t*) number_of_entries,
+		(arb_t*)(arb_t)public_ip_addr,
+		(arb_t*)(arb_t)number_of_entries,
 		(arb_t*) tbl_hdl,
 		(arb_t*) mem_type_ptr,
 	};
@@ -275,7 +309,7 @@ int ipa_nati_del_ipv4_table(
 	uint32_t tbl_hdl)
 {
 	arb_t* args[] = {
-		(arb_t*) tbl_hdl,
+		(arb_t*)(arb_t)tbl_hdl,
 	};
 
 	int ret;
@@ -293,7 +327,7 @@ int ipa_nati_clear_ipv4_tbl(
 	uint32_t tbl_hdl )
 {
 	arb_t* args[] = {
-		(arb_t*) tbl_hdl,
+		(arb_t*)(arb_t)tbl_hdl,
 	};
 
 	int ret;
@@ -314,8 +348,8 @@ int ipa_nati_walk_ipv4_tbl(
 	void*             arb_data_ptr )
 {
 	arb_t* args[] = {
-		(arb_t*) tbl_hdl,
-		(arb_t*) which,
+		(arb_t*)(arb_t)tbl_hdl,
+		(arb_t*)(arb_t)which,
 		(arb_t*) walk_cb,
 		(arb_t*) arb_data_ptr,
 	};
@@ -337,7 +371,7 @@ int ipa_nati_ipv4_tbl_stats(
 	ipa_nati_tbl_stats* idx_stats_ptr )
 {
 	arb_t* args[] = {
-		(arb_t*) tbl_hdl,
+		(arb_t*)(arb_t)tbl_hdl,
 		(arb_t*) nat_stats_ptr,
 		(arb_t*) idx_stats_ptr,
 	};
@@ -359,7 +393,7 @@ int ipa_nati_add_ipv4_rule(
 	uint32_t*                rule_hdl )
 {
 	arb_t* args[] = {
-		(arb_t*) tbl_hdl,
+		(arb_t*)(arb_t)tbl_hdl,
 		(arb_t*) clnt_rule,
 		(arb_t*) rule_hdl,
 	};
@@ -385,8 +419,8 @@ int ipa_nati_del_ipv4_rule(
 	uint32_t rule_hdl )
 {
 	arb_t* args[] = {
-		(arb_t*) tbl_hdl,
-		(arb_t*) rule_hdl,
+		(arb_t*)(arb_t)tbl_hdl,
+		(arb_t*)(arb_t)rule_hdl,
 	};
 
 	int ret;
@@ -406,8 +440,8 @@ int ipa_nati_query_timestamp(
 	uint32_t* time_stamp)
 {
 	arb_t* args[] = {
-		(arb_t*) tbl_hdl,
-		(arb_t*) rule_hdl,
+		(arb_t*)(arb_t)tbl_hdl,
+		(arb_t*)(arb_t)rule_hdl,
 		(arb_t*) time_stamp,
 	};
 
@@ -1108,8 +1142,8 @@ static int _smAddSramAndDdrTbl(
 			 * table...
 			 */
 			arb_t*   new_args[] = {
-				(arb_t*) public_ip_addr,
-				(arb_t*) number_of_entries,
+				(arb_t*)(arb_t)public_ip_addr,
+				(arb_t*)(arb_t)number_of_entries,
 				(arb_t*) &tbl_hdl,  /* to protect app's table handle above */
 			};
 
@@ -1187,7 +1221,7 @@ static int _smDelSramAndDdrTbl(
 	if ( ret == 0 )
 	{
 		arb_t* new_args[] = {
-			(arb_t*) nati_obj_ptr->ddr_tbl_hdl,
+			(arb_t*)(arb_t)nati_obj_ptr->ddr_tbl_hdl,
 		};
 
 		ret = _smDelTbl(nati_obj_ptr, trigger, new_args);
@@ -1299,7 +1333,7 @@ static int _smClrTblHybrid(
 	uint32_t tbl_hdl = (uint32_t) args[0];
 
 	arb_t*   new_args[] = {
-		(arb_t*) (nati_obj_ptr->curr_state == NATI_STATE_HYBRID) ?
+		(arb_t*)(arb_t)(nati_obj_ptr->curr_state == NATI_STATE_HYBRID) ?
 		         tbl_hdl :
 		         nati_obj_ptr->ddr_tbl_hdl,
 	};
@@ -1394,7 +1428,7 @@ static int _smWalkTblHybrid(
 	arb_t*            wadp    = (arb_t*)            args[3];
 
 	arb_t* new_args[] = {
-		(arb_t*) (nati_obj_ptr->curr_state == NATI_STATE_HYBRID) ?
+		(arb_t*)(arb_t)(nati_obj_ptr->curr_state == NATI_STATE_HYBRID) ?
 		         tbl_hdl :
 		         nati_obj_ptr->ddr_tbl_hdl,
 		(arb_t*) which,
@@ -1490,7 +1524,7 @@ static int _smStatTblHybrid(
 	ipa_nati_tbl_stats* idx_stats_ptr = (ipa_nati_tbl_stats*) args[2];
 
 	arb_t* new_args[] = {
-		(arb_t*) (nati_obj_ptr->curr_state == NATI_STATE_HYBRID) ?
+		(arb_t*)(arb_t)(nati_obj_ptr->curr_state == NATI_STATE_HYBRID) ?
 		         tbl_hdl :
 		         nati_obj_ptr->ddr_tbl_hdl,
 		(arb_t*) nat_stats_ptr,
@@ -1659,7 +1693,7 @@ static int _smAddRuleHybrid(
 	uint32_t*          rule_hdl  = (uint32_t*)          args[2];
 
 	arb_t*             new_args[] = {
-		(arb_t*) (nati_obj_ptr->curr_state == NATI_STATE_HYBRID) ?
+		(arb_t*)(arb_t)(nati_obj_ptr->curr_state == NATI_STATE_HYBRID) ?
 		         tbl_hdl :
 		         nati_obj_ptr->ddr_tbl_hdl,
 		(arb_t*) clnt_rule,
@@ -1814,10 +1848,10 @@ static int _smDelRuleHybrid(
 	if ( ret == 0 )
 	{
 		arb_t* new_args[]  = {
-			(arb_t*) (nati_obj_ptr->curr_state == NATI_STATE_HYBRID) ?
+			(arb_t*)(arb_t)(nati_obj_ptr->curr_state == NATI_STATE_HYBRID) ?
 			        tbl_hdl :
 			        nati_obj_ptr->ddr_tbl_hdl,
-			(arb_t*) new_rule_hdl,
+			(arb_t*)(arb_t)new_rule_hdl,
 		};
 
 		IPADBG("orig_rule_hdl(0x%08X) -> new_rule_hdl(0x%08X)\n",
@@ -2398,10 +2432,10 @@ static int _smGetTmStmpHybrid(
 	if ( ret == 0 )
 	{
 		arb_t* new_args[] = {
-			(arb_t*) (nati_obj_ptr->curr_state == NATI_STATE_HYBRID) ?
+			(arb_t*)(arb_t)(nati_obj_ptr->curr_state == NATI_STATE_HYBRID) ?
 			         tbl_hdl :
 			         nati_obj_ptr->ddr_tbl_hdl,
-			(arb_t*) new_rule_hdl,
+			(arb_t*)(arb_t)new_rule_hdl,
 			(arb_t*) time_stamp,
 		};
 

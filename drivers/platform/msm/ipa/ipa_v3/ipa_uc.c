@@ -1514,7 +1514,7 @@ int ipa3_uc_memcpy(phys_addr_t dest, phys_addr_t src, int len)
 	struct IpaHwMemCopyData_t *cmd;
 
 	IPADBG("dest 0x%pa src 0x%pa len %d\n", &dest, &src, len);
-	mem.size = sizeof(cmd);
+	mem.size = sizeof(*cmd);
 	mem.base = dma_alloc_coherent(ipa3_ctx->pdev, mem.size, &mem.phys_base,
 		GFP_KERNEL);
 	if (!mem.base) {

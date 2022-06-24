@@ -61,5 +61,16 @@ LOCAL_MODULE_PATH := $(KERNEL_MODULES_OUT)
 $(warning $(DLKM_DIR))
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 
+include $(CLEAR_VARS)
+KBUILD_OPTIONS += MODNAME=ipatestm
+LOCAL_SRC_FILES   := $(wildcard $(LOCAL_PATH)/**/*) $(wildcard $(LOCAL_PATH)/*)
+LOCAL_MODULE              := ipatestm.ko
+LOCAL_MODULE_KBUILD_NAME  := ipa/ipatestm.ko
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_HEADER_LIBRARIES    := ipa_test_kernel_headers
+LOCAL_MODULE_PATH := $(KERNEL_MODULES_OUT)
+$(warning $(DLKM_DIR))
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+
 endif #End of Check for target
 endif #End of Check for qssi target

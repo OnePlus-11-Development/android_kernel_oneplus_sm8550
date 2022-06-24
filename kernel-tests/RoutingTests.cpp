@@ -5170,7 +5170,73 @@ public:
 		Register(*this);
 	}
 
-	bool Run()
+	bool Setup()
+	{
+		return IpaRoutingBlockTestFixture:: Setup(true);
+	}
+
+	bool AddRules()
+	{
+		struct ipa_ioc_add_rt_rule_v2 *rt_rule;
+		struct ipa_rt_rule_add_v2 *rt_rule_entry;
+		const int NUM_RULES = 3;
+
+		rt_rule = (struct ipa_ioc_add_rt_rule_v2 *)
+		calloc(1, sizeof(struct ipa_ioc_add_rt_rule_v2));
+
+		if(!rt_rule) {
+			printf("fail\n");
+			return false;
+		}
+
+		rt_rule->rules = (uint64_t)calloc(3, sizeof(struct ipa_rt_rule_add_v2));
+		if(!rt_rule->rules) {
+			printf("fail\n");
+			return false;
+		}
+
+		rt_rule->commit = 1;
+		rt_rule->num_rules = NUM_RULES;
+		rt_rule->ip = IPA_IP_v4;
+		strlcpy(rt_rule->rt_tbl_name, "LAN", sizeof(rt_rule->rt_tbl_name));
+
+		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[0]);
+		rt_rule_entry->at_rear = 0;
+		rt_rule_entry->rule.dst = IPA_CLIENT_TEST2_CONS;
+		rt_rule_entry->rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+		rt_rule_entry->rule.attrib.u.v4.dst_addr      = 0xC0A802FF;
+		rt_rule_entry->rule.attrib.u.v4.dst_addr_mask = 0xFFFFFFFF;
+		rt_rule_entry->rule.ttl_update = 1;
+
+		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[1]);
+		rt_rule_entry->at_rear = 0;
+		rt_rule_entry->rule.dst = IPA_CLIENT_TEST3_CONS;
+		rt_rule_entry->rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+		rt_rule_entry->rule.attrib.u.v4.dst_addr      = 0xC0A802AA;
+		rt_rule_entry->rule.attrib.u.v4.dst_addr_mask = 0xFFFFFFFF;
+		rt_rule_entry->rule.ttl_update = 1;
+
+		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[2]);
+		rt_rule_entry->at_rear = 1;
+		rt_rule_entry->rule.ttl_update = 0;
+		rt_rule_entry->rule.dst = IPA_CLIENT_TEST4_CONS;
+
+		if (false == m_routing.AddRoutingRule(rt_rule))
+		{
+			printf("Routing rule addition failed!\n");
+			return false;
+		}
+
+		printf("rt rule hdl1=%x\n", rt_rule_entry->rt_rule_hdl);
+
+		free(rt_rule);
+
+		InitFilteringBlock();
+
+		return true;
+	}
+
+	virtual bool Run()
 	{
 		bool res = false;
 		bool isSuccess = false;
@@ -5325,70 +5391,6 @@ public:
 		delete[] rxBuff3;
 
 		return pkt1_cmp_succ && pkt2_cmp_succ && pkt3_cmp_succ;
-	}
-
-
-	bool AddRules()
-	{
-		struct ipa_ioc_add_rt_rule_v2 *rt_rule;
-		struct ipa_rt_rule_add_v2 *rt_rule_entry;
-		const int NUM_RULES = 3;
-
-		rt_rule = (struct ipa_ioc_add_rt_rule_v2 *)
-			calloc(1, sizeof(struct ipa_ioc_add_rt_rule_v2));
-
-		if(!rt_rule) {
-			printf("fail\n");
-			return false;
-		}
-
-		rt_rule->rules = (uint64_t)calloc(3, sizeof(struct ipa_rt_rule_add_v2));
-		if(!rt_rule->rules) {
-			printf("fail\n");
-			return false;
-		}
-
-		rt_rule->commit = 1;
-		rt_rule->num_rules = NUM_RULES;
-		rt_rule->ip = IPA_IP_v4;
-		strlcpy(rt_rule->rt_tbl_name, "LAN", sizeof(rt_rule->rt_tbl_name));
-
-		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[0]);
-		rt_rule_entry->at_rear = 0;
-		rt_rule_entry->rule.dst = IPA_CLIENT_TEST2_CONS;
-//		rt_rule_entry->rule.hdr_hdl = hdr_entry->hdr_hdl; // gidons, there is no support for header insertion / removal yet.
-		rt_rule_entry->rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
-		rt_rule_entry->rule.attrib.u.v4.dst_addr      = 0xC0A802FF;
-		rt_rule_entry->rule.attrib.u.v4.dst_addr_mask = 0xFFFFFFFF;
-		rt_rule_entry->rule.ttl_update = 1;
-
-		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[1]);
-		rt_rule_entry->at_rear = 0;
-		rt_rule_entry->rule.dst = IPA_CLIENT_TEST3_CONS;
-//		rt_rule_entry->rule.hdr_hdl = hdr_entry->hdr_hdl; // gidons, there is no support for header insertion / removal yet.
-		rt_rule_entry->rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
-		rt_rule_entry->rule.attrib.u.v4.dst_addr      = 0xC0A802AA;
-		rt_rule_entry->rule.attrib.u.v4.dst_addr_mask = 0xFFFFFFFF;
-		rt_rule_entry->rule.ttl_update = 1;
-
-		rt_rule_entry = &(((struct ipa_rt_rule_add_v2 *)rt_rule->rules)[2]);
-		rt_rule_entry->at_rear = 1;
-		rt_rule_entry->rule.ttl_update = 0;
-		rt_rule_entry->rule.dst = IPA_CLIENT_TEST4_CONS;
-
-		if (false == m_routing.AddRoutingRule(rt_rule))
-		{
-			printf("Routing rule addition failed!\n");
-			return false;
-		}
-
-		printf("rt rule hdl1=%x\n", rt_rule_entry->rt_rule_hdl);
-
-		free(rt_rule);
-
-		InitFilteringBlock();
-
-		return true;
 	}
 };
 

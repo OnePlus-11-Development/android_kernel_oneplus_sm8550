@@ -189,29 +189,23 @@ static int ipa3_eth_config_uc(bool init,
 		cmd.base = dma_alloc_coherent(ipa3_ctx->uc_pdev, cmd.size,
 			&cmd.phys_base, GFP_KERNEL);
 		if (cmd.base == NULL) {
-			IPAERR("fail to get DMA memory.\n");
+			IPAERR("dma_alloc_coherent failed\n");
 			return -ENOMEM;
 		}
-		cmd_data =
-			(struct IpaHwOffloadSetUpCmdData_t_v4_0 *)cmd.base;
+		cmd_data = (struct IpaHwOffloadSetUpCmdData_t_v4_0 *)cmd.base;
 		cmd_data->protocol = protocol;
 		switch (protocol) {
 		case IPA_HW_PROTOCOL_AQC:
-			cmd_data->SetupCh_params.AqcSetupCh_params.dir =
-				dir;
-			cmd_data->SetupCh_params.AqcSetupCh_params.gsi_ch =
-				gsi_ch;
-			cmd_data->SetupCh_params.AqcSetupCh_params.aqc_ch =
-				peripheral_ch;
+			cmd_data->SetupCh_params.aqc_params.dir = dir;
+			cmd_data->SetupCh_params.aqc_params.gsi_ch = gsi_ch;
+			cmd_data->SetupCh_params.aqc_params.aqc_ch = peripheral_ch;
 			break;
 		case IPA_HW_PROTOCOL_RTK:
-			cmd_data->SetupCh_params.RtkSetupCh_params.dir =
-				dir;
-			cmd_data->SetupCh_params.RtkSetupCh_params.gsi_ch =
-				gsi_ch;
+			cmd_data->SetupCh_params.rtk_params.dir = dir;
+			cmd_data->SetupCh_params.rtk_params.gsi_ch = gsi_ch;
 			break;
 		default:
-			IPAERR("invalid protocol%d\n", protocol);
+			IPAERR("Unsupported protocol%d\n", protocol);
 		}
 		command = IPA_CPU_2_HW_CMD_OFFLOAD_CHANNEL_SET_UP;
 
@@ -222,44 +216,36 @@ static int ipa3_eth_config_uc(bool init,
 		cmd.base = dma_alloc_coherent(ipa3_ctx->uc_pdev, cmd.size,
 			&cmd.phys_base, GFP_KERNEL);
 		if (cmd.base == NULL) {
-			IPAERR("fail to get DMA memory.\n");
+			IPAERR("dma_alloc_coherent failed\n");
 			return -ENOMEM;
 		}
 
-		cmd_data =
-			(struct IpaHwOffloadCommonChCmdData_t_v4_0 *)cmd.base;
+		cmd_data = (struct IpaHwOffloadCommonChCmdData_t_v4_0 *)cmd.base;
 
 		cmd_data->protocol = protocol;
 		switch (protocol) {
 		case IPA_HW_PROTOCOL_AQC:
-			cmd_data->CommonCh_params.AqcCommonCh_params.gsi_ch =
-				gsi_ch;
+			cmd_data->CommonCh_params.aqc_params.gsi_ch = gsi_ch;
 			break;
 		case IPA_HW_PROTOCOL_RTK:
-			cmd_data->CommonCh_params.RtkCommonCh_params.gsi_ch =
-				gsi_ch;
+			cmd_data->CommonCh_params.rtk_params.gsi_ch = gsi_ch;
 			break;
 		default:
-			IPAERR("invalid protocol%d\n", protocol);
+			IPAERR("Unsupported protocol%d\n", protocol);
 		}
-		cmd_data->CommonCh_params.RtkCommonCh_params.gsi_ch = gsi_ch;
-		command = IPA_CPU_2_HW_CMD_OFFLOAD_TEAR_DOWN;
+		cmd_data->CommonCh_params.rtk_params.gsi_ch = gsi_ch;
+		command = IPA_CPU_2_HW_CMD_OFFLOAD_CHANNEL_TEAR_DOWN;
 	}
 
 	IPA_ACTIVE_CLIENTS_INC_SIMPLE();
 
-	result = ipa3_uc_send_cmd((u32)(cmd.phys_base),
-		command,
-		IPA_HW_2_CPU_OFFLOAD_CMD_STATUS_SUCCESS,
-		false, 10 * HZ);
-	if (result) {
+	result = ipa3_uc_send_cmd((u32)(cmd.phys_base), command,
+		IPA_HW_2_CPU_OFFLOAD_CMD_STATUS_SUCCESS, false, 10 * HZ);
+	if (result)
 		IPAERR("fail to %s uc for %s gsi channel %d\n",
-			init ? "init" : "deinit",
-			dir == IPA_ETH_RX ? "Rx" : "Tx", gsi_ch);
-	}
+			init ? "init" : "deinit", dir == IPA_ETH_RX ? "Rx" : "Tx", gsi_ch);
 
-	dma_free_coherent(ipa3_ctx->uc_pdev,
-		cmd.size, cmd.base, cmd.phys_base);
+	dma_free_coherent(ipa3_ctx->uc_pdev, cmd.size, cmd.base, cmd.phys_base);
 	IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
 
 	IPADBG("exit\n");
@@ -733,7 +719,7 @@ fail_get_gsi_ep_info:
 	return result;
 }
 
-static int ipa_eth_setup_ntn_gsi_channel(
+static int ipa_eth_setup_ntn3_gsi_channel(
 	struct ipa_eth_client_pipe_info *pipe,
 	struct ipa3_ep_context *ep)
 {
@@ -765,8 +751,11 @@ static int ipa_eth_setup_ntn_gsi_channel(
 	gsi_evt_ring_props.int_modt = IPA_ETH_NTN_MODT;
 	/* len / RE_SIZE == len in counts (convert from bytes) */
 	len = pipe->info.transfer_ring_size;
-	gsi_evt_ring_props.int_modc = len * IPA_ETH_AQC_MODC_FACTOR /
-		(100 * GSI_EVT_RING_RE_SIZE_16B);
+	/*
+	 * int_modc = 2 is experiments based best value for tput.
+	 * we shall use a framework setup in the future.
+	 */
+	gsi_evt_ring_props.int_modc = 2;
 	gsi_evt_ring_props.exclusive = true;
 	gsi_evt_ring_props.err_cb = ipa_eth_gsi_evt_ring_err_cb;
 	gsi_evt_ring_props.user_data = NULL;
@@ -1029,7 +1018,7 @@ int ipa3_eth_connect(
 		result = ipa_eth_setup_aqc_gsi_channel(pipe, ep);
 		break;
 	case IPA_HW_PROTOCOL_NTN3:
-		result = ipa_eth_setup_ntn_gsi_channel(pipe, ep);
+		result = ipa_eth_setup_ntn3_gsi_channel(pipe, ep);
 		break;
 	default:
 		IPAERR("unknown protocol %d\n", prot);

@@ -194,7 +194,7 @@ static int ipa3_uc_send_ntn_setup_pipe_cmd(
 	int ipa_ep_idx;
 	int result = 0;
 	struct ipa_mem_buffer cmd;
-	struct Ipa3HwNtnSetUpCmdData_t *Ntn_params;
+	struct uc_channel_setup_cmd_hw_ntn *Ntn_params;
 	struct IpaHwOffloadSetUpCmdData_t *cmd_data;
 	struct IpaHwOffloadSetUpCmdData_t_v4_0 *cmd_data_v4_0;
 
@@ -237,11 +237,11 @@ static int ipa3_uc_send_ntn_setup_pipe_cmd(
 		cmd_data_v4_0 = (struct IpaHwOffloadSetUpCmdData_t_v4_0 *)
 			cmd.base;
 		cmd_data_v4_0->protocol = IPA_HW_PROTOCOL_ETH;
-		Ntn_params = &cmd_data_v4_0->SetupCh_params.NtnSetupCh_params;
+		Ntn_params = &cmd_data_v4_0->SetupCh_params.ntn_params;
 	} else {
 		cmd_data = (struct IpaHwOffloadSetUpCmdData_t *)cmd.base;
 		cmd_data->protocol = IPA_HW_PROTOCOL_ETH;
-		Ntn_params = &cmd_data->SetupCh_params.NtnSetupCh_params;
+		Ntn_params = &cmd_data->SetupCh_params.ntn_params;
 	}
 
 	if (ntn_info->smmu_enabled) {
@@ -601,7 +601,7 @@ int ipa3_tear_down_uc_offload_pipes(int ipa_ep_idx_ul,
 	struct ipa3_ep_context *ep_ul, *ep_dl;
 	struct IpaHwOffloadCommonChCmdData_t *cmd_data;
 	struct IpaHwOffloadCommonChCmdData_t_v4_0 *cmd_data_v4_0;
-	union Ipa3HwNtnCommonChCmdData_t *tear;
+	union uc_channel_teardown_cmd_hw_ntn *tear;
 	int result = 0;
 
 	IPADBG("ep_ul = %d\n", ipa_ep_idx_ul);
@@ -650,11 +650,11 @@ int ipa3_tear_down_uc_offload_pipes(int ipa_ep_idx_ul,
 		cmd_data_v4_0 = (struct IpaHwOffloadCommonChCmdData_t_v4_0 *)
 			cmd.base;
 		cmd_data_v4_0->protocol = IPA_HW_PROTOCOL_ETH;
-		tear = &cmd_data_v4_0->CommonCh_params.NtnCommonCh_params;
+		tear = &cmd_data_v4_0->CommonCh_params.ntn_params;
 	} else {
 		cmd_data = (struct IpaHwOffloadCommonChCmdData_t *)cmd.base;
 		cmd_data->protocol = IPA_HW_PROTOCOL_ETH;
-		tear = &cmd_data->CommonCh_params.NtnCommonCh_params;
+		tear = &cmd_data->CommonCh_params.ntn_params;
 	}
 
 	/* teardown the DL pipe */
@@ -668,7 +668,7 @@ int ipa3_tear_down_uc_offload_pipes(int ipa_ep_idx_ul,
 	IPADBG("dl client (ep: %d) disconnected\n", ipa_ep_idx_dl);
 	tear->params.ipa_pipe_number = ipa_ep_idx_dl;
 	result = ipa3_uc_send_cmd((u32)(cmd.phys_base),
-				IPA_CPU_2_HW_CMD_OFFLOAD_TEAR_DOWN,
+				IPA_CPU_2_HW_CMD_OFFLOAD_CHANNEL_TEAR_DOWN,
 				IPA_HW_2_CPU_OFFLOAD_CMD_STATUS_SUCCESS,
 				false, 10*HZ);
 	if (result) {
@@ -689,7 +689,7 @@ int ipa3_tear_down_uc_offload_pipes(int ipa_ep_idx_ul,
 
 	tear->params.ipa_pipe_number = ipa_ep_idx_ul;
 	result = ipa3_uc_send_cmd((u32)(cmd.phys_base),
-				IPA_CPU_2_HW_CMD_OFFLOAD_TEAR_DOWN,
+				IPA_CPU_2_HW_CMD_OFFLOAD_CHANNEL_TEAR_DOWN,
 				IPA_HW_2_CPU_OFFLOAD_CMD_STATUS_SUCCESS,
 				false, 10*HZ);
 	if (result) {

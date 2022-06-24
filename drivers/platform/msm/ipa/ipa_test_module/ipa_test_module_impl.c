@@ -693,7 +693,9 @@ static struct sk_buff *datapath_create_skb(const char *buf, size_t size)
 {
 	struct sk_buff *skb;
 	unsigned char *data;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,10,0)
 	int err = 0;
+#endif
 
 	IPATEST_DBG("allocating SKB, len=%zu", size);
 	skb = alloc_skb(size, GFP_KERNEL);
@@ -706,10 +708,13 @@ static struct sk_buff *datapath_create_skb(const char *buf, size_t size)
 		return NULL;
 	}
 	IPATEST_DBG("skb put finish, skb->len=%d", skb->len);
-	skb->csum = csum_and_copy_from_user(
-			buf, data,
-			size, 0, &err);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,10,0)
+	skb->csum = csum_and_copy_from_user(buf, data, size);
+	if (!skb->csum) {
+#else
+	skb->csum = csum_and_copy_from_user(buf, data, size, 0, &err);
 	if (err) {
+#endif
 		kfree_skb(skb);
 		return NULL;
 	}
@@ -1212,7 +1217,7 @@ int connect_apps_to_ipa(struct test_endpoint_sys *tx_ep,
 	tx_ep->gsi_channel_props.low_weight = 1;
 	tx_ep->gsi_channel_props.chan_user_data = tx_ep;
 	if (ipa_get_hw_type() >= IPA_HW_v4_9)
-		tx_ep->gsi_channel_props.db_in_bytes = 1; 
+		tx_ep->gsi_channel_props.db_in_bytes = 1;
 
 	tx_ep->gsi_channel_props.err_cb = ipa_test_gsi_chan_err_cb;
 	tx_ep->gsi_channel_props.xfer_cb = ipa_test_gsi_irq_notify_cb;

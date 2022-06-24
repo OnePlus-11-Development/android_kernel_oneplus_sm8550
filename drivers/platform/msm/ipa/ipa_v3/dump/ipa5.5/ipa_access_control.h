@@ -23,6 +23,7 @@ static struct reg_mem_access_map_t mem_access_map[] = {
 	/*      Range               Use when              Use when    */
 	/*  Begin    End           SD_ENABLED           SD_DISABLED   */
 	/*------------------------------------------------------------*/
+	{ 0x04000, 0x04FFF, { &io_matrix[AN_COMBO], &io_matrix[AN_COMBO] } },
 	{ 0xA8000, 0xB8000, { &io_matrix[AN_COMBO], &io_matrix[AN_COMBO] } },
 	{ 0x05000, 0x0F000, { &io_matrix[AN_COMBO], &io_matrix[AN_COMBO] } },
 	{ 0x0F000, 0x10000, { &io_matrix[AN_COMBO], &io_matrix[AN_COMBO] } },
