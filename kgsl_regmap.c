@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/io.h>
@@ -99,6 +100,14 @@ struct kgsl_regmap_region *kgsl_regmap_get_region(struct kgsl_regmap *regmap,
 	}
 
 	return NULL;
+}
+
+bool kgsl_regmap_valid_offset(struct kgsl_regmap *regmap, u32 offset)
+{
+	if (kgsl_regmap_get_region(regmap, offset))
+		return true;
+
+	return false;
 }
 
 u32 kgsl_regmap_read(struct kgsl_regmap *regmap, u32 offset)

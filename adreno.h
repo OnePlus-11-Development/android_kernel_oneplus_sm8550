@@ -120,6 +120,8 @@
 #define ADRENO_BCL BIT(12)
 /* L3 voting is supported with L3 constraints */
 #define ADRENO_L3_VOTE BIT(13)
+/* LPAC is supported  */
+#define ADRENO_LPAC BIT(14)
 /* Late Stage Reprojection (LSR) enablment for GMU */
 #define ADRENO_LSR BIT(15)
 
@@ -216,6 +218,7 @@ enum adreno_gpurev {
 	ADRENO_REV_GEN7_0_0 = 0x070000,
 	ADRENO_REV_GEN7_0_1 = 0x070001,
 	ADRENO_REV_GEN7_2_0 = 0x070200,
+	ADRENO_REV_GEN7_2_1 = 0x070201,
 	ADRENO_REV_GEN7_4_0 = 0x070400,
 };
 
@@ -417,8 +420,6 @@ struct adreno_power_ops {
  */
 struct adreno_gpu_core {
 	enum adreno_gpurev gpurev;
-	/** @chipid: Unique GPU chipid for external identification */
-	u32 chipid;
 	unsigned int core, major, minor, patchid;
 	/**
 	 * @compatible: If specified, use the compatible string to match the
@@ -533,9 +534,6 @@ struct adreno_device {
 	struct kgsl_device dev;    /* Must be first field in this struct */
 	unsigned long priv;
 	unsigned int chipid;
-	unsigned long cx_dbgc_base;
-	unsigned int cx_dbgc_len;
-	void __iomem *cx_dbgc_virt;
 	unsigned int cx_misc_len;
 	void __iomem *cx_misc_virt;
 	unsigned long isense_base;
@@ -581,8 +579,8 @@ struct adreno_device {
 	bool sptp_pc_enabled;
 	/** @bcl_enabled: True if BCL is enabled */
 	bool bcl_enabled;
-	/** @lsr_enabled: True if LSR is enabled */
-	bool lsr_enabled;
+	/** @lpac_enabled: True if LPAC is enabled */
+	bool lpac_enabled;
 	struct kgsl_memdesc *profile_buffer;
 	unsigned int profile_index;
 	struct kgsl_memdesc *pwrup_reglist;
@@ -599,7 +597,15 @@ struct adreno_device {
 	unsigned int highest_bank_bit;
 	unsigned int quirks;
 
-	struct coresight_device *csdev[2];
+#ifdef CONFIG_QCOM_KGSL_CORESIGHT
+	/** @gx_coresight:  A coresight instance for GX */
+	struct adreno_coresight_device gx_coresight;
+	/** @gx_coresight:  A coresight instance for CX */
+	struct adreno_coresight_device cx_coresight;
+	/** @funnel_gfx:  A coresight instance for gfx funnel */
+	struct adreno_funnel_device funnel_gfx;
+#endif
+
 	uint32_t gpmu_throttle_counters[ADRENO_GPMU_THROTTLE_COUNTERS];
 	struct work_struct irq_storm_work;
 
@@ -655,8 +661,6 @@ struct adreno_device {
  * @ADRENO_DEVICE_PWRON - Set during init after a power collapse
  * @ADRENO_DEVICE_PWRON_FIXUP - Set if the target requires the shader fixup
  * after power collapse
- * @ADRENO_DEVICE_CORESIGHT - Set if the coresight (trace bus) registers should
- * be restored after power collapse
  * @ADRENO_DEVICE_STARTED - Set if the device start sequence is in progress
  * @ADRENO_DEVICE_FAULT - Set if the device is currently in fault (and shouldn't
  * send any more commands to the ringbuffer)
@@ -674,7 +678,6 @@ enum adreno_device_flags {
 	ADRENO_DEVICE_PWRON = 0,
 	ADRENO_DEVICE_PWRON_FIXUP = 1,
 	ADRENO_DEVICE_INITIALIZED = 2,
-	ADRENO_DEVICE_CORESIGHT = 3,
 	ADRENO_DEVICE_STARTED = 5,
 	ADRENO_DEVICE_FAULT = 6,
 	ADRENO_DEVICE_DRAWOBJ_PROFILE = 7,
@@ -684,7 +687,6 @@ enum adreno_device_flags {
 	ADRENO_DEVICE_GPMU_INITIALIZED = 11,
 	ADRENO_DEVICE_ISDB_ENABLED = 12,
 	ADRENO_DEVICE_CACHE_FLUSH_TS_SUSPENDED = 13,
-	ADRENO_DEVICE_CORESIGHT_CX = 14,
 };
 
 /**
@@ -799,8 +801,6 @@ struct adreno_gpudev {
 	 */
 	unsigned int *const reg_offsets;
 
-	struct adreno_coresight *coresight[2];
-
 	/* GPU specific function hooks */
 	int (*probe)(struct platform_device *pdev, u32 chipid,
 		const struct adreno_gpu_core *gpucore);
@@ -867,6 +867,14 @@ struct adreno_gpudev {
 	 */
 	int (*perfcounter_remove)(struct adreno_device *adreno_dev,
 			struct adreno_perfcount_register *reg, u32 groupid);
+	/**
+	 * @set_isdb_breakpoint_registers - Program isdb registers to issue break command
+	 */
+	void (*set_isdb_breakpoint_registers)(struct adreno_device *adreno_dev);
+	/**
+	 * @reset_and_snapshot - Target specific function to do reset and snapshot
+	 */
+	void (*reset_and_snapshot) (struct adreno_device *adreno_dev, int fault);
 };
 
 /**
@@ -942,7 +950,7 @@ int adreno_set_constraint(struct kgsl_device *device,
 
 void adreno_snapshot(struct kgsl_device *device,
 		struct kgsl_snapshot *snapshot,
-		struct kgsl_context *context);
+		struct kgsl_context *context, struct kgsl_context *context_lpac);
 
 int adreno_reset(struct kgsl_device *device, int fault);
 
@@ -963,12 +971,6 @@ long adreno_ioctl_perfcounter_get(struct kgsl_device_private *dev_priv,
 long adreno_ioctl_perfcounter_put(struct kgsl_device_private *dev_priv,
 	unsigned int cmd, void *data);
 
-bool adreno_is_cx_dbgc_register(struct kgsl_device *device,
-		unsigned int offset);
-void adreno_cx_dbgc_regread(struct kgsl_device *adreno_device,
-		unsigned int offsetwords, unsigned int *value);
-void adreno_cx_dbgc_regwrite(struct kgsl_device *device,
-		unsigned int offsetwords, unsigned int value);
 void adreno_cx_misc_regread(struct adreno_device *adreno_dev,
 		unsigned int offsetwords, unsigned int *value);
 void adreno_cx_misc_regwrite(struct adreno_device *adreno_dev,
@@ -1070,6 +1072,7 @@ ADRENO_TARGET(a610, ADRENO_REV_A610)
 ADRENO_TARGET(a612, ADRENO_REV_A612)
 ADRENO_TARGET(a618, ADRENO_REV_A618)
 ADRENO_TARGET(a619, ADRENO_REV_A619)
+ADRENO_TARGET(a621, ADRENO_REV_A621)
 ADRENO_TARGET(a630, ADRENO_REV_A630)
 ADRENO_TARGET(a635, ADRENO_REV_A635)
 ADRENO_TARGET(a662, ADRENO_REV_A662)
@@ -1153,7 +1156,13 @@ static inline int adreno_is_gen7(struct adreno_device *adreno_dev)
 ADRENO_TARGET(gen7_0_0, ADRENO_REV_GEN7_0_0)
 ADRENO_TARGET(gen7_0_1, ADRENO_REV_GEN7_0_1)
 ADRENO_TARGET(gen7_2_0, ADRENO_REV_GEN7_2_0)
+ADRENO_TARGET(gen7_2_1, ADRENO_REV_GEN7_2_1)
 ADRENO_TARGET(gen7_4_0, ADRENO_REV_GEN7_4_0)
+
+static inline int adreno_is_gen7_2_x(struct adreno_device *adreno_dev)
+{
+	return adreno_is_gen7_2_0(adreno_dev) || adreno_is_gen7_2_1(adreno_dev);
+}
 
 /*
  * adreno_checkreg_off() - Checks the validity of a register enum
@@ -1607,9 +1616,14 @@ static inline void adreno_reg_offset_init(u32 *reg_offsets)
 	}
 }
 
-static inline u32 adreno_get_level(u32 priority)
+static inline u32 adreno_get_level(struct kgsl_context *context)
 {
-	u32 level = priority / KGSL_PRIORITY_MAX_RB_LEVELS;
+	u32 level;
+
+	if (kgsl_context_is_lpac(context))
+		return KGSL_LPAC_RB_ID;
+
+	level = context->priority / KGSL_PRIORITY_MAX_RB_LEVELS;
 
 	return min_t(u32, level, KGSL_PRIORITY_MAX_RB_LEVELS - 1);
 }
@@ -1791,19 +1805,6 @@ static inline int adreno_allocate_global(struct kgsl_device *device,
 	*memdesc = kgsl_allocate_global(device, size, padding, flags, priv, name);
 	return PTR_ERR_OR_ZERO(*memdesc);
 }
-
-/**
- * adreno_regulator_disable_poll - Disable the regulator and wait for it to
- * complete
- * @device: A GPU device handle
- * @reg: Pointer to the regulator to disable
- * @offset: Offset of the register to poll for success
- * @timeout: Timeout (in milliseconds)
- *
- * Return: true if the regulator got disabled or false on timeout
- */
-bool adreno_regulator_disable_poll(struct kgsl_device *device,
-		struct regulator *reg, u32 offset, u32 timeout);
 
 static inline void adreno_set_dispatch_ops(struct adreno_device *adreno_dev,
 		const struct adreno_dispatch_ops *ops)

@@ -1,12 +1,14 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _ADRENO_CORESIGHT_H_
 #define _ADRENO_CORESIGHT_H_
 
 #include <linux/device.h>
+#include <linux/coresight.h>
 
 struct adreno_device;
 
@@ -86,18 +88,42 @@ struct adreno_coresight {
 	unsigned int count;
 	/** @groups: Pointer to an attribute list of control files */
 	const struct attribute_group **groups;
+};
+
+/**
+ * struct adreno_coresight_device - Container for a coresight instance
+ */
+struct adreno_coresight_device {
+	/** @dev: Pointer to the corsight device */
+	struct coresight_device *dev;
+	/** @coresight: Point to the GPU specific coresight definition */
+	const struct adreno_coresight *coresight;
+	/** @device: Pointer to a GPU device handle */
+	struct kgsl_device *device;
+	/** @enabled: True if the coresight instance is enabled */
+	bool enabled;
 	/** @atid: The unique ATID value of the coresight device */
 	unsigned int atid;
 };
 
-#ifdef CONFIG_QCOM_KGSL_CORESIGHT
 /**
- * adreno_coresight_init - Initialize coresight for the GPU device
- * @adreno_dev: An Adreno GPU device handle
- *
- * Initialize devices for the GPU target.
+ * struct adreno_funnel_device - Container for a coresight gfx funnel
  */
-void adreno_coresight_init(struct adreno_device *adreno_dev);
+struct adreno_funnel_device {
+	/** @funnel_dev: Pointer to the gfx funnel device */
+	struct device *funnel_dev;
+	/** @funnel_csdev: Point to the gfx funnel coresight definition */
+	struct coresight_device *funnel_csdev;
+	/** @funnel_ops: Function pointers to enable/disable the coresight funnel */
+	const struct coresight_ops *funnel_ops;
+};
+
+#ifdef CONFIG_QCOM_KGSL_CORESIGHT
+
+void adreno_coresight_add_device(struct adreno_device *adreno_dev,
+		const char *name,
+		const struct adreno_coresight *coresight,
+		struct adreno_coresight_device *adreno_csdev);
 
 /**
  * adreno_coresight_start - Reprogram coresight registers after power collapse
@@ -124,7 +150,13 @@ void adreno_coresight_stop(struct adreno_device *adreno_dev);
  */
 void adreno_coresight_remove(struct adreno_device *adreno_dev);
 #else
-static inline void adreno_coresight_init(struct adreno_device *adreno_dev) { }
+static inline void adreno_coresight_add_device(struct kgsl_device *device,
+		const char *name,
+		const struct adreno_coresight *coresight,
+		struct adreno_coresight_device *adreno_csdev)
+{
+}
+
 static inline void adreno_coresight_start(struct adreno_device *adreno_dev) { }
 static inline void adreno_coresight_stop(struct adreno_device *adreno_dev) { }
 static inline void adreno_coresight_remove(struct adreno_device *adreno_dev) { }

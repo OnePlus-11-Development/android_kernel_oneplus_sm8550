@@ -8,6 +8,7 @@
 
 #include "adreno.h"
 #include "adreno_gen7.h"
+#include "kgsl_regmap.h"
 
 #define CLUSTER_NONE 0
 #define CLUSTER_FE 1
@@ -1879,6 +1880,14 @@ struct gen7_shader_block_info {
 	unsigned int usptp;
 	u32 bank;
 	u64 offset;
+};
+
+struct gen7_trace_buffer_info {
+	u16 dbgc_ctrl;
+	u16 segment;
+	u16 granularity;
+	u16 ping_blk[TRACE_BUF_NUM_SIG];
+	u16 ping_idx[TRACE_BUF_NUM_SIG];
 };
 
 static struct reg_list {

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef KGSL_REGMAP_H
@@ -48,7 +49,7 @@ struct kgsl_regmap {
 	 */
 	struct resource *base;
 	/** @region: Array of regions for this regmap */
-	struct kgsl_regmap_region region[3];
+	struct kgsl_regmap_region region[4];
 	/** @count: Number of active regions in @region */
 	int count;
 };
@@ -99,6 +100,15 @@ int kgsl_regmap_init(struct platform_device *pdev, struct kgsl_regmap *regmap,
  */
 int kgsl_regmap_add_region(struct kgsl_regmap *regmap, struct platform_device *pdev,
 		const char *name, const struct kgsl_regmap_ops *ops, void *priv);
+
+/**
+ * kgsl_regmap_valid_offset - return true if the offset is valid
+ * @regmap: The regmap to query
+ * @offset: The dword offset to query
+ *
+ * Return: True if @offset is a valid register in the regmap
+ */
+bool kgsl_regmap_valid_offset(struct kgsl_regmap *regmap, u32 offset);
 
 /**
  * kgsl_regmap_read - Read a register from the regmap

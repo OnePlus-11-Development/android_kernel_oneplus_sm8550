@@ -228,19 +228,6 @@ static inline bool gen7_is_smmu_stalled(struct kgsl_device *device)
 	return val & BIT(24);
 }
 
-/**
- * gen7_cx_regulator_disable_wait - Disable a cx regulator and wait for it
- * @reg: A &struct regulator handle
- * @device: kgsl device struct
- * @timeout: Time to wait (in milliseconds)
- *
- * Disable the regulator and wait @timeout milliseconds for it to enter the
- * disabled state.
- *
- */
-void gen7_cx_regulator_disable_wait(struct regulator *reg,
-		struct kgsl_device *device, u32 timeout);
-
 /* Preemption functions */
 void gen7_preemption_trigger(struct adreno_device *adreno_dev, bool atomic);
 void gen7_preemption_schedule(struct adreno_device *adreno_dev);
@@ -470,4 +457,11 @@ void gen7_rdpm_mx_freq_update(struct gen7_gmu_device *gmu, u32 freq);
  * This function communicates GPU cx frequency(in Mhz) changes to rdpm.
  */
 void gen7_rdpm_cx_freq_update(struct gen7_gmu_device *gmu, u32 freq);
+
+#ifdef CONFIG_QCOM_KGSL_CORESIGHT
+void gen7_coresight_init(struct adreno_device *device);
+#else
+static inline void gen7_coresight_init(struct adreno_device *device) { }
+#endif
+
 #endif

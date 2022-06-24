@@ -132,9 +132,17 @@
 #define GEN7_CP_BV_CHICKEN_DBG           0xada
 
 /* LPAC registers */
+#define GEN7_CP_LPAC_RB_RPTR             0xb06
+#define GEN7_CP_LPAC_RB_WPTR             0xb07
 #define GEN7_CP_LPAC_DRAW_STATE_ADDR     0xb0a
 #define GEN7_CP_LPAC_DRAW_STATE_DATA     0xb0b
 #define GEN7_CP_LPAC_ROQ_DBG_ADDR        0xb0c
+#define GEN7_CP_LPAC_IB1_BASE            0xb0d
+#define GEN7_CP_LPAC_IB1_BASE_HI         0xb0e
+#define GEN7_CP_LPAC_IB1_REM_SIZE        0xb0f
+#define GEN7_CP_LPAC_IB2_BASE            0xb10
+#define GEN7_CP_LPAC_IB2_BASE_HI         0xb11
+#define GEN7_CP_LPAC_IB2_REM_SIZE        0xb12
 #define GEN7_CP_SQE_AC_UCODE_DBG_ADDR    0xb27
 #define GEN7_CP_SQE_AC_UCODE_DBG_DATA    0xb28
 #define GEN7_CP_SQE_AC_STAT_ADDR         0xb29
@@ -144,6 +152,7 @@
 #define GEN7_CP_LPAC_ROQ_DBG_DATA        0xb35
 #define GEN7_CP_LPAC_FIFO_DBG_DATA       0xb36
 #define GEN7_CP_LPAC_FIFO_DBG_ADDR       0xb40
+#define GEN7_LPAC_RBBM_STATUS            0x5fe
 
 /* RBBM registers */
 #define GEN7_RBBM_INT_0_STATUS                   0x201
@@ -705,6 +714,9 @@
 #define GEN7_DBGC_PERF_ATB_DRAIN_CMD                0x64a
 #define GEN7_DBGC_ECO_CNTL                          0x650
 #define GEN7_DBGC_AHB_DBG_CNTL                      0x651
+#define GEN7_DBGC_TRACE_BUFFER_STATUS               0x699
+#define GEN7_DBGC_DBG_TRACE_BUFFER_RD_ADDR          0x69b
+#define GEN7_DBGC_DBG_TRACE_BUFFER_RD_DATA          0x69c
 
 /* VSC registers */
 #define GEN7_VSC_PERFCTR_VSC_SEL_0          0xcd8
@@ -1163,6 +1175,7 @@
 #define GEN7_GMU_AHB_FENCE_STATUS_CLR		0x23b14
 #define GEN7_GMU_RBBM_INT_UNMASKED_STATUS	0x23b15
 #define GEN7_GMU_AO_SPARE_CNTL			0x23b16
+#define GEN7_GPU_GMU_AO_GPU_LPAC_BUSY_STATUS	0x23b30
 
 /* GMU RSC control registers */
 #define GEN7_GMU_RSCC_CONTROL_REQ		0x23b07
@@ -1197,6 +1210,10 @@
 
 /* Device-specific RSCC registers */
 #define GEN7_2_0_RSCC_SEQ_MEM_0_DRV0			0x00154
+#define GEN7_2_0_RSCC_TCS0_DRV0_STATUS			0x0034a
+#define GEN7_2_0_RSCC_TCS1_DRV0_STATUS			0x003f2
+#define GEN7_2_0_RSCC_TCS2_DRV0_STATUS			0x0049a
+#define GEN7_2_0_RSCC_TCS3_DRV0_STATUS			0x00542
 
 /* GPU PDC sequencer registers in AOSS.RPMh domain */
 #define GEN7_PDC_GPU_ENABLE_PDC				0x1140
@@ -1206,5 +1223,17 @@
 
 /* GPU CX_MISC registers */
 #define GEN7_GPU_CX_MISC_TCM_RET_CNTL		0x39
+
+/* QDSS register offsets */
+#define QDSS_AOSS_APB_TMC_RSZ 0x04
+#define QDSS_AOSS_APB_TMC_RRD 0x10
+#define QDSS_AOSS_APB_TMC_RRP 0x14
+#define QDSS_AOSS_APB_TMC_RWP 0x18
+#define QDSS_AOSS_APB_TMC_CTRL 0x20
+#define QDSS_AOSS_APB_TMC_MODE 0x28
+#define QDSS_AOSS_APB_TMC_FFCR 0x304
+#define QDSS_AOSS_APB_TMC_LAR 0xfb0
+#define QDSS_AOSS_APB_ETR_CTRL 0x20
+#define QDSS_AOSS_APB_ETR1_CTRL 0x7020
 
 #endif /* _GEN7_REG_H */

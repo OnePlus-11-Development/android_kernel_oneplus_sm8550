@@ -70,7 +70,8 @@
 #define HFI_FEATURE_MINBW	20
 #define HFI_FEATURE_CLX		21
 #define HFI_FEATURE_LSR		23
-
+#define HFI_FEATURE_LPAC	24
+#define HFI_FEATURE_PERF_NORETAIN	26
 
 /* A6xx uses a different value for KPROF */
 #define HFI_FEATURE_A6XX_KPROF	14
@@ -204,6 +205,12 @@ enum hfi_mem_kind {
 	 * memory for LPAC context record
 	 */
 	HFI_MEMKIND_CSW_LPAC_PRIV_NON_SECURE,
+	/** @HFI_MEMKIND_MEMSTORE: Buffer used to query a context's GPU sop/eop timestamps */
+	HFI_MEMKIND_MEMSTORE,
+	/** @HFI_MEMKIND_HW_FENCE:  Hardware fence Tx/Rx headers and queues */
+	HFI_MEMKIND_HW_FENCE,
+	/** @HFI_MEMKIND_PREEMPT_SCRATCH: Used for Preemption scratch memory */
+	HFI_MEMKIND_PREEMPT_SCRATCH,
 	HFI_MEMKIND_MAX,
 };
 
@@ -230,6 +237,9 @@ static const char * const hfi_memkind_strings[] = {
 	[HFI_MEMKIND_MMIO_IPC_CORE] = "GMU MMIO IPC",
 	[HFI_MEMKIND_MMIO_IPCC_AOSS] = "GMU MMIO IPCC AOSS",
 	[HFI_MEMKIND_CSW_LPAC_PRIV_NON_SECURE] = "GMU CSW LPAC PRIV NON SECURE",
+	[HFI_MEMKIND_MEMSTORE] = "GMU MEMSTORE",
+	[HFI_MEMKIND_HW_FENCE] = "GMU HW FENCE",
+	[HFI_MEMKIND_PREEMPT_SCRATCH] = "GMU PREEMPTION",
 	[HFI_MEMKIND_MAX] = "GMU UNKNOWN",
 };
 
@@ -344,9 +354,6 @@ struct hfi_queue_table {
 #define MSG_HDR_GET_TYPE(hdr) (((hdr) >> 16) & 0xF)
 #define MSG_HDR_GET_SEQNUM(hdr) (((hdr) >> 20) & 0xFFF)
 
-#define MSG_HDR_GET_SIZE(hdr) (((hdr) >> 8) & 0xFF)
-#define MSG_HDR_GET_SEQNUM(hdr) (((hdr) >> 20) & 0xFFF)
-
 #define HDR_CMP_SEQNUM(out_hdr, in_hdr) \
 	(MSG_HDR_GET_SEQNUM(out_hdr) == MSG_HDR_GET_SEQNUM(in_hdr))
 
@@ -391,6 +398,7 @@ struct hfi_queue_table {
 #define H2F_MSG_TS_NOTIFY		132
 #define F2H_MSG_TS_RETIRE		133
 #define H2F_MSG_CONTEXT_POINTERS	134
+#define H2F_MSG_ISSUE_LPAC_CMD_RAW	135
 #define H2F_MSG_CONTEXT_RULE		140 /* AKA constraint */
 #define H2F_MSG_ISSUE_RECURRING_CMD	141
 #define F2H_MSG_CONTEXT_BAD		150
@@ -426,7 +434,8 @@ struct hfi_bwtable_cmd {
 
 struct opp_gx_desc {
 	u32 vote;
-	u32 acd;
+	/* This is 'acdLvl' in gmu fw which is now repurposed for cx vote */
+	u32 cx_vote;
 	u32 freq;
 } __packed;
 
@@ -690,8 +699,24 @@ struct hfi_context_rule_cmd {
 	u32 status;
 } __packed;
 
+struct fault_info {
+	u32 ctxt_id;
+	u32 policy;
+	u32 ts;
+} __packed;
+
 /* F2H */
 struct hfi_context_bad_cmd {
+	u32 hdr;
+	u32 version;
+	struct fault_info gc;
+	struct fault_info lpac;
+	u32 error;
+	u32 payload[];
+} __packed;
+
+/* F2H */
+struct hfi_context_bad_cmd_legacy {
 	u32 hdr;
 	u32 ctxt_id;
 	u32 policy;
@@ -786,6 +811,9 @@ struct payload_section {
 #define KEY_CP_BV_OPCODE_ERROR 4
 #define KEY_CP_BV_PROTECTED_ERROR 5
 #define KEY_CP_BV_HW_FAULT 6
+#define KEY_CP_LPAC_OPCODE_ERROR 7
+#define KEY_CP_LPAC_PROTECTED_ERROR 8
+#define KEY_CP_LPAC_HW_FAULT 9
 
 /* Keys for PAYLOAD_RB type payload */
 #define KEY_RB_ID 1
@@ -833,6 +861,18 @@ struct payload_section {
 #define GMU_CP_BV_UCODE_ERROR 613
 /* GPU BV encountered an illegal instruction */
 #define GMU_CP_BV_ILLEGAL_INST_ERROR 614
+/* GPU encountered a bad LPAC opcode */
+#define GMU_CP_LPAC_OPCODE_ERROR 615
+/* GPU LPAC encountered a CP ucode error */
+#define GMU_CP_LPAC_UCODE_ERROR 616
+/* GPU LPAC encountered a CP hw fault error */
+#define GMU_CP_LPAC_HW_FAULT_ERROR 617
+/* GPU LPAC encountered protected mode error */
+#define GMU_CP_LPAC_PROTECTED_ERROR 618
+/* GPU LPAC encountered an illegal instruction */
+#define GMU_CP_LPAC_ILLEGAL_INST_ERROR 619
+/* Fault due to LPAC Long IB timeout */
+#define GMU_GPU_LPAC_SW_HANG 620
 /* GPU encountered an unknown CP error */
 #define GMU_CP_UNKNOWN_ERROR 700
 

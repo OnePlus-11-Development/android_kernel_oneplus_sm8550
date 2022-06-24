@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef __ADRENO_GEN7_GMU_H
 #define __ADRENO_GEN7_GMU_H
@@ -56,9 +57,9 @@ struct gen7_gmu_device {
 	int num_clks;
 	unsigned int idle_level;
 	/** @freqs: Array of GMU frequencies */
-	u32 freqs[2];
+	u32 freqs[GMU_MAX_PWRLEVELS];
 	/** @vlvls: Array of GMU voltage levels */
-	u32 vlvls[2];
+	u32 vlvls[GMU_MAX_PWRLEVELS];
 	struct kgsl_mailbox mailbox;
 	/** @gmu_globals: Array to store gmu global buffers */
 	struct kgsl_memdesc gmu_globals[GMU_KERNEL_ENTRIES];
@@ -86,7 +87,7 @@ struct gen7_gmu_device {
 	struct kobject log_kobj;
 	/*
 	 * @perf_ddr_bw: The lowest ddr bandwidth that puts CX at a corner at
-	 * which GMU can run at 500 Mhz.
+	 * which GMU can run at higher frequency.
 	 */
 	u32 perf_ddr_bw;
 	/** @rdpm_cx_virt: Pointer where the RDPM CX block is mapped */
@@ -97,6 +98,10 @@ struct gen7_gmu_device {
 	u32 num_oob_perfcntr;
 	/** @acd_debug_val: DVM value to calibrate ACD for a level */
 	u32 acd_debug_val;
+	/** @gdsc_nb: Notifier block for cx gdsc regulator */
+	struct notifier_block gdsc_nb;
+	/** @gdsc_gate: Completion to signal cx gdsc collapse status */
+	struct completion gdsc_gate;
 };
 
 /* Helper function to get to gen7 gmu device from adreno device */
@@ -427,6 +432,12 @@ int gen7_gmu_enable_clks(struct adreno_device *adreno_dev);
  * Return: 0 on success or negative error on failure
  */
 int gen7_gmu_enable_gdsc(struct adreno_device *adreno_dev);
+
+/**
+ * gen7_gmu_disable_gdsc - Disable gmu gdsc
+ * @adreno_dev: Pointer to the adreno device
+ */
+void gen7_gmu_disable_gdsc(struct adreno_device *adreno_dev);
 
 /**
  * gen7_gmu_handle_watchdog - Handle watchdog interrupt

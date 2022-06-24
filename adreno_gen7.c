@@ -4,7 +4,6 @@
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
-#include <linux/clk/qcom.h>
 #include <linux/debugfs.h>
 #include <linux/io.h>
 #include <linux/of.h>
@@ -283,16 +282,6 @@ static void gen7_protect_init(struct adreno_device *adreno_dev)
 				FIELD_PREP(GENMASK(17, 0), regs[i].start) |
 				FIELD_PREP(GENMASK(30, 18), count) |
 				FIELD_PREP(BIT(31), regs[i].noaccess));
-	}
-}
-
-void gen7_cx_regulator_disable_wait(struct regulator *reg,
-		struct kgsl_device *device, u32 timeout)
-{
-	if (!adreno_regulator_disable_poll(device, reg, GEN7_GPU_CC_CX_GDSCR, timeout)) {
-		dev_err(device->dev, "GPU CX wait timeout. Dumping CX votes:\n");
-		/* Dump the cx regulator consumer list */
-		qcom_clk_dump(NULL, reg, false);
 	}
 }
 
@@ -622,7 +611,7 @@ void gen7_spin_idle_debug(struct adreno_device *adreno_dev,
 
 	dev_err(device->dev, " hwfault=%8.8X\n", hwfault);
 
-	kgsl_device_snapshot(device, NULL, false);
+	kgsl_device_snapshot(device, NULL, NULL, false);
 }
 
 /*
@@ -1002,6 +991,49 @@ static const char *gen7_fault_block_uche(struct kgsl_device *device,
 	return str;
 }
 
+static const char *gen7_fault_block_uche_lpac(struct kgsl_device *device,
+		unsigned int mid)
+{
+	unsigned int uche_client_id;
+	static char str[20];
+
+	/*
+	 * Smmu driver takes a vote on CX gdsc before calling the kgsl
+	 * pagefault handler. If there is contention for device mutex in this
+	 * path and the dispatcher fault handler is holding this lock, trying
+	 * to turn off CX gdsc will fail during the reset. So to avoid blocking
+	 * here, try to lock device mutex and return if it fails.
+	 */
+	if (!mutex_trylock(&device->mutex))
+		return "UCHE LPAC: unknown";
+
+	if (!kgsl_state_is_awake(device)) {
+		mutex_unlock(&device->mutex);
+		return "UCHE LPAC: unknown";
+	}
+
+	kgsl_regread(device, GEN7_UCHE_CLIENT_PF, &uche_client_id);
+	mutex_unlock(&device->mutex);
+
+	/* Ignore the value if the gpu is in IFPC */
+	if (uche_client_id == SCOOBYDOO)
+		return "UCHE LPAC: unknown";
+
+	/* UCHE client id mask is bits [6:0] */
+	uche_client_id &= GENMASK(6, 0);
+	if (uche_client_id >= ARRAY_SIZE(uche_client))
+		return "UCHE LPAC: unknown";
+
+	if ((uche_client_id != 1) && (uche_client_id != 4) &&
+			 (uche_client_id != 7))
+		return "UCHE LPAC: Invalid";
+
+	snprintf(str, sizeof(str), "UCHE LPAC: %s",
+			uche_client[uche_client_id]);
+
+	return str;
+}
+
 static const char *gen7_iommu_fault_block(struct kgsl_device *device,
 		unsigned int fsynr1)
 {
@@ -1020,6 +1052,8 @@ static const char *gen7_iommu_fault_block(struct kgsl_device *device,
 		return "Flag cache";
 	case 0x7:
 		return "GMU";
+	case 0x8:
+		return gen7_fault_block_uche_lpac(device, mid);
 	}
 
 	return "Unknown";
@@ -1195,6 +1229,7 @@ int gen7_probe_common(struct platform_device *pdev,
 	/* debugfs node for ACD calibration */
 	debugfs_create_file("acd_calibrate", 0644, device->d_debugfs, device, &acd_cal_fops);
 
+	gen7_coresight_init(adreno_dev);
 	return 0;
 }
 
@@ -1505,6 +1540,59 @@ static int gen7_setproperty(struct kgsl_device_private *dev_priv,
 	return 0;
 }
 
+static void gen7_set_isdb_breakpoint_registers(struct adreno_device *adreno_dev)
+{
+	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
+	struct clk *clk;
+	int ret;
+
+	if (!device->set_isdb_breakpoint || device->ftbl->is_hwcg_on(device)
+			|| device->qdss_gfx_virt == NULL || !device->force_panic)
+		goto err;
+
+	clk = clk_get(&device->pdev->dev, "apb_pclk");
+
+	if (IS_ERR(clk)) {
+		dev_err(device->dev, "Unable to get QDSS clock\n");
+		goto err;
+	}
+
+	ret = clk_prepare_enable(clk);
+
+	if (ret) {
+		dev_err(device->dev, "QDSS Clock enable error: %d\n", ret);
+		clk_put(clk);
+		goto err;
+	}
+
+	/* Issue break command for eight SPs */
+	isdb_write(device->qdss_gfx_virt, 0x0000);
+	isdb_write(device->qdss_gfx_virt, 0x1000);
+	isdb_write(device->qdss_gfx_virt, 0x2000);
+	isdb_write(device->qdss_gfx_virt, 0x3000);
+	isdb_write(device->qdss_gfx_virt, 0x4000);
+	isdb_write(device->qdss_gfx_virt, 0x5000);
+	isdb_write(device->qdss_gfx_virt, 0x6000);
+	isdb_write(device->qdss_gfx_virt, 0x7000);
+
+	/* gen7_2_x has additional SPs */
+	if (adreno_is_gen7_2_x(adreno_dev)) {
+		isdb_write(device->qdss_gfx_virt, 0x8000);
+		isdb_write(device->qdss_gfx_virt, 0x9000);
+		isdb_write(device->qdss_gfx_virt, 0xa000);
+		isdb_write(device->qdss_gfx_virt, 0xb000);
+	}
+
+	clk_disable_unprepare(clk);
+	clk_put(clk);
+
+	return;
+
+err:
+	/* Do not force kernel panic if isdb writes did not go through */
+	device->force_panic = false;
+}
+
 const struct gen7_gpudev adreno_gen7_hwsched_gpudev = {
 	.base = {
 		.reg_offsets = gen7_register_offsets,
@@ -1524,6 +1612,8 @@ const struct gen7_gpudev adreno_gen7_hwsched_gpudev = {
 		.gx_is_on = gen7_gmu_gx_is_on,
 		.send_recurring_cmdobj = gen7_hwsched_send_recurring_cmdobj,
 		.perfcounter_remove = gen7_perfcounter_remove,
+		.set_isdb_breakpoint_registers = gen7_set_isdb_breakpoint_registers,
+		.reset_and_snapshot = gen7_hwsched_reset_and_snapshot,
 	},
 	.hfi_probe = gen7_hwsched_hfi_probe,
 	.hfi_remove = gen7_hwsched_hfi_remove,
@@ -1552,6 +1642,7 @@ const struct gen7_gpudev adreno_gen7_gmu_gpudev = {
 		.add_to_va_minidump = gen7_gmu_add_to_minidump,
 		.gx_is_on = gen7_gmu_gx_is_on,
 		.perfcounter_remove = gen7_perfcounter_remove,
+		.set_isdb_breakpoint_registers = gen7_set_isdb_breakpoint_registers,
 	},
 	.hfi_probe = gen7_gmu_hfi_probe,
 	.handle_watchdog = gen7_gmu_handle_watchdog,

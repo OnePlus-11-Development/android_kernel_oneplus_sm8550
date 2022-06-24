@@ -178,4 +178,12 @@ static inline void kgsl_qcom_va_md_register(struct kgsl_device *device)
 {
 }
 #endif
+
+/**
+ * isdb_write - Program isdb registers to issue break commands to SP
+ * @base: Base address of qdss registers to be programmed
+ * @offset: offset to the SP block
+ */
+void isdb_write(void __iomem *base, u32 offset);
+
 #endif

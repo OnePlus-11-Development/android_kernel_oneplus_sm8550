@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of.h>
@@ -460,7 +461,7 @@ static void kgsl_free_snapshot(struct kgsl_snapshot *snapshot)
 #define SP0_ISDB_ISDB_EN 0x40004
 #define SP0_ISDB_ISDB_CMD 0x4000C
 
-static void isdb_write(void __iomem *base, u32 offset)
+void isdb_write(void __iomem *base, u32 offset)
 {
 	/* To set the SCHBREAKTYPE bit */
 	__raw_writel(0x801, base + SP0_ISDB_ISDB_BRKPT_CFG + offset);
@@ -480,50 +481,6 @@ static void isdb_write(void __iomem *base, u32 offset)
 	wmb();
 	/*To issue ISDB_0_ISDB_CMD_BREAK*/
 	__raw_writel(0x1, base + SP0_ISDB_ISDB_CMD + offset);
-}
-
-static void set_isdb_breakpoint_registers(struct kgsl_device *device)
-{
-	struct clk *clk;
-	int ret;
-
-	if (!device->set_isdb_breakpoint || device->ftbl->is_hwcg_on(device)
-					|| device->qdss_gfx_virt == NULL)
-		return;
-
-	clk = clk_get(&device->pdev->dev, "apb_pclk");
-
-	if (IS_ERR(clk)) {
-		dev_err(device->dev, "Unable to get QDSS clock\n");
-		goto err;
-	}
-
-	ret = clk_prepare_enable(clk);
-
-	if (ret) {
-		dev_err(device->dev, "QDSS Clock enable error: %d\n", ret);
-		clk_put(clk);
-		goto err;
-	}
-
-	/* Issue break command for all eight SPs */
-	isdb_write(device->qdss_gfx_virt, 0x0000);
-	isdb_write(device->qdss_gfx_virt, 0x1000);
-	isdb_write(device->qdss_gfx_virt, 0x2000);
-	isdb_write(device->qdss_gfx_virt, 0x3000);
-	isdb_write(device->qdss_gfx_virt, 0x4000);
-	isdb_write(device->qdss_gfx_virt, 0x5000);
-	isdb_write(device->qdss_gfx_virt, 0x6000);
-	isdb_write(device->qdss_gfx_virt, 0x7000);
-
-	clk_disable_unprepare(clk);
-	clk_put(clk);
-
-	return;
-
-err:
-	/* Do not force kernel panic if isdb writes did not go through */
-	device->force_panic = false;
 }
 
 static void kgsl_device_snapshot_atomic(struct kgsl_device *device)
@@ -585,7 +542,7 @@ static void kgsl_device_snapshot_atomic(struct kgsl_device *device)
 	 * GMU state based on current GPU power state.
 	 */
 	if (device->ftbl->snapshot)
-		device->ftbl->snapshot(device, snapshot, NULL);
+		device->ftbl->snapshot(device, snapshot, NULL, NULL);
 
 	/*
 	 * The timestamp is the seconds since boot so it is easier to match to
@@ -612,12 +569,14 @@ static void kgsl_device_snapshot_atomic(struct kgsl_device *device)
  * and store it in the device snapshot memory.
  */
 void kgsl_device_snapshot(struct kgsl_device *device,
-		struct kgsl_context *context, bool gmu_fault)
+		struct kgsl_context *context,  struct kgsl_context *context_lpac,
+		bool gmu_fault)
 {
 	struct kgsl_snapshot *snapshot;
 	struct timespec64 boot;
 
-	set_isdb_breakpoint_registers(device);
+	if (device->ftbl->set_isdb_breakpoint_registers)
+		device->ftbl->set_isdb_breakpoint_registers(device);
 
 	if (device->snapshot_memory.ptr == NULL) {
 		dev_err(device->dev,
@@ -675,7 +634,7 @@ void kgsl_device_snapshot(struct kgsl_device *device,
 	snapshot->first_read = true;
 	snapshot->sysfs_read = 0;
 
-	device->ftbl->snapshot(device, snapshot, context);
+	device->ftbl->snapshot(device, snapshot, context, context_lpac);
 
 	/*
 	 * The timestamp is the seconds since boot so it is easier to match to

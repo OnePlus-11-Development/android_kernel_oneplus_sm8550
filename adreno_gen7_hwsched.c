@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -15,6 +16,16 @@
 #include "kgsl_device.h"
 #include "kgsl_trace.h"
 #include "kgsl_util.h"
+
+void gen7_hwsched_reset_and_snapshot(struct adreno_device *adreno_dev, int fault)
+{
+	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
+
+	if (GMU_VER_MINOR(gmu->ver.hfi) < 2)
+		adreno_hwsched_reset_and_snapshot_legacy(adreno_dev, fault);
+	else
+		adreno_hwsched_reset_and_snapshot(adreno_dev, fault);
+}
 
 static size_t adreno_hwsched_snapshot_rb(struct kgsl_device *device, u8 *buf,
 	size_t remain, void *priv)
@@ -160,6 +171,40 @@ static size_t adreno_hwsched_snapshot_rb_payload(struct kgsl_device *device,
 	return size + sizeof(*header);
 }
 
+static bool parse_payload_rb_legacy(struct adreno_device *adreno_dev,
+	struct kgsl_snapshot *snapshot)
+{
+	struct hfi_context_bad_cmd_legacy *cmd = adreno_dev->hwsched.ctxt_bad;
+	u32 i = 0, payload_bytes;
+	void *start;
+	bool ret = false;
+
+	/* Skip if we didn't receive a context bad HFI */
+	if (!cmd->hdr)
+		return false;
+
+	payload_bytes = (MSG_HDR_GET_SIZE(cmd->hdr) << 2) -
+			offsetof(struct hfi_context_bad_cmd_legacy, payload);
+
+	start = &cmd->payload[0];
+
+	while (i < payload_bytes) {
+		struct payload_section *payload = start + i;
+
+		if (payload->type == PAYLOAD_RB) {
+			kgsl_snapshot_add_section(KGSL_DEVICE(adreno_dev),
+				KGSL_SNAPSHOT_SECTION_RB_V2,
+				snapshot, adreno_hwsched_snapshot_rb_payload,
+				payload);
+			ret = true;
+		}
+
+		i += sizeof(*payload) + (payload->dwords << 2);
+	}
+
+	return ret;
+}
+
 static bool parse_payload_rb(struct adreno_device *adreno_dev,
 	struct kgsl_snapshot *snapshot)
 {
@@ -197,10 +242,12 @@ static bool parse_payload_rb(struct adreno_device *adreno_dev,
 void gen7_hwsched_snapshot(struct adreno_device *adreno_dev,
 	struct kgsl_snapshot *snapshot)
 {
+	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	struct gen7_hwsched_hfi *hw_hfi = to_gen7_hwsched_hfi(adreno_dev);
 	bool skip_memkind_rb = false;
 	u32 i;
+	bool parse_payload;
 
 	gen7_gmu_snapshot(adreno_dev, snapshot);
 
@@ -212,7 +259,12 @@ void gen7_hwsched_snapshot(struct adreno_device *adreno_dev,
 	 * payloads are not present, fall back to dumping ringbuffers
 	 * based on MEMKIND_RB
 	 */
-	if (parse_payload_rb(adreno_dev, snapshot))
+	if (GMU_VER_MINOR(gmu->ver.hfi) < 2)
+		parse_payload = parse_payload_rb_legacy(adreno_dev, snapshot);
+	else
+		parse_payload = parse_payload_rb(adreno_dev, snapshot);
+
+	if (parse_payload)
 		skip_memkind_rb = true;
 
 	for (i = 0; i < hw_hfi->mem_alloc_entries; i++) {
@@ -244,6 +296,12 @@ void gen7_hwsched_snapshot(struct adreno_device *adreno_dev,
 
 		if (entry->desc.mem_kind == HFI_MEMKIND_CSW_PRIV_NON_SECURE)
 			snapshot_preemption_records(device, snapshot,
+				entry->md);
+
+		if (entry->desc.mem_kind == HFI_MEMKIND_PREEMPT_SCRATCH)
+			kgsl_snapshot_add_section(device,
+				KGSL_SNAPSHOT_SECTION_GPU_OBJECT_V2,
+				snapshot, adreno_snapshot_global,
 				entry->md);
 	}
 
@@ -312,9 +370,6 @@ static int gen7_hwsched_gmu_first_boot(struct adreno_device *adreno_dev)
 	if (ADRENO_FEATURE(adreno_dev, ADRENO_BCL))
 		adreno_dev->bcl_enabled = true;
 
-	if (ADRENO_FEATURE(adreno_dev, ADRENO_LSR))
-		adreno_dev->lsr_enabled = true;
-
 	trace_kgsl_pwr_set_state(device, KGSL_STATE_AWARE);
 
 	return 0;
@@ -332,8 +387,7 @@ clks_gdsc_off:
 	clk_bulk_disable_unprepare(gmu->num_clks, gmu->clks);
 
 gdsc_off:
-	/* Poll to make sure that the CX is off */
-	gen7_cx_regulator_disable_wait(gmu->cx_gdsc, device, 5000);
+	gen7_gmu_disable_gdsc(adreno_dev);
 
 	gen7_rdpm_cx_freq_update(gmu, 0);
 
@@ -355,6 +409,13 @@ static int gen7_hwsched_gmu_boot(struct adreno_device *adreno_dev)
 	ret = gen7_gmu_enable_clks(adreno_dev);
 	if (ret)
 		goto gdsc_off;
+
+	/*
+	 * TLB operations are skipped during slumber. Incase CX doesn't
+	 * go down, it can result in incorrect translations due to stale
+	 * TLB entries. Flush TLB before boot up to ensure fresh start.
+	 */
+	kgsl_mmu_flush_tlb(&device->mmu);
 
 	ret = gen7_rscc_wakeup_sequence(adreno_dev);
 	if (ret)
@@ -394,8 +455,7 @@ clks_gdsc_off:
 	clk_bulk_disable_unprepare(gmu->num_clks, gmu->clks);
 
 gdsc_off:
-	/* Poll to make sure that the CX is off */
-	gen7_cx_regulator_disable_wait(gmu->cx_gdsc, device, 5000);
+	gen7_gmu_disable_gdsc(adreno_dev);
 
 	gen7_rdpm_cx_freq_update(gmu, 0);
 
@@ -482,8 +542,7 @@ static int gen7_hwsched_gmu_power_off(struct adreno_device *adreno_dev)
 
 	clk_bulk_disable_unprepare(gmu->num_clks, gmu->clks);
 
-	/* Poll to make sure that the CX is off */
-	gen7_cx_regulator_disable_wait(gmu->cx_gdsc, device, 5000);
+	gen7_gmu_disable_gdsc(adreno_dev);
 
 	gen7_rdpm_cx_freq_update(gmu, 0);
 
@@ -528,6 +587,12 @@ static int gen7_hwsched_gpu_boot(struct adreno_device *adreno_dev)
 	gen7_enable_gpu_irq(adreno_dev);
 
 	ret = gen7_hwsched_cp_init(adreno_dev);
+	if (ret) {
+		gen7_disable_gpu_irq(adreno_dev);
+		goto err;
+	}
+
+	ret = gen7_hwsched_lpac_cp_init(adreno_dev);
 	if (ret) {
 		gen7_disable_gpu_irq(adreno_dev);
 		goto err;
@@ -926,7 +991,7 @@ static void scale_gmu_frequency(struct adreno_device *adreno_dev, int buslevel)
 	 * a higher frequency
 	 */
 	if (pwr->ddr_table[buslevel] >= gmu->perf_ddr_bw)
-		freq = gmu->freqs[1];
+		freq = gmu->freqs[GMU_MAX_PWRLEVELS - 1];
 
 	if (prev_freq == freq)
 		return;
@@ -1152,6 +1217,11 @@ int gen7_hwsched_probe(struct platform_device *pdev,
 
 	if (ADRENO_FEATURE(adreno_dev, ADRENO_PREEMPTION))
 		set_bit(ADRENO_DEVICE_PREEMPTION, &adreno_dev->priv);
+
+	if (ADRENO_FEATURE(adreno_dev, ADRENO_LPAC))
+		adreno_dev->lpac_enabled = true;
+
+	kgsl_mmu_set_feature(device, KGSL_MMU_PAGEFAULT_TERMINATE);
 
 	return adreno_hwsched_init(adreno_dev, &gen7_hwsched_ops);
 }

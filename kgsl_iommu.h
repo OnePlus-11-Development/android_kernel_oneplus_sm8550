@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef __KGSL_IOMMU_H
 #define __KGSL_IOMMU_H
@@ -98,6 +99,9 @@
 
 /* FSR fields */
 #define KGSL_IOMMU_FSR_SS_SHIFT		30
+
+/* ASID field in TTBR register */
+#define KGSL_IOMMU_ASID_START_BIT	48
 
 /* offset at which a nop command is placed in setstate */
 #define KGSL_IOMMU_SETSTATE_NOP_OFFSET	1024

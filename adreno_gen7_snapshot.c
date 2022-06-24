@@ -13,6 +13,9 @@ static struct kgsl_memdesc *gen7_crashdump_registers;
 static u32 *gen7_cd_reg_end;
 static const struct gen7_snapshot_block_list *gen7_snapshot_block_list;
 
+/* Starting kernel virtual address for QDSS TMC register block */
+static void __iomem *tmc_virt;
+
 const struct gen7_snapshot_block_list gen7_0_0_snapshot_block_list = {
 	.pre_crashdumper_regs = gen7_0_0_pre_crashdumper_registers,
 	.debugbus_blocks = gen7_0_0_debugbus_blocks,
@@ -265,6 +268,268 @@ static size_t gen7_snapshot_shader_memory(struct kgsl_device *device,
 			(block->size << 2));
 
 	return (sizeof(*header) + (block->size << 2));
+}
+
+static void qdss_regwrite(void __iomem *regbase, u32 offsetbytes, u32 value)
+{
+	void __iomem *reg;
+
+	reg = regbase + offsetbytes;
+
+	 /* Ensure previous write is committed */
+	wmb();
+	__raw_writel(value, reg);
+}
+
+static u32 qdss_regread(void __iomem *regbase, u32 offsetbytes)
+{
+	void __iomem *reg;
+	u32 val;
+
+	reg = regbase + offsetbytes;
+	val = __raw_readl(reg);
+
+	/* Make sure memory is updated before next access */
+	rmb();
+	return val;
+}
+
+static size_t gen7_snapshot_trace_buffer_gfx_trace(struct kgsl_device *device,
+		u8 *buf, size_t remain, void *priv)
+{
+	u32 start_idx = 0, status = 0, count = 0, wrap_count = 0, write_ptr = 0;
+	struct kgsl_snapshot_trace_buffer *header =
+			(struct kgsl_snapshot_trace_buffer *) buf;
+	u32 *data = (u32 *)(buf + sizeof(*header));
+	struct gen7_trace_buffer_info* info =
+				(struct gen7_trace_buffer_info *) priv;
+
+	if (remain < SZ_2K + sizeof(*header)) {
+		SNAPSHOT_ERR_NOMEM(device, "TRACE 2K BUFFER");
+		return 0;
+	}
+
+	memcpy(header->ping_blk, info->ping_blk, sizeof(header->ping_blk));
+	memcpy(header->ping_idx, info->ping_idx, sizeof(header->ping_idx));
+	header->granularity = info->granularity;
+	header->segment = info->segment;
+	header->dbgc_ctrl = info->dbgc_ctrl;
+
+	/* Read the status of trace buffer to determine if it's full or empty */
+	kgsl_regread(device, GEN7_DBGC_TRACE_BUFFER_STATUS, &status);
+
+	/*
+	 * wrap_count and write ptr are part of status.
+	 * if status is 0 => wrap_count = 0 and write ptr = 0 buffer is empty.
+	 * if status is non zero and wrap count is 0 read partial buffer.
+	 * if wrap count in non zero read entier 2k buffer.
+	 * Always read the oldest data available.
+	 */
+
+	/* if status is 0 then buffer is empty */
+	if (!status) {
+		header->size = 0;
+		return sizeof(*header);
+	}
+
+	/* Number of times the circular buffer has wrapped around */
+	wrap_count = FIELD_GET(GENMASK(31,12), status);
+	write_ptr = FIELD_GET(GENMASK(8,0), status);
+
+	/* Read partial buffer starting from 0 */
+	if (!wrap_count) {
+		/* No of dwords to read : (write ptr - 0) of indexed register */
+		count = write_ptr;
+		header->size = count << 2;
+		start_idx = 0;
+	} else {
+		/* Read entire 2k buffer starting from write ptr */
+		start_idx = write_ptr + 1;
+		count = SZ_512;
+		header->size = SZ_2K;
+	}
+
+	kgsl_regmap_read_indexed_interleaved(&device->regmap,
+		GEN7_DBGC_DBG_TRACE_BUFFER_RD_ADDR, GEN7_DBGC_DBG_TRACE_BUFFER_RD_DATA, data,
+			start_idx, count);
+
+	return (sizeof(*header) + header->size);
+}
+
+static size_t gen7_snapshot_trace_buffer_etb(struct kgsl_device *device,
+		u8 *buf, size_t remain, void *priv)
+{
+	u32 read_ptr, count, write_ptr, val, idx = 0;
+	struct kgsl_snapshot_trace_buffer *header = (struct kgsl_snapshot_trace_buffer *) buf;
+	u32 *data = (u32 *)(buf + sizeof(*header));
+	struct gen7_trace_buffer_info* info = (struct gen7_trace_buffer_info *) priv;
+
+	/* Unlock ETB buffer */
+	qdss_regwrite(tmc_virt, QDSS_AOSS_APB_TMC_LAR, 0xC5ACCE55);
+
+	/* Make sure unlock goes through before proceeding further */
+	mb();
+
+	/* Flush the QDSS pipeline to ensure completion of pending write to buffer */
+	val = qdss_regread(tmc_virt, QDSS_AOSS_APB_TMC_FFCR);
+	qdss_regwrite(tmc_virt, QDSS_AOSS_APB_TMC_FFCR, val | 0x40);
+
+	/* Make sure pipeline is flushed before we get read and write pointers */
+	mb();
+
+	/* Disable ETB */
+	qdss_regwrite(tmc_virt, QDSS_AOSS_APB_TMC_CTRL, 0);
+
+	/* Set to circular mode */
+	qdss_regwrite(tmc_virt, QDSS_AOSS_APB_TMC_MODE, 0);
+
+	/* Ensure buffer is set to circular mode before accessing it */
+	mb();
+
+	/* Size of buffer is specified in register TMC_RSZ */
+	count = qdss_regread(tmc_virt, QDSS_AOSS_APB_TMC_RSZ) << 2;
+	read_ptr = qdss_regread(tmc_virt, QDSS_AOSS_APB_TMC_RRP);
+	write_ptr = qdss_regread(tmc_virt, QDSS_AOSS_APB_TMC_RWP);
+
+	/* ETB buffer if full read_ptr will be equal to write_ptr else write_ptr leads read_ptr */
+	count = (read_ptr == write_ptr) ? count : (write_ptr - read_ptr);
+
+	if (remain < count + sizeof(*header)) {
+		SNAPSHOT_ERR_NOMEM(device, "ETB BUFFER");
+		return 0;
+	}
+
+	/*
+	 * Read pointer is 4 byte aligned and write pointer is 2 byte aligned
+	 * We read 4 bytes of data in one iteration below so aligin it down
+	 * to 4 bytes.
+	 */
+	count = ALIGN_DOWN(count, 4);
+
+	header->size = count;
+	header->dbgc_ctrl = info->dbgc_ctrl;
+	memcpy(header->ping_blk, info->ping_blk, sizeof(header->ping_blk));
+	memcpy(header->ping_idx, info->ping_idx, sizeof(header->ping_idx));
+	header->granularity = info->granularity;
+	header->segment = info->segment;
+
+	while (count != 0) {
+		/* This indexed register auto increments index as we read */
+		data[idx++] = qdss_regread(tmc_virt, QDSS_AOSS_APB_TMC_RRD);
+		count = count - 4;
+	}
+
+	return (sizeof(*header) + header->size);
+}
+
+static void gen7_snapshot_trace_buffer(struct kgsl_device *device,
+				struct kgsl_snapshot *snapshot)
+{
+	u32 val_tmc_ctrl = 0, val_etr_ctrl = 0, val_etr1_ctrl = 0;
+	u32 i = 0, sel_gx = 0, sel_cx = 0, val_gx = 0, val_cx = 0, val = 0;
+	struct gen7_trace_buffer_info info;
+	struct resource *res1, *res2;
+	struct clk *clk;
+	int ret;
+	void __iomem *etr_virt;
+
+	/*
+	 * Data can be collected from CX_DBGC or DBGC and it's mutually exclusive.
+	 * Read the necessary select registers and determine the source of data.
+	 * This loop reads SEL_A to SEL_D of both CX_DBGC and DBGC and accordingly
+	 * updates the header information of trace buffer section.
+	 */
+	for (i = 0; i < TRACE_BUF_NUM_SIG; i++) {
+		kgsl_regread(device, GEN7_DBGC_CFG_DBGBUS_SEL_A + i, &sel_gx);
+		kgsl_regread(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_A + i, &sel_cx);
+		val_gx |= sel_gx;
+		val_cx |= sel_cx;
+		info.ping_idx[i] = FIELD_GET(GENMASK(7, 0), (sel_gx | sel_cx));
+		info.ping_blk[i] = FIELD_GET(GENMASK(24, 16), (sel_gx | sel_cx));
+	}
+
+	/* Zero the header if not programmed to export any buffer */
+	if (!val_gx && !val_cx) {
+		kgsl_snapshot_add_section(device, KGSL_SNAPSHOT_SECTION_TRACE_BUFFER,
+			snapshot, NULL, &info);
+		return;
+	}
+
+	/* Enable APB clock to read data from trace buffer */
+	clk = clk_get(&device->pdev->dev, "apb_pclk");
+
+	if (IS_ERR(clk)) {
+		dev_err(device->dev, "Unable to get QDSS clock\n");
+		return;
+	}
+
+	ret = clk_prepare_enable(clk);
+
+	if (ret) {
+		dev_err(device->dev, "QDSS Clock enable error: %d\n", ret);
+		clk_put(clk);
+		return;
+	}
+
+	res1 = platform_get_resource_byname(device->pdev, IORESOURCE_MEM, "qdss_etr");
+	res2 = platform_get_resource_byname(device->pdev, IORESOURCE_MEM, "qdss_tmc");
+
+	if (!res1 || !res2)
+		goto err_clk_put;
+
+	etr_virt = ioremap(res1->start, resource_size(res1));
+	tmc_virt = ioremap(res2->start, resource_size(res2));
+
+	if (!etr_virt || !tmc_virt)
+		goto err_unmap;
+
+	/*
+	 * Update header information based on source of data, read necessary CNTLT registers
+	 * for granularity and segment information.
+	 */
+	if (val_gx) {
+		info.dbgc_ctrl = GX_DBGC;
+		kgsl_regread(device, GEN7_DBGC_CFG_DBGBUS_CNTLT, &val);
+	} else {
+		info.dbgc_ctrl = CX_DBGC;
+		kgsl_regread(device, GEN7_CX_DBGC_CFG_DBGBUS_CNTLT, &val);
+	}
+
+	info.granularity = FIELD_GET(GENMASK(14,12), val);
+	info.segment = FIELD_GET(GENMASK(31,28), val);
+
+	val_tmc_ctrl = qdss_regread(tmc_virt, QDSS_AOSS_APB_TMC_CTRL);
+
+	/*
+	 * Incase TMC CTRL is 0 and val_cx is non zero dump empty buffer.
+	 * Incase TMC CTRL is 0 and val_gx is non zero dump 2k gfx buffer.
+	 * 2k buffer is not present for CX blocks.
+	 * Incase both ETR's CTRL is 0 Dump ETB QDSS buffer and disable QDSS.
+	 * Incase either ETR's CTRL is 1 Disable QDSS dumping ETB buffer to DDR.
+	 */
+	if (!val_tmc_ctrl) {
+		if (val_gx)
+			kgsl_snapshot_add_section(device, KGSL_SNAPSHOT_SECTION_TRACE_BUFFER,
+				snapshot, gen7_snapshot_trace_buffer_gfx_trace, &info);
+		else
+			kgsl_snapshot_add_section(device, KGSL_SNAPSHOT_SECTION_TRACE_BUFFER,
+					snapshot, NULL, &info);
+	} else {
+		val_etr_ctrl = qdss_regread(etr_virt, QDSS_AOSS_APB_ETR_CTRL);
+		val_etr1_ctrl = qdss_regread(etr_virt, QDSS_AOSS_APB_ETR1_CTRL);
+		if (!val_etr_ctrl && !val_etr1_ctrl)
+			kgsl_snapshot_add_section(device, KGSL_SNAPSHOT_SECTION_TRACE_BUFFER,
+				snapshot, gen7_snapshot_trace_buffer_etb, &info);
+		qdss_regwrite(tmc_virt, QDSS_AOSS_APB_TMC_CTRL, 0);
+	}
+
+err_unmap:
+	iounmap(tmc_virt);
+	iounmap(etr_virt);
+
+err_clk_put:
+	clk_disable_unprepare(clk);
+	clk_put(clk);
 }
 
 static void gen7_snapshot_shader(struct kgsl_device *device,
@@ -767,10 +1032,10 @@ static void gen7_cx_debug_bus_read(struct kgsl_device *device,
 	reg = FIELD_PREP(GENMASK(7, 0), index) |
 		FIELD_PREP(GENMASK(24, 16), block_id);
 
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_A, reg);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_B, reg);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_C, reg);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_D, reg);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_A, reg);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_B, reg);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_C, reg);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_D, reg);
 
 	/*
 	 * There needs to be a delay of 1 us to ensure enough time for correct
@@ -778,9 +1043,9 @@ static void gen7_cx_debug_bus_read(struct kgsl_device *device,
 	 */
 	udelay(1);
 
-	adreno_cx_dbgc_regread(device, GEN7_CX_DBGC_CFG_DBGBUS_TRACE_BUF2, val);
+	kgsl_regread(device, GEN7_CX_DBGC_CFG_DBGBUS_TRACE_BUF2, val);
 	val++;
-	adreno_cx_dbgc_regread(device, GEN7_CX_DBGC_CFG_DBGBUS_TRACE_BUF1, val);
+	kgsl_regread(device, GEN7_CX_DBGC_CFG_DBGBUS_TRACE_BUF1, val);
 }
 
 /*
@@ -817,10 +1082,10 @@ static void gen7_cx_side_debug_bus_read(struct kgsl_device *device,
 	unsigned int reg = FIELD_PREP(GENMASK(7, 0), index) |
 			FIELD_PREP(GENMASK(24, 16), block_id);
 
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_A, reg);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_B, reg);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_C, reg);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_D, reg);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_A, reg);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_B, reg);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_C, reg);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_D, reg);
 
 	/*
 	 * There needs to be a delay of 1 us to ensure enough time for correct
@@ -828,7 +1093,7 @@ static void gen7_cx_side_debug_bus_read(struct kgsl_device *device,
 	 */
 	udelay(1);
 
-	adreno_cx_dbgc_regread(device, GEN7_CX_DBGC_CFG_DBGBUS_OVER, &reg);
+	kgsl_regread(device, GEN7_CX_DBGC_CFG_DBGBUS_OVER, &reg);
 	*val = FIELD_GET(GENMASK(27, 24), reg);
 }
 
@@ -903,18 +1168,18 @@ static void gen7_snapshot_debugbus(struct adreno_device *adreno_dev,
 	kgsl_regwrite(device, GEN7_DBGC_CFG_DBGBUS_MASKL_2, 0);
 	kgsl_regwrite(device, GEN7_DBGC_CFG_DBGBUS_MASKL_3, 0);
 
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_CNTLT,
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_CNTLT,
 			FIELD_PREP(GENMASK(31, 28), 0xf));
 
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_CNTLM,
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_CNTLM,
 			FIELD_PREP(GENMASK(27, 24), 0xf));
 
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_IVTL_0, 0);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_IVTL_1, 0);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_IVTL_2, 0);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_IVTL_3, 0);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_IVTL_0, 0);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_IVTL_1, 0);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_IVTL_2, 0);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_IVTL_3, 0);
 
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_BYTEL_0,
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_BYTEL_0,
 			FIELD_PREP(GENMASK(3, 0), 0x0) |
 			FIELD_PREP(GENMASK(7, 4), 0x1) |
 			FIELD_PREP(GENMASK(11, 8), 0x2) |
@@ -923,7 +1188,7 @@ static void gen7_snapshot_debugbus(struct adreno_device *adreno_dev,
 			FIELD_PREP(GENMASK(23, 20), 0x5) |
 			FIELD_PREP(GENMASK(27, 24), 0x6) |
 			FIELD_PREP(GENMASK(31, 28), 0x7));
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_BYTEL_1,
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_BYTEL_1,
 			FIELD_PREP(GENMASK(3, 0), 0x8) |
 			FIELD_PREP(GENMASK(7, 4), 0x9) |
 			FIELD_PREP(GENMASK(11, 8), 0xa) |
@@ -933,10 +1198,10 @@ static void gen7_snapshot_debugbus(struct adreno_device *adreno_dev,
 			FIELD_PREP(GENMASK(27, 24), 0xe) |
 			FIELD_PREP(GENMASK(31, 28), 0xf));
 
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_MASKL_0, 0);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_MASKL_1, 0);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_MASKL_2, 0);
-	adreno_cx_dbgc_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_MASKL_3, 0);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_MASKL_0, 0);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_MASKL_1, 0);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_MASKL_2, 0);
+	kgsl_regwrite(device, GEN7_CX_DBGC_CFG_DBGBUS_MASKL_3, 0);
 
 	for (i = 0; i < gen7_snapshot_block_list->debugbus_blocks_len; i++) {
 		kgsl_snapshot_add_section(device,
@@ -961,7 +1226,7 @@ static void gen7_snapshot_debugbus(struct adreno_device *adreno_dev,
 	}
 
 	/* Dump the CX debugbus data if the block exists */
-	if (adreno_is_cx_dbgc_register(device, GEN7_CX_DBGC_CFG_DBGBUS_SEL_A)) {
+	if (kgsl_regmap_valid_offset(&device->regmap, GEN7_CX_DBGC_CFG_DBGBUS_SEL_A)) {
 		for (i = 0; i < gen7_snapshot_block_list->cx_debugbus_blocks_len; i++) {
 			kgsl_snapshot_add_section(device,
 				KGSL_SNAPSHOT_SECTION_DEBUGBUS,
@@ -1167,8 +1432,11 @@ void gen7_snapshot(struct adreno_device *adreno_dev,
 	unsigned int i;
 	u32 hi, lo, cgc = 0, cgc1 = 0, cgc2 = 0;
 	const struct adreno_gen7_core *gpucore = to_gen7_core(ADRENO_DEVICE(device));
+	int is_current_rt;
 
 	gen7_snapshot_block_list = gpucore->gen7_snapshot_block_list;
+
+	gen7_snapshot_trace_buffer(device, snapshot);
 
 	/*
 	 * Dump debugbus data here to capture it for both
@@ -1199,6 +1467,11 @@ void gen7_snapshot(struct adreno_device *adreno_dev,
 	if (!adreno_gx_is_on(adreno_dev))
 		return;
 
+	is_current_rt = rt_task(current);
+
+	if (is_current_rt)
+		sched_set_normal(current, 0);
+
 	kgsl_regread(device, GEN7_CP_IB1_BASE, &lo);
 	kgsl_regread(device, GEN7_CP_IB1_BASE_HI, &hi);
 
@@ -1211,6 +1484,19 @@ void gen7_snapshot(struct adreno_device *adreno_dev,
 
 	kgsl_regread(device, GEN7_CP_IB1_REM_SIZE, &snapshot->ib1size);
 	kgsl_regread(device, GEN7_CP_IB2_REM_SIZE, &snapshot->ib2size);
+
+	kgsl_regread(device, GEN7_CP_LPAC_IB1_BASE, &lo);
+	kgsl_regread(device, GEN7_CP_LPAC_IB1_BASE_HI, &hi);
+
+	snapshot->ib1base_lpac = (((u64) hi) << 32) | lo;
+
+	kgsl_regread(device, GEN7_CP_LPAC_IB2_BASE, &lo);
+	kgsl_regread(device, GEN7_CP_LPAC_IB2_BASE_HI, &hi);
+
+	snapshot->ib2base_lpac = (((u64) hi) << 32) | lo;
+
+	kgsl_regread(device, GEN7_CP_LPAC_IB1_REM_SIZE, &snapshot->ib1size_lpac);
+	kgsl_regread(device, GEN7_CP_LPAC_IB2_REM_SIZE, &snapshot->ib2size_lpac);
 
 	/* Assert the isStatic bit before triggering snapshot */
 	kgsl_regwrite(device, GEN7_RBBM_SNAPSHOT_STATUS, 0x1);
@@ -1283,6 +1569,8 @@ void gen7_snapshot(struct adreno_device *adreno_dev,
 				rb->preemption_desc);
 		}
 	}
+	if (is_current_rt)
+		sched_set_fifo(current);
 }
 
 void gen7_crashdump_init(struct adreno_device *adreno_dev)

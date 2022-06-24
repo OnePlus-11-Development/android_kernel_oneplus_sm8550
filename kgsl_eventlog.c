@@ -12,7 +12,7 @@
 #include "kgsl_eventlog.h"
 #include "kgsl_util.h"
 
-#define EVENTLOG_SIZE SZ_8K
+#define EVENTLOG_SIZE (SZ_64K + SZ_32K)
 #define MAGIC 0xabbaabba
 #define LOG_FENCE_NAME_LEN 74
 

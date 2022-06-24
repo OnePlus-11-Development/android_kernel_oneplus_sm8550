@@ -288,7 +288,7 @@ __get_gmu_ao_cgc_mode_cntl(struct adreno_device *adreno_dev)
 	else if (adreno_is_a615_family(adreno_dev))
 		return 0x00000222;
 	/* a662 should be checked before a660 */
-	else if (adreno_is_a662(adreno_dev))
+	else if (adreno_is_a662(adreno_dev) || adreno_is_a621(adreno_dev))
 		return 0x00020200;
 	else if (adreno_is_a660(adreno_dev))
 		return 0x00020000;
@@ -320,26 +320,13 @@ __get_gmu_ao_cgc_hyst_cntl(struct adreno_device *adreno_dev)
 
 static unsigned int __get_gmu_wfi_config(struct adreno_device *adreno_dev)
 {
-	if (adreno_is_a620(adreno_dev) || adreno_is_a640(adreno_dev) ||
+	unsigned int rev = ADRENO_GPUREV(adreno_dev);
+
+	if ((rev == ADRENO_REV_A620) || adreno_is_a640(adreno_dev) ||
 		adreno_is_a650(adreno_dev))
 		return 0x00000002;
 
 	return 0x00000000;
-}
-
-void a6xx_cx_regulator_disable_wait(struct regulator *reg,
-				struct kgsl_device *device, u32 timeout)
-{
-	u32 offset;
-
-	offset = adreno_is_a662(ADRENO_DEVICE(device)) ?
-			 A662_GPU_CC_CX_GDSCR : A6XX_GPU_CC_CX_GDSCR;
-
-	if (!adreno_regulator_disable_poll(device, reg, offset, timeout)) {
-		dev_err(device->dev, "GPU CX wait timeout. Dumping CX votes:\n");
-		/* Dump the cx regulator consumer list */
-		qcom_clk_dump(NULL, reg, false);
-	}
 }
 
 static void set_holi_sptprac_clock(struct kgsl_device *device, bool enable)
@@ -988,7 +975,7 @@ void a6xx_spin_idle_debug(struct adreno_device *adreno_dev,
 
 	dev_err(device->dev, " hwfault=%8.8X\n", hwfault);
 
-	kgsl_device_snapshot(device, NULL, false);
+	kgsl_device_snapshot(device, NULL, NULL, false);
 
 }
 
@@ -1221,7 +1208,7 @@ static void a6xx_gpu_keepalive(struct adreno_device *adreno_dev,
 	gmu_core_regwrite(device, A6XX_GMU_GMU_PWR_COL_KEEPALIVE, state);
 }
 
-static bool a6xx_irq_pending(struct adreno_device *adreno_dev)
+bool a6xx_irq_pending(struct adreno_device *adreno_dev)
 {
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	u32 status;
@@ -1859,427 +1846,12 @@ done:
 	return ret;
 }
 
-#ifdef CONFIG_QCOM_KGSL_CORESIGHT
-static struct adreno_coresight_register a6xx_coresight_regs[] = {
-	{ A6XX_DBGC_CFG_DBGBUS_SEL_A },
-	{ A6XX_DBGC_CFG_DBGBUS_SEL_B },
-	{ A6XX_DBGC_CFG_DBGBUS_SEL_C },
-	{ A6XX_DBGC_CFG_DBGBUS_SEL_D },
-	{ A6XX_DBGC_CFG_DBGBUS_CNTLT },
-	{ A6XX_DBGC_CFG_DBGBUS_CNTLM },
-	{ A6XX_DBGC_CFG_DBGBUS_OPL },
-	{ A6XX_DBGC_CFG_DBGBUS_OPE },
-	{ A6XX_DBGC_CFG_DBGBUS_IVTL_0 },
-	{ A6XX_DBGC_CFG_DBGBUS_IVTL_1 },
-	{ A6XX_DBGC_CFG_DBGBUS_IVTL_2 },
-	{ A6XX_DBGC_CFG_DBGBUS_IVTL_3 },
-	{ A6XX_DBGC_CFG_DBGBUS_MASKL_0 },
-	{ A6XX_DBGC_CFG_DBGBUS_MASKL_1 },
-	{ A6XX_DBGC_CFG_DBGBUS_MASKL_2 },
-	{ A6XX_DBGC_CFG_DBGBUS_MASKL_3 },
-	{ A6XX_DBGC_CFG_DBGBUS_BYTEL_0 },
-	{ A6XX_DBGC_CFG_DBGBUS_BYTEL_1 },
-	{ A6XX_DBGC_CFG_DBGBUS_IVTE_0 },
-	{ A6XX_DBGC_CFG_DBGBUS_IVTE_1 },
-	{ A6XX_DBGC_CFG_DBGBUS_IVTE_2 },
-	{ A6XX_DBGC_CFG_DBGBUS_IVTE_3 },
-	{ A6XX_DBGC_CFG_DBGBUS_MASKE_0 },
-	{ A6XX_DBGC_CFG_DBGBUS_MASKE_1 },
-	{ A6XX_DBGC_CFG_DBGBUS_MASKE_2 },
-	{ A6XX_DBGC_CFG_DBGBUS_MASKE_3 },
-	{ A6XX_DBGC_CFG_DBGBUS_NIBBLEE },
-	{ A6XX_DBGC_CFG_DBGBUS_PTRC0 },
-	{ A6XX_DBGC_CFG_DBGBUS_PTRC1 },
-	{ A6XX_DBGC_CFG_DBGBUS_LOADREG },
-	{ A6XX_DBGC_CFG_DBGBUS_IDX },
-	{ A6XX_DBGC_CFG_DBGBUS_CLRC },
-	{ A6XX_DBGC_CFG_DBGBUS_LOADIVT },
-	{ A6XX_DBGC_VBIF_DBG_CNTL },
-	{ A6XX_DBGC_DBG_LO_HI_GPIO },
-	{ A6XX_DBGC_EXT_TRACE_BUS_CNTL },
-	{ A6XX_DBGC_READ_AHB_THROUGH_DBG },
-	{ A6XX_DBGC_CFG_DBGBUS_TRACE_BUF1 },
-	{ A6XX_DBGC_CFG_DBGBUS_TRACE_BUF2 },
-	{ A6XX_DBGC_EVT_CFG },
-	{ A6XX_DBGC_EVT_INTF_SEL_0 },
-	{ A6XX_DBGC_EVT_INTF_SEL_1 },
-	{ A6XX_DBGC_PERF_ATB_CFG },
-	{ A6XX_DBGC_PERF_ATB_COUNTER_SEL_0 },
-	{ A6XX_DBGC_PERF_ATB_COUNTER_SEL_1 },
-	{ A6XX_DBGC_PERF_ATB_COUNTER_SEL_2 },
-	{ A6XX_DBGC_PERF_ATB_COUNTER_SEL_3 },
-	{ A6XX_DBGC_PERF_ATB_TRIG_INTF_SEL_0 },
-	{ A6XX_DBGC_PERF_ATB_TRIG_INTF_SEL_1 },
-	{ A6XX_DBGC_PERF_ATB_DRAIN_CMD },
-	{ A6XX_DBGC_ECO_CNTL },
-	{ A6XX_DBGC_AHB_DBG_CNTL },
-};
-
-static struct adreno_coresight_register a6xx_coresight_regs_cx[] = {
-	{ A6XX_CX_DBGC_CFG_DBGBUS_SEL_A },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_SEL_B },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_SEL_C },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_SEL_D },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_CNTLT },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_CNTLM },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_OPL },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_OPE },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_IVTL_0 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_IVTL_1 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_IVTL_2 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_IVTL_3 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_MASKL_0 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_MASKL_1 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_MASKL_2 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_MASKL_3 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_BYTEL_0 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_BYTEL_1 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_IVTE_0 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_IVTE_1 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_IVTE_2 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_IVTE_3 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_MASKE_0 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_MASKE_1 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_MASKE_2 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_MASKE_3 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_NIBBLEE },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_PTRC0 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_PTRC1 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_LOADREG },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_IDX },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_CLRC },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_LOADIVT },
-	{ A6XX_CX_DBGC_VBIF_DBG_CNTL },
-	{ A6XX_CX_DBGC_DBG_LO_HI_GPIO },
-	{ A6XX_CX_DBGC_EXT_TRACE_BUS_CNTL },
-	{ A6XX_CX_DBGC_READ_AHB_THROUGH_DBG },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_TRACE_BUF1 },
-	{ A6XX_CX_DBGC_CFG_DBGBUS_TRACE_BUF2 },
-	{ A6XX_CX_DBGC_EVT_CFG },
-	{ A6XX_CX_DBGC_EVT_INTF_SEL_0 },
-	{ A6XX_CX_DBGC_EVT_INTF_SEL_1 },
-	{ A6XX_CX_DBGC_PERF_ATB_CFG },
-	{ A6XX_CX_DBGC_PERF_ATB_COUNTER_SEL_0 },
-	{ A6XX_CX_DBGC_PERF_ATB_COUNTER_SEL_1 },
-	{ A6XX_CX_DBGC_PERF_ATB_COUNTER_SEL_2 },
-	{ A6XX_CX_DBGC_PERF_ATB_COUNTER_SEL_3 },
-	{ A6XX_CX_DBGC_PERF_ATB_TRIG_INTF_SEL_0 },
-	{ A6XX_CX_DBGC_PERF_ATB_TRIG_INTF_SEL_1 },
-	{ A6XX_CX_DBGC_PERF_ATB_DRAIN_CMD },
-	{ A6XX_CX_DBGC_ECO_CNTL },
-	{ A6XX_CX_DBGC_AHB_DBG_CNTL },
-};
-
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_sel_a, &a6xx_coresight_regs[0]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_sel_b, &a6xx_coresight_regs[1]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_sel_c, &a6xx_coresight_regs[2]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_sel_d, &a6xx_coresight_regs[3]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_cntlt, &a6xx_coresight_regs[4]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_cntlm, &a6xx_coresight_regs[5]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_opl, &a6xx_coresight_regs[6]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_ope, &a6xx_coresight_regs[7]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_ivtl_0, &a6xx_coresight_regs[8]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_ivtl_1, &a6xx_coresight_regs[9]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_ivtl_2, &a6xx_coresight_regs[10]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_ivtl_3, &a6xx_coresight_regs[11]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_maskl_0, &a6xx_coresight_regs[12]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_maskl_1, &a6xx_coresight_regs[13]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_maskl_2, &a6xx_coresight_regs[14]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_maskl_3, &a6xx_coresight_regs[15]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_bytel_0, &a6xx_coresight_regs[16]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_bytel_1, &a6xx_coresight_regs[17]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_ivte_0, &a6xx_coresight_regs[18]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_ivte_1, &a6xx_coresight_regs[19]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_ivte_2, &a6xx_coresight_regs[20]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_ivte_3, &a6xx_coresight_regs[21]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_maske_0, &a6xx_coresight_regs[22]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_maske_1, &a6xx_coresight_regs[23]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_maske_2, &a6xx_coresight_regs[24]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_maske_3, &a6xx_coresight_regs[25]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_nibblee, &a6xx_coresight_regs[26]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_ptrc0, &a6xx_coresight_regs[27]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_ptrc1, &a6xx_coresight_regs[28]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_loadreg, &a6xx_coresight_regs[29]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_idx, &a6xx_coresight_regs[30]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_clrc, &a6xx_coresight_regs[31]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_loadivt, &a6xx_coresight_regs[32]);
-static ADRENO_CORESIGHT_ATTR(vbif_dbg_cntl, &a6xx_coresight_regs[33]);
-static ADRENO_CORESIGHT_ATTR(dbg_lo_hi_gpio, &a6xx_coresight_regs[34]);
-static ADRENO_CORESIGHT_ATTR(ext_trace_bus_cntl, &a6xx_coresight_regs[35]);
-static ADRENO_CORESIGHT_ATTR(read_ahb_through_dbg, &a6xx_coresight_regs[36]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_trace_buf1, &a6xx_coresight_regs[37]);
-static ADRENO_CORESIGHT_ATTR(cfg_dbgbus_trace_buf2, &a6xx_coresight_regs[38]);
-static ADRENO_CORESIGHT_ATTR(evt_cfg, &a6xx_coresight_regs[39]);
-static ADRENO_CORESIGHT_ATTR(evt_intf_sel_0, &a6xx_coresight_regs[40]);
-static ADRENO_CORESIGHT_ATTR(evt_intf_sel_1, &a6xx_coresight_regs[41]);
-static ADRENO_CORESIGHT_ATTR(perf_atb_cfg, &a6xx_coresight_regs[42]);
-static ADRENO_CORESIGHT_ATTR(perf_atb_counter_sel_0, &a6xx_coresight_regs[43]);
-static ADRENO_CORESIGHT_ATTR(perf_atb_counter_sel_1, &a6xx_coresight_regs[44]);
-static ADRENO_CORESIGHT_ATTR(perf_atb_counter_sel_2, &a6xx_coresight_regs[45]);
-static ADRENO_CORESIGHT_ATTR(perf_atb_counter_sel_3, &a6xx_coresight_regs[46]);
-static ADRENO_CORESIGHT_ATTR(perf_atb_trig_intf_sel_0,
-				&a6xx_coresight_regs[47]);
-static ADRENO_CORESIGHT_ATTR(perf_atb_trig_intf_sel_1,
-				&a6xx_coresight_regs[48]);
-static ADRENO_CORESIGHT_ATTR(perf_atb_drain_cmd, &a6xx_coresight_regs[49]);
-static ADRENO_CORESIGHT_ATTR(eco_cntl, &a6xx_coresight_regs[50]);
-static ADRENO_CORESIGHT_ATTR(ahb_dbg_cntl, &a6xx_coresight_regs[51]);
-
-/*CX debug registers*/
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_sel_a,
-				&a6xx_coresight_regs_cx[0]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_sel_b,
-				&a6xx_coresight_regs_cx[1]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_sel_c,
-				&a6xx_coresight_regs_cx[2]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_sel_d,
-				&a6xx_coresight_regs_cx[3]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_cntlt,
-				&a6xx_coresight_regs_cx[4]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_cntlm,
-				&a6xx_coresight_regs_cx[5]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_opl,
-				&a6xx_coresight_regs_cx[6]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_ope,
-				&a6xx_coresight_regs_cx[7]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_ivtl_0,
-				&a6xx_coresight_regs_cx[8]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_ivtl_1,
-				&a6xx_coresight_regs_cx[9]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_ivtl_2,
-				&a6xx_coresight_regs_cx[10]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_ivtl_3,
-				&a6xx_coresight_regs_cx[11]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_maskl_0,
-				&a6xx_coresight_regs_cx[12]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_maskl_1,
-				&a6xx_coresight_regs_cx[13]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_maskl_2,
-				&a6xx_coresight_regs_cx[14]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_maskl_3,
-				&a6xx_coresight_regs_cx[15]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_bytel_0,
-				&a6xx_coresight_regs_cx[16]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_bytel_1,
-				&a6xx_coresight_regs_cx[17]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_ivte_0,
-				&a6xx_coresight_regs_cx[18]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_ivte_1,
-				&a6xx_coresight_regs_cx[19]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_ivte_2,
-				&a6xx_coresight_regs_cx[20]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_ivte_3,
-				&a6xx_coresight_regs_cx[21]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_maske_0,
-				&a6xx_coresight_regs_cx[22]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_maske_1,
-				&a6xx_coresight_regs_cx[23]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_maske_2,
-				&a6xx_coresight_regs_cx[24]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_maske_3,
-				&a6xx_coresight_regs_cx[25]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_nibblee,
-				&a6xx_coresight_regs_cx[26]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_ptrc0,
-				&a6xx_coresight_regs_cx[27]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_ptrc1,
-				&a6xx_coresight_regs_cx[28]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_loadreg,
-				&a6xx_coresight_regs_cx[29]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_idx,
-				&a6xx_coresight_regs_cx[30]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_clrc,
-				&a6xx_coresight_regs_cx[31]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_loadivt,
-				&a6xx_coresight_regs_cx[32]);
-static ADRENO_CORESIGHT_ATTR(cx_vbif_dbg_cntl,
-				&a6xx_coresight_regs_cx[33]);
-static ADRENO_CORESIGHT_ATTR(cx_dbg_lo_hi_gpio,
-				&a6xx_coresight_regs_cx[34]);
-static ADRENO_CORESIGHT_ATTR(cx_ext_trace_bus_cntl,
-				&a6xx_coresight_regs_cx[35]);
-static ADRENO_CORESIGHT_ATTR(cx_read_ahb_through_dbg,
-				&a6xx_coresight_regs_cx[36]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_trace_buf1,
-				&a6xx_coresight_regs_cx[37]);
-static ADRENO_CORESIGHT_ATTR(cx_cfg_dbgbus_trace_buf2,
-				&a6xx_coresight_regs_cx[38]);
-static ADRENO_CORESIGHT_ATTR(cx_evt_cfg,
-				&a6xx_coresight_regs_cx[39]);
-static ADRENO_CORESIGHT_ATTR(cx_evt_intf_sel_0,
-				&a6xx_coresight_regs_cx[40]);
-static ADRENO_CORESIGHT_ATTR(cx_evt_intf_sel_1,
-				&a6xx_coresight_regs_cx[41]);
-static ADRENO_CORESIGHT_ATTR(cx_perf_atb_cfg,
-				&a6xx_coresight_regs_cx[42]);
-static ADRENO_CORESIGHT_ATTR(cx_perf_atb_counter_sel_0,
-				&a6xx_coresight_regs_cx[43]);
-static ADRENO_CORESIGHT_ATTR(cx_perf_atb_counter_sel_1,
-				&a6xx_coresight_regs_cx[44]);
-static ADRENO_CORESIGHT_ATTR(cx_perf_atb_counter_sel_2,
-				&a6xx_coresight_regs_cx[45]);
-static ADRENO_CORESIGHT_ATTR(cx_perf_atb_counter_sel_3,
-				&a6xx_coresight_regs_cx[46]);
-static ADRENO_CORESIGHT_ATTR(cx_perf_atb_trig_intf_sel_0,
-				&a6xx_coresight_regs_cx[47]);
-static ADRENO_CORESIGHT_ATTR(cx_perf_atb_trig_intf_sel_1,
-				&a6xx_coresight_regs_cx[48]);
-static ADRENO_CORESIGHT_ATTR(cx_perf_atb_drain_cmd,
-				&a6xx_coresight_regs_cx[49]);
-static ADRENO_CORESIGHT_ATTR(cx_eco_cntl,
-				&a6xx_coresight_regs_cx[50]);
-static ADRENO_CORESIGHT_ATTR(cx_ahb_dbg_cntl,
-				&a6xx_coresight_regs_cx[51]);
-
-static struct attribute *a6xx_coresight_attrs[] = {
-	&coresight_attr_cfg_dbgbus_sel_a.attr.attr,
-	&coresight_attr_cfg_dbgbus_sel_b.attr.attr,
-	&coresight_attr_cfg_dbgbus_sel_c.attr.attr,
-	&coresight_attr_cfg_dbgbus_sel_d.attr.attr,
-	&coresight_attr_cfg_dbgbus_cntlt.attr.attr,
-	&coresight_attr_cfg_dbgbus_cntlm.attr.attr,
-	&coresight_attr_cfg_dbgbus_opl.attr.attr,
-	&coresight_attr_cfg_dbgbus_ope.attr.attr,
-	&coresight_attr_cfg_dbgbus_ivtl_0.attr.attr,
-	&coresight_attr_cfg_dbgbus_ivtl_1.attr.attr,
-	&coresight_attr_cfg_dbgbus_ivtl_2.attr.attr,
-	&coresight_attr_cfg_dbgbus_ivtl_3.attr.attr,
-	&coresight_attr_cfg_dbgbus_maskl_0.attr.attr,
-	&coresight_attr_cfg_dbgbus_maskl_1.attr.attr,
-	&coresight_attr_cfg_dbgbus_maskl_2.attr.attr,
-	&coresight_attr_cfg_dbgbus_maskl_3.attr.attr,
-	&coresight_attr_cfg_dbgbus_bytel_0.attr.attr,
-	&coresight_attr_cfg_dbgbus_bytel_1.attr.attr,
-	&coresight_attr_cfg_dbgbus_ivte_0.attr.attr,
-	&coresight_attr_cfg_dbgbus_ivte_1.attr.attr,
-	&coresight_attr_cfg_dbgbus_ivte_2.attr.attr,
-	&coresight_attr_cfg_dbgbus_ivte_3.attr.attr,
-	&coresight_attr_cfg_dbgbus_maske_0.attr.attr,
-	&coresight_attr_cfg_dbgbus_maske_1.attr.attr,
-	&coresight_attr_cfg_dbgbus_maske_2.attr.attr,
-	&coresight_attr_cfg_dbgbus_maske_3.attr.attr,
-	&coresight_attr_cfg_dbgbus_nibblee.attr.attr,
-	&coresight_attr_cfg_dbgbus_ptrc0.attr.attr,
-	&coresight_attr_cfg_dbgbus_ptrc1.attr.attr,
-	&coresight_attr_cfg_dbgbus_loadreg.attr.attr,
-	&coresight_attr_cfg_dbgbus_idx.attr.attr,
-	&coresight_attr_cfg_dbgbus_clrc.attr.attr,
-	&coresight_attr_cfg_dbgbus_loadivt.attr.attr,
-	&coresight_attr_vbif_dbg_cntl.attr.attr,
-	&coresight_attr_dbg_lo_hi_gpio.attr.attr,
-	&coresight_attr_ext_trace_bus_cntl.attr.attr,
-	&coresight_attr_read_ahb_through_dbg.attr.attr,
-	&coresight_attr_cfg_dbgbus_trace_buf1.attr.attr,
-	&coresight_attr_cfg_dbgbus_trace_buf2.attr.attr,
-	&coresight_attr_evt_cfg.attr.attr,
-	&coresight_attr_evt_intf_sel_0.attr.attr,
-	&coresight_attr_evt_intf_sel_1.attr.attr,
-	&coresight_attr_perf_atb_cfg.attr.attr,
-	&coresight_attr_perf_atb_counter_sel_0.attr.attr,
-	&coresight_attr_perf_atb_counter_sel_1.attr.attr,
-	&coresight_attr_perf_atb_counter_sel_2.attr.attr,
-	&coresight_attr_perf_atb_counter_sel_3.attr.attr,
-	&coresight_attr_perf_atb_trig_intf_sel_0.attr.attr,
-	&coresight_attr_perf_atb_trig_intf_sel_1.attr.attr,
-	&coresight_attr_perf_atb_drain_cmd.attr.attr,
-	&coresight_attr_eco_cntl.attr.attr,
-	&coresight_attr_ahb_dbg_cntl.attr.attr,
-	NULL,
-};
-
-/*cx*/
-static struct attribute *a6xx_coresight_attrs_cx[] = {
-	&coresight_attr_cx_cfg_dbgbus_sel_a.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_sel_b.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_sel_c.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_sel_d.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_cntlt.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_cntlm.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_opl.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_ope.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_ivtl_0.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_ivtl_1.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_ivtl_2.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_ivtl_3.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_maskl_0.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_maskl_1.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_maskl_2.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_maskl_3.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_bytel_0.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_bytel_1.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_ivte_0.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_ivte_1.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_ivte_2.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_ivte_3.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_maske_0.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_maske_1.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_maske_2.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_maske_3.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_nibblee.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_ptrc0.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_ptrc1.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_loadreg.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_idx.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_clrc.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_loadivt.attr.attr,
-	&coresight_attr_cx_vbif_dbg_cntl.attr.attr,
-	&coresight_attr_cx_dbg_lo_hi_gpio.attr.attr,
-	&coresight_attr_cx_ext_trace_bus_cntl.attr.attr,
-	&coresight_attr_cx_read_ahb_through_dbg.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_trace_buf1.attr.attr,
-	&coresight_attr_cx_cfg_dbgbus_trace_buf2.attr.attr,
-	&coresight_attr_cx_evt_cfg.attr.attr,
-	&coresight_attr_cx_evt_intf_sel_0.attr.attr,
-	&coresight_attr_cx_evt_intf_sel_1.attr.attr,
-	&coresight_attr_cx_perf_atb_cfg.attr.attr,
-	&coresight_attr_cx_perf_atb_counter_sel_0.attr.attr,
-	&coresight_attr_cx_perf_atb_counter_sel_1.attr.attr,
-	&coresight_attr_cx_perf_atb_counter_sel_2.attr.attr,
-	&coresight_attr_cx_perf_atb_counter_sel_3.attr.attr,
-	&coresight_attr_cx_perf_atb_trig_intf_sel_0.attr.attr,
-	&coresight_attr_cx_perf_atb_trig_intf_sel_1.attr.attr,
-	&coresight_attr_cx_perf_atb_drain_cmd.attr.attr,
-	&coresight_attr_cx_eco_cntl.attr.attr,
-	&coresight_attr_cx_ahb_dbg_cntl.attr.attr,
-	NULL,
-};
-
-static const struct attribute_group a6xx_coresight_group = {
-	.attrs = a6xx_coresight_attrs,
-};
-
-static const struct attribute_group *a6xx_coresight_groups[] = {
-	&a6xx_coresight_group,
-	NULL,
-};
-
-static const struct attribute_group a6xx_coresight_group_cx = {
-	.attrs = a6xx_coresight_attrs_cx,
-};
-
-static const struct attribute_group *a6xx_coresight_groups_cx[] = {
-	&a6xx_coresight_group_cx,
-	NULL,
-};
-
-static struct adreno_coresight a6xx_coresight = {
-	.registers = a6xx_coresight_regs,
-	.count = ARRAY_SIZE(a6xx_coresight_regs),
-	.groups = a6xx_coresight_groups,
-};
-
-static struct adreno_coresight a6xx_coresight_cx = {
-	.registers = a6xx_coresight_regs_cx,
-	.count = ARRAY_SIZE(a6xx_coresight_regs_cx),
-	.groups = a6xx_coresight_groups_cx,
-};
-#endif
-
 int a6xx_probe_common(struct platform_device *pdev,
 	struct	adreno_device *adreno_dev, u32 chipid,
 	const struct adreno_gpu_core *gpucore)
 {
 	const struct adreno_gpudev *gpudev = gpucore->gpudev;
+	int ret;
 
 	adreno_dev->gpucore = gpucore;
 	adreno_dev->chipid = chipid;
@@ -2292,7 +1864,13 @@ int a6xx_probe_common(struct platform_device *pdev,
 	adreno_dev->preempt.skipsaverestore = true;
 	adreno_dev->preempt.usesgmem = true;
 
-	return adreno_device_probe(pdev, adreno_dev);
+	ret = adreno_device_probe(pdev, adreno_dev);
+
+	if (ret)
+		return ret;
+
+	a6xx_coresight_init(adreno_dev);
+	return 0;
 }
 
 static int a6xx_probe(struct platform_device *pdev,
@@ -2607,6 +2185,51 @@ static int a6xx_dev_add_to_minidump(struct adreno_device *adreno_dev)
 				(void *)(adreno_dev), sizeof(struct adreno_device));
 }
 
+static void a6xx_set_isdb_breakpoint_registers(struct adreno_device *adreno_dev)
+{
+	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
+	struct clk *clk;
+	int ret;
+
+	if (!device->set_isdb_breakpoint || device->ftbl->is_hwcg_on(device)
+			|| device->qdss_gfx_virt == NULL || !device->force_panic)
+		goto err;
+
+	clk = clk_get(&device->pdev->dev, "apb_pclk");
+
+	if (IS_ERR(clk)) {
+		dev_err(device->dev, "Unable to get QDSS clock\n");
+		goto err;
+	}
+
+	ret = clk_prepare_enable(clk);
+
+	if (ret) {
+		dev_err(device->dev, "QDSS Clock enable error: %d\n", ret);
+		clk_put(clk);
+		goto err;
+	}
+
+	/* Issue break command for all eight SPs */
+	isdb_write(device->qdss_gfx_virt, 0x0000);
+	isdb_write(device->qdss_gfx_virt, 0x1000);
+	isdb_write(device->qdss_gfx_virt, 0x2000);
+	isdb_write(device->qdss_gfx_virt, 0x3000);
+	isdb_write(device->qdss_gfx_virt, 0x4000);
+	isdb_write(device->qdss_gfx_virt, 0x5000);
+	isdb_write(device->qdss_gfx_virt, 0x6000);
+	isdb_write(device->qdss_gfx_virt, 0x7000);
+
+	clk_disable_unprepare(clk);
+	clk_put(clk);
+
+	return;
+
+err:
+	/* Do not force kernel panic if isdb writes did not go through */
+	device->force_panic = false;
+}
+
 static int a619_holi_sptprac_enable(struct adreno_device *adreno_dev)
 {
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
@@ -2671,9 +2294,6 @@ const struct adreno_gpudev adreno_a6xx_gpudev = {
 	.reset = a6xx_reset,
 	.preemption_schedule = a6xx_preemption_schedule,
 	.preemption_context_init = a6xx_preemption_context_init,
-#ifdef CONFIG_QCOM_KGSL_CORESIGHT
-	.coresight = {&a6xx_coresight, &a6xx_coresight_cx},
-#endif
 #if IS_ENABLED(CONFIG_COMMON_CLK_QCOM)
 	.clk_set_options = a6xx_clk_set_options,
 #endif
@@ -2699,9 +2319,6 @@ const struct a6xx_gpudev adreno_a6xx_hwsched_gpudev = {
 		.iommu_fault_block = a6xx_iommu_fault_block,
 		.preemption_context_init = a6xx_preemption_context_init,
 		.context_detach = a6xx_hwsched_context_detach,
-#ifdef CONFIG_QCOM_KGSL_CORESIGHT
-		.coresight = {&a6xx_coresight, &a6xx_coresight_cx},
-#endif
 		.read_alwayson = a6xx_read_alwayson,
 		.reset = a6xx_hwsched_reset,
 		.power_ops = &a6xx_hwsched_power_ops,
@@ -2711,6 +2328,8 @@ const struct a6xx_gpudev adreno_a6xx_hwsched_gpudev = {
 		.add_to_va_minidump = a6xx_hwsched_add_to_minidump,
 		.gx_is_on = a6xx_gmu_gx_is_on,
 		.send_recurring_cmdobj = a6xx_hwsched_send_recurring_cmdobj,
+		.set_isdb_breakpoint_registers = a6xx_set_isdb_breakpoint_registers,
+		.reset_and_snapshot = a6xx_hwsched_reset_and_snapshot,
 	},
 	.hfi_probe = a6xx_hwsched_hfi_probe,
 	.hfi_remove = a6xx_hwsched_hfi_remove,
@@ -2732,9 +2351,6 @@ const struct a6xx_gpudev adreno_a6xx_gmu_gpudev = {
 		.reset = a6xx_gmu_reset,
 		.preemption_schedule = a6xx_preemption_schedule,
 		.preemption_context_init = a6xx_preemption_context_init,
-#ifdef CONFIG_QCOM_KGSL_CORESIGHT
-		.coresight = {&a6xx_coresight, &a6xx_coresight_cx},
-#endif
 		.read_alwayson = a6xx_read_alwayson,
 		.power_ops = &a6xx_gmu_power_ops,
 		.remove = a6xx_remove,
@@ -2743,6 +2359,7 @@ const struct a6xx_gpudev adreno_a6xx_gmu_gpudev = {
 		.setproperty = a6xx_setproperty,
 		.add_to_va_minidump = a6xx_gmu_add_to_minidump,
 		.gx_is_on = a6xx_gmu_gx_is_on,
+		.set_isdb_breakpoint_registers = a6xx_set_isdb_breakpoint_registers,
 	},
 	.hfi_probe = a6xx_gmu_hfi_probe,
 	.handle_watchdog = a6xx_gmu_handle_watchdog,
@@ -2762,9 +2379,6 @@ const struct adreno_gpudev adreno_a6xx_rgmu_gpudev = {
 	.reset = a6xx_rgmu_reset,
 	.preemption_schedule = a6xx_preemption_schedule,
 	.preemption_context_init = a6xx_preemption_context_init,
-#ifdef CONFIG_QCOM_KGSL_CORESIGHT
-	.coresight = {&a6xx_coresight, &a6xx_coresight_cx},
-#endif
 	.read_alwayson = a6xx_read_alwayson,
 	.power_ops = &a6xx_rgmu_power_ops,
 	.remove = a6xx_remove,
@@ -2792,9 +2406,6 @@ const struct adreno_gpudev adreno_a619_holi_gpudev = {
 	.reset = a6xx_reset,
 	.preemption_schedule = a6xx_preemption_schedule,
 	.preemption_context_init = a6xx_preemption_context_init,
-#ifdef CONFIG_QCOM_KGSL_CORESIGHT
-	.coresight = {&a6xx_coresight, &a6xx_coresight_cx},
-#endif
 #if IS_ENABLED(CONFIG_COMMON_CLK_QCOM)
 	.clk_set_options = a6xx_clk_set_options,
 #endif
@@ -2826,9 +2437,6 @@ const struct a6xx_gpudev adreno_a630_gpudev = {
 		.reset = a6xx_gmu_reset,
 		.preemption_schedule = a6xx_preemption_schedule,
 		.preemption_context_init = a6xx_preemption_context_init,
-#ifdef CONFIG_QCOM_KGSL_CORESIGHT
-		.coresight = {&a6xx_coresight, &a6xx_coresight_cx},
-#endif
 		.read_alwayson = a6xx_read_alwayson,
 		.power_ops = &a630_gmu_power_ops,
 		.remove = a6xx_remove,
