@@ -15,8 +15,8 @@
 #include "msm_vidc_platform.h"
 
 #define CAP_TO_8BIT_QP(a) {          \
-	if ((a) < 0)                 \
-		(a) = 0;             \
+	if ((a) < MIN_QP_8BIT)                 \
+		(a) = MIN_QP_8BIT;             \
 }
 
 extern struct msm_vidc_core *g_core;

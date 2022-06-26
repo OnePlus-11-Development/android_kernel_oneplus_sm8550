@@ -23,8 +23,6 @@
 #define DEFAULT_BITRATE         20000000
 #define MINIMUM_FPS             1
 #define MAXIMUM_FPS             480
-#define MIN_QP_10BIT            -12
-#define MIN_QP_8BIT             0
 #define MAX_QP                  51
 #define DEFAULT_QP              20
 #define MAX_CONSTANT_QUALITY    100
