@@ -2227,12 +2227,17 @@ static void a5xx_gpmu_int_callback(struct adreno_device *adreno_dev, int bit)
 					A5XX_GPMU_CM3_SYSRESET, 1);
 				kgsl_schedule_work(&adreno_dev->gpmu_work);
 			}
-			/* fallthrough */
+			fallthrough;
 		case BIT(FW_INTR_INFO):
+			fallthrough;
 		case BIT(LLM_ACK_ERR_INTR):
+			fallthrough;
 		case BIT(ISENS_TRIM_ERR_INTR):
+			fallthrough;
 		case BIT(ISENS_ERR_INTR):
+			fallthrough;
 		case BIT(ISENS_IDLE_ERR_INTR):
+			fallthrough;
 		case BIT(ISENS_PWR_ON_ERR_INTR):
 			dev_crit_ratelimited(device->dev,
 						"GPMU: interrupt %s(%08lx)\n",
