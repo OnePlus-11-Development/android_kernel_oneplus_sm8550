@@ -790,16 +790,20 @@ static int _sde_enc_phys_wb_validate_dnsc_blur_ds(struct drm_crtc_state *crtc_st
 			struct sde_rect *wb_roi)
 {
 	struct sde_crtc_state *cstate = to_sde_crtc_state(crtc_state);
+	const struct drm_display_mode *mode = &crtc_state->mode;
 	struct sde_io_res ds_res = {0, }, dnsc_blur_res = {0, };
 	u32 ds_tap_pt = sde_crtc_get_property(cstate, CRTC_PROP_CAPTURE_OUTPUT);
 
 	sde_crtc_get_ds_io_res(crtc_state, &ds_res);
 	sde_connector_get_dnsc_blur_io_res(conn_state, &dnsc_blur_res);
 
-	if ((ds_res.enabled && (!ds_res.src_w || !ds_res.src_h
-					|| !ds_res.dst_w || !ds_res.dst_h))) {
-		SDE_ERROR("invalid ds cfg src:%ux%u dst:%ux%u\n",
-				ds_res.src_w, ds_res.src_h, ds_res.dst_w, ds_res.dst_h);
+	/* wb_roi should match with mode w/h if none of these features are enabled */
+	if ((!ds_res.enabled && !dnsc_blur_res.enabled && !cstate->cwb_enc_mask)
+			&& ((wb_roi->w && (wb_roi->w != mode->hdisplay))
+				|| (wb_roi->h && (wb_roi->h != mode->vdisplay)))) {
+		SDE_ERROR("invalid wb-roi {%u,%u,%u,%u} mode:%ux%u\n",
+				wb_roi->x, wb_roi->y, wb_roi->w, wb_roi->h,
+				mode->hdisplay, mode->vdisplay);
 		return -EINVAL;
 	}
 
@@ -1421,6 +1425,13 @@ static void _sde_encoder_phys_wb_setup_dnsc_blur(struct sde_encoder_phys *phys_e
 
 	sde_conn = to_sde_connector(wb_dev->connector);
 	sde_conn_state = to_sde_connector_state(wb_dev->connector->state);
+
+	if (sde_conn_state->dnsc_blur_count && !hw_dnsc_blur) {
+		SDE_ERROR("[enc:%d wb:%d] invalid config - dnsc_blur block not reserved\n",
+			DRMID(phys_enc->parent), WBID(wb_enc));
+		sde_kms->catalog->dnsc_blur_count = 0;
+		return;
+	}
 
 	/* swap between 0 & 1 lut idx on each config change for gaussian lut */
 	sde_conn_state->dnsc_blur_lut = 1 - sde_conn_state->dnsc_blur_lut;
