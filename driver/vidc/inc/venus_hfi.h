@@ -68,6 +68,8 @@ int venus_hfi_set_ir_period(struct msm_vidc_inst *inst, u32 ir_type,
 void venus_hfi_pm_work_handler(struct work_struct *work);
 irqreturn_t venus_hfi_isr(int irq, void *data);
 irqreturn_t venus_hfi_isr_handler(int irq, void *data);
+int venus_hfi_interface_queues_init(struct msm_vidc_core *core);
+void venus_hfi_interface_queues_deinit(struct msm_vidc_core *core);
 
 int __write_register_masked(struct msm_vidc_core *core,
 		u32 reg, u32 value, u32 mask);

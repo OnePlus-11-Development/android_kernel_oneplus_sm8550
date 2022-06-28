@@ -359,6 +359,8 @@ static int msm_vidc_remove_video_device(struct platform_device *pdev)
 
 	msm_vidc_core_deinit(core, true);
 
+	venus_hfi_interface_queues_deinit(core);
+
 	d_vpr_h("depopulating sub devices\n");
 	/*
 	 * Trigger remove for each sub-device i.e. qcom,msm-vidc,context-bank.
@@ -547,6 +549,12 @@ static int msm_vidc_probe_video_device(struct platform_device *pdev)
 		goto sub_dev_failed;
 	}
 
+	rc = venus_hfi_interface_queues_init(core);
+	if (rc) {
+		d_vpr_e("%s: interface queues init failed\n", __func__);
+		goto queues_init_failed;
+	}
+
 	rc = msm_vidc_core_init(core);
 	if (rc) {
 		d_vpr_e("%s: sys init failed\n", __func__);
@@ -557,6 +565,8 @@ static int msm_vidc_probe_video_device(struct platform_device *pdev)
 	return rc;
 
 core_init_failed:
+	venus_hfi_interface_queues_deinit(core);
+queues_init_failed:
 	of_platform_depopulate(&pdev->dev);
 sub_dev_failed:
 #ifdef CONFIG_MEDIA_CONTROLLER

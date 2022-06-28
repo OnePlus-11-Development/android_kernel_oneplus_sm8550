@@ -2203,7 +2203,7 @@ static void __set_queue_hdr_defaults(struct hfi_queue_header *q_hdr)
 	q_hdr->qhdr_write_idx = 0x0;
 }
 
-static void __interface_queues_deinit(struct msm_vidc_core *core)
+void venus_hfi_interface_queues_deinit(struct msm_vidc_core *core)
 {
 	int i;
 
@@ -2227,7 +2227,7 @@ static void __interface_queues_deinit(struct msm_vidc_core *core)
 	core->sfr.align_device_addr = 0;
 }
 
-static int __interface_queues_init(struct msm_vidc_core *core)
+int venus_hfi_interface_queues_init(struct msm_vidc_core *core)
 {
 	int rc = 0;
 	struct hfi_queue_table_header *q_tbl_hdr;
@@ -2341,10 +2341,6 @@ static int __interface_queues_init(struct msm_vidc_core *core)
 	core->sfr.mem_size = ALIGNED_SFR_SIZE;
 	/* write sfr buffer size in first word */
 	*((u32 *)core->sfr.align_virtual_addr) = core->sfr.mem_size;
-
-	rc = call_venus_op(core, setup_ucregion_memmap, core);
-	if (rc)
-		return rc;
 
 	return 0;
 fail_alloc_queue:
@@ -2500,6 +2496,11 @@ int __load_fw(struct msm_vidc_core *core)
 	*/
 	__hand_off_regulators(core);
 	trace_msm_v4l2_vidc_fw_load("END");
+
+	/* configure interface_queues memory to firmware */
+	rc = call_venus_op(core, setup_ucregion_memmap, core);
+	if (rc)
+		return rc;
 
 	return rc;
 fail_protect_mem:
@@ -2704,10 +2705,6 @@ int venus_hfi_core_init(struct msm_vidc_core *core)
 	if (rc)
 		goto error;
 
-	rc = __interface_queues_init(core);
-	if (rc)
-		goto error;
-
 	rc = call_venus_op(core, boot_firmware, core);
 	if (rc)
 		goto error;
@@ -2772,7 +2769,6 @@ int venus_hfi_core_deinit(struct msm_vidc_core *core, bool force)
 	 */
 	if (msm_vidc_fw_dump)
 		fw_coredump(core);
-	__interface_queues_deinit(core);
 
 	return 0;
 }
