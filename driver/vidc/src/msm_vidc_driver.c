@@ -2094,10 +2094,12 @@ int msm_vidc_process_stop_done(struct msm_vidc_inst *inst,
 			msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
 		}
 		/*
-		 * FW is expected to return DRAIN LAST flag before input
-		 * stop done if DRAIN sequence is pending
+		 * for a decode session, FW is expected to return
+		 * DRAIN LAST flag before input stop done if
+		 * DRAIN sequence is pending
 		 */
-		if (is_sub_state(inst, MSM_VIDC_DRAIN) &&
+		if (is_decode_session(inst) &&
+			is_sub_state(inst, MSM_VIDC_DRAIN) &&
 			!is_sub_state(inst, MSM_VIDC_DRAIN_LAST_BUFFER)) {
 			i_vpr_e(inst, "%s: drain last flag pkt not received\n", __func__);
 			msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
