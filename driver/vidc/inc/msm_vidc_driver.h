@@ -523,7 +523,8 @@ int msm_vidc_state_change_drain_last_flag(struct msm_vidc_inst *inst);
 int msm_vidc_state_change_psc_last_flag(struct msm_vidc_inst *inst);
 int msm_vidc_process_drain(struct msm_vidc_inst *inst);
 int msm_vidc_process_resume(struct msm_vidc_inst *inst);
-int msm_vidc_process_streamon(struct msm_vidc_inst *inst, u32 type);
+int msm_vidc_process_streamon_input(struct msm_vidc_inst *inst);
+int msm_vidc_process_streamon_output(struct msm_vidc_inst *inst);
 int msm_vidc_process_stop_done(struct msm_vidc_inst *inst,
 	enum signal_session_response signal_type);
 int msm_vidc_process_drain_done(struct msm_vidc_inst *inst);
@@ -586,5 +587,6 @@ int msm_vidc_update_input_rate(struct msm_vidc_inst *inst, u64 time_us);
 int msm_vidc_get_input_rate(struct msm_vidc_inst *inst);
 int msm_vidc_get_frame_rate(struct msm_vidc_inst *inst);
 int msm_vidc_get_operating_rate(struct msm_vidc_inst *inst);
+int msm_vidc_alloc_and_queue_input_internal_buffers(struct msm_vidc_inst *inst);
 #endif // _MSM_VIDC_DRIVER_H_
 

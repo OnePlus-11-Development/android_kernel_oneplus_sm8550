@@ -755,7 +755,7 @@ static int msm_vdec_set_output_properties(struct msm_vidc_inst *inst)
 	return rc;
 }
 
-static int msm_vdec_get_input_internal_buffers(struct msm_vidc_inst *inst)
+int msm_vdec_get_input_internal_buffers(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
 	u32 i = 0;
@@ -790,7 +790,7 @@ static int msm_vdec_get_output_internal_buffers(struct msm_vidc_inst *inst)
 	return rc;
 }
 
-static int msm_vdec_create_input_internal_buffers(struct msm_vidc_inst *inst)
+int msm_vdec_create_input_internal_buffers(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
 	u32 i = 0;
@@ -815,7 +815,7 @@ static int msm_vdec_create_output_internal_buffers(struct msm_vidc_inst *inst)
 	return 0;
 }
 
-static int msm_vdec_queue_input_internal_buffers(struct msm_vidc_inst *inst)
+int msm_vdec_queue_input_internal_buffers(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
 	u32 i = 0;
@@ -840,7 +840,7 @@ static int msm_vdec_queue_output_internal_buffers(struct msm_vidc_inst *inst)
 	return 0;
 }
 
-static int msm_vdec_release_input_internal_buffers(struct msm_vidc_inst *inst)
+int msm_vdec_release_input_internal_buffers(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
 	u32 i = 0;
@@ -1371,30 +1371,6 @@ int msm_vdec_input_port_settings_change(struct msm_vidc_inst *inst)
 	event.u.src_change.changes = V4L2_EVENT_SRC_CH_RESOLUTION;
 	v4l2_event_queue_fh(&inst->event_handler, &event);
 
-	rc = msm_vdec_get_input_internal_buffers(inst);
-	if (rc)
-		return rc;
-
-	rc = msm_vdec_release_input_internal_buffers(inst);
-	if (rc)
-		return rc;
-
-	rc = msm_vdec_create_input_internal_buffers(inst);
-	if (rc)
-		return rc;
-
-	rc = msm_vdec_queue_input_internal_buffers(inst);
-	if (rc)
-		return rc;
-
-	rc = msm_vidc_set_stage(inst, STAGE);
-	if (rc)
-		return rc;
-
-	rc = msm_vidc_set_pipe(inst, PIPE);
-	if (rc)
-		return rc;
-
 	return rc;
 }
 
@@ -1489,7 +1465,7 @@ int msm_vdec_streamon_input(struct msm_vidc_inst *inst)
 	if (rc)
 		goto error;
 
-	rc = msm_vidc_process_streamon(inst, INPUT_PORT);
+	rc = msm_vidc_process_streamon_input(inst);
 	if (rc)
 		goto error;
 
@@ -1809,7 +1785,7 @@ int msm_vdec_streamon_output(struct msm_vidc_inst *inst)
 	if (rc)
 		goto error;
 
-	rc = msm_vidc_process_streamon(inst, OUTPUT_PORT);
+	rc = msm_vidc_process_streamon_output(inst);
 	if (rc)
 		goto error;
 
@@ -2205,6 +2181,27 @@ int msm_vdec_process_cmd(struct msm_vidc_inst *inst, u32 cmd)
 		inst->decode_batch.enable = msm_vidc_allow_decode_batch(inst);
 		msm_vidc_allow_dcvs(inst);
 		msm_vidc_power_data_reset(inst);
+
+		/*
+		 * client is completing partial port reconfiguration,
+		 * hence reallocate input internal buffers before input port
+		 * is resumed.
+		 */
+		if (is_sub_state(inst, MSM_VIDC_DRC) &&
+			is_sub_state(inst, MSM_VIDC_DRC_LAST_BUFFER) &&
+			is_sub_state(inst, MSM_VIDC_INPUT_PAUSE)) {
+			rc = msm_vidc_alloc_and_queue_input_internal_buffers(inst);
+			if (rc)
+				return rc;
+
+			rc = msm_vidc_set_stage(inst, STAGE);
+			if (rc)
+				return rc;
+
+			rc = msm_vidc_set_pipe(inst, PIPE);
+			if (rc)
+				return rc;
+		}
 
 		/* allocate and queue extra dpb buffers */
 		rc = msm_vdec_alloc_and_queue_additional_dpb_buffers(inst);

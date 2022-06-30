@@ -1664,12 +1664,15 @@ bool msm_vidc_allow_start(struct msm_vidc_inst *inst)
 	}
 
 	/* client would call start (resume) to complete DRC/drain sequence */
-	if ((is_sub_state(inst, MSM_VIDC_DRC) &&
-		is_sub_state(inst, MSM_VIDC_DRC_LAST_BUFFER)) ||
-		(is_sub_state(inst, MSM_VIDC_DRAIN) &&
-		is_sub_state(inst, MSM_VIDC_DRAIN_LAST_BUFFER)))
-		allow = true;
-
+	if (inst->state == MSM_VIDC_INPUT_STREAMING ||
+		inst->state == MSM_VIDC_OUTPUT_STREAMING ||
+		inst->state == MSM_VIDC_STREAMING) {
+		if ((is_sub_state(inst, MSM_VIDC_DRC) &&
+			is_sub_state(inst, MSM_VIDC_DRC_LAST_BUFFER)) ||
+			(is_sub_state(inst, MSM_VIDC_DRAIN) &&
+			is_sub_state(inst, MSM_VIDC_DRAIN_LAST_BUFFER)))
+			allow = true;
+	}
 	if (!allow)
 		i_vpr_e(inst, "%s: not allowed in state %s, sub state %s\n",
 			__func__, state_name(inst->state), inst->sub_state_name);
@@ -1984,8 +1987,58 @@ int msm_vidc_process_resume(struct msm_vidc_inst *inst)
 	return rc;
 }
 
-int msm_vidc_process_streamon(struct msm_vidc_inst *inst,
-		enum msm_vidc_port_type port)
+int msm_vidc_process_streamon_input(struct msm_vidc_inst *inst)
+{
+	int rc = 0;
+	enum msm_vidc_sub_state clear_sub_state = MSM_VIDC_SUB_STATE_NONE;
+	enum msm_vidc_sub_state set_sub_state = MSM_VIDC_SUB_STATE_NONE;
+
+	if (!inst) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	msm_vidc_scale_power(inst, true);
+
+	rc = venus_hfi_start(inst, INPUT_PORT);
+	if (rc)
+		return rc;
+
+	/* clear input pause substate immediately */
+	if (is_sub_state(inst, MSM_VIDC_INPUT_PAUSE)) {
+		rc = msm_vidc_change_sub_state(inst, MSM_VIDC_INPUT_PAUSE, 0, __func__);
+		if (rc)
+			return rc;
+	}
+
+	/*
+	 * if DRC sequence is not completed by the client then PAUSE
+	 * firmware input port to avoid firmware raising IPSC again.
+	 * When client completes DRC or DRAIN sequences, firmware
+	 * input port will be resumed.
+	 */
+	if (is_sub_state(inst, MSM_VIDC_DRC) ||
+		is_sub_state(inst, MSM_VIDC_DRAIN)) {
+		if (!is_sub_state(inst, MSM_VIDC_INPUT_PAUSE)) {
+			rc = venus_hfi_session_pause(inst, INPUT_PORT);
+			if (rc)
+				return rc;
+			set_sub_state = MSM_VIDC_INPUT_PAUSE;
+		}
+	}
+
+	rc = msm_vidc_state_change_streamon(inst, INPUT_PORT);
+	if (rc)
+		return rc;
+
+	rc = msm_vidc_change_sub_state(inst, clear_sub_state, set_sub_state, __func__);
+	if (rc)
+		return rc;
+
+	return rc;
+}
+
+int msm_vidc_process_streamon_output(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
 	enum msm_vidc_sub_state clear_sub_state = MSM_VIDC_SUB_STATE_NONE;
@@ -1997,70 +2050,64 @@ int msm_vidc_process_streamon(struct msm_vidc_inst *inst,
 		return -EINVAL;
 	}
 
-	if (port == INPUT_META_PORT || port == OUTPUT_META_PORT)
-		return 0;
-
 	msm_vidc_scale_power(inst, true);
 
-	rc = venus_hfi_start(inst, port);
+	/*
+	 * client completed drc sequence, reset DRC and
+	 * MSM_VIDC_DRC_LAST_BUFFER substates
+	 */
+	if (is_sub_state(inst, MSM_VIDC_DRC) &&
+		is_sub_state(inst, MSM_VIDC_DRC_LAST_BUFFER)) {
+		clear_sub_state = MSM_VIDC_DRC | MSM_VIDC_DRC_LAST_BUFFER;
+	}
+	/*
+	 * Client is completing port reconfiguration, hence reallocate
+	 * input internal buffers before input port is resumed.
+	 * Drc sub-state cannot be checked because DRC sub-state will
+	 * not be set during initial port reconfiguration.
+	 */
+	if (is_decode_session(inst) &&
+		is_sub_state(inst, MSM_VIDC_INPUT_PAUSE)) {
+		rc = msm_vidc_alloc_and_queue_input_internal_buffers(inst);
+		if (rc)
+			return rc;
+		rc = msm_vidc_set_stage(inst, STAGE);
+		if (rc)
+			return rc;
+		rc = msm_vidc_set_pipe(inst, PIPE);
+		if (rc)
+			return rc;
+	}
+
+	/*
+	 * fw input port is paused due to ipsc. now that client
+	 * completed drc sequence, resume fw input port provided
+	 * drain is not pending and input port is streaming.
+	 */
+	drain_pending = is_sub_state(inst, MSM_VIDC_DRAIN) &&
+		is_sub_state(inst, MSM_VIDC_DRAIN_LAST_BUFFER);
+	if (!drain_pending && is_state(inst, MSM_VIDC_INPUT_STREAMING)) {
+		if (is_sub_state(inst, MSM_VIDC_INPUT_PAUSE)) {
+			rc = venus_hfi_session_resume(inst, INPUT_PORT,
+					HFI_CMD_SETTINGS_CHANGE);
+			if (rc)
+				return rc;
+			clear_sub_state |= MSM_VIDC_INPUT_PAUSE;
+		}
+	}
+
+	rc = venus_hfi_start(inst, OUTPUT_PORT);
 	if (rc)
 		return rc;
 
-	/* clear input/output pause substate immediately */
-	if (port == INPUT_PORT && is_sub_state(inst, MSM_VIDC_INPUT_PAUSE)) {
-		rc = msm_vidc_change_sub_state(inst, MSM_VIDC_INPUT_PAUSE, 0, __func__);
-		if (rc)
-			return rc;
-	} else if (port == OUTPUT_PORT && is_sub_state(inst, MSM_VIDC_OUTPUT_PAUSE)) {
+	/* clear output pause substate immediately */
+	if (is_sub_state(inst, MSM_VIDC_OUTPUT_PAUSE)) {
 		rc = msm_vidc_change_sub_state(inst, MSM_VIDC_OUTPUT_PAUSE, 0, __func__);
 		if (rc)
 			return rc;
 	}
 
-	if (port == INPUT_PORT) {
-		/*
-		 * if DRC sequence is not completed by the client then PAUSE
-		 * firmware input port to avoid firmware raising IPSC again.
-		 * When client completes DRC or DRAIN sequences, firmware
-		 * input port will be resumed.
-		 */
-		if (is_sub_state(inst, MSM_VIDC_DRC) ||
-			is_sub_state(inst, MSM_VIDC_DRAIN)) {
-			if (!is_sub_state(inst, MSM_VIDC_INPUT_PAUSE)) {
-				rc = venus_hfi_session_pause(inst, INPUT_PORT);
-				if (rc)
-					return rc;
-				set_sub_state = MSM_VIDC_INPUT_PAUSE;
-			}
-		}
-	} else if (port == OUTPUT_PORT) {
-		/*
-		 * client completed drc sequence, reset DRC and
-		 * MSM_VIDC_DRC_LAST_BUFFER substates
-		 */
-		if (is_sub_state(inst, MSM_VIDC_DRC) &&
-			is_sub_state(inst, MSM_VIDC_DRC_LAST_BUFFER)) {
-			clear_sub_state = MSM_VIDC_DRC | MSM_VIDC_DRC_LAST_BUFFER;
-		}
-		/*
-		 * fw input port is paused due to ipsc. now that client
-		 * completed drc sequence, resume fw input port provided
-		 * drain is not pending and input port is streaming.
-		 */
-		drain_pending = is_sub_state(inst, MSM_VIDC_DRAIN) &&
-			is_sub_state(inst, MSM_VIDC_DRAIN_LAST_BUFFER);
-		if (!drain_pending && is_state(inst, MSM_VIDC_INPUT_STREAMING)) {
-			if (is_sub_state(inst, MSM_VIDC_INPUT_PAUSE)) {
-				rc = venus_hfi_session_resume(inst, INPUT_PORT,
-						HFI_CMD_SETTINGS_CHANGE);
-				if (rc)
-					return rc;
-				clear_sub_state |= MSM_VIDC_INPUT_PAUSE;
-			}
-		}
-	}
-
-	rc = msm_vidc_state_change_streamon(inst, port);
+	rc = msm_vidc_state_change_streamon(inst, OUTPUT_PORT);
 	if (rc)
 		return rc;
 
@@ -3585,6 +3632,34 @@ static int msm_vidc_queue_buffer(struct msm_vidc_inst *inst, struct msm_vidc_buf
 	msm_vidc_update_stats(inst, buf, etype);
 
 	return 0;
+}
+
+int msm_vidc_alloc_and_queue_input_internal_buffers(struct msm_vidc_inst *inst)
+{
+	int rc = 0;
+
+	if (!inst) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	rc = msm_vdec_get_input_internal_buffers(inst);
+	if (rc)
+		return rc;
+
+	rc = msm_vdec_release_input_internal_buffers(inst);
+	if (rc)
+		return rc;
+
+	rc = msm_vdec_create_input_internal_buffers(inst);
+	if (rc)
+		return rc;
+
+	rc = msm_vdec_queue_input_internal_buffers(inst);
+	if (rc)
+		return rc;
+
+	return rc;
 }
 
 int msm_vidc_queue_deferred_buffers(struct msm_vidc_inst *inst, enum msm_vidc_buffer_type buf_type)
