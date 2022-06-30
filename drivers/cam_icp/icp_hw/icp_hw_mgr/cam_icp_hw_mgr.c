@@ -3853,6 +3853,8 @@ static int cam_icp_mgr_abort_handle_wq(
 	abort_cmd->fw_handles[0] = ctx_data->fw_handle;
 	abort_cmd->user_data1 = PTR_TO_U64(ctx_data);
 	abort_cmd->user_data2 = (uint64_t)0x0;
+	// default abort_data.user_data
+	abort_data.user_data = 0;
 
 	rc = hfi_write_cmd(abort_cmd);
 	if (rc) {
