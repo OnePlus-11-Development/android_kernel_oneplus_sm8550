@@ -4726,6 +4726,7 @@ u32 sde_encoder_helper_get_kickoff_timeout_ms(struct drm_encoder *drm_enc)
 {
 	struct drm_encoder *src_enc = drm_enc;
 	struct sde_encoder_virt *sde_enc;
+	struct sde_kms *sde_kms;
 	u32 fps;
 
 	if (!drm_enc) {
@@ -4733,11 +4734,18 @@ u32 sde_encoder_helper_get_kickoff_timeout_ms(struct drm_encoder *drm_enc)
 		return DEFAULT_KICKOFF_TIMEOUT_MS;
 	}
 
+	sde_kms = sde_encoder_get_kms(drm_enc);
+	if (!sde_kms)
+		return DEFAULT_KICKOFF_TIMEOUT_MS;
+
 	if (sde_encoder_in_clone_mode(drm_enc))
 		src_enc = sde_crtc_get_src_encoder_of_clone(drm_enc->crtc);
 
 	if (!src_enc)
 		return DEFAULT_KICKOFF_TIMEOUT_MS;
+
+	if (test_bit(SDE_FEATURE_EMULATED_ENV, sde_kms->catalog->features))
+		return MAX_KICKOFF_TIMEOUT_MS;
 
 	sde_enc = to_sde_encoder_virt(src_enc);
 	fps = sde_enc->mode_info.frame_rate;
