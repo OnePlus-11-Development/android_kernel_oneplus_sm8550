@@ -424,6 +424,13 @@ static const struct adreno_coresight gen7_coresight_cx = {
 	.groups = gen7_coresight_groups_cx,
 };
 
+static int name_match(struct device *dev, void *data)
+{
+	char *child_name = data;
+
+	return strcmp(child_name, dev_name(dev)) == 0;
+}
+
 void gen7_coresight_init(struct adreno_device *adreno_dev)
 {
 	struct adreno_funnel_device *funnel_gfx = &adreno_dev->funnel_gfx;
@@ -434,7 +441,7 @@ void gen7_coresight_init(struct adreno_device *adreno_dev)
 	if (!amba_dev)
 		return;
 
-	funnel_gfx->funnel_dev = device_find_child_by_name(amba_dev, "coresight-funnel-gfx");
+	funnel_gfx->funnel_dev = device_find_child(amba_dev, "coresight-funnel-gfx", name_match);
 	if (funnel_gfx->funnel_dev == NULL)
 		return;
 
