@@ -477,9 +477,6 @@ int gen7_start(struct adreno_device *adreno_dev)
 			BIT(3) | BIT(2) |
 			FIELD_PREP(GENMASK(1, 0), 2));
 
-	/* Set the AHB default slave response to "ERROR" */
-	kgsl_regwrite(device, GEN7_CP_AHB_CNTL, 0x1);
-
 	/* Turn on the IFPC counter (countable 4 on XOCLK4) */
 	kgsl_regwrite(device, GEN7_GMU_CX_GMU_POWER_COUNTER_SELECT_1,
 			FIELD_PREP(GENMASK(7, 0), 0x4));
