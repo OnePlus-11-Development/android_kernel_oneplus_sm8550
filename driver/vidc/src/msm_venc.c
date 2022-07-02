@@ -863,7 +863,7 @@ int msm_venc_streamon_input(struct msm_vidc_inst *inst)
 	if (rc)
 		goto error;
 
-	rc = msm_vidc_process_streamon(inst, INPUT_PORT);
+	rc = msm_vidc_process_streamon_input(inst);
 	if (rc)
 		goto error;
 
@@ -1013,7 +1013,7 @@ int msm_venc_streamon_output(struct msm_vidc_inst *inst)
 	if (rc)
 		goto error;
 
-	rc = msm_vidc_process_streamon(inst, OUTPUT_PORT);
+	rc = msm_vidc_process_streamon_output(inst);
 	if (rc)
 		goto error;
 
