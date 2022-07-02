@@ -607,6 +607,10 @@ enum hfi_saliency_type {
 
 #define HFI_INFO_VCODEC_RESET                                   0x06000005
 
+#define HFI_INFO_HFI_FLAG_DRAIN_LAST                            0x06000006
+
+#define HFI_INFO_HFI_FLAG_PSC_LAST                              0x06000007
+
 #define HFI_INFORMATION_END                                     0x06FFFFFF
 
 #endif //__H_HFI_PROPERTY_H__

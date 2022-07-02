@@ -857,13 +857,13 @@ int msm_venc_streamon_input(struct msm_vidc_inst *inst)
 
 	rc = msm_venc_property_subscription(inst, INPUT_PORT);
 	if (rc)
-		return rc;
+		goto error;
 
 	rc = msm_venc_metadata_delivery(inst, INPUT_PORT);
 	if (rc)
-		return rc;
+		goto error;
 
-	rc = msm_vidc_session_streamon(inst, INPUT_PORT);
+	rc = msm_vidc_process_streamon(inst, INPUT_PORT);
 	if (rc)
 		goto error;
 
@@ -910,15 +910,7 @@ int msm_venc_process_cmd(struct msm_vidc_inst *inst, u32 cmd)
 			return 0;
 		else if (allow != MSM_VIDC_ALLOW)
 			return -EINVAL;
-		rc = venus_hfi_session_command(inst,
-				HFI_CMD_DRAIN,
-				INPUT_PORT,
-				HFI_PAYLOAD_NONE,
-				NULL,
-				0);
-		if (rc)
-			return rc;
-		rc = msm_vidc_state_change_stop(inst);
+		rc = msm_vidc_process_drain(inst);
 		if (rc)
 			return rc;
 	} else if (cmd == V4L2_ENC_CMD_START) {
@@ -928,10 +920,6 @@ int msm_venc_process_cmd(struct msm_vidc_inst *inst, u32 cmd)
 		vb2_clear_last_buffer_dequeued(inst->bufq[OUTPUT_META_PORT].vb2q);
 		vb2_clear_last_buffer_dequeued(inst->bufq[OUTPUT_PORT].vb2q);
 
-		rc = msm_vidc_state_change_start(inst);
-		if (rc)
-			return rc;
-
 		/* tune power features */
 		msm_vidc_allow_dcvs(inst);
 		msm_vidc_power_data_reset(inst);
@@ -939,12 +927,7 @@ int msm_venc_process_cmd(struct msm_vidc_inst *inst, u32 cmd)
 		/* print final buffer counts & size details */
 		msm_vidc_print_buffer_info(inst);
 
-		rc = venus_hfi_session_command(inst,
-				HFI_CMD_RESUME,
-				INPUT_PORT,
-				HFI_PAYLOAD_NONE,
-				NULL,
-				0);
+		rc = msm_vidc_process_resume(inst);
 		if (rc)
 			return rc;
 	} else {
@@ -1030,7 +1013,7 @@ int msm_venc_streamon_output(struct msm_vidc_inst *inst)
 	if (rc)
 		goto error;
 
-	rc = msm_vidc_session_streamon(inst, OUTPUT_PORT);
+	rc = msm_vidc_process_streamon(inst, OUTPUT_PORT);
 	if (rc)
 		goto error;
 

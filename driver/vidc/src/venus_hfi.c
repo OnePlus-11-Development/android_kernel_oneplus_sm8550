@@ -3304,6 +3304,137 @@ unlock:
 	return rc;
 }
 
+int venus_hfi_session_pause(struct msm_vidc_inst *inst, enum msm_vidc_port_type port)
+{
+	int rc = 0;
+	struct msm_vidc_core* core;
+
+	if (!inst || !inst->core || !inst->packet) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	core = inst->core;
+	core_lock(core, __func__);
+
+	if (!__valdiate_session(core, inst, __func__)) {
+		rc = -EINVAL;
+		goto unlock;
+	}
+
+	if (port != INPUT_PORT && port != OUTPUT_PORT) {
+		i_vpr_e(inst, "%s: invalid port %d\n", __func__, port);
+		goto unlock;
+	}
+
+	rc = hfi_packet_session_command(inst,
+				HFI_CMD_PAUSE,
+				(HFI_HOST_FLAGS_RESPONSE_REQUIRED |
+				HFI_HOST_FLAGS_INTR_REQUIRED),
+				get_hfi_port(inst, port),
+				inst->session_id,
+				HFI_PAYLOAD_NONE,
+				NULL,
+				0);
+	if (rc)
+		goto unlock;
+
+	rc = __iface_cmdq_write(inst->core, inst->packet);
+	if (rc)
+		goto unlock;
+
+unlock:
+	core_unlock(core, __func__);
+	return rc;
+}
+
+int venus_hfi_session_resume(struct msm_vidc_inst *inst,
+	enum msm_vidc_port_type port, u32 payload)
+{
+	int rc = 0;
+	struct msm_vidc_core* core;
+
+	if (!inst || !inst->core || !inst->packet) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	core = inst->core;
+	core_lock(core, __func__);
+
+	if (!__valdiate_session(core, inst, __func__)) {
+		rc = -EINVAL;
+		goto unlock;
+	}
+
+	if (port != INPUT_PORT && port != OUTPUT_PORT) {
+		i_vpr_e(inst, "%s: invalid port %d\n", __func__, port);
+		goto unlock;
+	}
+
+	rc = hfi_packet_session_command(inst,
+				HFI_CMD_RESUME,
+				(HFI_HOST_FLAGS_RESPONSE_REQUIRED |
+				HFI_HOST_FLAGS_INTR_REQUIRED),
+				get_hfi_port(inst, port),
+				inst->session_id,
+				HFI_PAYLOAD_U32,
+				&payload,
+				sizeof(u32));
+	if (rc)
+		goto unlock;
+
+	rc = __iface_cmdq_write(inst->core, inst->packet);
+	if (rc)
+		goto unlock;
+
+unlock:
+	core_unlock(core, __func__);
+	return rc;
+}
+
+int venus_hfi_session_drain(struct msm_vidc_inst *inst, enum msm_vidc_port_type port)
+{
+	int rc = 0;
+	struct msm_vidc_core* core;
+
+	if (!inst || !inst->core || !inst->packet) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	core = inst->core;
+	core_lock(core, __func__);
+
+	if (!__valdiate_session(core, inst, __func__)) {
+		rc = -EINVAL;
+		goto unlock;
+	}
+
+	if (port != INPUT_PORT) {
+		i_vpr_e(inst, "%s: invalid port %d\n", __func__, port);
+		goto unlock;
+	}
+
+	rc = hfi_packet_session_command(inst,
+				HFI_CMD_DRAIN,
+				(HFI_HOST_FLAGS_RESPONSE_REQUIRED |
+				HFI_HOST_FLAGS_INTR_REQUIRED |
+				HFI_HOST_FLAGS_NON_DISCARDABLE),
+				get_hfi_port(inst, port),
+				inst->session_id,
+				HFI_PAYLOAD_NONE,
+				NULL,
+				0);
+	if (rc)
+		goto unlock;
+
+	rc = __iface_cmdq_write(inst->core, inst->packet);
+	if (rc)
+		goto unlock;
+
+unlock:
+	core_unlock(core, __func__);
+	return rc;
+}
+
 int venus_hfi_session_command(struct msm_vidc_inst *inst,
 	u32 cmd, enum msm_vidc_port_type port, u32 payload_type,
 	void *payload, u32 payload_size)

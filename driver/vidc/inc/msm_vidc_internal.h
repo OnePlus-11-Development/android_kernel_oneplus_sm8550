@@ -500,6 +500,7 @@ enum msm_vidc_inst_capability_type {
 	CAVLC_MAX_BITRATE,
 	ALLINTRA_MAX_BITRATE,
 	LOWLATENCY_MAX_BITRATE,
+	LAST_FLAG_EVENT_ENABLE,
 	/* place all root(no parent) enums before this line */
 
 	PROFILE,
@@ -938,19 +939,6 @@ enum msm_vidc_allow {
 	MSM_VIDC_DEFER,
 	MSM_VIDC_DISCARD,
 	MSM_VIDC_IGNORE,
-};
-
-enum response_work_type {
-	RESP_WORK_INPUT_PSC = 1,
-	RESP_WORK_OUTPUT_PSC,
-	RESP_WORK_LAST_FLAG,
-};
-
-struct response_work {
-	struct list_head        list;
-	enum response_work_type type;
-	void                   *data;
-	u32                     data_size;
 };
 
 struct msm_vidc_ssr {

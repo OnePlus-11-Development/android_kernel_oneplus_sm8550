@@ -268,6 +268,9 @@ enum v4l2_h264_encode_delivery_mode {
 #define V4L2_CID_MPEG_VIDC_CLIENT_ID                                          \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x41)
 
+#define V4L2_CID_MPEG_VIDC_LAST_FLAG_EVENT_ENABLE                             \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x42)
+
 /* add new controls above this line */
 /* Deprecate below controls once availble in gki and gsi bionic header */
 #ifndef V4L2_CID_MPEG_VIDEO_BASELAYER_PRIORITY_ID
@@ -461,6 +464,19 @@ struct v4l2_event_vidc_metadata {
 	__u32                                offset;
 	__u8                                 reserved[44];
 };
+
+#define V4L2_EVENT_VIDC_LAST_FLAG                                             \
+	(V4L2_EVENT_PRIVATE_START + 0x2)
+
+enum v4l2_event_last_flag {
+	LAST_FLAG_DRC         = (1 << 0),
+	LAST_FLAG_DRAIN       = (1 << 1),
+};
+
+struct v4l2_event_vidc_last_flag {
+	enum v4l2_event_last_flag flag_type;
+};
+
 /* vendor events end */
 
 /* Default metadata size (align to 4KB) */
