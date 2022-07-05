@@ -23,6 +23,7 @@
 #define DEFAULT_BITRATE         20000000
 #define MINIMUM_FPS             1
 #define MAXIMUM_FPS             480
+#define MAXIMUM_DEC_FPS         960
 #define MAX_QP                  51
 #define DEFAULT_QP              20
 #define MAX_CONSTANT_QUALITY    100
@@ -253,7 +254,7 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 		CAP_FLAG_OUTPUT_PORT},
 
 	{FRAME_RATE, DEC, CODECS_ALL,
-		(MINIMUM_FPS << 16), (MAXIMUM_FPS << 16),
+		(MINIMUM_FPS << 16), (MAXIMUM_DEC_FPS << 16),
 		1, (DEFAULT_FPS << 16),
 		V4L2_CID_MPEG_VIDC_FRAME_RATE,
 		0,
@@ -273,7 +274,7 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 		1, (DEFAULT_FPS << 16)},
 
 	{OPERATING_RATE, DEC, CODECS_ALL,
-		(MINIMUM_FPS << 16), (MAXIMUM_FPS << 16),
+		(MINIMUM_FPS << 16), (MAXIMUM_DEC_FPS << 16),
 		1, (DEFAULT_FPS << 16),
 		V4L2_CID_MPEG_VIDC_OPERATING_RATE,
 		0,
