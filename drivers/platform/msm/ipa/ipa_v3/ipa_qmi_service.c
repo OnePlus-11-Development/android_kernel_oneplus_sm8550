@@ -2605,6 +2605,7 @@ int ipa3_qmi_send_endp_desc_indication(
 void ipa3_qmi_init(void)
 {
 	mutex_init(&ipa3_qmi_lock);
+	nat_move_qmi_disabled = true;
 }
 
 void ipa3_qmi_cleanup(void)
