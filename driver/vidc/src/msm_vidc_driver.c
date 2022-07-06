@@ -196,6 +196,7 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{ALLINTRA_MAX_BITRATE,           "ALLINTRA_MAX_BITRATE"       },
 	{LOWLATENCY_MAX_BITRATE,         "LOWLATENCY_MAX_BITRATE"     },
 	{LAST_FLAG_EVENT_ENABLE,         "LAST_FLAG_EVENT_ENABLE"     },
+	{NUM_COMV,                       "NUM_COMV"                   },
 	{PROFILE,                        "PROFILE"                    },
 	{ENH_LAYER_COUNT,                "ENH_LAYER_COUNT"            },
 	{BIT_RATE,                       "BIT_RATE"                   },
@@ -3980,6 +3981,12 @@ int msm_vidc_queue_internal_buffers(struct msm_vidc_inst *inst,
 		i_vpr_l(inst, "%s: reuse enabled for %s buf\n",
 			__func__, buf_name(buffer_type));
 		return 0;
+	}
+
+	if (is_decode_session(inst) && buffer_type == MSM_VIDC_BUF_COMV) {
+		rc = msm_vdec_set_num_comv(inst);
+		if (rc)
+			return rc;
 	}
 
 	list_for_each_entry_safe(buffer, dummy, &buffers->list, list) {

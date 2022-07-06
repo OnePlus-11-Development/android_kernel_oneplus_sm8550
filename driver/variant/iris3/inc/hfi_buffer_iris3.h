@@ -386,7 +386,7 @@ typedef HFI_U32 HFI_BOOL;
 	} while (0)
 
 #define HFI_BUFFER_COMV_H264D(coMV_size, frame_width, \
-			frame_height, _yuv_bufcount_min) \
+			frame_height, _comv_bufcount) \
 	do \
 	{ \
 		HFI_U32 frame_width_in_mbs = ((frame_width + 15) >> 4); \
@@ -413,7 +413,7 @@ typedef HFI_U32 HFI_BOOL;
 		size_colloc = HFI_ALIGN(size_colloc, \
 				BUFFER_ALIGNMENT_512_BYTES); \
 		size_colloc += (col_zero_size + SIZE_H264D_BUFTAB_T * 2); \
-		coMV_size = size_colloc * (_yuv_bufcount_min); \
+		coMV_size = size_colloc * (_comv_bufcount); \
 		coMV_size += BUFFER_ALIGNMENT_512_BYTES; \
 	} while (0)
 
@@ -597,13 +597,13 @@ typedef HFI_U32 HFI_BOOL;
 	} while (0)
 
 #define HFI_BUFFER_COMV_H265D(_size, frame_width, frame_height, \
-							_yuv_bufcount_min) \
+							_comv_bufcount) \
 	do \
 	{ \
 		_size = HFI_ALIGN(((((frame_width + 15) >> 4) * \
 			((frame_height + 15) >> 4)) << 8), \
 			BUFFER_ALIGNMENT_512_BYTES); \
-		_size *= _yuv_bufcount_min; \
+		_size *= _comv_bufcount; \
 		_size += BUFFER_ALIGNMENT_512_BYTES; \
 	} while (0)
 
@@ -893,14 +893,14 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 #define AV1D_MAX_TILE_COLS     64
 
 #define HFI_BUFFER_COMV_AV1D(_size, frame_width, frame_height, \
-				_yuv_bufcount_min) \
+				_comv_bufcount) \
 	do { \
 		_size = 2 * HFI_ALIGN(MAX(((frame_width + 63) / 64) * \
 				((frame_height + 63) / 64) * 512, \
 				((frame_width + 127) / 128) * \
 				((frame_height + 127) / 128) * 2816), \
 				VENUS_DMA_ALIGNMENT); \
-		_size *= _yuv_bufcount_min; \
+		_size *= _comv_bufcount; \
 	} while (0)
 
 #define SIZE_AV1D_LB_FE_TOP_DATA(frame_width, frame_height) \

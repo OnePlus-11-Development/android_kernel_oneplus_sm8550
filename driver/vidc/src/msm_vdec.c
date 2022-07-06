@@ -1223,6 +1223,33 @@ int msm_vdec_init_input_subcr_params(struct msm_vidc_inst *inst)
 	return 0;
 }
 
+int msm_vdec_set_num_comv(struct msm_vidc_inst *inst)
+{
+	int rc = 0;
+	u32 num_comv = 0;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	num_comv = inst->capabilities->cap[NUM_COMV].value;
+	i_vpr_h(inst, "%s: num COMV: %d", __func__, num_comv);
+	rc = venus_hfi_session_property(inst,
+			HFI_PROP_COMV_BUFFER_COUNT,
+			HFI_HOST_FLAGS_NONE,
+			get_hfi_port(inst, INPUT_PORT),
+			HFI_PAYLOAD_U32,
+			&num_comv,
+			sizeof(u32));
+	if (rc) {
+		i_vpr_e(inst, "%s: set property failed\n", __func__);
+		return rc;
+	}
+
+	return rc;
+}
+
 static int msm_vdec_read_input_subcr_params(struct msm_vidc_inst *inst)
 {
 	struct msm_vidc_subscription_params subsc_params;
