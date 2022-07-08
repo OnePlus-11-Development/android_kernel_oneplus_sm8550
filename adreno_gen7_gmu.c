@@ -270,6 +270,7 @@ int gen7_gmu_enable_gdsc(struct adreno_device *adreno_dev)
 		dev_err(&gmu->pdev->dev,
 			"Failed to enable GMU CX gdsc, error %d\n", ret);
 
+	clear_bit(GMU_PRIV_CX_GDSC_WAIT, &gmu->flags);
 	return ret;
 }
 
@@ -278,6 +279,7 @@ void gen7_gmu_disable_gdsc(struct adreno_device *adreno_dev)
 	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
 
 	reinit_completion(&gmu->gdsc_gate);
+	set_bit(GMU_PRIV_CX_GDSC_WAIT, &gmu->flags);
 	regulator_disable(gmu->cx_gdsc);
 }
 
@@ -2012,13 +2014,15 @@ static int gmu_cx_gdsc_event(struct notifier_block *nb,
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	u32 val;
 
-	if (!(event & REGULATOR_EVENT_DISABLE))
+	if (!(event & REGULATOR_EVENT_DISABLE) ||
+		!test_bit(GMU_PRIV_CX_GDSC_WAIT, &gmu->flags))
 		return 0;
 
 	if (kgsl_regmap_read_poll_timeout(&device->regmap, GEN7_GPU_CC_CX_GDSCR,
 		val, !(val & BIT(31)), 100, 100 * 1000))
 		dev_err(device->dev, "GPU CX wait timeout.\n");
 
+	clear_bit(GMU_PRIV_CX_GDSC_WAIT, &gmu->flags);
 	complete_all(&gmu->gdsc_gate);
 
 	return 0;
@@ -2043,6 +2047,9 @@ static int gen7_gmu_regulators_probe(struct gen7_gmu_device *gmu,
 		return PTR_ERR(gmu->gx_gdsc);
 	}
 
+	init_completion(&gmu->gdsc_gate);
+	complete_all(&gmu->gdsc_gate);
+
 	gmu->gdsc_nb.notifier_call = gmu_cx_gdsc_event;
 	ret = devm_regulator_register_notifier(gmu->cx_gdsc, &gmu->gdsc_nb);
 
@@ -2050,9 +2057,6 @@ static int gen7_gmu_regulators_probe(struct gen7_gmu_device *gmu,
 		dev_err(&pdev->dev, "Failed to register gmu cx gdsc notifier: %d\n", ret);
 		return ret;
 	}
-
-	init_completion(&gmu->gdsc_gate);
-	complete_all(&gmu->gdsc_gate);
 
 	return 0;
 }
@@ -2381,6 +2385,14 @@ static int gen7_gpu_boot(struct adreno_device *adreno_dev)
 		gen7_disable_gpu_irq(adreno_dev);
 		goto oob_clear;
 	}
+
+	/*
+	 * At this point it is safe to assume that we recovered. Setting
+	 * this field allows us to take a new snapshot for the next failure
+	 * if we are prioritizing the first unrecoverable snapshot.
+	 */
+	if (device->snapshot)
+		device->snapshot->recovered = true;
 
 	/* Start the dispatcher */
 	adreno_dispatcher_start(device);

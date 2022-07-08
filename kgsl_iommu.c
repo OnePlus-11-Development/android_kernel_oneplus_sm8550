@@ -233,7 +233,7 @@ static size_t _iopgtbl_map_pages(struct kgsl_iommu_pt *pt, u64 gpuaddr,
 	return mapped;
 }
 
-static int _iopgtbl_map_sg(struct kgsl_iommu_pt *pt, u64 gpuaddr,
+static size_t _iopgtbl_map_sg(struct kgsl_iommu_pt *pt, u64 gpuaddr,
 		struct sg_table *sgt, int prot)
 {
 	struct io_pgtable_ops *ops = pt->pgtbl_ops;
@@ -272,6 +272,7 @@ kgsl_iopgtbl_map_child(struct kgsl_pagetable *pt, struct kgsl_memdesc *memdesc,
 	struct kgsl_iommu_pt *iommu_pt = to_iommu_pt(pt);
 	struct sg_table sgt;
 	u32 flags;
+	size_t mapped;
 	int ret;
 
 	ret = get_sg_from_child(&sgt, child, child_offset, length);
@@ -281,11 +282,11 @@ kgsl_iopgtbl_map_child(struct kgsl_pagetable *pt, struct kgsl_memdesc *memdesc,
 	/* Inherit the flags from the child for this mapping */
 	flags = _iommu_get_protection_flags(pt->mmu, child);
 
-	ret = _iopgtbl_map_sg(iommu_pt, memdesc->gpuaddr + offset, &sgt, flags);
+	mapped = _iopgtbl_map_sg(iommu_pt, memdesc->gpuaddr + offset, &sgt, flags);
 
 	sg_free_table(&sgt);
 
-	return ret ? 0 : -ENOMEM;
+	return mapped ? 0 : -ENOMEM;
 }
 
 

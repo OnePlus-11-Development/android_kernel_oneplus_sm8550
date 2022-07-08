@@ -406,8 +406,9 @@ static void kgsl_pwrctrl_min_pwrlevel_set(struct kgsl_device *device,
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
 
 	mutex_lock(&device->mutex);
-	if (level >= pwr->num_pwrlevels)
-		level = pwr->num_pwrlevels - 1;
+
+	if (level > pwr->min_render_pwrlevel)
+		level = pwr->min_render_pwrlevel;
 
 	/* You can't set a minimum power level lower than the maximum */
 	if (level < pwr->max_pwrlevel)
@@ -1627,8 +1628,6 @@ void kgsl_pwrctrl_close(struct kgsl_device *device)
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
 
 	pwr->power_flags = 0;
-
-	kgsl_bus_close(device);
 
 	if (dev_pm_qos_request_active(&pwr->sysfs_thermal_req))
 		dev_pm_qos_remove_request(&pwr->sysfs_thermal_req);
