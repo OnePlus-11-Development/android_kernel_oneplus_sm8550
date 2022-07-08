@@ -567,6 +567,8 @@ enum hfi_saliency_type {
 
 #define HFI_PROP_COMV_BUFFER_COUNT                              0x03000193
 
+#define HFI_PROP_DISABLE_VUI_TIMING_INFO                        0x03000194
+
 #define HFI_PROP_END                                            0x03FFFFFF
 
 #define HFI_SESSION_ERROR_BEGIN                                 0x04000000

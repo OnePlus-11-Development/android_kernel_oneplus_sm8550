@@ -538,6 +538,7 @@ enum msm_vidc_inst_capability_type {
 	INPUT_BUF_HOST_MAX_COUNT,
 	OUTPUT_BUF_HOST_MAX_COUNT,
 	DELIVERY_MODE,
+	VUI_TIMING_INFO,
 	/* place all leaf(no child) enums before this line */
 	INST_CAP_MAX,
 };

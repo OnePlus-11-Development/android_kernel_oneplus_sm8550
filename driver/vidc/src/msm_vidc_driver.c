@@ -229,6 +229,7 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{INPUT_BUF_HOST_MAX_COUNT,       "INPUT_BUF_HOST_MAX_COUNT"   },
 	{OUTPUT_BUF_HOST_MAX_COUNT,      "OUTPUT_BUF_HOST_MAX_COUNT"  },
 	{DELIVERY_MODE,                  "DELIVERY_MODE"              },
+	{VUI_TIMING_INFO,                "VUI_TIMING_INFO"            },
 	{INST_CAP_MAX,                   "INST_CAP_MAX"               },
 };
 

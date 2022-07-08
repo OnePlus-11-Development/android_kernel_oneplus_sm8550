@@ -412,6 +412,14 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_CID_MPEG_VIDEO_PREPEND_SPSPPS_TO_IDR},
 
+	{VUI_TIMING_INFO, ENC, CODECS_ALL,
+		V4L2_MPEG_MSM_VIDC_DISABLE,
+		V4L2_MPEG_MSM_VIDC_ENABLE,
+		1, V4L2_MPEG_MSM_VIDC_DISABLE,
+		V4L2_CID_MPEG_VIDC_VUI_TIMING_INFO,
+		HFI_PROP_DISABLE_VUI_TIMING_INFO,
+		CAP_FLAG_OUTPUT_PORT},
+
 	{WITHOUT_STARTCODE, ENC, CODECS_ALL,
 		V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_MPEG_MSM_VIDC_ENABLE,
@@ -2427,6 +2435,12 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kala
 		{SLICE_MODE}, {LOWLATENCY_MODE, OUTPUT_BUF_HOST_MAX_COUNT},
 		msm_vidc_adjust_delivery_mode,
 		msm_vidc_set_u32},
+
+	{VUI_TIMING_INFO, ENC, CODECS_ALL,
+		{0},
+		{0},
+		NULL,
+		msm_vidc_set_vui_timing_info},
 };
 
 /* Default UBWC config for LPDDR5 */

@@ -135,5 +135,7 @@ int msm_vidc_get_parent_value(struct msm_vidc_inst* inst, u32 cap, u32 parent,
 	s32 *value, const char *func);
 u32 msm_vidc_get_port_info(struct msm_vidc_inst *inst,
 	enum msm_vidc_inst_capability_type cap_id);
+int msm_vidc_set_vui_timing_info(void *instance,
+	enum msm_vidc_inst_capability_type cap_id);
 
 #endif

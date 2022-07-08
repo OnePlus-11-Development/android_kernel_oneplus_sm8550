@@ -271,6 +271,9 @@ enum v4l2_h264_encode_delivery_mode {
 #define V4L2_CID_MPEG_VIDC_LAST_FLAG_EVENT_ENABLE                             \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x42)
 
+#define V4L2_CID_MPEG_VIDC_VUI_TIMING_INFO                                    \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x43)
+
 /* add new controls above this line */
 /* Deprecate below controls once availble in gki and gsi bionic header */
 #ifndef V4L2_CID_MPEG_VIDEO_BASELAYER_PRIORITY_ID
