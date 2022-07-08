@@ -346,9 +346,14 @@ static int cam_actuator_platform_component_bind(struct device *dev,
 {
 	int32_t                          rc = 0;
 	int32_t                          i = 0;
+	bool                             i3c_i2c_target;
 	struct cam_actuator_ctrl_t       *a_ctrl = NULL;
 	struct cam_actuator_soc_private  *soc_private = NULL;
 	struct platform_device *pdev = to_platform_device(dev);
+
+	i3c_i2c_target = of_property_read_bool(pdev->dev.of_node, "i3c-i2c-target");
+	if (i3c_i2c_target)
+		return 0;
 
 	/* Create actuator control structure */
 	a_ctrl = devm_kzalloc(&pdev->dev,
@@ -444,7 +449,12 @@ static void cam_actuator_platform_component_unbind(struct device *dev,
 	struct cam_actuator_ctrl_t      *a_ctrl;
 	struct cam_actuator_soc_private *soc_private;
 	struct cam_sensor_power_ctrl_t  *power_info;
+	bool                             i3c_i2c_target;
 	struct platform_device *pdev = to_platform_device(dev);
+
+	i3c_i2c_target = of_property_read_bool(pdev->dev.of_node, "i3c-i2c-target");
+	if (i3c_i2c_target)
+		return;
 
 	a_ctrl = platform_get_drvdata(pdev);
 	if (!a_ctrl) {
@@ -596,66 +606,11 @@ static struct i3c_driver cam_actuator_i3c_driver = {
 	},
 };
 
-static int cam_actuator_fill_i3c_device_id(void)
-{
-	struct device_node                      *dev;
-	int                                      num_entries;
-	int                                      i = 0;
-	uint8_t                                  ent_num = 0;
-	uint32_t                                 mid;
-	uint32_t                                 pid;
-	int                                      rc;
-
-	dev = of_find_node_by_path(I3C_SENSOR_DEV_ID_DT_PATH);
-	if (!dev) {
-		CAM_WARN(CAM_ACTUATOR, "Couldnt Find the i3c-id-table dev node");
-		return 0;
-	}
-
-	num_entries = of_property_count_u32_elems(dev, "i3c-actuator-id-table");
-	if (num_entries <= 0) {
-		CAM_WARN(CAM_ACTUATOR, "Failed while reading the property. num_entries:%d",
-			num_entries);
-		return 0;
-	}
-
-	while (i < num_entries) {
-		if (ent_num >= MAX_I3C_DEVICE_ID_ENTRIES) {
-			CAM_WARN(CAM_ACTUATOR,
-				"Num_entries are more than MAX_I3C_DEVICE_ID_ENTRIES");
-			return -ENOMEM;
-		}
-
-		rc = of_property_read_u32_index(dev, "i3c-actuator-id-table", i, &mid);
-		if (rc) {
-			CAM_ERR(CAM_ACTUATOR, "Failed in reading the MID. rc: %d", rc);
-			return rc;
-		}
-		i++;
-
-		rc = of_property_read_u32_index(dev, "i3c-actuator-id-table", i, &pid);
-		if (rc) {
-			CAM_ERR(CAM_ACTUATOR, "Failed in reading the PID. rc: %d", rc);
-			return rc;
-		}
-		i++;
-
-		CAM_DBG(CAM_ACTUATOR, "PID: 0x%x, MID: 0x%x", pid, mid);
-
-		actuator_i3c_id[ent_num].manuf_id = mid;
-		actuator_i3c_id[ent_num].match_flags = I3C_MATCH_MANUF_AND_PART;
-		actuator_i3c_id[ent_num].part_id  = pid;
-		actuator_i3c_id[ent_num].data     = 0;
-
-		ent_num++;
-	}
-
-	return 0;
-}
-
 int cam_actuator_driver_init(void)
 {
 	int32_t rc = 0;
+	struct device_node                      *dev;
+	int num_entries = 0;
 
 	rc = platform_driver_register(&cam_actuator_platform_driver);
 	if (rc < 0) {
@@ -671,7 +626,20 @@ int cam_actuator_driver_init(void)
 	}
 
 	memset(actuator_i3c_id, 0, sizeof(struct i3c_device_id) * (MAX_I3C_DEVICE_ID_ENTRIES + 1));
-	rc = cam_actuator_fill_i3c_device_id();
+
+	dev = of_find_node_by_path(I3C_SENSOR_DEV_ID_DT_PATH);
+	if (!dev) {
+		CAM_WARN(CAM_ACTUATOR, "Couldnt Find the i3c-id-table dev node");
+		return 0;
+	}
+
+	rc = cam_sensor_count_elems_i3c_device_id(dev, &num_entries,
+		"i3c-actuator-id-table");
+	if (rc)
+		return 0;
+
+	rc = cam_sensor_fill_i3c_device_id(dev, num_entries,
+		"i3c-actuator-id-table", actuator_i3c_id);
 	if (rc)
 		goto i3c_register_err;
 
