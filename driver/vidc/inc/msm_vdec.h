@@ -30,6 +30,7 @@ int msm_vdec_output_port_settings_change(struct msm_vidc_inst *inst);
 int msm_vdec_process_cmd(struct msm_vidc_inst *inst, u32 cmd);
 int msm_vdec_handle_release_buffer(struct msm_vidc_inst *inst,
 	struct msm_vidc_buffer *buf);
+int msm_vdec_set_num_comv(struct msm_vidc_inst *inst);
 int msm_vdec_get_input_internal_buffers(struct msm_vidc_inst *inst);
 int msm_vdec_create_input_internal_buffers(struct msm_vidc_inst *inst);
 int msm_vdec_queue_input_internal_buffers(struct msm_vidc_inst *inst);

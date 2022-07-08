@@ -501,6 +501,7 @@ enum msm_vidc_inst_capability_type {
 	ALLINTRA_MAX_BITRATE,
 	LOWLATENCY_MAX_BITRATE,
 	LAST_FLAG_EVENT_ENABLE,
+	NUM_COMV,
 	/* place all root(no parent) enums before this line */
 
 	PROFILE,

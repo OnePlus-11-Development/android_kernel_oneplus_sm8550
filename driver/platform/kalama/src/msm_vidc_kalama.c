@@ -498,6 +498,9 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 	{LOWLATENCY_MAX_BITRATE, ENC, H264|HEVC, 0,
 		70000000, 1, 70000000},
 
+	{NUM_COMV, DEC, CODECS_ALL,
+		0, INT_MAX, 1, 0},
+
 	{LOSSLESS, ENC, HEVC,
 		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,

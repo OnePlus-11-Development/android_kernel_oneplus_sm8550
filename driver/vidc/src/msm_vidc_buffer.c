@@ -70,11 +70,8 @@ u32 msm_vidc_output_min_count(struct msm_vidc_inst *inst)
 			output_min_count = 4;
 			break;
 		case MSM_VIDC_VP9:
-			output_min_count = 9;
-			break;
 		case MSM_VIDC_AV1:
-			// TODO: needs review
-			output_min_count = 11;
+			output_min_count = 9;
 			break;
 		case MSM_VIDC_HEIC:
 			output_min_count = 3;

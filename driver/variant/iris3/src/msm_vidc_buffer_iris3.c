@@ -68,10 +68,10 @@ static u32 msm_vidc_decoder_bin_size_iris3(struct msm_vidc_inst *inst)
 static u32 msm_vidc_decoder_comv_size_iris3(struct msm_vidc_inst* inst)
 {
 	u32 size = 0;
-	u32 width, height, out_min_count, vpp_delay;
+	u32 width, height, num_comv, vpp_delay;
 	struct v4l2_format *f;
 
-	if (!inst || !inst->core) {
+	if (!inst || !inst->core || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return size;
 	}
@@ -79,17 +79,33 @@ static u32 msm_vidc_decoder_comv_size_iris3(struct msm_vidc_inst* inst)
 	f = &inst->fmts[INPUT_PORT];
 	width = f->fmt.pix_mp.width;
 	height = f->fmt.pix_mp.height;
+
+	if (inst->codec == MSM_VIDC_AV1) {
+		/*
+		 * AV1 requires larger COMV buffer size to meet performance
+		 * for certain use cases. Increase the COMV buffer size by
+		 * increasing COMV bufcount. Use lower count for 8k to
+		 * achieve performance but save memory.
+		 */
+		if (res_is_greater_than(width, height, 4096, 2176))
+			num_comv = inst->buffers.output.min_count + 3;
+		else
+			num_comv = inst->buffers.output.min_count + 7;
+	} else {
+		num_comv = inst->buffers.output.min_count;
+	}
+	msm_vidc_update_cap_value(inst, NUM_COMV, num_comv, __func__);
+
 	if (inst->decode_vpp_delay.enable)
 		vpp_delay = inst->decode_vpp_delay.size;
 	else
 		vpp_delay = DEFAULT_BSE_VPP_DELAY;
-	out_min_count = inst->buffers.output.min_count;
-	out_min_count = max(vpp_delay + 1, out_min_count);
+	num_comv = max(vpp_delay + 1, num_comv);
 
 	if (inst->codec == MSM_VIDC_H264) {
-		HFI_BUFFER_COMV_H264D(size, width, height, out_min_count);
+		HFI_BUFFER_COMV_H264D(size, width, height, num_comv);
 	} else if (inst->codec == MSM_VIDC_HEVC || inst->codec == MSM_VIDC_HEIC) {
-		HFI_BUFFER_COMV_H265D(size, width, height, out_min_count);
+		HFI_BUFFER_COMV_H265D(size, width, height, num_comv);
 	} else if (inst->codec == MSM_VIDC_AV1) {
 		/*
 		 * When DRAP is enabled, COMV buffer is part of PERSIST buffer and
@@ -99,7 +115,7 @@ static u32 msm_vidc_decoder_comv_size_iris3(struct msm_vidc_inst* inst)
 		if (inst->capabilities->cap[DRAP].value)
 			size = 0;
 		else
-			HFI_BUFFER_COMV_AV1D(size, width, height, out_min_count);
+			HFI_BUFFER_COMV_AV1D(size, width, height, num_comv);
 	}
 
 	i_vpr_l(inst, "%s: size %d\n", __func__, size);
