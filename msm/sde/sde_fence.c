@@ -904,8 +904,8 @@ void sde_fence_signal(struct sde_fence_context *ctx, ktime_t ts,
 
 		if ((int)(ctx->done_count - ctx->commit_count) < 0) {
 			SDE_DEBUG(
-			  "timeline reset attempt! done count:%d commit:%d\n",
-				ctx->done_count, ctx->commit_count);
+			  "timeline reset attempt! ctx:0x%x done count:%d commit:%d\n",
+				ctx->drm_id, ctx->done_count, ctx->commit_count);
 			ctx->done_count = ctx->commit_count;
 			SDE_EVT32(ctx->drm_id, ctx->done_count,
 				ctx->commit_count, ktime_to_us(ts),
