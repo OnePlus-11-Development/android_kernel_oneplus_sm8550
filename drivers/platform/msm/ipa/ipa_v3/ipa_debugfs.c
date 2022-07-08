@@ -1555,6 +1555,9 @@ static ssize_t ipa3_read_stats(struct file *file, char __user *ubuf,
 		"num_buff_below_thresh_for_def_pipe_notified=%u\n"
 		"num_buff_above_thresh_for_coal_pipe_notified=%u\n"
 		"num_buff_below_thresh_for_coal_pipe_notified=%u\n"
+		"num_buff_above_thresh_for_ll_pipe_notified=%u\n"
+		"num_buff_below_thresh_for_ll_pipe_notified=%u\n"
+		"num_free_page_task_scheduled=%u\n"
 		"pipe_setup_fail_cnt=%u\n"
 		"ttl_count=%u\n",
 		ipa3_ctx->stats.tx_sw_pkts,
@@ -1583,6 +1586,9 @@ static ssize_t ipa3_read_stats(struct file *file, char __user *ubuf,
 		atomic_read(&ipa3_ctx->stats.num_buff_below_thresh_for_def_pipe_notified),
 		atomic_read(&ipa3_ctx->stats.num_buff_above_thresh_for_coal_pipe_notified),
 		atomic_read(&ipa3_ctx->stats.num_buff_below_thresh_for_coal_pipe_notified),
+		atomic_read(&ipa3_ctx->stats.num_buff_above_thresh_for_ll_pipe_notified),
+		atomic_read(&ipa3_ctx->stats.num_buff_below_thresh_for_ll_pipe_notified),
+		atomic_read(&ipa3_ctx->stats.num_free_page_task_scheduled),
 		ipa3_ctx->stats.pipe_setup_fail_cnt,
 		ipa3_ctx->stats.ttl_cnt
 		);

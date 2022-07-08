@@ -1264,6 +1264,7 @@ static void ipa3_tasklet_find_freepage(unsigned long data)
 		list_splice(&temp_head, &sys->page_recycle_repl->page_repl_head);
 		ipa3_ctx->stats.page_recycle_cnt_in_tasklet += found_free_page;
 		IPADBG_LOW("found free pages count = %d\n", found_free_page);
+		ipa3_ctx->free_page_task_scheduled = false;
 		atomic_set(&sys->common_sys->page_avilable, 1);
 	}
 	spin_unlock_bh(&sys->common_sys->spinlock);
@@ -2669,6 +2670,21 @@ static struct ipa3_rx_pkt_wrapper * ipa3_get_free_page
 		atomic_set(&sys->common_sys->page_avilable, 0);
 		tasklet_schedule(&sys->common_sys->tasklet_find_freepage);
 		++ipa3_ctx->stats.num_sort_tasklet_sched[stats_i];
+		spin_lock(&ipa3_ctx->notifier_lock);
+		if(ipa3_ctx->ipa_rmnet_notifier_enabled &&
+		   !ipa3_ctx->free_page_task_scheduled) {
+				atomic_inc(&ipa3_ctx->stats.num_free_page_task_scheduled);
+				if (stats_i ==2) {
+					raw_notifier_call_chain(ipa3_ctx->ipa_rmnet_notifier_list_internal,
+					FREE_PAGE_TASK_SCHEDULED_LL, &sys->common_sys->napi_sort_page_thrshld_cnt);
+				}
+				else {
+					raw_notifier_call_chain(ipa3_ctx->ipa_rmnet_notifier_list_internal,
+						FREE_PAGE_TASK_SCHEDULED, &sys->common_sys->napi_sort_page_thrshld_cnt);
+				}
+				ipa3_ctx->free_page_task_scheduled = true;
+			}
+			spin_unlock(&ipa3_ctx->notifier_lock);
 	}
 	return NULL;
 }
@@ -2710,7 +2726,7 @@ int ipa3_unregister_notifier(void *fn_ptr)
 	return 0;
 }
 
-static void ipa3_replenish_rx_page_recycle(struct ipa3_sys_context *sys)
+ static void ipa3_replenish_rx_page_recycle(struct ipa3_sys_context *sys)
 {
 	struct ipa3_rx_pkt_wrapper *rx_pkt;
 	int ret;
@@ -2844,8 +2860,19 @@ static void ipa3_replenish_rx_page_recycle(struct ipa3_sys_context *sys)
 			IPA_STATS_INC_CNT(ipa3_ctx->stats.lan_rx_empty);
 		else if (sys->ep->client == IPA_CLIENT_APPS_LAN_COAL_CONS)
 			IPA_STATS_INC_CNT(ipa3_ctx->stats.lan_rx_empty_coal);
-		else if (sys->ep->client == IPA_CLIENT_APPS_WAN_LOW_LAT_DATA_CONS)
+		else if (sys->ep->client == IPA_CLIENT_APPS_WAN_LOW_LAT_DATA_CONS) {
 			IPA_STATS_INC_CNT(ipa3_ctx->stats.rmnet_ll_rx_empty);
+			spin_lock(&ipa3_ctx->notifier_lock);
+			if (ipa3_ctx->ipa_rmnet_notifier_enabled
+				&& !ipa3_ctx->buff_below_thresh_for_ll_pipe_notified) {
+				atomic_inc(&ipa3_ctx->stats.num_buff_below_thresh_for_ll_pipe_notified);
+				raw_notifier_call_chain(ipa3_ctx->ipa_rmnet_notifier_list_internal,
+					BUFF_BELOW_LOW_THRESHOLD_FOR_LL_PIPE, &rx_len_cached);
+				ipa3_ctx->buff_above_thresh_for_ll_pipe_notified = false;
+				ipa3_ctx->buff_below_thresh_for_ll_pipe_notified = true;
+			}
+			spin_unlock(&ipa3_ctx->notifier_lock);
+		}
 		else
 			WARN_ON(1);
 	}
@@ -2871,6 +2898,17 @@ static void ipa3_replenish_rx_page_recycle(struct ipa3_sys_context *sys)
 					BUFF_ABOVE_HIGH_THRESHOLD_FOR_COAL_PIPE, &rx_len_cached);
 				ipa3_ctx->buff_above_thresh_for_coal_pipe_notified = true;
 				ipa3_ctx->buff_below_thresh_for_coal_pipe_notified = false;
+			}
+			spin_unlock(&ipa3_ctx->notifier_lock);
+		} else if (sys->ep->client == IPA_CLIENT_APPS_WAN_LOW_LAT_DATA_CONS) {
+			spin_lock(&ipa3_ctx->notifier_lock);
+			if(ipa3_ctx->ipa_rmnet_notifier_enabled &&
+				!ipa3_ctx->buff_above_thresh_for_ll_pipe_notified) {
+				atomic_inc(&ipa3_ctx->stats.num_buff_above_thresh_for_ll_pipe_notified);
+				raw_notifier_call_chain(ipa3_ctx->ipa_rmnet_notifier_list_internal,
+					BUFF_ABOVE_HIGH_THRESHOLD_FOR_LL_PIPE, &rx_len_cached);
+				ipa3_ctx->buff_above_thresh_for_ll_pipe_notified = true;
+				ipa3_ctx->buff_below_thresh_for_ll_pipe_notified = false;
 			}
 			spin_unlock(&ipa3_ctx->notifier_lock);
 		}
