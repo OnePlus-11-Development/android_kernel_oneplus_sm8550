@@ -1488,6 +1488,17 @@ int msm_vdec_streamon_input(struct msm_vidc_inst *inst)
 	if (rc)
 		goto error;
 
+	/*
+	 * Subscribe output metadatas in input port sequence as well so that
+	 * metadatas detected in bitstream before output port is started
+	 * are not missed.
+	 * Example: AV1 HDR metadata which can be part of
+	 * first ETB (sequence header OBU + metadata OBU)
+	 */
+	rc = msm_vdec_subscribe_metadata(inst, OUTPUT_PORT);
+	if (rc)
+		goto error;
+
 	rc = msm_vdec_set_delivery_mode_metadata(inst, INPUT_PORT);
 	if (rc)
 		goto error;
