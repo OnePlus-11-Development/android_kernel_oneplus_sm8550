@@ -1,3 +1,13 @@
+TARGET_MMRM_ENABLE := false
+ifeq ($(TARGET_KERNEL_DLKM_DISABLE),true)
+	ifeq ($(TARGET_KERNEL_DLKM_MMRM_OVERRIDE),true)
+		TARGET_MMRM_ENABLE := true
+	endif
+else
+TARGET_MMRM_ENABLE := true
+endif
+
+ifeq ($(TARGET_MMRM_ENABLE),true)
 MMRM_BLD_DIR := $(shell pwd)/vendor/qcom/opensource/mmrm-driver
 
 # Build msm-mmrm.ko
@@ -60,4 +70,5 @@ ifeq ($(CONFIG_MSM_MMRM_VM),y)
 	# Include kp_module.ko in the /vendor/lib/modules (vendor.img)
 	# BOARD_VENDOR_KERNEL_MODULES += $(LOCAL_MODULE_PATH)/$(LOCAL_MODULE)
 	include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
 endif
