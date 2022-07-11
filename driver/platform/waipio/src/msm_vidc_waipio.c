@@ -21,8 +21,6 @@
 #define DEFAULT_BITRATE         20000000
 #define MINIMUM_FPS             1
 #define MAXIMUM_FPS             480
-#define MIN_QP_10BIT            -12
-#define MIN_QP_8BIT             0
 #define MAX_QP                  51
 #define DEFAULT_QP              20
 #define MAX_CONSTANT_QUALITY    100
@@ -39,7 +37,7 @@
 #define VP9     MSM_VIDC_VP9
 #define HEIC    MSM_VIDC_HEIC
 #define CODECS_ALL     (H264 | HEVC | VP9 | HEIC)
-#define MAXIMUM_OVERRIDE_VP9_FPS 120
+#define MAXIMUM_OVERRIDE_VP9_FPS 180
 
 static struct msm_platform_core_capability core_data_waipio[] = {
 	/* {type, value} */

@@ -116,6 +116,7 @@ enum hfi_buffer_firmware_flags {
 	HFI_BUF_FW_FLAG_READONLY        = 0x00000010,
 	HFI_BUF_FW_FLAG_CODEC_CONFIG    = 0x00000100,
 	HFI_BUF_FW_FLAG_LAST            = 0x10000000,
+	HFI_BUF_FW_FLAG_PSC_LAST        = 0x20000000,
 };
 
 enum hfi_metapayload_header_flags {
@@ -165,22 +166,23 @@ enum hfi_reserve_type {
 #define HFI_CMD_DELIVERY_MODE                                   0x0100000A
 #define HFI_CMD_SUBSCRIBE_MODE                                  0x0100000B
 #define HFI_CMD_SETTINGS_CHANGE                                 0x0100000C
-#define HFI_CMD_RESERVE                                         0x0100000F
 
 #define HFI_SSR_TYPE_SW_ERR_FATAL       0x1
 #define HFI_SSR_TYPE_SW_DIV_BY_ZERO     0x2
 #define HFI_SSR_TYPE_CPU_WDOG_IRQ       0x3
 #define HFI_SSR_TYPE_NOC_ERROR          0x4
-
 #define HFI_BITMASK_HW_CLIENT_ID                        0x000000f0
 #define HFI_BITMASK_SSR_TYPE                            0x0000000f
 #define HFI_CMD_SSR                                             0x0100000D
 
 #define HFI_STABILITY_TYPE_VCODEC_HUNG        0x1
 #define HFI_STABILITY_TYPE_ENC_BUFFER_FULL    0x2
-#define HFI_BITMASK_STABILITY_TYPE                              0x0000000f
+#define HFI_BITMASK_STABILITY_TYPE                      0x0000000f
 #define HFI_CMD_STABILITY                                       0x0100000E
 
+#define HFI_CMD_RESERVE                                         0x0100000F
+#define HFI_CMD_FLUSH                                           0x01000010
+#define HFI_CMD_PAUSE                                           0x01000011
 #define HFI_CMD_END                                             0x01FFFFFF
 
 #endif //__H_HFI_COMMAND_H__

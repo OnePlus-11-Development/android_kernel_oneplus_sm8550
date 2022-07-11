@@ -14,6 +14,11 @@ LINUXINCLUDE    += -include $(VIDEO_ROOT)/config/kalama_video.h \
                    -I$(VIDEO_ROOT)/driver/platform/kalama/inc
 endif
 
+ifeq ($(CONFIG_ARCH_ANORAK), y)
+include $(VIDEO_ROOT)/config/anorak_video.conf
+LINUXINCLUDE    += -include $(VIDEO_ROOT)/config/anorak_video.h \
+                   -I$(VIDEO_ROOT)/driver/platform/anorak/inc
+endif
 
 LINUXINCLUDE    += -I$(VIDEO_ROOT)/driver/vidc/inc \
                    -I$(VIDEO_ROOT)/driver/platform/common/inc \
@@ -30,6 +35,10 @@ endif
 
 ifeq ($(CONFIG_MSM_VIDC_KALAMA), y)
 msm_video-objs += driver/platform/kalama/src/msm_vidc_kalama.o
+endif
+
+ifeq ($(CONFIG_MSM_VIDC_ANORAK), y)
+msm_video-objs += driver/platform/anorak/src/msm_vidc_anorak.o
 endif
 
 ifeq ($(CONFIG_MSM_VIDC_IRIS2), y)

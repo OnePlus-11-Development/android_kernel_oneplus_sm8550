@@ -15,8 +15,8 @@
 #include "msm_vidc_platform.h"
 
 #define CAP_TO_8BIT_QP(a) {          \
-	if ((a) < 0)                 \
-		(a) = 0;             \
+	if ((a) < MIN_QP_8BIT)                 \
+		(a) = MIN_QP_8BIT;             \
 }
 
 extern struct msm_vidc_core *g_core;
@@ -257,7 +257,7 @@ static inline bool is_all_parents_visited(
 static int add_node_list(struct list_head *list, enum msm_vidc_inst_capability_type cap_id)
 {
 	int rc = 0;
-	struct msm_vidc_inst_cap_entry *entry;
+	struct msm_vidc_inst_cap_entry *entry = NULL;
 
 	rc = msm_vidc_vmem_alloc(sizeof(struct msm_vidc_inst_cap_entry),
 			(void **)&entry, __func__);
@@ -1077,6 +1077,12 @@ static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
 	/* update value to db */
 	msm_vidc_update_cap_value(inst, cap_id, ctrl->val, __func__);
 
+	if (ctrl->id == V4L2_CID_MPEG_VIDC_CLIENT_ID) {
+		rc = msm_vidc_update_debug_str(inst);
+		if (rc)
+			return rc;
+	}
+
 	if (ctrl->id == V4L2_CID_MPEG_VIDC_SECURE) {
 		if (ctrl->val) {
 			rc = msm_vidc_allow_secure_session(inst);
@@ -1749,7 +1755,8 @@ int msm_vidc_adjust_slice_count(void *instance, struct v4l2_ctrl *ctrl)
 	if (fps > MAX_SLICES_FRAME_RATE ||
 		(rc_type != HFI_RC_OFF &&
 		rc_type != HFI_RC_CBR_CFR &&
-		rc_type != HFI_RC_CBR_VFR) ||
+		rc_type != HFI_RC_CBR_VFR &&
+		rc_type != HFI_RC_VBR_CFR) ||
 		all_intra) {
 		adjusted_value = V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_SINGLE;
 		update_cap = SLICE_MODE;

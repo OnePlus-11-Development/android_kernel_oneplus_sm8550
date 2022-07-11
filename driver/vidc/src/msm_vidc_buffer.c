@@ -70,11 +70,8 @@ u32 msm_vidc_output_min_count(struct msm_vidc_inst *inst)
 			output_min_count = 4;
 			break;
 		case MSM_VIDC_VP9:
-			output_min_count = 9;
-			break;
 		case MSM_VIDC_AV1:
-			// TODO: needs review
-			output_min_count = 11;
+			output_min_count = 9;
 			break;
 		case MSM_VIDC_HEIC:
 			output_min_count = 3;
@@ -313,7 +310,7 @@ u32 msm_vidc_encoder_input_size(struct msm_vidc_inst *inst)
 	return size;
 }
 
-static u32 msm_vidc_enc_delivery_mode_based_output_buf_size(struct msm_vidc_inst *inst,
+u32 msm_vidc_enc_delivery_mode_based_output_buf_size(struct msm_vidc_inst *inst,
 	u32 frame_size)
 {
 	u32 slice_size;
@@ -360,6 +357,11 @@ u32 msm_vidc_encoder_output_size(struct msm_vidc_inst *inst)
 	u32 width, height;
 	struct v4l2_format *f;
 
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return 0;
+	}
+
 	f = &inst->fmts[OUTPUT_PORT];
 	/*
 	 * Encoder output size calculation: 32 Align width/height
@@ -376,7 +378,8 @@ u32 msm_vidc_encoder_output_size(struct msm_vidc_inst *inst)
 	frame_size = (width * height * 3);
 
 	/* Image session: 2 x yuv size */
-	if (is_image_session(inst))
+	if (is_image_session(inst) ||
+		inst->capabilities->cap[BITRATE_MODE].value == V4L2_MPEG_VIDEO_BITRATE_MODE_CQ)
 		goto skip_calc;
 
 	if (mbs_per_frame <= NUM_MBS_360P)

@@ -29,7 +29,7 @@ u64 msm_vidc_calc_freq_iris3(struct msm_vidc_inst *inst, u32 data_size)
 	}
 
 	core = inst->core;
-	if (!core->dt) {
+	if (!core->dt || !core->dt->allowed_clks_tbl) {
 		d_vpr_e("%s: invalid params\n", __func__);
 		return freq;
 	}
@@ -227,6 +227,16 @@ u64 msm_vidc_calc_freq_iris3(struct msm_vidc_inst *inst, u32 data_size)
 
 	freq = max(vpp_cycles, vsp_cycles);
 	freq = max(freq, fw_cycles);
+
+	if (inst->codec != MSM_VIDC_AV1) {
+		/*
+		 * for non-AV1 codecs limit the frequency to NOM only
+		 * index 0 is TURBO, index 1 is NOM clock rate
+		 */
+		if (core->dt->allowed_clks_tbl_size >= 2 &&
+		    freq > core->dt->allowed_clks_tbl[1].clock_rate)
+			freq = core->dt->allowed_clks_tbl[1].clock_rate;
+	}
 
 	i_vpr_p(inst, "%s: filled len %d, required freq %llu, fps %u, mbpf %u\n",
 		__func__, data_size, freq, fps, mbpf);

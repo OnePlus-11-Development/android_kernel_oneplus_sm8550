@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <soc/qcom/of_common.h>
 
-#include "msm_vidc_kalama.h"
+#include "msm_vidc_anorak.h"
 #include "msm_vidc_platform.h"
 #include "msm_vidc_debug.h"
 #include "msm_vidc_internal.h"
@@ -19,11 +19,10 @@
 #define MAX_LTR_FRAME_COUNT     2
 #define MAX_BASE_LAYER_PRIORITY_ID 63
 #define MAX_OP_POINT            31
-#define MAX_BITRATE             245000000
+#define MAX_BITRATE             220000000
 #define DEFAULT_BITRATE         20000000
 #define MINIMUM_FPS             1
 #define MAXIMUM_FPS             480
-#define MAXIMUM_DEC_FPS         960
 #define MAX_QP                  51
 #define DEFAULT_QP              20
 #define MAX_CONSTANT_QUALITY    100
@@ -43,7 +42,7 @@
 #define CODECS_ALL     (H264 | HEVC | VP9 | HEIC | AV1)
 #define MAXIMUM_OVERRIDE_VP9_FPS 180
 
-static struct msm_platform_core_capability core_data_kalama[] = {
+static struct msm_platform_core_capability core_data_anorak[] = {
 	/* {type, value} */
 	{ENC_CODECS, H264|HEVC|HEIC},
 	{DEC_CODECS, H264|HEVC|VP9|AV1|HEIC},
@@ -94,10 +93,10 @@ static struct msm_platform_core_capability core_data_kalama[] = {
 	{AV_SYNC_WINDOW_SIZE, 40},
 	{NON_FATAL_FAULTS, 1},
 	{ENC_AUTO_FRAMERATE, 1},
-	{MMRM, 1},
+	{MMRM, 0},
 };
 
-static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
+static struct msm_platform_inst_capability instance_cap_data_anorak[] = {
 	/* {cap, domain, codec,
 	 *      min, max, step_or_mask, value,
 	 *      v4l2_id,
@@ -221,7 +220,7 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 	/* ((16384x16384)/256)@1fps */
 	{MBPS, ENC, HEIC, 36, 1048576, 1, 1048576},
 
-	/* ((1920 * 1088) / 256) * 960 fps */
+	/* ((3840 * 2176) / 256) * 240 fps */
 	{MBPS, DEC, CODECS_ALL, 64, 7833600, 1, 7833600},
 
 	/* ((4096 * 2304) / 256) * 120 */
@@ -254,7 +253,7 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 		CAP_FLAG_OUTPUT_PORT},
 
 	{FRAME_RATE, DEC, CODECS_ALL,
-		(MINIMUM_FPS << 16), (MAXIMUM_DEC_FPS << 16),
+		(MINIMUM_FPS << 16), (MAXIMUM_FPS << 16),
 		1, (DEFAULT_FPS << 16),
 		V4L2_CID_MPEG_VIDC_FRAME_RATE,
 		0,
@@ -274,7 +273,7 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 		1, (DEFAULT_FPS << 16)},
 
 	{OPERATING_RATE, DEC, CODECS_ALL,
-		(MINIMUM_FPS << 16), (MAXIMUM_DEC_FPS << 16),
+		(MINIMUM_FPS << 16), (MAXIMUM_FPS << 16),
 		1, (DEFAULT_FPS << 16),
 		V4L2_CID_MPEG_VIDC_OPERATING_RATE,
 		0,
@@ -493,13 +492,10 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 		220000000, 1, 220000000},
 
 	{ALLINTRA_MAX_BITRATE, ENC, H264|HEVC, 0,
-		245000000, 1, 245000000},
+		220000000, 1, 220000000},
 
 	{LOWLATENCY_MAX_BITRATE, ENC, H264|HEVC, 0,
 		70000000, 1, 70000000},
-
-	{NUM_COMV, DEC, CODECS_ALL,
-		0, INT_MAX, 1, 0},
 
 	{LOSSLESS, ENC, HEVC,
 		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,
@@ -1459,11 +1455,6 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 		HFI_PROP_AV1_DRAP_CONFIG,
 		CAP_FLAG_INPUT_PORT},
 
-	{LAST_FLAG_EVENT_ENABLE, DEC, CODECS_ALL,
-		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,
-		1, V4L2_MPEG_MSM_VIDC_DISABLE,
-		V4L2_CID_MPEG_VIDC_LAST_FLAG_EVENT_ENABLE},
-
 	{META_BITSTREAM_RESOLUTION, DEC, AV1,
 		V4L2_MPEG_VIDC_META_DISABLE,
 		V4L2_MPEG_VIDC_META_ENABLE | V4L2_MPEG_VIDC_META_RX_INPUT |
@@ -1785,7 +1776,7 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 };
 
-static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kalama[] = {
+static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_anorak[] = {
 	/* {cap, domain, codec,
 	 *      parents,
 	 *      children,
@@ -2430,24 +2421,24 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kala
 };
 
 /* Default UBWC config for LPDDR5 */
-static struct msm_vidc_ubwc_config_data ubwc_config_kalama[] = {
+static struct msm_vidc_ubwc_config_data ubwc_config_anorak[] = {
 	UBWC_CONFIG(8, 32, 16, 0, 1, 1, 1),
 };
 
-static const struct msm_vidc_platform_data kalama_data = {
-	.core_data = core_data_kalama,
-	.core_data_size = ARRAY_SIZE(core_data_kalama),
-	.inst_cap_data = instance_cap_data_kalama,
-	.inst_cap_data_size = ARRAY_SIZE(instance_cap_data_kalama),
-	.inst_cap_dependency_data = instance_cap_dependency_data_kalama,
-	.inst_cap_dependency_data_size = ARRAY_SIZE(instance_cap_dependency_data_kalama),
+static const struct msm_vidc_platform_data anorak_data = {
+	.core_data = core_data_anorak,
+	.core_data_size = ARRAY_SIZE(core_data_anorak),
+	.inst_cap_data = instance_cap_data_anorak,
+	.inst_cap_data_size = ARRAY_SIZE(instance_cap_data_anorak),
+	.inst_cap_dependency_data = instance_cap_dependency_data_anorak,
+	.inst_cap_dependency_data_size = ARRAY_SIZE(instance_cap_dependency_data_anorak),
 	.csc_data.vpe_csc_custom_bias_coeff = vpe_csc_custom_bias_coeff,
 	.csc_data.vpe_csc_custom_matrix_coeff = vpe_csc_custom_matrix_coeff,
 	.csc_data.vpe_csc_custom_limit_coeff = vpe_csc_custom_limit_coeff,
-	.ubwc_config = ubwc_config_kalama,
+	.ubwc_config = ubwc_config_anorak,
 };
 
-int msm_vidc_kalama_check_ddr_type(void)
+int msm_vidc_anorak_check_ddr_type(void)
 {
 	u32 ddr_type;
 
@@ -2470,17 +2461,17 @@ static int msm_vidc_init_data(struct msm_vidc_core *core)
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
-	d_vpr_h("%s: initialize kalama data\n", __func__);
+	d_vpr_h("%s: initialize anorak data\n", __func__);
 
-	core->platform->data = kalama_data;
-	rc = msm_vidc_kalama_check_ddr_type();
+	core->platform->data = anorak_data;
+	rc = msm_vidc_anorak_check_ddr_type();
 	if (rc)
 		return rc;
 
 	return rc;
 }
 
-int msm_vidc_init_platform_kalama(struct msm_vidc_core *core, struct device *dev)
+int msm_vidc_init_platform_anorak(struct msm_vidc_core *core, struct device *dev)
 {
 	int rc = 0;
 
@@ -2491,7 +2482,7 @@ int msm_vidc_init_platform_kalama(struct msm_vidc_core *core, struct device *dev
 	return 0;
 }
 
-int msm_vidc_deinit_platform_kalama(struct msm_vidc_core *core, struct device *dev)
+int msm_vidc_deinit_platform_anorak(struct msm_vidc_core *core, struct device *dev)
 {
 	/* do nothing */
 	return 0;

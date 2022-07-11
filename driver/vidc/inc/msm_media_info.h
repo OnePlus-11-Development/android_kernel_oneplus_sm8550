@@ -520,7 +520,6 @@ static inline unsigned int VIDEO_RAW_BUFFER_SIZE(unsigned int v4l2_fmt,
 				uv_meta_scanlines, 4096);
 			size = (y_ubwc_plane + uv_ubwc_plane + y_meta_plane +
 				uv_meta_plane);
-			size = MSM_MEDIA_ALIGN(size, 4096);
 		} else {
 			if (pix_width <= INTERLACE_WIDTH_MAX &&
 				pix_height <= INTERLACE_HEIGHT_MAX &&
@@ -597,6 +596,7 @@ static inline unsigned int VIDEO_RAW_BUFFER_SIZE(unsigned int v4l2_fmt,
 	}
 
 invalid_input:
+	size = MSM_MEDIA_ALIGN(size, 4096);
 	return size;
 }
 

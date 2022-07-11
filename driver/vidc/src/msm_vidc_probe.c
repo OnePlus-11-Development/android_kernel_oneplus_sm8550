@@ -306,7 +306,7 @@ static int msm_vidc_initialize_core(struct msm_vidc_core *core)
 		goto exit;
 	}
 
-	core->packet_size = 4096;
+	core->packet_size = VIDC_IFACEQ_VAR_HUGE_PKT_SIZE;
 	rc = msm_vidc_vmem_alloc(core->packet_size,
 			(void **)&core->packet, "core packet");
 	if (rc)
@@ -358,6 +358,8 @@ static int msm_vidc_remove_video_device(struct platform_device *pdev)
 	d_vpr_h("%s()\n", __func__);
 
 	msm_vidc_core_deinit(core, true);
+
+	venus_hfi_interface_queues_deinit(core);
 
 	d_vpr_h("depopulating sub devices\n");
 	/*
@@ -547,6 +549,12 @@ static int msm_vidc_probe_video_device(struct platform_device *pdev)
 		goto sub_dev_failed;
 	}
 
+	rc = venus_hfi_interface_queues_init(core);
+	if (rc) {
+		d_vpr_e("%s: interface queues init failed\n", __func__);
+		goto queues_init_failed;
+	}
+
 	rc = msm_vidc_core_init(core);
 	if (rc) {
 		d_vpr_e("%s: sys init failed\n", __func__);
@@ -557,6 +565,8 @@ static int msm_vidc_probe_video_device(struct platform_device *pdev)
 	return rc;
 
 core_init_failed:
+	venus_hfi_interface_queues_deinit(core);
+queues_init_failed:
 	of_platform_depopulate(&pdev->dev);
 sub_dev_failed:
 #ifdef CONFIG_MEDIA_CONTROLLER

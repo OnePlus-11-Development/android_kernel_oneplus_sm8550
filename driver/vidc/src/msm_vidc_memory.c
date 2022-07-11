@@ -473,7 +473,7 @@ int msm_vidc_memory_free(struct msm_vidc_core *core, struct msm_vidc_alloc *mem)
 
 void *msm_memory_pool_alloc(struct msm_vidc_inst *inst, enum msm_memory_pool_type type)
 {
-	struct msm_memory_alloc_header *hdr;
+	struct msm_memory_alloc_header *hdr = NULL;
 	struct msm_memory_pool *pool;
 
 	if (!inst || type < 0 || type >= MSM_MEM_POOL_MAX) {

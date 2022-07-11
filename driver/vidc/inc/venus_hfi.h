@@ -49,6 +49,10 @@ int venus_hfi_start(struct msm_vidc_inst *inst, enum msm_vidc_port_type port);
 int venus_hfi_stop(struct msm_vidc_inst *inst, enum msm_vidc_port_type port);
 int venus_hfi_session_close(struct msm_vidc_inst *inst);
 int venus_hfi_session_open(struct msm_vidc_inst *inst);
+int venus_hfi_session_pause(struct msm_vidc_inst *inst, enum msm_vidc_port_type port);
+int venus_hfi_session_resume(struct msm_vidc_inst *inst,
+	enum msm_vidc_port_type port, u32 payload);
+int venus_hfi_session_drain(struct msm_vidc_inst *inst, enum msm_vidc_port_type port);
 int venus_hfi_session_set_codec(struct msm_vidc_inst *inst);
 int venus_hfi_session_set_secure_mode(struct msm_vidc_inst *inst);
 int venus_hfi_core_init(struct msm_vidc_core *core);
@@ -68,6 +72,8 @@ int venus_hfi_set_ir_period(struct msm_vidc_inst *inst, u32 ir_type,
 void venus_hfi_pm_work_handler(struct work_struct *work);
 irqreturn_t venus_hfi_isr(int irq, void *data);
 irqreturn_t venus_hfi_isr_handler(int irq, void *data);
+int venus_hfi_interface_queues_init(struct msm_vidc_core *core);
+void venus_hfi_interface_queues_deinit(struct msm_vidc_core *core);
 
 int __write_register_masked(struct msm_vidc_core *core,
 		u32 reg, u32 value, u32 mask);

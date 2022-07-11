@@ -112,7 +112,7 @@ int msm_vidc_queue_setup(struct vb2_queue *q,
 		return -EINVAL;
 	}
 
-	if (inst->state == MSM_VIDC_START) {
+	if (is_state(inst, MSM_VIDC_STREAMING)) {
 		i_vpr_e(inst, "%s: invalid state %d\n", __func__, inst->state);
 		return -EINVAL;
 	}
@@ -216,10 +216,6 @@ int msm_vidc_start_streaming(struct vb2_queue *q, unsigned int count)
 		rc = -EBUSY;
 		goto unlock;
 	}
-
-	rc = msm_vidc_state_change_streamon(inst, q->type);
-	if (rc)
-		goto unlock;
 
 	if (q->type == INPUT_META_PLANE &&
 		inst->capabilities->cap[INPUT_META_VIA_REQUEST].value) {
@@ -335,7 +331,7 @@ int msm_vidc_start_streaming(struct vb2_queue *q, unsigned int count)
 unlock:
 	if (rc) {
 		i_vpr_e(inst, "Streamon: %s failed\n", v4l2_type_name(q->type));
-		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
+		msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
 	}
 	inst_unlock(inst, __func__);
 	client_unlock(inst, __func__);
@@ -381,10 +377,6 @@ void msm_vidc_stop_streaming(struct vb2_queue *q)
 		goto unlock;
 	}
 
-	rc = msm_vidc_state_change_streamoff(inst, q->type);
-	if (rc)
-		goto unlock;
-
 	if (!is_decode_session(inst) && !is_encode_session(inst)) {
 		i_vpr_e(inst, "%s: invalid session %d\n",
 			__func__, inst->domain);
@@ -420,7 +412,7 @@ void msm_vidc_stop_streaming(struct vb2_queue *q)
 unlock:
 	if (rc) {
 		i_vpr_e(inst, "Streamoff: %s failed\n", v4l2_type_name(q->type));
-		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
+		msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
 	}
 	inst_unlock(inst, __func__);
 	client_unlock(inst, __func__);
@@ -531,7 +523,7 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 
 unlock:
 	if (rc) {
-		msm_vidc_change_inst_state(inst, MSM_VIDC_ERROR, __func__);
+		msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
 		vb2_buffer_done(vb2, VB2_BUF_STATE_ERROR);
 	}
 	inst_unlock(inst, __func__);
