@@ -40,6 +40,14 @@ RMNET_MODULE_HOOK(shs_skb_entry,
 	RMNET_MODULE_HOOK_RETURN_TYPE(int)
 );
 
+RMNET_MODULE_HOOK(shs_skb_ll_entry,
+	RMNET_MODULE_HOOK_NUM(SHS_SKB_LL_ENTRY),
+	RMNET_MODULE_HOOK_PROTOCOL(struct sk_buff *skb,
+				   struct rmnet_shs_clnt_s *cfg),
+	RMNET_MODULE_HOOK_ARGS(skb, cfg),
+	RMNET_MODULE_HOOK_RETURN_TYPE(int)
+);
+
 RMNET_MODULE_HOOK(shs_switch,
 	RMNET_MODULE_HOOK_NUM(SHS_SWITCH),
 	RMNET_MODULE_HOOK_PROTOCOL(struct sk_buff *skb,
