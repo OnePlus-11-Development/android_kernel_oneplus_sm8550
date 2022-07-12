@@ -371,7 +371,7 @@ typedef HFI_U32 HFI_BOOL;
 	{    \
 		HFI_U32 _height = HFI_ALIGN(frame_height, \
 				BUFFER_ALIGNMENT_32_BYTES);  \
-		_size = MIN((((_height + 15) >> 4) * 3 * 4), H264D_MAX_SLICE) *\
+		_size = MIN((((_height + 15) >> 4) * 48), H264D_MAX_SLICE) *\
 					  SIZE_H264D_BSE_CMD_PER_BUF; \
 	} while (0)
 
@@ -380,7 +380,7 @@ typedef HFI_U32 HFI_BOOL;
 	{    \
 		HFI_U32 _height = HFI_ALIGN(frame_height, \
 				BUFFER_ALIGNMENT_32_BYTES); \
-		_size = MIN((((_height + 15) >> 4) * 3 * 4), H264D_MAX_SLICE) * \
+		_size = MIN((((_height + 15) >> 4) * 48), H264D_MAX_SLICE) * \
 					SIZE_H264D_VPP_CMD_PER_BUF; \
 		if (_size > VPP_CMD_MAX_SIZE) { _size = VPP_CMD_MAX_SIZE; } \
 	} while (0)
