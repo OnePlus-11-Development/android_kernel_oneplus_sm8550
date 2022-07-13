@@ -1402,6 +1402,13 @@ static int _sde_crtc_check_rois(struct drm_crtc *crtc,
 			return -EINVAL;
 		}
 
+		if (sde_connector_is_3d_merge_enabled(conn) && (mixer_width % 2)) {
+			SDE_ERROR(
+			  "%s: invalid width w/ 3d-merge - mixer_w:%d, crtc_w:%d, num_mixers:%d\n",
+				sde_crtc->name, crtc_width, mixer_width, sde_crtc->num_mixers);
+			return -EINVAL;
+		}
+
 		if (!mode_info.roi_caps.enabled)
 			continue;
 

@@ -1215,6 +1215,24 @@ static inline int sde_connector_state_get_compression_info(
 	return 0;
 }
 
+static inline bool sde_connector_is_3d_merge_enabled(struct drm_connector *conn)
+{
+	enum sde_rm_topology_name topology;
+
+	if (!conn)
+		return false;
+
+	topology = sde_connector_get_topology_name(conn);
+	if ((topology == SDE_RM_TOPOLOGY_DUALPIPE_3DMERGE)
+			|| (topology == SDE_RM_TOPOLOGY_DUALPIPE_3DMERGE_DSC)
+			|| (topology == SDE_RM_TOPOLOGY_DUALPIPE_3DMERGE_VDC)
+			|| (topology == SDE_RM_TOPOLOGY_QUADPIPE_3DMERGE)
+			|| (topology == SDE_RM_TOPOLOGY_QUADPIPE_3DMERGE_DSC))
+		return true;
+
+	return false;
+}
+
 /**
 * sde_connector_set_msm_mode - set msm_mode for connector state
 * @conn_state: Pointer to drm connector state structure
