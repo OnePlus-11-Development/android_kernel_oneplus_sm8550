@@ -8,6 +8,7 @@
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
+#include <linux/component.h>
 #include <linux/interrupt.h>
 
 #include "msm_vidc_internal.h"
@@ -341,6 +342,88 @@ exit:
 	return rc;
 }
 
+static int msm_vidc_component_compare_of(struct device *dev, void *data)
+{
+	return dev->of_node == data;
+}
+
+static void msm_vidc_component_release_of(struct device *dev, void *data)
+{
+	d_vpr_h("%s(): %s\n", __func__, of_node_full_name(data));
+	of_node_put(data);
+}
+
+static int msm_vidc_component_cb_bind(struct device *dev,
+	struct device *master, void *data)
+{
+	d_vpr_h("%s(): %s\n", __func__, dev_name(dev));
+	return 0;
+}
+
+static void msm_vidc_component_cb_unbind(struct device *dev,
+	struct device *master, void *data)
+{
+	d_vpr_h("%s(): %s\n", __func__, dev_name(dev));
+}
+
+static int msm_vidc_component_bind(struct device *dev)
+{
+	struct msm_vidc_core *core = dev_get_drvdata(dev);
+	int rc = 0;
+
+	d_vpr_h("%s(): %s\n", __func__, dev_name(dev));
+
+	rc = component_bind_all(dev, core);
+	if (rc) {
+		d_vpr_e("%s: sub-device bind failed\n", __func__);
+		return rc;
+	}
+
+	rc = venus_hfi_interface_queues_init(core);
+	if (rc) {
+		d_vpr_e("%s: interface queues init failed\n", __func__);
+		goto queues_deinit;
+	}
+
+	rc = msm_vidc_core_init(core);
+	if (rc) {
+		d_vpr_e("%s: sys init failed\n", __func__);
+		goto queues_deinit;
+	}
+
+	d_vpr_h("%s(): succssful\n", __func__);
+
+	return rc;
+
+queues_deinit:
+	venus_hfi_interface_queues_deinit(core);
+	component_unbind_all(dev, core);
+	return rc;
+}
+
+static void msm_vidc_component_unbind(struct device *dev)
+{
+	struct msm_vidc_core *core = dev_get_drvdata(dev);
+
+	d_vpr_h("%s(): %s\n", __func__, dev_name(dev));
+
+	msm_vidc_core_deinit(core, true);
+	venus_hfi_interface_queues_deinit(core);
+	component_unbind_all(dev, core);
+
+	d_vpr_h("%s(): succssful\n", __func__);
+}
+
+static const struct component_ops msm_vidc_component_cb_ops = {
+	.bind           = msm_vidc_component_cb_bind,
+	.unbind         = msm_vidc_component_cb_unbind,
+};
+
+static const struct component_master_ops msm_vidc_component_ops = {
+	.bind           = msm_vidc_component_bind,
+	.unbind         = msm_vidc_component_unbind,
+};
+
 static int msm_vidc_remove_video_device(struct platform_device *pdev)
 {
 	struct msm_vidc_core* core;
@@ -357,9 +440,8 @@ static int msm_vidc_remove_video_device(struct platform_device *pdev)
 
 	d_vpr_h("%s()\n", __func__);
 
-	msm_vidc_core_deinit(core, true);
-
-	venus_hfi_interface_queues_deinit(core);
+	/* destroy component master and deallocate match data */
+	component_master_del(&pdev->dev, &msm_vidc_component_ops);
 
 	d_vpr_h("depopulating sub devices\n");
 	/*
@@ -396,6 +478,7 @@ static int msm_vidc_remove_video_device(struct platform_device *pdev)
 	debugfs_remove_recursive(core->debugfs_parent);
 	msm_vidc_vmem_free((void **)&core);
 	g_core = NULL;
+	d_vpr_h("%s(): succssful\n", __func__);
 
 	return 0;
 }
@@ -404,6 +487,8 @@ static int msm_vidc_remove_context_bank(struct platform_device *pdev)
 {
 	d_vpr_h("%s(): Detached %s and destroyed mapping\n",
 		__func__, dev_name(&pdev->dev));
+
+	component_del(&pdev->dev, &msm_vidc_component_cb_ops);
 
 	return 0;
 }
@@ -430,8 +515,10 @@ static int msm_vidc_remove(struct platform_device *pdev)
 static int msm_vidc_probe_video_device(struct platform_device *pdev)
 {
 	int rc = 0;
+	struct component_match *match = NULL;
 	struct msm_vidc_core *core = NULL;
-	int nr = BASE_DEVICE_NUMBER;
+	struct device_node *child = NULL;
+	int sub_device_count = 0, nr = BASE_DEVICE_NUMBER;
 
 	d_vpr_h("%s()\n", __func__);
 
@@ -535,7 +622,21 @@ static int msm_vidc_probe_video_device(struct platform_device *pdev)
 	if (!core->debugfs_root)
 		d_vpr_h("Failed to init debugfs core\n");
 
-	d_vpr_h("populating sub devices\n");
+	/* registering sub-device with component model framework */
+	for_each_available_child_of_node(pdev->dev.of_node, child) {
+		sub_device_count++;
+		of_node_get(child);
+		component_match_add_release(&pdev->dev, &match, msm_vidc_component_release_of,
+			msm_vidc_component_compare_of, child);
+		if (IS_ERR(match)) {
+			of_node_put(child);
+			rc = PTR_ERR(match) ? PTR_ERR(match) : -ENOMEM;
+			d_vpr_e("%s: component match add release failed\n", __func__);
+			goto sub_dev_failed;
+		}
+	}
+
+	d_vpr_h("populating sub devices. count %d\n", sub_device_count);
 	/*
 	 * Trigger probe for each sub-device i.e. qcom,msm-vidc,context-bank.
 	 * When msm_vidc_probe is called for each sub-device, parse the
@@ -549,24 +650,18 @@ static int msm_vidc_probe_video_device(struct platform_device *pdev)
 		goto sub_dev_failed;
 	}
 
-	rc = venus_hfi_interface_queues_init(core);
+	/* create component master and add match data */
+	rc = component_master_add_with_match(&pdev->dev, &msm_vidc_component_ops, match);
 	if (rc) {
-		d_vpr_e("%s: interface queues init failed\n", __func__);
-		goto queues_init_failed;
+		d_vpr_e("%s: component master add with match failed\n", __func__);
+		goto master_add_failed;
 	}
 
-	rc = msm_vidc_core_init(core);
-	if (rc) {
-		d_vpr_e("%s: sys init failed\n", __func__);
-		goto core_init_failed;
-	}
 	d_vpr_h("%s(): succssful\n", __func__);
 
 	return rc;
 
-core_init_failed:
-	venus_hfi_interface_queues_deinit(core);
-queues_init_failed:
+master_add_failed:
 	of_platform_depopulate(&pdev->dev);
 sub_dev_failed:
 #ifdef CONFIG_MEDIA_CONTROLLER
@@ -603,9 +698,15 @@ init_core_failed:
 
 static int msm_vidc_probe_context_bank(struct platform_device *pdev)
 {
+	int rc = 0;
+
 	d_vpr_h("%s()\n", __func__);
 
-	return msm_vidc_read_context_bank_resources_from_dt(pdev);
+	rc = msm_vidc_read_context_bank_resources_from_dt(pdev);
+	if (rc)
+		return rc;
+
+	return component_add(&pdev->dev, &msm_vidc_component_cb_ops);
 }
 
 static int msm_vidc_probe(struct platform_device *pdev)
@@ -698,6 +799,7 @@ struct platform_driver msm_vidc_driver = {
 		.name = "msm_vidc_v4l2",
 		.of_match_table = msm_vidc_dt_match,
 		.pm = &msm_vidc_pm_ops,
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 };
 
@@ -712,6 +814,7 @@ static int __init msm_vidc_init(void)
 		d_vpr_e("Failed to register platform driver\n");
 		return rc;
 	}
+	d_vpr_h("%s(): succssful\n", __func__);
 
 	return 0;
 }
@@ -721,6 +824,7 @@ static void __exit msm_vidc_exit(void)
 	d_vpr_h("%s()\n", __func__);
 
 	platform_driver_unregister(&msm_vidc_driver);
+	d_vpr_h("%s(): succssful\n", __func__);
 }
 
 module_init(msm_vidc_init);
