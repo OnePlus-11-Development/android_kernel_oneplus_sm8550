@@ -25,15 +25,15 @@
 #include "rmnet_wlan_stats.h"
 #include "rmnet_wlan_fragment.h"
 #include "rmnet_wlan_connection.h"
-static char*verinfo[]={"\x34\x36\x35\x36\x30\x62\x31\x34",
-"\x64\x33\x37\x61\x30\x39\x63\x63","\x65\x32\x31\x38\x66\x34\x35\x31",
-"\x30\x65\x33\x34\x62\x31\x39\x31","\x39\x66\x33\x66\x31\x31\x33\x30",
-"\x62\x31\x62\x63\x64\x66\x66\x61","\x61\x33\x33\x33\x36\x37\x61\x31",
-"\x37\x34\x31\x35\x39\x32\x31\x63","\x33\x35\x36\x63\x34\x39\x31\x63",
-"\x34\x64\x32\x32\x34\x33\x36\x33","\x61\x34\x31\x63\x39\x64\x37\x62",
-"\x38\x66\x32\x66\x65\x64\x32\x66","\x63\x30\x32\x62\x61\x39\x30\x65"};
-module_param_array(verinfo,charp,NULL,(0xcb7+5769-0x221c));MODULE_PARM_DESC(
-verinfo,
+static char*verinfo[]={"\x62\x64\x66\x66\x39\x32\x62\x33",
+"\x34\x36\x35\x36\x30\x62\x31\x34","\x64\x33\x37\x61\x30\x39\x63\x63",
+"\x65\x32\x31\x38\x66\x34\x35\x31","\x30\x65\x33\x34\x62\x31\x39\x31",
+"\x39\x66\x33\x66\x31\x31\x33\x30","\x62\x31\x62\x63\x64\x66\x66\x61",
+"\x61\x33\x33\x33\x36\x37\x61\x31","\x37\x34\x31\x35\x39\x32\x31\x63",
+"\x33\x35\x36\x63\x34\x39\x31\x63","\x34\x64\x32\x32\x34\x33\x36\x33",
+"\x61\x34\x31\x63\x39\x64\x37\x62","\x38\x66\x32\x66\x65\x64\x32\x66",
+"\x63\x30\x32\x62\x61\x39\x30\x65"};module_param_array(verinfo,charp,NULL,
+(0xcb7+5769-0x221c));MODULE_PARM_DESC(verinfo,
 "\x56\x65\x72\x73\x69\x6f\x6e\x20\x6f\x66\x20\x74\x68\x65\x20\x64\x72\x69\x76\x65\x72"
 );
 #define DATARMNETaf49b04806 ((0xeb7+1158-0x132d))
@@ -563,11 +563,9 @@ DATARMNET49b2094b56;mutex_unlock(&DATARMNET63a2b7773e);return
 DATARMNET268a8314cf;}int DATARMNET078f6bd384(void){DATARMNETbb4efa5b3d();return
 (0xd2d+202-0xdf7);}void DATARMNETfae36afa03(void){DATARMNETbb4efa5b3d();}char*
 DATARMNET934406764d(void){return DATARMNET30500ba48c;}char*DATARMNETe447822105(
-void){return DATARMNET755f0f0df8;}
-#define DATARMNET3fee49f944 (0xd2d+202-0xdf7)
-int DATARMNETaba2beb199(const char*DATARMNETf6f1ac8bbf,const char*
-DATARMNET8faed3a82a,size_t DATARMNET1dfbbc30a5){while(DATARMNET1dfbbc30a5--&&*
-DATARMNET8faed3a82a!=DATARMNET3fee49f944){if(*DATARMNETf6f1ac8bbf!=*
-DATARMNET8faed3a82a){return(int)((unsigned char)*DATARMNETf6f1ac8bbf-(unsigned 
-char)*DATARMNET8faed3a82a);}else{++DATARMNETf6f1ac8bbf;++DATARMNET8faed3a82a;}}
-return(int)((unsigned char)*DATARMNETf6f1ac8bbf);}
+void){return DATARMNET755f0f0df8;}int DATARMNETaba2beb199(const char*
+DATARMNETf6f1ac8bbf,const char*DATARMNET8faed3a82a,size_t DATARMNET1dfbbc30a5){
+while(DATARMNET1dfbbc30a5--){if(*DATARMNETf6f1ac8bbf!=*DATARMNET8faed3a82a)
+return((unsigned char)*DATARMNETf6f1ac8bbf-(unsigned char)*DATARMNET8faed3a82a);
+DATARMNETf6f1ac8bbf++;DATARMNET8faed3a82a++;if(!(*DATARMNETf6f1ac8bbf))break;}
+return(0xd2d+202-0xdf7);}
