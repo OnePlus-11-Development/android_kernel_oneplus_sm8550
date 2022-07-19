@@ -470,7 +470,10 @@ int msm_vidc_scale_clocks(struct msm_vidc_inst *inst)
 	}
 	core = inst->core;
 
-	if (inst->power.buffer_counter < DCVS_WINDOW || is_image_session(inst)) {
+	if (inst->power.buffer_counter < DCVS_WINDOW ||
+	    is_image_session(inst) ||
+	    is_sub_state(inst, MSM_VIDC_DRC) ||
+	    is_sub_state(inst, MSM_VIDC_DRAIN)) {
 		inst->power.min_freq = msm_vidc_max_freq(inst);
 		inst->power.dcvs_flags = 0;
 	} else if (msm_vidc_clock_voting) {
