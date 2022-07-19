@@ -2240,6 +2240,11 @@ int venus_hfi_interface_queues_init(struct msm_vidc_core *core)
 
 	d_vpr_h("%s()\n", __func__);
 
+	if (core->iface_q_table.align_virtual_addr) {
+		d_vpr_h("%s: queues already allocated\n", __func__);
+		return 0;
+	}
+
 	memset(&alloc, 0, sizeof(alloc));
 	alloc.type       = MSM_VIDC_BUF_QUEUE;
 	alloc.region     = MSM_VIDC_NON_SECURE;
@@ -2499,10 +2504,13 @@ int __load_fw(struct msm_vidc_core *core)
 
 	/* configure interface_queues memory to firmware */
 	rc = call_venus_op(core, setup_ucregion_memmap, core);
-	if (rc)
-		return rc;
+	if (rc) {
+		d_vpr_e("%s: failed to setup ucregion\n");
+		goto fail_setup_ucregion;
+	}
 
 	return rc;
+fail_setup_ucregion:
 fail_protect_mem:
 	if (core->dt->fw_cookie)
 		qcom_scm_pas_shutdown(core->dt->fw_cookie);
@@ -2700,6 +2708,10 @@ int venus_hfi_core_init(struct msm_vidc_core *core)
 	rc = __strict_check(core, __func__);
 	if (rc)
 		return rc;
+
+	rc = venus_hfi_interface_queues_init(core);
+	if (rc)
+		goto error;
 
 	rc = __load_fw(core);
 	if (rc)
