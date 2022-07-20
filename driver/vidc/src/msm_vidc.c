@@ -897,6 +897,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	inst->opsc_properties_set = false;
 	inst->has_bframe = false;
 	inst->auto_framerate = DEFAULT_FPS << 16;
+	inst->initial_time_us = ktime_get_ns() / 1000;
 	kref_init(&inst->kref);
 	mutex_init(&inst->lock);
 	mutex_init(&inst->request_lock);
@@ -957,6 +958,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	INIT_LIST_HEAD(&inst->input_timer_list);
 	INIT_LIST_HEAD(&inst->pending_pkts);
 	INIT_LIST_HEAD(&inst->fence_list);
+	INIT_LIST_HEAD(&inst->buffer_stats_list);
 	for (i = 0; i < MAX_SIGNAL; i++)
 		init_completion(&inst->completions[i]);
 

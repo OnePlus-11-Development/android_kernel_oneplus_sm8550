@@ -163,6 +163,7 @@ struct msm_vidc_inst {
 	struct list_head                   firmware_list; /* struct msm_vidc_inst_cap_entry */
 	struct list_head                   pending_pkts; /* list of struct hfi_pending_packet */
 	struct list_head                   fence_list; /* list of struct msm_vidc_fence */
+	struct list_head                   buffer_stats_list; /* struct msm_vidc_buffer_stats */
 	bool                               once_per_session_set;
 	bool                               ipsc_properties_set;
 	bool                               opsc_properties_set;
@@ -175,6 +176,7 @@ struct msm_vidc_inst {
 	struct msm_vidc_fence_context      fence_context;
 	bool                               active;
 	u64                                last_qbuf_time_ns;
+	u64                                initial_time_us;
 	bool                               vb2q_init;
 	u32                                max_input_data_size;
 	u32                                dpb_list_payload[MAX_DPB_LIST_ARRAY_SIZE];

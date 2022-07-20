@@ -64,6 +64,7 @@ enum vidc_msg_prio {
 	VIDC_PERF       = 0x00000008,
 	VIDC_PKT        = 0x00000010,
 	VIDC_BUS        = 0x00000020,
+	VIDC_STAT       = 0x00000040,
 	VIDC_ENCODER    = 0x00000100,
 	VIDC_DECODER    = 0x00000200,
 	VIDC_PRINTK     = 0x00001000,
@@ -97,9 +98,12 @@ enum vidc_msg_prio {
 #define i_vpr_p(inst, __fmt, ...) dprintk_inst(VIDC_PERF, "perf", inst, __fmt, ##__VA_ARGS__)
 #define i_vpr_t(inst, __fmt, ...) dprintk_inst(VIDC_PKT,  "pkt ", inst, __fmt, ##__VA_ARGS__)
 #define i_vpr_b(inst, __fmt, ...) dprintk_inst(VIDC_BUS,  "bus ", inst, __fmt, ##__VA_ARGS__)
+#define i_vpr_s(inst, __fmt, ...) dprintk_inst(VIDC_STAT, "stat", inst, __fmt, ##__VA_ARGS__)
 
 #define i_vpr_hp(inst, __fmt, ...) \
 	dprintk_inst(VIDC_HIGH | VIDC_PERF, "high", inst, __fmt, ##__VA_ARGS__)
+#define i_vpr_hs(inst, __fmt, ...) \
+	dprintk_inst(VIDC_HIGH | VIDC_STAT, "high", inst, __fmt, ##__VA_ARGS__)
 
 #define dprintk_core(__level, __level_str, __fmt, ...) \
 	do { \
@@ -118,6 +122,7 @@ enum vidc_msg_prio {
 #define d_vpr_p(__fmt, ...) dprintk_core(VIDC_PERF, "perf", __fmt, ##__VA_ARGS__)
 #define d_vpr_t(__fmt, ...) dprintk_core(VIDC_PKT,  "pkt ", __fmt, ##__VA_ARGS__)
 #define d_vpr_b(__fmt, ...) dprintk_core(VIDC_BUS,  "bus ", __fmt, ##__VA_ARGS__)
+#define d_vpr_s(__fmt, ...) dprintk_core(VIDC_STAT, "stat", __fmt, ##__VA_ARGS__)
 
 #define dprintk_ratelimit(__level, __level_str, __fmt, ...) \
 	do { \

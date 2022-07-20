@@ -903,6 +903,8 @@ struct msm_vidc_buffer {
 	u64                                timestamp;
 	enum msm_vidc_buffer_attributes    attr;
 	u64                                fence_id;
+	u32                                start_time_ms;
+	u32                                end_time_ms;
 };
 
 struct msm_vidc_buffers {
@@ -912,6 +914,24 @@ struct msm_vidc_buffers {
 	u32                    actual_count;
 	u32                    size;
 	bool                   reuse;
+};
+
+struct msm_vidc_buffer_stats {
+	struct list_head                   list;
+	u32                                frame_num;
+	u64                                timestamp;
+	u32                                etb_time_ms;
+	u32                                ebd_time_ms;
+	u32                                ftb_time_ms;
+	u32                                fbd_time_ms;
+	u32                                data_size;
+	u32                                flags;
+};
+
+enum msm_vidc_buffer_stats_flag {
+	MSM_VIDC_STATS_FLAG_CORRUPT     = BIT(0),
+	MSM_VIDC_STATS_FLAG_OVERFLOW    = BIT(1),
+	MSM_VIDC_STATS_FLAG_NO_OUTPUT   = BIT(2),
 };
 
 struct msm_vidc_sort {

@@ -1877,6 +1877,8 @@ static int msm_vdec_qbuf_batch(struct msm_vidc_inst *inst,
 	if (!buf)
 		return -EINVAL;
 
+	msm_vidc_add_buffer_stats(inst, buf);
+
 	allow = msm_vidc_allow_qbuf(inst, vb2->type);
 	if (allow == MSM_VIDC_DISALLOW) {
 		i_vpr_e(inst, "%s: qbuf not allowed\n", __func__);
