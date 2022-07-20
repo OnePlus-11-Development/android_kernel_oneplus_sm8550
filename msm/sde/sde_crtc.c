@@ -28,6 +28,7 @@
 #include <drm/drm_flip_work.h>
 #include <soc/qcom/of_common.h>
 #include <linux/version.h>
+#include <linux/soc/qcom/qcom_sync_file.h>
 
 #include "sde_kms.h"
 #include "sde_hw_lm.h"
@@ -52,6 +53,9 @@
 
 /* Max number of planes with hw fences within one commit */
 #define MAX_HW_FENCES SDE_MULTIRECT_PLANE_MAX
+
+/* Wait for at most 2 vsync for spec fence bind */
+#define SPEC_FENCE_TIMEOUT_MS 84
 
 struct sde_crtc_custom_events {
 	u32 event;
@@ -3682,6 +3686,10 @@ static struct dma_fence *_sde_plane_get_input_hw_fence(struct drm_plane *plane)
 	struct sde_plane_state *pstate;
 	void *input_fence;
 	struct dma_fence *input_hw_fence = NULL;
+	struct dma_fence_array *array = NULL;
+	struct dma_fence *spec_fence = NULL;
+	bool spec_hw_fence = true;
+	int i;
 
 	if (!plane || !plane->state) {
 		SDE_ERROR("invalid input %d\n", !plane);
@@ -3694,7 +3702,28 @@ static struct dma_fence *_sde_plane_get_input_hw_fence(struct drm_plane *plane)
 
 	if (input_fence) {
 		fence = (struct dma_fence *)pstate->input_fence;
-		if (fence->flags & BIT(MSM_HW_FENCE_FLAG_ENABLED_BIT)) {
+
+		if (test_bit(SPEC_FENCE_FLAG_FENCE_ARRAY, &fence->flags)) {
+			array = container_of(fence, struct dma_fence_array, base);
+			if (IS_ERR_OR_NULL(array))
+				goto exit;
+
+			if (!test_bit(SPEC_FENCE_FLAG_FENCE_ARRAY_BOUND, &fence->flags))
+				if (spec_sync_wait_bind_array(array, SPEC_FENCE_TIMEOUT_MS) < 0)
+					goto exit;
+
+			for (i = 0; i < array->num_fences; i++) {
+				spec_fence = array->fences[i];
+				if (IS_ERR_OR_NULL(spec_fence) ||
+					!(test_bit(MSM_HW_FENCE_FLAG_ENABLED_BIT,
+						&spec_fence->flags))) {
+					spec_hw_fence = false;
+					break;
+				}
+			}
+			if (spec_hw_fence)
+				input_hw_fence = fence;
+		} else if (test_bit(MSM_HW_FENCE_FLAG_ENABLED_BIT, &fence->flags)) {
 			input_hw_fence = fence;
 
 			SDE_DEBUG("input hwfence ctx:%llu seqno:%llu f:0x%lx timeline:%s\n",
@@ -3705,6 +3734,7 @@ static struct dma_fence *_sde_plane_get_input_hw_fence(struct drm_plane *plane)
 		SDE_EVT32_VERBOSE(DRMID(plane), fence->flags);
 	}
 
+exit:
 	return input_hw_fence;
 }
 
