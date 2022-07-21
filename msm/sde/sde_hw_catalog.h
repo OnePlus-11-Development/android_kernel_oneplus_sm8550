@@ -724,6 +724,7 @@ enum {
  * @SDE_FEATURE_CTL_DONE       Support for CTL DONE irq
  * @SDE_FEATURE_SYS_CACHE_NSE  Support for no-self-evict feature
  * @SDE_FEATURE_HW_FENCE_IPCC  HW fence supports ipcc signaling in dpu
+ * @SDE_FEATURE_EMULATED_ENV   Emulated environment supported
  * @SDE_FEATURE_MAX:             MAX features value
  */
 enum sde_mdss_features {
@@ -765,6 +766,7 @@ enum sde_mdss_features {
 	SDE_FEATURE_CTL_DONE,
 	SDE_FEATURE_SYS_CACHE_NSE,
 	SDE_FEATURE_HW_FENCE_IPCC,
+	SDE_FEATURE_EMULATED_ENV,
 	SDE_FEATURE_MAX
 };
 

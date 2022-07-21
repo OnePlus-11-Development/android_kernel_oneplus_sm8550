@@ -1307,10 +1307,9 @@ static int last_cmd_v1(struct sde_hw_ctl *ctl, enum sde_reg_dma_queue q,
 	SDE_EVT32(SDE_EVTLOG_FUNC_ENTRY, mode, ctl->idx, kick_off.queue_select,
 			kick_off.dma_type, kick_off.op);
 	if (mode == REG_DMA_WAIT4_COMP) {
-		rc = readl_poll_timeout(hw.base_off + hw.blk_off +
-			reg_dma_intr_status_offset, val,
-			(val & ctl_trigger_done_mask[ctl->idx][q]),
-			10, 20000);
+		rc = read_poll_timeout(sde_reg_read, val,
+				(val & ctl_trigger_done_mask[ctl->idx][q]), 10, false, 20000,
+				&hw, reg_dma_intr_status_offset);
 		if (rc)
 			DRM_ERROR("poll wait failed %d val %x mask %x\n",
 			    rc, val, ctl_trigger_done_mask[ctl->idx][q]);

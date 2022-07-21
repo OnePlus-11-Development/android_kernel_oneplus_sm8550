@@ -195,71 +195,6 @@ static int _sde_vbif_wait_for_axi_halt(struct sde_hw_vbif *vbif)
 	return rc;
 }
 
-int sde_vbif_halt_plane_xin(struct sde_kms *sde_kms, u32 xin_id, u32 clk_ctrl)
-{
-	struct sde_hw_vbif *vbif = NULL;
-	struct sde_hw_mdp *mdp;
-	bool forced_on = false;
-	bool status;
-	int rc = 0;
-
-	if (!sde_kms) {
-		SDE_ERROR("invalid argument\n");
-		return -EINVAL;
-	}
-
-	if (!sde_kms_is_vbif_operation_allowed(sde_kms)) {
-		SDE_DEBUG("vbif operations not permitted\n");
-		return 0;
-	}
-
-	vbif = sde_kms->hw_vbif[VBIF_RT];
-	mdp = sde_kms->hw_mdp;
-	if (!vbif || !mdp || !vbif->ops.get_xin_halt_status ||
-		       !vbif->ops.set_xin_halt ||
-		       !_sde_vbif_setup_clk_supported(sde_kms, clk_ctrl)) {
-		SDE_ERROR("invalid vbif or mdp arguments\n");
-		return -EINVAL;
-	}
-
-	mutex_lock(&vbif->mutex);
-
-	SDE_EVT32_VERBOSE(vbif->idx, xin_id);
-
-	/*
-	 * If status is 0, then make sure client clock is not gated
-	 * while halting by forcing it ON only if it was not previously
-	 * forced on. If status is 1 then its already halted.
-	 */
-	status = vbif->ops.get_xin_halt_status(vbif, xin_id);
-	if (status) {
-		mutex_unlock(&vbif->mutex);
-		return 0;
-	}
-
-	forced_on = _sde_vbif_setup_clk_force_ctrl(sde_kms, clk_ctrl, true);
-
-	/* send halt request for unused plane's xin client */
-	vbif->ops.set_xin_halt(vbif, xin_id, true);
-
-	rc = _sde_vbif_wait_for_xin_halt(vbif, xin_id);
-	if (rc) {
-		SDE_ERROR(
-		"wait failed for pipe halt:xin_id %u, clk_ctrl %u, rc %u\n",
-			xin_id, clk_ctrl, rc);
-		SDE_EVT32(xin_id, clk_ctrl, rc, SDE_EVTLOG_ERROR);
-	}
-
-	/* open xin client to enable transactions */
-	vbif->ops.set_xin_halt(vbif, xin_id, false);
-	if (forced_on)
-		_sde_vbif_setup_clk_force_ctrl(sde_kms, clk_ctrl, false);
-
-	mutex_unlock(&vbif->mutex);
-
-	return rc;
-}
-
 /**
  * _sde_vbif_apply_dynamic_ot_limit - determine OT based on usecase parameters
  * @vbif:	Pointer to hardware vbif driver
@@ -390,6 +325,9 @@ void sde_vbif_set_ot_limit(struct sde_kms *sde_kms,
 	if (!_sde_vbif_setup_clk_supported(sde_kms, params->clk_ctrl) ||
 			!vbif->ops.set_limit_conf ||
 			!vbif->ops.set_xin_halt)
+		return;
+
+	if (test_bit(SDE_FEATURE_EMULATED_ENV, sde_kms->catalog->features))
 		return;
 
 	mutex_lock(&vbif->mutex);
@@ -717,6 +655,9 @@ void sde_vbif_axi_halt_request(struct sde_kms *sde_kms)
 		SDE_DEBUG("vbif operations not permitted\n");
 		return;
 	}
+
+	if (test_bit(SDE_FEATURE_EMULATED_ENV, sde_kms->catalog->features))
+		return;
 
 	for (i = 0; i < ARRAY_SIZE(sde_kms->hw_vbif); i++) {
 		vbif = sde_kms->hw_vbif[i];

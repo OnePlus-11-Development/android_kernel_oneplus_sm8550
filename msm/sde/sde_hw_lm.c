@@ -14,6 +14,7 @@
 #include "sde_hw_mdss.h"
 #include "sde_dbg.h"
 #include "sde_kms.h"
+#include "sde_hw_util.h"
 
 #define LM_OP_MODE                        0x00
 #define LM_OUT_SIZE                       0x04
@@ -257,6 +258,7 @@ static int sde_hw_lm_collect_misr(struct sde_hw_mixer *ctx, bool nonblock,
 {
 	struct sde_hw_blk_reg_map *c = &ctx->hw;
 	u32 ctrl = 0;
+	int rc = 0;
 
 	if (!misr_value)
 		return -EINVAL;
@@ -264,12 +266,8 @@ static int sde_hw_lm_collect_misr(struct sde_hw_mixer *ctx, bool nonblock,
 	ctrl = SDE_REG_READ(c, LM_MISR_CTRL);
 	if (!nonblock) {
 		if (ctrl & MISR_CTRL_ENABLE) {
-			int rc;
-
-			rc = readl_poll_timeout(c->base_off + c->blk_off +
-					LM_MISR_CTRL, ctrl,
-					(ctrl & MISR_CTRL_STATUS) > 0, 500,
-					84000);
+			rc = read_poll_timeout(sde_reg_read, ctrl, (ctrl & MISR_CTRL_STATUS) > 0,
+					500, false, 84000, c, LM_MISR_CTRL);
 			if (rc)
 				return rc;
 		} else {
@@ -279,7 +277,7 @@ static int sde_hw_lm_collect_misr(struct sde_hw_mixer *ctx, bool nonblock,
 
 	*misr_value  = SDE_REG_READ(c, LM_MISR_SIGNATURE);
 
-	return 0;
+	return rc;
 }
 
 static void sde_hw_clear_noise_layer(struct sde_hw_mixer *ctx)

@@ -481,12 +481,9 @@ int sde_encoder_helper_wait_for_irq(struct sde_encoder_phys *phys_enc,
 			unsigned long flags;
 
 			SDE_EVT32(DRMID(phys_enc->parent), intr_idx,
-				irq->hw_idx, irq->irq_idx,
-				phys_enc->hw_pp->idx - PINGPONG_0,
-				atomic_read(wait_info->atomic_cnt));
-			SDE_DEBUG_PHYS(phys_enc,
-					"done but irq %d not triggered\n",
-					irq->irq_idx);
+				irq->hw_idx, irq->irq_idx, phys_enc->hw_pp->idx - PINGPONG_0,
+				atomic_read(wait_info->atomic_cnt), SDE_EVTLOG_FUNC_CASE1);
+			SDE_DEBUG_PHYS(phys_enc, "done but irq %d not triggered\n", irq->irq_idx);
 			local_irq_save(flags);
 			irq->cb.func(phys_enc, irq->irq_idx);
 			local_irq_restore(flags);
@@ -503,7 +500,7 @@ int sde_encoder_helper_wait_for_irq(struct sde_encoder_phys *phys_enc,
 		ret = 0;
 		SDE_EVT32(DRMID(phys_enc->parent), intr_idx, irq->hw_idx,
 			irq->irq_idx, phys_enc->hw_pp->idx - PINGPONG_0,
-			atomic_read(wait_info->atomic_cnt));
+			atomic_read(wait_info->atomic_cnt), SDE_EVTLOG_FUNC_CASE2);
 	}
 
 	SDE_EVT32_VERBOSE(DRMID(phys_enc->parent), intr_idx, irq->hw_idx,
@@ -4729,6 +4726,7 @@ u32 sde_encoder_helper_get_kickoff_timeout_ms(struct drm_encoder *drm_enc)
 {
 	struct drm_encoder *src_enc = drm_enc;
 	struct sde_encoder_virt *sde_enc;
+	struct sde_kms *sde_kms;
 	u32 fps;
 
 	if (!drm_enc) {
@@ -4736,11 +4734,18 @@ u32 sde_encoder_helper_get_kickoff_timeout_ms(struct drm_encoder *drm_enc)
 		return DEFAULT_KICKOFF_TIMEOUT_MS;
 	}
 
+	sde_kms = sde_encoder_get_kms(drm_enc);
+	if (!sde_kms)
+		return DEFAULT_KICKOFF_TIMEOUT_MS;
+
 	if (sde_encoder_in_clone_mode(drm_enc))
 		src_enc = sde_crtc_get_src_encoder_of_clone(drm_enc->crtc);
 
 	if (!src_enc)
 		return DEFAULT_KICKOFF_TIMEOUT_MS;
+
+	if (test_bit(SDE_FEATURE_EMULATED_ENV, sde_kms->catalog->features))
+		return MAX_KICKOFF_TIMEOUT_MS;
 
 	sde_enc = to_sde_encoder_virt(src_enc);
 	fps = sde_enc->mode_info.frame_rate;
@@ -5573,8 +5578,13 @@ int sde_encoder_wait_for_event(struct drm_encoder *drm_enc,
 			SDE_ATRACE_BEGIN(atrace_buf);
 			ret = fn_wait(phys);
 			SDE_ATRACE_END(atrace_buf);
-			if (ret)
+			if (ret) {
+				SDE_ERROR_ENC(sde_enc, "intf_type:%d, event:%d i:%d, failed:%d\n",
+						sde_enc->disp_info.intf_type, event, i, ret);
+				SDE_EVT32(DRMID(drm_enc), sde_enc->disp_info.intf_type, event,
+						i, ret, SDE_EVTLOG_ERROR);
 				return ret;
+			}
 		}
 	}
 

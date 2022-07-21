@@ -42,6 +42,7 @@ struct dp_aux {
 	bool read;
 
 	struct mutex *access_lock;
+	void *ipc_log_context;
 
 	struct drm_dp_aux *drm_aux;
 	int (*drm_aux_register)(struct dp_aux *aux, struct drm_device *drm_dev);

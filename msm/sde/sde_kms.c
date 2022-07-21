@@ -1639,7 +1639,10 @@ static void sde_kms_wait_for_commit_done(struct msm_kms *kms,
 		ret = sde_encoder_wait_for_event(encoder, cwb_disabling ?
 						MSM_ENC_TX_COMPLETE : MSM_ENC_COMMIT_DONE);
 		if (ret && ret != -EWOULDBLOCK) {
-			SDE_ERROR("wait for commit done returned %d\n", ret);
+			SDE_ERROR("crtc:%d, enc:%d, cwb_d:%d, wait for commit done failed ret:%d\n",
+					DRMID(crtc), DRMID(encoder), cwb_disabling, ret);
+			SDE_EVT32(DRMID(crtc), DRMID(encoder), cwb_disabling,
+					ret, SDE_EVTLOG_ERROR);
 			sde_crtc_request_frame_reset(crtc, encoder);
 			break;
 		}

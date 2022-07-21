@@ -201,8 +201,8 @@ static int sde_hw_get_axi_halt_status(struct sde_hw_vbif *vbif)
 	struct sde_hw_blk_reg_map *c = &vbif->hw;
 	int ctrl = 0;
 
-	return readl_poll_timeout(c->base_off + c->blk_off +
-		VBIF_AXI_HALT_CTRL1, ctrl, ctrl & BIT(0), 100, 4000);
+	return read_poll_timeout(sde_reg_read, ctrl, (ctrl & BIT(0)),
+			100, false, 4000, c, VBIF_AXI_HALT_CTRL1);
 }
 
 static void sde_hw_set_qos_remap(struct sde_hw_vbif *vbif,

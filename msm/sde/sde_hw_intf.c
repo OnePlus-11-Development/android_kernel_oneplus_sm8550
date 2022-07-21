@@ -596,6 +596,7 @@ static int sde_hw_intf_collect_misr(struct sde_hw_intf *intf, bool nonblock,
 {
 	struct sde_hw_blk_reg_map *c = &intf->hw;
 	u32 ctrl = 0;
+	int rc = 0;
 
 	if (!misr_value)
 		return -EINVAL;
@@ -603,12 +604,8 @@ static int sde_hw_intf_collect_misr(struct sde_hw_intf *intf, bool nonblock,
 	ctrl = SDE_REG_READ(c, INTF_MISR_CTRL);
 	if (!nonblock) {
 		if (ctrl & MISR_CTRL_ENABLE) {
-			int rc;
-
-			rc = readl_poll_timeout(c->base_off + c->blk_off +
-					INTF_MISR_CTRL, ctrl,
-					(ctrl & MISR_CTRL_STATUS) > 0, 500,
-					84000);
+			rc = read_poll_timeout(sde_reg_read, ctrl, (ctrl & MISR_CTRL_STATUS) > 0,
+					500, false, 84000, c, INTF_MISR_CTRL);
 			if (rc)
 				return rc;
 		} else {
@@ -617,7 +614,7 @@ static int sde_hw_intf_collect_misr(struct sde_hw_intf *intf, bool nonblock,
 	}
 
 	*misr_value =  SDE_REG_READ(c, INTF_MISR_SIGNATURE);
-	return 0;
+	return rc;
 }
 
 static u32 sde_hw_intf_get_line_count(struct sde_hw_intf *intf)
@@ -744,16 +741,13 @@ static int sde_hw_intf_poll_timeout_wr_ptr(struct sde_hw_intf *intf,
 {
 	struct sde_hw_blk_reg_map *c;
 	u32 val;
-	int rc;
 
 	if (!intf)
 		return -EINVAL;
 
 	c = &intf->hw;
-	rc = readl_poll_timeout(c->base_off + c->blk_off + INTF_TEAR_LINE_COUNT,
-			val, (val & 0xffff) >= 1, 10, timeout_us);
-
-	return rc;
+	return read_poll_timeout(sde_reg_read, val, (val & 0xffff) >= 1, 10, false, timeout_us,
+			c, INTF_TEAR_LINE_COUNT);
 }
 
 static int sde_hw_intf_enable_te(struct sde_hw_intf *intf, bool enable)

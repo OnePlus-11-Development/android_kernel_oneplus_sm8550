@@ -87,35 +87,6 @@ static const struct dp_mst_sim_port output_port = {
 	0, 0, 2520, 2520, NULL, 0
 };
 
-#if IS_ENABLED(CONFIG_DYNAMIC_DEBUG)
-static void dp_sim_aux_hex_dump(struct drm_dp_aux_msg *msg)
-{
-	char prefix[64];
-	int i, linelen, remaining = msg->size;
-	const int rowsize = 16;
-	u8 linebuf[64];
-
-	snprintf(prefix, sizeof(prefix), "%s %s %4xh(%2zu): ",
-		(msg->request & DP_AUX_I2C_MOT) ? "I2C" : "NAT",
-		(msg->request & DP_AUX_I2C_READ) ? "RD" : "WR",
-		msg->address, msg->size);
-
-	for (i = 0; i < msg->size; i += rowsize) {
-		linelen = min(remaining, rowsize);
-		remaining -= rowsize;
-
-		hex_dump_to_buffer(msg->buffer + i, linelen, rowsize, 1,
-			linebuf, sizeof(linebuf), false);
-
-		DP_DEBUG("%s%s\n", prefix, linebuf);
-	}
-}
-#else
-static void dp_sim_aux_hex_dump(struct drm_dp_aux_msg *msg)
-{
-}
-#endif /* CONFIG_DYNAMIC_DEBUG */
-
 static int dp_sim_register_hpd(struct dp_aux_bridge *bridge,
 	int (*hpd_cb)(void *, bool, bool), void *dev)
 {
@@ -334,8 +305,6 @@ static ssize_t dp_sim_transfer(struct dp_aux_bridge *bridge,
 		ret = drm_aux->transfer(drm_aux, msg);
 
 end:
-	dp_sim_aux_hex_dump(msg);
-
 	mutex_unlock(&sim_dev->lock);
 
 	return ret;
