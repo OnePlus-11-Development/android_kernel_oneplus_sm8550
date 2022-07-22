@@ -83,16 +83,6 @@ u64 msm_vidc_calc_freq_iris3(struct msm_vidc_inst *inst, u32 data_size)
 		if (inst->capabilities->cap[REQUEST_PREPROCESS].value)
 			vpp_cycles = vpp_cycles + vpp_cycles / 2;
 
-		if (res_is_greater_than(inst->crop.width, inst->crop.height,
-			4096 + (4096 >> 1), 2176 + (2176 >> 1))) {
-			/*
-			 * 8k@30 fps encode has a very low margin for sw/fw at 338MHz.
-			 * Hence, increase core clock little bit(5%) to move to the next
-			 * corner i.e., 366MHz.
-			 */
-			vpp_cycles = div_u64(vpp_cycles * 21, 20);
-		}
-
 		/* VSP */
 		/* bitrate is based on fps, scale it using operating rate */
 		operating_rate = inst->capabilities->cap[OPERATING_RATE].value >> 16;
@@ -123,15 +113,6 @@ u64 msm_vidc_calc_freq_iris3(struct msm_vidc_inst *inst, u32 data_size)
 
 		vsp_cycles += mbs_per_second * base_cycles;
 
-		if (res_is_greater_than(inst->crop.width, inst->crop.height,
-			4096 + (4096 >> 1), 2176 + (2176 >> 1))) {
-			/*
-			 * 8k@30 fps encode has a very low margin for sw/fw at 338MHz.
-			 * Hence, increase core clock little bit(5%) to move to the next
-			 * corner i.e., 366MHz.
-			 */
-			vsp_cycles = div_u64(vsp_cycles * 21, 20);
-		}
 	} else if (inst->domain == MSM_VIDC_DECODER) {
 		/* VPP */
 		vpp_cycles = mbs_per_second * inst->capabilities->cap[MB_CYCLES_VPP].value /
