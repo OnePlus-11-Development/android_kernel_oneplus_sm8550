@@ -131,11 +131,13 @@ char sde_hw_blk_str[SDE_HW_BLK_MAX][SDE_HW_BLK_NAME_LEN] = {
  * @top_ctrl:  topology control preference from kernel client
  * @top:       selected topology for the display
  * @hw_res:	   Hardware resources required as reported by the encoders
+ * @conn_lm_mask:  preferred LM mask of cwb requested display
  */
 struct sde_rm_requirements {
 	uint64_t top_ctrl;
 	const struct sde_rm_topology_def *topology;
 	struct sde_encoder_hw_resources hw_res;
+	u32 conn_lm_mask;
 };
 
 /**
@@ -1157,7 +1159,8 @@ static bool _sde_rm_check_lm_and_get_connected_blks(
 		struct sde_rm_hw_blk **dspp,
 		struct sde_rm_hw_blk **ds,
 		struct sde_rm_hw_blk **pp,
-		struct sde_rm_hw_blk *primary_lm)
+		struct sde_rm_hw_blk *primary_lm,
+		u32 conn_lm_mask)
 {
 	const struct sde_lm_cfg *lm_cfg = to_sde_hw_mixer(lm->hw)->cap;
 	const struct sde_pingpong_cfg *pp_cfg;
@@ -1212,6 +1215,11 @@ static bool _sde_rm_check_lm_and_get_connected_blks(
 		} else if (!RM_RQ_DCWB(reqs) && dcwb_pref) {
 			SDE_DEBUG("fail: dcwb supported dummy lm incorrectly allocated\n");
 			return false;
+		} else if (RM_RQ_DCWB(reqs) && dcwb_pref &&
+				((ffs(conn_lm_mask) % 2) ==  ((lm_cfg->id + 1) % 2))) {
+			SDE_DEBUG("fail: dcwb:%d trying to match lm:%d\n",
+					lm_cfg->id, ffs(conn_lm_mask));
+			return false;
 		}
 	} else if ((!is_conn_primary && lm_primary_pref) ||
 			(!is_conn_secondary && lm_secondary_pref)) {
@@ -1258,7 +1266,7 @@ static int _sde_rm_reserve_lms(
 	struct sde_rm_hw_blk *ds[MAX_BLOCKS];
 	struct sde_rm_hw_blk *pp[MAX_BLOCKS];
 	struct sde_rm_hw_iter iter_i, iter_j;
-	u32 lm_mask = 0;
+	u32 lm_mask = 0,  conn_lm_mask = 0;
 	int lm_count = 0;
 	int i, rc = 0;
 
@@ -1267,6 +1275,8 @@ static int _sde_rm_reserve_lms(
 		return 0;
 	}
 
+	if (RM_RQ_DCWB(reqs))
+		conn_lm_mask = reqs->conn_lm_mask;
 	/* Find a primary mixer */
 	sde_rm_init_hw_iter(&iter_i, 0, SDE_HW_BLK_LM);
 	while (lm_count != reqs->topology->num_lm &&
@@ -1290,7 +1300,7 @@ static int _sde_rm_reserve_lms(
 		if (!_sde_rm_check_lm_and_get_connected_blks(
 				rm, rsvp, reqs, lm[lm_count],
 				&dspp[lm_count], &ds[lm_count],
-				&pp[lm_count], NULL))
+				&pp[lm_count], NULL, conn_lm_mask))
 			continue;
 
 		lm_mask |= (1 << iter_i.blk->id);
@@ -1299,6 +1309,9 @@ static int _sde_rm_reserve_lms(
 		/* Return if peer is not needed */
 		if (lm_count == reqs->topology->num_lm)
 			break;
+
+		if (RM_RQ_DCWB(reqs))
+			conn_lm_mask = conn_lm_mask & ~BIT(ffs(conn_lm_mask) - 1);
 
 		/* Valid primary mixer found, find matching peers */
 		sde_rm_init_hw_iter(&iter_j, 0, SDE_HW_BLK_LM);
@@ -1315,7 +1328,8 @@ static int _sde_rm_reserve_lms(
 			if (!_sde_rm_check_lm_and_get_connected_blks(
 					rm, rsvp, reqs, iter_j.blk,
 					&dspp[lm_count], &ds[lm_count],
-					&pp[lm_count], iter_i.blk))
+					&pp[lm_count], iter_i.blk,
+					conn_lm_mask))
 				continue;
 
 			SDE_DEBUG("blk id = %d, _lm_ids[%d] = %d\n",
@@ -1328,6 +1342,10 @@ static int _sde_rm_reserve_lms(
 
 			lm_mask |= (1 << iter_j.blk->id);
 			++lm_count;
+
+			if (RM_RQ_DCWB(reqs))
+				conn_lm_mask = conn_lm_mask & ~BIT(ffs(conn_lm_mask) - 1);
+
 			break;
 		}
 
@@ -2278,6 +2296,26 @@ int sde_rm_cont_splash_res_init(struct msm_drm_private *priv,
 	return 0;
 }
 
+static struct drm_connector *_sde_rm_get_connector(
+		struct drm_encoder *enc)
+{
+	struct drm_connector *conn = NULL, *conn_search;
+	struct sde_connector *c_conn = NULL;
+	struct drm_connector_list_iter conn_iter;
+
+	drm_connector_list_iter_begin(enc->dev, &conn_iter);
+	drm_for_each_connector_iter(conn_search, &conn_iter) {
+		c_conn = to_sde_connector(conn_search);
+		if (c_conn->encoder == enc) {
+			conn = conn_search;
+			break;
+		}
+	}
+	drm_connector_list_iter_end(&conn_iter);
+
+	return conn;
+}
+
 static int _sde_rm_populate_requirements(
 		struct sde_rm *rm,
 		struct drm_encoder *enc,
@@ -2287,6 +2325,8 @@ static int _sde_rm_populate_requirements(
 		struct sde_rm_requirements *reqs)
 {
 	const struct drm_display_mode *mode = &crtc_state->mode;
+	struct drm_encoder *encoder_iter;
+	struct drm_connector *conn;
 	int i, num_lm;
 
 	reqs->top_ctrl = sde_connector_get_property(conn_state,
@@ -2353,6 +2393,19 @@ static int _sde_rm_populate_requirements(
 			reqs->topology->top_name, reqs->topology->num_ctl);
 	}
 
+	if (RM_RQ_DCWB(reqs)) {
+		drm_for_each_encoder_mask(encoder_iter, enc->dev,
+					 crtc_state->encoder_mask) {
+			if (drm_encoder_mask(encoder_iter) == drm_encoder_mask(enc))
+				continue;
+
+			conn = _sde_rm_get_connector(encoder_iter);
+			if (conn)
+				reqs->conn_lm_mask = to_sde_connector(conn)->lm_mask;
+			break;
+		}
+	}
+
 	SDE_DEBUG("top_ctrl: 0x%llX num_h_tiles: %d\n", reqs->top_ctrl,
 			reqs->hw_res.display_num_of_h_tiles);
 	SDE_DEBUG("num_lm: %d num_ctl: %d topology: %d split_display: %d\n",
@@ -2393,26 +2446,6 @@ static struct sde_rm_rsvp *_sde_rm_get_rsvp_nxt(struct sde_rm *rm, struct drm_en
 static struct sde_rm_rsvp *_sde_rm_get_rsvp_cur(struct sde_rm *rm, struct drm_encoder *enc)
 {
 	return _sde_rm_get_rsvp(rm, enc, false);
-}
-
-static struct drm_connector *_sde_rm_get_connector(
-		struct drm_encoder *enc)
-{
-	struct drm_connector *conn = NULL, *conn_search;
-	struct sde_connector *c_conn = NULL;
-	struct drm_connector_list_iter conn_iter;
-
-	drm_connector_list_iter_begin(enc->dev, &conn_iter);
-	drm_for_each_connector_iter(conn_search, &conn_iter) {
-		c_conn = to_sde_connector(conn_search);
-		if (c_conn->encoder == enc) {
-			conn = conn_search;
-			break;
-		}
-	}
-	drm_connector_list_iter_end(&conn_iter);
-
-	return conn;
 }
 
 int sde_rm_update_topology(struct sde_rm *rm,
