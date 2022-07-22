@@ -421,11 +421,8 @@ static u64 __calculate_decoder(struct vidc_bus_vote_data *d)
 	ddr.line_buffer_read =
 		fp_div(FP_INT(tnbr_per_lcu * lcu_per_frame * fps),
 			FP_INT(bps(1)));
-	/* This change is applicable for all IRIS3 targets,
-	 * but currently being done for IRIS3 with 2 pipes
-	 * only due to timeline constraints.
-	 */
-	if((num_vpp_pipes == 2) && (is_h264_category))
+
+	if (is_h264_category)
 		ddr.line_buffer_write = fp_div(ddr.line_buffer_read,FP_INT(2));
 	else
 		ddr.line_buffer_write = ddr.line_buffer_read;
