@@ -1923,6 +1923,8 @@ int msm_vidc_process_drain(struct msm_vidc_inst *inst)
 	if (rc)
 		return rc;
 
+	msm_vidc_scale_power(inst, true);
+
 	return rc;
 }
 
@@ -1936,6 +1938,8 @@ int msm_vidc_process_resume(struct msm_vidc_inst *inst)
 		d_vpr_e("%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
+
+	msm_vidc_scale_power(inst, true);
 
 	/* first check DRC pending else check drain pending */
 	if (is_sub_state(inst, MSM_VIDC_DRC) &&
