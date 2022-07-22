@@ -60,7 +60,7 @@ static void _pool_entry_free(void *element, void *arg)
 static int
 __kgsl_pool_add_page(struct kgsl_page_pool *pool, struct page *p)
 {
-	struct rb_node **node, *parent;
+	struct rb_node **node, *parent = NULL;
 	struct kgsl_pool_page_entry *new_page, *entry;
 	gfp_t gfp_mask = GFP_KERNEL & ~__GFP_DIRECT_RECLAIM;
 
