@@ -1871,6 +1871,7 @@ static int __cam_req_mgr_process_req(struct cam_req_mgr_core_link *link,
 	int                                  rc = 0, idx, i;
 	int                                  reset_step = 0;
 	uint32_t                             trigger = trigger_data->trigger;
+	uint64_t                             wq_sched_timeout = 0;
 	struct cam_req_mgr_slot             *slot = NULL;
 	struct cam_req_mgr_req_queue        *in_q;
 	struct cam_req_mgr_core_session     *session;
@@ -1944,13 +1945,26 @@ static int __cam_req_mgr_process_req(struct cam_req_mgr_core_link *link,
 		link->prev_sof_timestamp = link->sof_timestamp;
 		link->sof_timestamp = trigger_data->sof_timestamp_val;
 
+		/* Use half frame interval to detect the WQ congestion */
+		wq_sched_timeout = CAM_REQ_MGR_HALF_FRAME_DURATION(link->sof_timestamp -
+			link->prev_sof_timestamp) / CAM_COMMON_NS_PER_MS;
+
 		/* Check for WQ congestion */
 		if (jiffies_to_msecs(jiffies -
 			link->last_sof_trigger_jiffies) <
-			MINIMUM_WORKQUEUE_SCHED_TIME_IN_MS)
+			wq_sched_timeout)
 			link->wq_congestion = true;
 		else
 			link->wq_congestion = false;
+
+		/*
+		 * Only update the jiffies for SOF trigger,
+		 * since it is used to protect from
+		 * applying fails in ISP which is triggered at SOF.
+		 */
+		if (trigger == CAM_TRIGGER_POINT_SOF)
+			link->last_sof_trigger_jiffies = jiffies;
+
 	}
 
 	if (slot->status != CRM_SLOT_STATUS_REQ_READY) {
@@ -2137,13 +2151,6 @@ static int __cam_req_mgr_process_req(struct cam_req_mgr_core_link *link,
 		}
 	}
 end:
-	/*
-	 * Only update the jiffies for SOF trigger,
-	 * since it is used to protect from
-	 * applying fails in ISP which is triggered at SOF.
-	 */
-	if (trigger == CAM_TRIGGER_POINT_SOF)
-		link->last_sof_trigger_jiffies = jiffies;
 	mutex_unlock(&session->lock);
 	return rc;
 }
@@ -3250,6 +3257,7 @@ int cam_req_mgr_process_error(void *priv, void *data)
 	struct cam_req_mgr_error_notify     *err_info = NULL;
 	struct cam_req_mgr_core_link        *link = NULL;
 	struct cam_req_mgr_req_queue        *in_q = NULL;
+	struct cam_req_mgr_slot             *slot = NULL;
 	struct crm_task_payload             *task_data = NULL;
 
 	if (!data || !priv) {
@@ -3280,11 +3288,25 @@ int cam_req_mgr_process_error(void *priv, void *data)
 		} else {
 			CAM_DBG(CAM_CRM, "req_id %lld found at idx %d last_applied %d",
 				err_info->req_id, idx, in_q->last_applied_idx);
-
+			slot = &in_q->slot[idx];
+			if (!slot->recover) {
+				CAM_WARN(CAM_CRM,
+					"err recovery disabled req_id %lld",
+					err_info->req_id);
+				mutex_unlock(&link->req.lock);
+				return 0;
+			} else if (slot->status != CRM_SLOT_STATUS_REQ_PENDING
+			&& slot->status != CRM_SLOT_STATUS_REQ_APPLIED) {
+				CAM_WARN(CAM_CRM,
+					"req_id %lld can not be recovered %d",
+					err_info->req_id, slot->status);
+				mutex_unlock(&link->req.lock);
+				return -EINVAL;
+			}
 			/* Bring processing pointer to bubbled req id */
 			__cam_req_mgr_tbl_set_all_skip_cnt(&link->req.l_tbl);
 			in_q->rd_idx = idx;
-
+			in_q->slot[idx].status = CRM_SLOT_STATUS_REQ_ADDED;
 			if (link->sync_link[0]) {
 				in_q->slot[idx].sync_mode = 0;
 				__cam_req_mgr_inc_idx(&idx, 1,
@@ -3636,11 +3658,9 @@ end:
 static int cam_req_mgr_cb_notify_err(
 	struct cam_req_mgr_error_notify *err_info)
 {
-	int                              rc = 0, idx = -1;
+	int                              rc = 0;
 	struct crm_workq_task           *task = NULL;
 	struct cam_req_mgr_core_link    *link = NULL;
-	struct cam_req_mgr_req_queue    *in_q = NULL;
-	struct cam_req_mgr_slot         *slot = NULL;
 	struct cam_req_mgr_error_notify *notify_err;
 	struct crm_task_payload         *task_data;
 
@@ -3666,43 +3686,6 @@ static int cam_req_mgr_cb_notify_err(
 		goto end;
 	}
 	crm_timer_reset(link->watchdog);
-	switch (err_info->error) {
-	case CRM_KMD_ERR_BUBBLE:
-	case CRM_KMD_WARN_INTERNAL_RECOVERY:
-		in_q = link->req.in_q;
-		idx = __cam_req_mgr_find_slot_for_req(in_q, err_info->req_id);
-		if (idx < 0) {
-			CAM_ERR_RATE_LIMIT(CAM_CRM,
-				"req_id %lld not found in input queue",
-				err_info->req_id);
-			spin_unlock_bh(&link->link_state_spin_lock);
-			rc = -EINVAL;
-			goto end;
-		}
-
-		slot = &in_q->slot[idx];
-
-		if (!slot->recover) {
-			CAM_WARN(CAM_CRM,
-				"err recovery disabled req_id %lld",
-				err_info->req_id);
-			spin_unlock_bh(&link->link_state_spin_lock);
-			rc = 0;
-			goto end;
-		} else if (slot->status != CRM_SLOT_STATUS_REQ_PENDING
-			&& slot->status != CRM_SLOT_STATUS_REQ_APPLIED) {
-			CAM_WARN(CAM_CRM,
-				"req_id %lld can not be recovered %d",
-				err_info->req_id, slot->status);
-			spin_unlock_bh(&link->link_state_spin_lock);
-			rc = -EINVAL;
-			goto end;
-		}
-		in_q->rd_idx = idx;
-		in_q->slot[idx].status = CRM_SLOT_STATUS_REQ_ADDED;
-	default:
-		break;
-	}
 	spin_unlock_bh(&link->link_state_spin_lock);
 
 	task = cam_req_mgr_workq_get_task(link->workq);
