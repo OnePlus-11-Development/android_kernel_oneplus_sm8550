@@ -458,12 +458,16 @@ int gen7_start(struct adreno_device *adreno_dev)
 	kgsl_regwrite(device, GEN7_UCHE_WRITE_THRU_BASE_LO, 0xfffff000);
 	kgsl_regwrite(device, GEN7_UCHE_WRITE_THRU_BASE_HI, 0x0001ffff);
 
-	if (adreno_dev->gpucore->gmem_base) {
+	/*
+	 * Some gen7 targets don't use a programmed UCHE GMEM base address,
+	 * so skip programming the register for such targets.
+	 */
+	if (adreno_dev->uche_gmem_base) {
 		kgsl_regwrite(device, GEN7_UCHE_GMEM_RANGE_MIN_LO,
-				adreno_dev->gpucore->gmem_base);
+				adreno_dev->uche_gmem_base);
 		kgsl_regwrite(device, GEN7_UCHE_GMEM_RANGE_MIN_HI, 0x0);
 		kgsl_regwrite(device, GEN7_UCHE_GMEM_RANGE_MAX_LO,
-				adreno_dev->gpucore->gmem_base +
+				adreno_dev->uche_gmem_base +
 				adreno_dev->gpucore->gmem_size - 1);
 		kgsl_regwrite(device, GEN7_UCHE_GMEM_RANGE_MAX_HI, 0x0);
 	}
@@ -476,9 +480,6 @@ int gen7_start(struct adreno_device *adreno_dev)
 			FIELD_PREP(GENMASK(11, 8), 9) |
 			BIT(3) | BIT(2) |
 			FIELD_PREP(GENMASK(1, 0), 2));
-
-	/* Set the AHB default slave response to "ERROR" */
-	kgsl_regwrite(device, GEN7_CP_AHB_CNTL, 0x1);
 
 	/* Turn on the IFPC counter (countable 4 on XOCLK4) */
 	kgsl_regwrite(device, GEN7_GMU_CX_GMU_POWER_COUNTER_SELECT_1,
@@ -1564,7 +1565,7 @@ static void gen7_set_isdb_breakpoint_registers(struct adreno_device *adreno_dev)
 
 	if (!device->set_isdb_breakpoint || device->ftbl->is_hwcg_on(device)
 			|| device->qdss_gfx_virt == NULL || !device->force_panic)
-		goto err;
+		return;
 
 	clk = clk_get(&device->pdev->dev, "apb_pclk");
 
@@ -1629,7 +1630,6 @@ const struct gen7_gpudev adreno_gen7_hwsched_gpudev = {
 		.send_recurring_cmdobj = gen7_hwsched_send_recurring_cmdobj,
 		.perfcounter_remove = gen7_perfcounter_remove,
 		.set_isdb_breakpoint_registers = gen7_set_isdb_breakpoint_registers,
-		.reset_and_snapshot = gen7_hwsched_reset_and_snapshot,
 	},
 	.hfi_probe = gen7_hwsched_hfi_probe,
 	.hfi_remove = gen7_hwsched_hfi_remove,

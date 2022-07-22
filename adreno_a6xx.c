@@ -596,16 +596,16 @@ void a6xx_start(struct adreno_device *adreno_dev)
 	kgsl_regwrite(device, A6XX_UCHE_WRITE_THRU_BASE_HI, 0x0001ffff);
 
 	/*
-	 * Some A6xx targets no longer use a programmed GMEM base address
-	 * so only write the registers if a non zero address is given
-	 * in the GPU list
+	 * Some A6xx targets no longer use a programmed UCHE GMEM base
+	 * address, so only write the registers if this address is
+	 * non-zero.
 	 */
-	if (adreno_dev->gpucore->gmem_base) {
+	if (adreno_dev->uche_gmem_base) {
 		kgsl_regwrite(device, A6XX_UCHE_GMEM_RANGE_MIN_LO,
-				adreno_dev->gpucore->gmem_base);
+				adreno_dev->uche_gmem_base);
 		kgsl_regwrite(device, A6XX_UCHE_GMEM_RANGE_MIN_HI, 0x0);
 		kgsl_regwrite(device, A6XX_UCHE_GMEM_RANGE_MAX_LO,
-				adreno_dev->gpucore->gmem_base +
+				adreno_dev->uche_gmem_base +
 				adreno_dev->gpucore->gmem_size - 1);
 		kgsl_regwrite(device, A6XX_UCHE_GMEM_RANGE_MAX_HI, 0x0);
 	}
@@ -2201,7 +2201,7 @@ static void a6xx_set_isdb_breakpoint_registers(struct adreno_device *adreno_dev)
 
 	if (!device->set_isdb_breakpoint || device->ftbl->is_hwcg_on(device)
 			|| device->qdss_gfx_virt == NULL || !device->force_panic)
-		goto err;
+		return;
 
 	clk = clk_get(&device->pdev->dev, "apb_pclk");
 
@@ -2337,7 +2337,6 @@ const struct a6xx_gpudev adreno_a6xx_hwsched_gpudev = {
 		.gx_is_on = a6xx_gmu_gx_is_on,
 		.send_recurring_cmdobj = a6xx_hwsched_send_recurring_cmdobj,
 		.set_isdb_breakpoint_registers = a6xx_set_isdb_breakpoint_registers,
-		.reset_and_snapshot = a6xx_hwsched_reset_and_snapshot,
 	},
 	.hfi_probe = a6xx_hwsched_hfi_probe,
 	.hfi_remove = a6xx_hwsched_hfi_remove,

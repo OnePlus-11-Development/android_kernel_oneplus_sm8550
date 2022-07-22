@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2010-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/errno.h>
 #include <linux/devfreq.h>
@@ -531,9 +532,10 @@ static int tz_handler(struct devfreq *devfreq, unsigned int event, void *data)
 		/* Reset the suspend_start when gpu resumes */
 		suspend_start = 0;
 		spin_unlock(&suspend_lock);
-		/* fallthrough */
+		fallthrough;
 	case DEVFREQ_GOV_UPDATE_INTERVAL:
-		/* fallthrough, this governor doesn't use polling */
+		/* This governor doesn't use polling */
+		fallthrough;
 	default:
 		result = 0;
 		break;
