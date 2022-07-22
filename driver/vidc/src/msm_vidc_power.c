@@ -231,6 +231,9 @@ int msm_vidc_scale_buses(struct msm_vidc_inst *inst)
 	vote_data->output_height = out_f->fmt.pix_mp.height;
 	vote_data->lcu_size = (codec == V4L2_PIX_FMT_HEVC ||
 			codec == V4L2_PIX_FMT_VP9) ? 32 : 16;
+	if (codec == V4L2_PIX_FMT_AV1)
+		vote_data->lcu_size =
+			inst->capabilities->cap[SUPER_BLOCK].value ? 128 : 64;
 	vote_data->fps = inst->max_rate;
 
 	if (inst->domain == MSM_VIDC_ENCODER) {

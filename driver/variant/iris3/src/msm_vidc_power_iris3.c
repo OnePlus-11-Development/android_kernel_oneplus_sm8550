@@ -279,7 +279,7 @@ static u64 __calculate_decoder(struct vidc_bus_vote_data *d)
 	fp_t dpb_read_compression_factor, dpb_opb_scaling_ratio,
 		dpb_write_compression_factor, opb_write_compression_factor,
 		qsmmu_bw_overhead_factor;
-	bool is_h264_category = true;
+	bool is_h264_category = (d->codec == MSM_VIDC_H264) ? true : false;
 
 	/* Derived parameters */
 	int lcu_per_frame, collocated_bytes_per_lcu, tnbr_per_lcu;
@@ -338,13 +338,6 @@ static u64 __calculate_decoder(struct vidc_bus_vote_data *d)
 
 	num_vpp_pipes = d->num_vpp_pipes;
 
-	if (d->codec == MSM_VIDC_HEVC ||
-		d->codec == MSM_VIDC_HEIC ||
-		d->codec == MSM_VIDC_VP9) {
-		/* H264, VP8, MPEG2 use the same settings */
-		/* HEVC, VP9 use the same setting */
-		is_h264_category = false;
-	}
 	if (d->use_sys_cache) {
 		llc_ref_read_l2_cache_enabled = true;
 		if (is_h264_category)
