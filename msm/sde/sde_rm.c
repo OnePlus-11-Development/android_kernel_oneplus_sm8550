@@ -2408,13 +2408,13 @@ static int _sde_rm_populate_requirements(
 
 	SDE_DEBUG("top_ctrl: 0x%llX num_h_tiles: %d\n", reqs->top_ctrl,
 			reqs->hw_res.display_num_of_h_tiles);
-	SDE_DEBUG("num_lm: %d num_ctl: %d topology: %d split_display: %d\n",
+	SDE_DEBUG("num_lm: %d num_ctl: %d topology: %d split_display: %d mask: 0x%llX\n",
 			reqs->topology->num_lm, reqs->topology->num_ctl,
 			reqs->topology->top_name,
-			reqs->topology->needs_split_display);
+			reqs->topology->needs_split_display, reqs->conn_lm_mask);
 	SDE_EVT32(mode->hdisplay, rm->lm_max_width, reqs->topology->num_lm,
 			reqs->top_ctrl, reqs->topology->top_name,
-			reqs->topology->num_ctl);
+			reqs->topology->num_ctl, reqs->conn_lm_mask);
 
 	return 0;
 }
