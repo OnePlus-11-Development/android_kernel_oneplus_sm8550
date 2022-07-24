@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -177,15 +178,15 @@ static int _sde_vm_release(struct sde_kms *kms)
 
 	sde_kms_vm_trusted_resource_deinit(kms);
 
+	rc = _sde_vm_release_irq(kms->vm);
+	if (rc)
+		SDE_ERROR("irq_release failed, rc = %d\n", rc);
+
 	rc = _sde_vm_release_mem(kms->vm);
 	if (rc) {
 		SDE_ERROR("mem_release failed, rc = %d\n", rc);
 		goto end;
 	}
-
-	rc = _sde_vm_release_irq(kms->vm);
-	if (rc)
-		SDE_ERROR("irq_release failed, rc = %d\n", rc);
 
 end:
 	return rc;
