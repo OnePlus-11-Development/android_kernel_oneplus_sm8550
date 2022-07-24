@@ -1,5 +1,5 @@
 /* Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,7 +15,9 @@
 
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
-#include <linux/ipa.h>
+#if !defined(__arch_um__)
+	#include <linux/ipa.h>
+#endif /* !defined(__arch_um__) */
 #include <linux/if_ether.h>
 #include <linux/interrupt.h>
 #include <linux/version.h>
@@ -27,6 +29,7 @@
 
 #define MAX_Q_LEN 1000
 
+#if !defined(__arch_um__)
 static struct rmnet_ll_endpoint *rmnet_ll_ipa_ep;
 static struct sk_buff_head tx_pending_list;
 extern spinlock_t rmnet_ll_tx_lock;
@@ -208,6 +211,11 @@ static int rmnet_ll_ipa_exit(void)
 
 	return 0;
 }
+#else
+static int rmnet_ll_ipa_tx(struct sk_buff *skb){return 0;};
+static int rmnet_ll_ipa_init(void){return 0;}
+static int rmnet_ll_ipa_exit(void){return 0;};
+#endif /* !defined(__arch_um__) */
 
 /* Export operations struct to the main framework */
 struct rmnet_ll_client_ops rmnet_ll_client = {
