@@ -2209,6 +2209,11 @@ void venus_hfi_interface_queues_deinit(struct msm_vidc_core *core)
 
 	d_vpr_h("%s()\n", __func__);
 
+	if (!core->iface_q_table.align_virtual_addr) {
+		d_vpr_h("%s: queues already deallocated\n", __func__);
+		return;
+	}
+
 	msm_vidc_memory_unmap(core, &core->iface_q_table.map);
 	msm_vidc_memory_free(core, &core->iface_q_table.alloc);
 	msm_vidc_memory_unmap(core, &core->sfr.map);
