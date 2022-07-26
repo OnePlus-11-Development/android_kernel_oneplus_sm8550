@@ -340,18 +340,21 @@ static void _sde_enc_phys_wb_get_out_resolution(struct drm_crtc_state *crtc_stat
 	sde_crtc_get_ds_io_res(crtc_state, &ds_res);
 	sde_connector_get_dnsc_blur_io_res(conn_state, &dnsc_blur_res);
 
-	if (ds_res.enabled) {
+	if (dnsc_blur_res.enabled) {
+		*out_width = dnsc_blur_res.dst_w;
+		*out_height = dnsc_blur_res.dst_h;
+	} else if (ds_res.enabled) {
 		if (ds_tap_pt == CAPTURE_DSPP_OUT) {
 			*out_width = ds_res.dst_w;
 			*out_height = ds_res.dst_h;
 		} else if (ds_tap_pt == CAPTURE_MIXER_OUT) {
 			*out_width = ds_res.src_w;
 			*out_height = ds_res.src_h;
+		} else {
+			*out_width = mode->hdisplay;
+			*out_height = mode->vdisplay;
 		}
-	} else if (dnsc_blur_res.enabled) {
-		*out_width = dnsc_blur_res.dst_w;
-		*out_height = dnsc_blur_res.dst_h;
-	} else {
+	}  else {
 		*out_width = mode->hdisplay;
 		*out_height = mode->vdisplay;
 	}
