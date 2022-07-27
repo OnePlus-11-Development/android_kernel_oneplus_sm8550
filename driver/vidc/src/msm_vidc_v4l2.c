@@ -381,8 +381,8 @@ int msm_v4l2_create_bufs(struct file *filp, void *fh,
 		return -EINVAL;
 	}
 
-	inst_lock(inst, __func__);
 	client_lock(inst, __func__);
+	inst_lock(inst, __func__);
 	rc = msm_vidc_create_bufs((void *)inst, b);
 	if (rc)
 		goto unlock;

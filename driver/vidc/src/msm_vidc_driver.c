@@ -5764,6 +5764,7 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 	list_for_each_entry_safe(timer, dummy_timer, &inst->input_timer_list, list) {
 		i_vpr_e(inst, "%s: removing input_timer %lld\n",
 			__func__, timer->time_us);
+		list_del(&timer->list);
 		msm_memory_pool_free(inst, timer);
 	}
 
