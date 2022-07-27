@@ -393,12 +393,15 @@ static int msm_vidc_component_bind(struct device *dev)
 
 	d_vpr_h("%s(): succssful\n", __func__);
 
-	return rc;
+	return 0;
 
 queues_deinit:
 	venus_hfi_interface_queues_deinit(core);
-	component_unbind_all(dev, core);
-	return rc;
+	/**
+	 * queues and core can be inited again during session_open.
+	 * So don't declare as probe failure.
+	 */
+	return 0;
 }
 
 static void msm_vidc_component_unbind(struct device *dev)
