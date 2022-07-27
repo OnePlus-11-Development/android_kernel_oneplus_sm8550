@@ -260,7 +260,7 @@ static u64 __calculate_decoder(struct vidc_bus_vote_data *d)
 	fp_t dpb_read_compression_factor, dpb_opb_scaling_ratio,
 		dpb_write_compression_factor, opb_write_compression_factor,
 		qsmmu_bw_overhead_factor;
-	bool is_h264_category = true;
+	bool is_h264_category = (d->codec == MSM_VIDC_H264) ? true : false;
 
 	/* Derived parameters */
 	int lcu_per_frame, collocated_bytes_per_lcu, tnbr_per_lcu;
@@ -319,13 +319,6 @@ static u64 __calculate_decoder(struct vidc_bus_vote_data *d)
 
 	num_vpp_pipes = d->num_vpp_pipes;
 
-	if (d->codec == MSM_VIDC_HEVC ||
-		d->codec == MSM_VIDC_HEIC ||
-		d->codec == MSM_VIDC_VP9) {
-		/* H264, VP8, MPEG2 use the same settings */
-		/* HEVC, VP9 use the same setting */
-		is_h264_category = false;
-	}
 	if (d->use_sys_cache) {
 		llc_ref_read_l2_cache_enabled = true;
 		if (is_h264_category)
@@ -409,11 +402,8 @@ static u64 __calculate_decoder(struct vidc_bus_vote_data *d)
 	ddr.line_buffer_read =
 		fp_div(FP_INT(tnbr_per_lcu * lcu_per_frame * fps),
 			FP_INT(bps(1)));
-	/* This change is applicable for all IRIS3 targets,
-	 * but currently being done for IRIS3 with 2 pipes
-	 * only due to timeline constraints.
-	 */
-	if((num_vpp_pipes == 2) && (is_h264_category))
+
+	if (is_h264_category)
 		ddr.line_buffer_write = fp_div(ddr.line_buffer_read,FP_INT(2));
 	else
 		ddr.line_buffer_write = ddr.line_buffer_read;
