@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2002,2007-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <asm/cacheflush.h>
@@ -830,64 +831,6 @@ void kgsl_sharedmem_free(struct kgsl_memdesc *memdesc)
 		memdesc->ops->free(memdesc);
 }
 
-#if IS_ENABLED(CONFIG_QCOM_SECURE_BUFFER)
-void kgsl_free_secure_page(struct page *page)
-{
-	struct sg_table sgt;
-	struct scatterlist sgl;
-
-	if (!page)
-		return;
-
-	sgt.sgl = &sgl;
-	sgt.nents = 1;
-	sgt.orig_nents = 1;
-	sg_init_table(&sgl, 1);
-	sg_set_page(&sgl, page, PAGE_SIZE, 0);
-
-	unlock_sgt(&sgt);
-	__free_page(page);
-}
-
-struct page *kgsl_alloc_secure_page(void)
-{
-	struct page *page;
-	struct sg_table sgt;
-	struct scatterlist sgl;
-	int status;
-
-	page = alloc_page(GFP_KERNEL | __GFP_ZERO |
-			__GFP_NORETRY | __GFP_HIGHMEM);
-	if (!page)
-		return NULL;
-
-	sgt.sgl = &sgl;
-	sgt.nents = 1;
-	sgt.orig_nents = 1;
-	sg_init_table(&sgl, 1);
-	sg_set_page(&sgl, page, PAGE_SIZE, 0);
-
-	status = lock_sgt(&sgt, PAGE_SIZE);
-	if (status) {
-		if (status == -EADDRNOTAVAIL)
-			return NULL;
-
-		__free_page(page);
-		return NULL;
-	}
-	return page;
-}
-#else
-void kgsl_free_secure_page(struct page *page)
-{
-}
-
-struct page *kgsl_alloc_secure_page(void)
-{
-	return NULL;
-}
-#endif
-
 int
 kgsl_sharedmem_readl(const struct kgsl_memdesc *memdesc,
 			uint32_t *dst,
@@ -1134,37 +1077,6 @@ static void _kgsl_free_pages(struct kgsl_memdesc *memdesc, unsigned int pcount)
 }
 #endif
 
-static void kgsl_free_pages_from_sgt(struct kgsl_memdesc *memdesc)
-{
-	int i;
-	struct scatterlist *sg;
-
-	for_each_sg(memdesc->sgt->sgl, sg, memdesc->sgt->nents, i) {
-		/*
-		 * sg_alloc_table_from_pages() will collapse any physically
-		 * adjacent pages into a single scatterlist entry. We cannot
-		 * just call __free_pages() on the entire set since we cannot
-		 * ensure that the size is a whole order. Instead, free each
-		 * page or compound page group individually.
-		 */
-		struct page *p = sg_page(sg), *next;
-		unsigned int count;
-		unsigned int j = 0;
-
-		while (j < (sg->length/PAGE_SIZE)) {
-			count = 1 << compound_order(p);
-			next = nth_page(p, count);
-			kgsl_free_page(p);
-
-			p = next;
-			j += count;
-		}
-	}
-
-	if (memdesc->shmem_filp)
-		fput(memdesc->shmem_filp);
-}
-
 void kgsl_page_sync_for_device(struct device *dev, struct page *page,
 		size_t size)
 {
@@ -1273,66 +1185,6 @@ static int _kgsl_alloc_pages(struct kgsl_memdesc *memdesc,
 	return count;
 }
 
-#if IS_ENABLED(CONFIG_QCOM_SECURE_BUFFER)
-static void kgsl_free_secure_system_pages(struct kgsl_memdesc *memdesc)
-{
-	int i;
-	struct scatterlist *sg;
-	int ret = unlock_sgt(memdesc->sgt);
-
-	if (ret) {
-		/*
-		 * Unlock of the secure buffer failed. This buffer will
-		 * be stuck in secure side forever and is unrecoverable.
-		 * Give up on the buffer and don't return it to the
-		 * pool.
-		 */
-		pr_err("kgsl: secure buf unlock failed: gpuaddr: %llx size: %llx ret: %d\n",
-			memdesc->gpuaddr, memdesc->size, ret);
-		return;
-	}
-
-	atomic_long_sub(memdesc->size, &kgsl_driver.stats.secure);
-
-	for_each_sg(memdesc->sgt->sgl, sg, memdesc->sgt->nents, i) {
-		struct page *page = sg_page(sg);
-
-		__free_pages(page, get_order(PAGE_SIZE));
-	}
-
-	sg_free_table(memdesc->sgt);
-	kfree(memdesc->sgt);
-
-	memdesc->sgt = NULL;
-}
-
-static void kgsl_free_secure_pages(struct kgsl_memdesc *memdesc)
-{
-	int ret = unlock_sgt(memdesc->sgt);
-
-	if (ret) {
-		/*
-		 * Unlock of the secure buffer failed. This buffer will
-		 * be stuck in secure side forever and is unrecoverable.
-		 * Give up on the buffer and don't return it to the
-		 * pool.
-		 */
-		pr_err("kgsl: secure buf unlock failed: gpuaddr: %llx size: %llx ret: %d\n",
-			memdesc->gpuaddr, memdesc->size, ret);
-		return;
-	}
-
-	atomic_long_sub(memdesc->size, &kgsl_driver.stats.secure);
-
-	kgsl_free_pages_from_sgt(memdesc);
-
-	sg_free_table(memdesc->sgt);
-	kfree(memdesc->sgt);
-
-	memdesc->sgt = NULL;
-}
-#endif
-
 static void kgsl_free_pages(struct kgsl_memdesc *memdesc)
 {
 	kgsl_paged_unmap_kernel(memdesc);
@@ -1397,6 +1249,142 @@ static const struct kgsl_memdesc_ops kgsl_contiguous_ops = {
 };
 
 #if IS_ENABLED(CONFIG_QCOM_SECURE_BUFFER)
+static void kgsl_free_pages_from_sgt(struct kgsl_memdesc *memdesc)
+{
+	int i;
+	struct scatterlist *sg;
+
+	for_each_sg(memdesc->sgt->sgl, sg, memdesc->sgt->nents, i) {
+		/*
+		 * sg_alloc_table_from_pages() will collapse any physically
+		 * adjacent pages into a single scatterlist entry. We cannot
+		 * just call __free_pages() on the entire set since we cannot
+		 * ensure that the size is a whole order. Instead, free each
+		 * page or compound page group individually.
+		 */
+		struct page *p = sg_page(sg), *next;
+		unsigned int count;
+		unsigned int j = 0;
+
+		while (j < (sg->length/PAGE_SIZE)) {
+			count = 1 << compound_order(p);
+			next = nth_page(p, count);
+			kgsl_free_page(p);
+
+			p = next;
+			j += count;
+		}
+	}
+
+	if (memdesc->shmem_filp)
+		fput(memdesc->shmem_filp);
+}
+
+static void kgsl_free_secure_system_pages(struct kgsl_memdesc *memdesc)
+{
+	int i;
+	struct scatterlist *sg;
+	int ret = unlock_sgt(memdesc->sgt);
+
+	if (ret) {
+		/*
+		 * Unlock of the secure buffer failed. This buffer will
+		 * be stuck in secure side forever and is unrecoverable.
+		 * Give up on the buffer and don't return it to the
+		 * pool.
+		 */
+		pr_err("kgsl: secure buf unlock failed: gpuaddr: %llx size: %llx ret: %d\n",
+			memdesc->gpuaddr, memdesc->size, ret);
+		return;
+	}
+
+	atomic_long_sub(memdesc->size, &kgsl_driver.stats.secure);
+
+	for_each_sg(memdesc->sgt->sgl, sg, memdesc->sgt->nents, i) {
+		struct page *page = sg_page(sg);
+
+		__free_pages(page, get_order(PAGE_SIZE));
+	}
+
+	sg_free_table(memdesc->sgt);
+	kfree(memdesc->sgt);
+
+	memdesc->sgt = NULL;
+}
+
+static void kgsl_free_secure_pages(struct kgsl_memdesc *memdesc)
+{
+	int ret = unlock_sgt(memdesc->sgt);
+
+	if (ret) {
+		/*
+		 * Unlock of the secure buffer failed. This buffer will
+		 * be stuck in secure side forever and is unrecoverable.
+		 * Give up on the buffer and don't return it to the
+		 * pool.
+		 */
+		pr_err("kgsl: secure buf unlock failed: gpuaddr: %llx size: %llx ret: %d\n",
+			memdesc->gpuaddr, memdesc->size, ret);
+		return;
+	}
+
+	atomic_long_sub(memdesc->size, &kgsl_driver.stats.secure);
+
+	kgsl_free_pages_from_sgt(memdesc);
+
+	sg_free_table(memdesc->sgt);
+	kfree(memdesc->sgt);
+
+	memdesc->sgt = NULL;
+}
+
+void kgsl_free_secure_page(struct page *page)
+{
+	struct sg_table sgt;
+	struct scatterlist sgl;
+
+	if (!page)
+		return;
+
+	sgt.sgl = &sgl;
+	sgt.nents = 1;
+	sgt.orig_nents = 1;
+	sg_init_table(&sgl, 1);
+	sg_set_page(&sgl, page, PAGE_SIZE, 0);
+
+	unlock_sgt(&sgt);
+	__free_page(page);
+}
+
+struct page *kgsl_alloc_secure_page(void)
+{
+	struct page *page;
+	struct sg_table sgt;
+	struct scatterlist sgl;
+	int status;
+
+	page = alloc_page(GFP_KERNEL | __GFP_ZERO |
+			__GFP_NORETRY | __GFP_HIGHMEM);
+	if (!page)
+		return NULL;
+
+	sgt.sgl = &sgl;
+	sgt.nents = 1;
+	sgt.orig_nents = 1;
+	sg_init_table(&sgl, 1);
+	sg_set_page(&sgl, page, PAGE_SIZE, 0);
+
+	status = lock_sgt(&sgt, PAGE_SIZE);
+	if (status) {
+		if (status == -EADDRNOTAVAIL)
+			return NULL;
+
+		__free_page(page);
+		return NULL;
+	}
+	return page;
+}
+
 static const struct kgsl_memdesc_ops kgsl_secure_system_ops = {
 	.free = kgsl_free_secure_system_pages,
 	/* FIXME: Make sure vmflags / vmfault does the right thing here */
@@ -1407,6 +1395,15 @@ static const struct kgsl_memdesc_ops kgsl_secure_page_ops = {
 	/* FIXME: Make sure vmflags / vmfault does the right thing here */
 	.put_gpuaddr = kgsl_unmap_and_put_gpuaddr,
 };
+#else
+void kgsl_free_secure_page(struct page *page)
+{
+}
+
+struct page *kgsl_alloc_secure_page(void)
+{
+	return NULL;
+}
 #endif
 
 static const struct kgsl_memdesc_ops kgsl_page_ops = {
@@ -1528,6 +1525,18 @@ static int kgsl_alloc_secure_pages(struct kgsl_device *device,
 
 	return 0;
 }
+
+static int kgsl_allocate_secure(struct kgsl_device *device,
+		struct kgsl_memdesc *memdesc, u64 size, u64 flags, u32 priv)
+{
+	return kgsl_alloc_secure_pages(device, memdesc, size, flags, priv);
+}
+#else
+static int kgsl_allocate_secure(struct kgsl_device *device,
+		struct kgsl_memdesc *memdesc, u64 size, u64 flags, u32 priv)
+{
+	return -ENODEV;
+}
 #endif
 
 static int kgsl_alloc_pages(struct kgsl_device *device,
@@ -1613,20 +1622,6 @@ static int kgsl_alloc_contiguous(struct kgsl_device *device,
 
 	return ret;
 }
-
-#if IS_ENABLED(CONFIG_QCOM_SECURE_BUFFER)
-static int kgsl_allocate_secure(struct kgsl_device *device,
-		struct kgsl_memdesc *memdesc, u64 size, u64 flags, u32 priv)
-{
-	return kgsl_alloc_secure_pages(device, memdesc, size, flags, priv);
-}
-#else
-static int kgsl_allocate_secure(struct kgsl_device *device,
-		struct kgsl_memdesc *memdesc, u64 size, u64 flags, u32 priv)
-{
-	return -ENODEV;
-}
-#endif
 
 int kgsl_allocate_user(struct kgsl_device *device, struct kgsl_memdesc *memdesc,
 		u64 size, u64 flags, u32 priv)
