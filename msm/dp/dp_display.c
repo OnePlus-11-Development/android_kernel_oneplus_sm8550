@@ -3052,37 +3052,38 @@ static void dp_display_convert_to_dp_mode(struct dp_display *dp_display,
 
 	memset(dp_mode, 0, sizeof(*dp_mode));
 
-	free_dsc_blks = dp_display->max_dsc_count -
+	if (dp_panel->dsc_en) {
+		free_dsc_blks = dp_display->max_dsc_count -
 				dp->tot_dsc_blks_in_use +
 				dp_panel->dsc_blks_in_use;
-	DP_DEBUG_V("Before: in_use:%d, max:%d, free:%d\n",
+		DP_DEBUG_V("Before: in_use:%d, max:%d, free:%d\n",
 				dp->tot_dsc_blks_in_use,
 				dp_display->max_dsc_count, free_dsc_blks);
 
-	rc = msm_get_dsc_count(dp->priv, drm_mode->hdisplay,
-			&required_dsc_blks);
-	if (rc) {
-		DP_ERR("error getting dsc count. rc:%d\n", rc);
-		return;
-	}
+		rc = msm_get_dsc_count(dp->priv, drm_mode->hdisplay,
+				&required_dsc_blks);
+		if (rc) {
+			DP_ERR("error getting dsc count. rc:%d\n", rc);
+			return;
+		}
 
-	curr_dsc = dp_panel->dsc_blks_in_use;
-	dp->tot_dsc_blks_in_use -= dp_panel->dsc_blks_in_use;
-	dp_panel->dsc_blks_in_use = 0;
+		curr_dsc = dp_panel->dsc_blks_in_use;
+		dp->tot_dsc_blks_in_use -= dp_panel->dsc_blks_in_use;
+		dp_panel->dsc_blks_in_use = 0;
 
-	if (free_dsc_blks >= required_dsc_blks) {
-		dp_mode->capabilities |= DP_PANEL_CAPS_DSC;
-		new_dsc = max(curr_dsc, required_dsc_blks);
-		dp_panel->dsc_blks_in_use = new_dsc;
-		dp->tot_dsc_blks_in_use += new_dsc;
-	}
+		if (free_dsc_blks >= required_dsc_blks) {
+			dp_mode->capabilities |= DP_PANEL_CAPS_DSC;
+			new_dsc = max(curr_dsc, required_dsc_blks);
+			dp_panel->dsc_blks_in_use = new_dsc;
+			dp->tot_dsc_blks_in_use += new_dsc;
+		}
 
-	if (dp_mode->capabilities & DP_PANEL_CAPS_DSC)
 		DP_DEBUG_V("After: in_use:%d, max:%d, free:%d, req:%d, caps:0x%x\n",
 				dp->tot_dsc_blks_in_use,
 				dp_display->max_dsc_count,
 				free_dsc_blks, required_dsc_blks,
 				dp_mode->capabilities);
+	}
 
 	dp_panel->convert_to_dp_mode(dp_panel, drm_mode, dp_mode);
 }
