@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #if !defined(_ADRENO_TRACE_H) || defined(TRACE_HEADER_MULTI_READ)
@@ -123,6 +124,7 @@ TRACE_EVENT(adreno_cmdbatch_retired,
 		__field(unsigned int, dispatch_queue)
 		__field(uint64_t, submitted_to_rb)
 		__field(uint64_t, retired_on_gmu)
+		__field(uint64_t, active)
 		),
 	TP_fast_assign(
 		__entry->id = context->id;
@@ -140,10 +142,11 @@ TRACE_EVENT(adreno_cmdbatch_retired,
 		__entry->dispatch_queue = info->gmu_dispatch_queue;
 		__entry->submitted_to_rb = info->submitted_to_rb;
 		__entry->retired_on_gmu = info->retired_on_gmu;
+		__entry->active = info->active;
 		),
 
 	TP_printk(
-		"ctx=%u ctx_prio=%d ts=%u inflight=%d recovery=%s flags=%s start=%llu retire=%llu rb_id=%d, r/w=%x/%x, q_inflight=%d, dq_id=%u, submitted_to_rb=%llu retired_on_gmu=%llu",
+		"ctx=%u ctx_prio=%d ts=%u inflight=%d recovery=%s flags=%s start=%llu retire=%llu rb_id=%d, r/w=%x/%x, q_inflight=%d, dq_id=%u, submitted_to_rb=%llu retired_on_gmu=%llu active=%llu",
 			__entry->id, __entry->prio, __entry->timestamp,
 			__entry->inflight,
 			__entry->recovery ?
@@ -156,7 +159,8 @@ TRACE_EVENT(adreno_cmdbatch_retired,
 			__entry->rb_id, __entry->rptr, __entry->wptr,
 			__entry->q_inflight,
 			__entry->dispatch_queue,
-			__entry->submitted_to_rb, __entry->retired_on_gmu
+			__entry->submitted_to_rb, __entry->retired_on_gmu,
+			__entry->active
 	 )
 );
 
