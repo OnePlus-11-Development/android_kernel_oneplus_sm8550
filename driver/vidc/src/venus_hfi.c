@@ -2466,6 +2466,7 @@ int __load_fw(struct msm_vidc_core *core)
 	d_vpr_h("%s\n", __func__);
 	core->handoff_done = false;
 	core->hw_power_control = false;
+	core->cpu_watchdog = false;
 
 	trace_msm_v4l2_vidc_fw_load("START");
 	rc = __init_resources(core);
@@ -2546,6 +2547,8 @@ void __unload_fw(struct msm_vidc_core *core)
 	__venus_power_off(core);
 	__deinit_resources(core);
 
+	core->cpu_watchdog = false;
+
 	d_vpr_h("%s done\n", __func__);
 }
 
@@ -2555,6 +2558,8 @@ static int __response_handler(struct msm_vidc_core *core)
 
 	if (call_venus_op(core, watchdog, core, core->intr_status)) {
 		struct hfi_packet pkt = {.type = HFI_SYS_ERROR_WD_TIMEOUT};
+		core->cpu_watchdog = true;
+		d_vpr_e("%s: CPU WD error received\n", __func__);
 
 		return handle_system_error(core, &pkt);
 	}
