@@ -117,7 +117,6 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{FENCE_ID,                       "FENCE_ID"                   },
 	{FENCE_FD,                       "FENCE_FD"                   },
 	{TS_REORDER,                     "TS_REORDER"                 },
-	{SLICE_INTERFACE,                "SLICE_INTERFACE"            },
 	{HFLIP,                          "HFLIP"                      },
 	{VFLIP,                          "VFLIP"                      },
 	{ROTATION,                       "ROTATION"                   },
@@ -230,6 +229,7 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{OUTPUT_BUF_HOST_MAX_COUNT,      "OUTPUT_BUF_HOST_MAX_COUNT"  },
 	{DELIVERY_MODE,                  "DELIVERY_MODE"              },
 	{VUI_TIMING_INFO,                "VUI_TIMING_INFO"            },
+	{SLICE_DECODE,                   "SLICE_DECODE"               },
 	{INST_CAP_MAX,                   "INST_CAP_MAX"               },
 };
 
@@ -1645,7 +1645,6 @@ bool msm_vidc_allow_metadata_subscription(struct msm_vidc_inst *inst, u32 cap_id
 		case META_SEI_MASTERING_DISP:
 		case META_SEI_CLL:
 		case META_HDR10PLUS:
-		case META_PICTURE_TYPE:
 			if (!is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE)) {
 				i_vpr_h(inst,
 					"%s: cap: %24s not allowed as output buffer fence is disabled\n",

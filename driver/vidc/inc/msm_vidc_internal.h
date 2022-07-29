@@ -422,7 +422,6 @@ enum msm_vidc_inst_capability_type {
 	FENCE_ID,
 	FENCE_FD,
 	TS_REORDER,
-	SLICE_INTERFACE,
 	HFLIP,
 	VFLIP,
 	ROTATION,
@@ -539,6 +538,7 @@ enum msm_vidc_inst_capability_type {
 	OUTPUT_BUF_HOST_MAX_COUNT,
 	DELIVERY_MODE,
 	VUI_TIMING_INFO,
+	SLICE_DECODE,
 	/* place all leaf(no child) enums before this line */
 	INST_CAP_MAX,
 };
