@@ -192,11 +192,12 @@ int sde_fence_update_hw_fences_txq(struct sde_fence_context *ctx, bool vid_mode,
  * @ctl: hw ctl to update the input-fence and enable hw-fences
  * @debugfs_hw_fence: hw-fence timestamp debugfs value
  * @hw_mdp: pointer to hw_mdp to get timestamp registers
+ * @disable: bool to indicate if we should disable hw-fencing for this commit
  *
  * Returns: Zero on success, otherwise returns an error code.
  */
 int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *ctl, u32 debugfs_hw_fence,
-	struct sde_hw_mdp *hw_mdp);
+	struct sde_hw_mdp *hw_mdp, bool disable);
 
 /**
  * sde_fence_deinit - deinit fence container

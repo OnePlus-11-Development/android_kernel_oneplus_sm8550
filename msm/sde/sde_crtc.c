@@ -3855,6 +3855,8 @@ static bool _sde_crtc_wait_for_fences(struct drm_crtc *crtc)
 	bool input_hw_fences_enable;
 	struct sde_kms *sde_kms = _sde_crtc_get_kms(crtc);
 	int ret;
+	enum sde_crtc_vm_req vm_req;
+	bool disable_hw_fences = false;
 
 	SDE_DEBUG("\n");
 
@@ -3866,10 +3868,15 @@ static bool _sde_crtc_wait_for_fences(struct drm_crtc *crtc)
 
 	SDE_ATRACE_BEGIN("plane_wait_input_fence");
 
+	/* if this is the last frame on vm transition, disable hw fences */
+	vm_req = sde_crtc_get_property(to_sde_crtc_state(crtc->state), CRTC_PROP_VM_REQ_STATE);
+	if (vm_req == VM_REQ_RELEASE)
+		disable_hw_fences = true;
+
 	/* update ctl hw to wait for ipcc input signal before fetch */
 	if (test_bit(HW_FENCE_IN_FENCES_ENABLE, sde_crtc->hwfence_features_mask) &&
 			!sde_fence_update_input_hw_fence_signal(hw_ctl, sde_kms->debugfs_hw_fence,
-			sde_kms->hw_mdp))
+			sde_kms->hw_mdp, disable_hw_fences))
 		ipcc_input_signal_wait = true;
 
 	/* avoid hw-fences in first frame after timing engine enable */
