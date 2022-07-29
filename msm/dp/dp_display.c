@@ -2574,12 +2574,12 @@ static int dp_display_post_enable(struct dp_display *dp_display, void *panel)
 		dp_panel->audio->lane_count = dp->link->link_params.lane_count;
 		dp_panel->audio->on(dp_panel->audio);
 	}
-end:
-	dp->aux->state |= DP_STATE_CTRL_POWERED_ON;
 
+	dp->aux->state |= DP_STATE_CTRL_POWERED_ON;
 	complete_all(&dp->notification_comp);
-	mutex_unlock(&dp->session_lock);
 	DP_DEBUG("display post enable complete. state: 0x%x\n", dp->state);
+end:
+	mutex_unlock(&dp->session_lock);
 	SDE_EVT32_EXTERNAL(SDE_EVTLOG_FUNC_EXIT, dp->state);
 	return 0;
 }
