@@ -77,7 +77,47 @@ static const struct kernel_param_ops msm_vidc_debug_fops = {
 	.get = debug_level_get,
 };
 
+static int fw_dump_set(const char *val,
+	const struct kernel_param *kp)
+{
+	struct msm_vidc_core *core = NULL;
+	unsigned int dvalue;
+	int ret;
+
+	if (!kp || !kp->arg || !val) {
+		d_vpr_e("%s: Invalid params\n", __func__);
+		return -EINVAL;
+	}
+	core = *(struct msm_vidc_core **) kp->arg;
+
+	if (!core || !core->capabilities) {
+		d_vpr_e("%s: Invalid core/capabilities\n", __func__);
+		return -EINVAL;
+	}
+
+	ret = kstrtouint(val, 0, &dvalue);
+	if (ret)
+		return ret;
+
+	msm_vidc_fw_dump = dvalue;
+
+	d_vpr_h("fw dump %s\n", msm_vidc_fw_dump ? "Enabled" : "Disabled");
+
+	return 0;
+}
+
+static int fw_dump_get(char *buffer, const struct kernel_param *kp)
+{
+	return scnprintf(buffer, PAGE_SIZE, "%#x", msm_vidc_fw_dump);
+}
+
+static const struct kernel_param_ops msm_vidc_fw_dump_fops = {
+	.set = fw_dump_set,
+	.get = fw_dump_get,
+};
+
 module_param_cb(msm_vidc_debug, &msm_vidc_debug_fops, &g_core, 0644);
+module_param_cb(msm_vidc_fw_dump, &msm_vidc_fw_dump_fops, &g_core, 0644);
 
 bool msm_vidc_lossless_encode = !true;
 EXPORT_SYMBOL(msm_vidc_lossless_encode);
@@ -358,8 +398,6 @@ struct dentry* msm_vidc_debugfs_init_drv()
 			&msm_vidc_syscache_disable);
 	debugfs_create_bool("lossless_encoding", 0644, dir,
 			&msm_vidc_lossless_encode);
-	debugfs_create_bool("msm_vidc_fw_dump", 0644, dir,
-			&msm_vidc_fw_dump);
 	debugfs_create_u32("enable_bugon", 0644, dir,
 			&msm_vidc_enable_bugon);
 
