@@ -35,7 +35,12 @@
 	(ADRENO_DEVICE(KGSL_MMU_DEVICE(__mmu))->uche_gmem_base + \
 		ADRENO_DEVICE(KGSL_MMU_DEVICE(__mmu))->gpucore->gmem_size)
 
-#define KGSL_IOMMU_SVM_END32		(0xC0000000 - SZ_16M)
+#define KGSL_IOMMU_SVM_END32(__mmu) \
+	(test_bit(KGSL_MMU_64BIT, &(__mmu)->features) ? \
+		(test_bit(KGSL_MMU_IOPGTABLE, &(__mmu)->features) ? \
+		 KGSL_MEMSTORE_TOKEN_ADDRESS : \
+		 KGSL_IOMMU_GLOBAL_MEM_BASE64) : \
+	(0xC0000000 - SZ_16M))
 
 /*
  * Limit secure size to 256MB for 32bit kernels.

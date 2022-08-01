@@ -1290,10 +1290,7 @@ static struct kgsl_pagetable *kgsl_iommu_default_pagetable(struct kgsl_mmu *mmu)
 
 	if (test_bit(KGSL_MMU_64BIT, &mmu->features)) {
 		iommu_pt->base.compat_va_start = KGSL_IOMMU_SVM_BASE32(mmu);
-		if (test_bit(KGSL_MMU_IOPGTABLE, &mmu->features))
-			iommu_pt->base.compat_va_end = KGSL_MEMSTORE_TOKEN_ADDRESS;
-		else
-			iommu_pt->base.compat_va_end = KGSL_IOMMU_GLOBAL_MEM_BASE64;
+		iommu_pt->base.compat_va_end = KGSL_IOMMU_SVM_END32(mmu);
 		iommu_pt->base.va_start = KGSL_IOMMU_VA_BASE64;
 		iommu_pt->base.va_end = KGSL_IOMMU_VA_END64;
 
@@ -1379,13 +1376,13 @@ static struct kgsl_pagetable *kgsl_iopgtbl_pagetable(struct kgsl_mmu *mmu, u32 n
 
 	if (test_bit(KGSL_MMU_64BIT, &mmu->features)) {
 		pt->base.compat_va_start = KGSL_IOMMU_SVM_BASE32(mmu);
-		pt->base.compat_va_end = KGSL_MEMSTORE_TOKEN_ADDRESS;
+		pt->base.compat_va_end = KGSL_IOMMU_SVM_END32(mmu);
 		pt->base.va_start = KGSL_IOMMU_VA_BASE64;
 		pt->base.va_end = KGSL_IOMMU_VA_END64;
 
 		if (is_compat_task()) {
 			pt->base.svm_start = KGSL_IOMMU_SVM_BASE32(mmu);
-			pt->base.svm_end = KGSL_MEMSTORE_TOKEN_ADDRESS;
+			pt->base.svm_end = KGSL_IOMMU_SVM_END32(mmu);
 		} else {
 			pt->base.svm_start = KGSL_IOMMU_SVM_BASE64;
 			pt->base.svm_end = KGSL_IOMMU_SVM_END64;
@@ -1397,7 +1394,7 @@ static struct kgsl_pagetable *kgsl_iopgtbl_pagetable(struct kgsl_mmu *mmu, u32 n
 		pt->base.compat_va_start = pt->base.va_start;
 		pt->base.compat_va_end = pt->base.va_end;
 		pt->base.svm_start = KGSL_IOMMU_SVM_BASE32(mmu);
-		pt->base.svm_end = KGSL_IOMMU_SVM_END32;
+		pt->base.svm_end = KGSL_IOMMU_SVM_END32(mmu);
 	}
 
 	ret = kgsl_iopgtbl_alloc(&iommu->user_context, pt);
