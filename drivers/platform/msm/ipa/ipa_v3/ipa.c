@@ -11217,6 +11217,19 @@ static int ipa_smmu_ap_cb_probe(struct device *dev)
 		ipa3_iommu_map(cb->iommu_domain,
 				iova_p, pa_p, size_p,
 				IOMMU_READ | IOMMU_WRITE);
+
+		ipa3_ctx->per_stats_smem_pa = iova;
+		ipa3_ctx->per_stats_smem_va = smem_addr;
+
+		/**
+		 * Force type casting to perpheral stats structure.
+		 * First 2kB of the FILTER_TABLE SMEM is allocated for
+		 * Peripheral stats design. If there is a need to
+		 * use rest of FILTER_TABLE_SMEM it should be used from
+		 * smem_addr + 2KB offset
+		 */
+		ret = ipa3_peripheral_stats_init((union ipa_peripheral_stats *) smem_addr);
+		if(ret)	IPAERR("IPA Peripheral stats init failure = %d ", ret);
 	}
 
 	smmu_info.present[IPA_SMMU_CB_AP] = true;
