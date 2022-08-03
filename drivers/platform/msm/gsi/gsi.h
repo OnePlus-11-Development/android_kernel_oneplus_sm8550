@@ -328,6 +328,8 @@ struct gsi_per_props {
 	void *user_data;
 	int (*clk_status_cb)(void);
 	void (*enable_clk_bug_on)(void);
+	void (*vote_clk_cb)(void);
+	void (*unvote_clk_cb)(void);
 	bool skip_ieob_mask_wa;
 	bool tx_poll;
 };
