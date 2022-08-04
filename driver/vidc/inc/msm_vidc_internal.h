@@ -46,7 +46,8 @@
 #define MAX_VP9D_INST_COUNT     6
 /* TODO: move below macros to waipio.c */
 #define MAX_ENH_LAYER_HB        3
-#define MAX_HEVC_ENH_LAYER_SLIDING_WINDOW     5
+#define MAX_HEVC_VBR_ENH_LAYER_SLIDING_WINDOW         5
+#define MAX_HEVC_NON_VBR_ENH_LAYER_SLIDING_WINDOW     3
 #define MAX_AVC_ENH_LAYER_SLIDING_WINDOW      3
 #define MAX_AVC_ENH_LAYER_HYBRID_HP           5
 #define INVALID_DEFAULT_MARK_OR_USE_LTR      -1

@@ -1896,7 +1896,7 @@ static int msm_vidc_adjust_static_layer_count_and_type(struct msm_vidc_inst *ins
 			inst->hfi_layer_type = HFI_HIER_P_HYBRID_LTR;
 	}
 
-	/* sanitize layer count based on layer type and codec */
+	/* sanitize layer count based on layer type and codec, and rc type */
 	if (inst->hfi_layer_type == HFI_HIER_B) {
 		if (layer_count > MAX_ENH_LAYER_HB)
 			layer_count = MAX_ENH_LAYER_HB;
@@ -1907,9 +1907,14 @@ static int msm_vidc_adjust_static_layer_count_and_type(struct msm_vidc_inst *ins
 		if (inst->codec == MSM_VIDC_H264) {
 			if (layer_count > MAX_AVC_ENH_LAYER_SLIDING_WINDOW)
 				layer_count = MAX_AVC_ENH_LAYER_SLIDING_WINDOW;
-		} else {
-			if (layer_count > MAX_HEVC_ENH_LAYER_SLIDING_WINDOW)
-				layer_count = MAX_HEVC_ENH_LAYER_SLIDING_WINDOW;
+		} else if (inst->codec == MSM_VIDC_HEVC) {
+			if (inst->hfi_rc_type == HFI_RC_VBR_CFR) {
+				if (layer_count > MAX_HEVC_VBR_ENH_LAYER_SLIDING_WINDOW)
+					layer_count = MAX_HEVC_VBR_ENH_LAYER_SLIDING_WINDOW;
+			} else {
+				if (layer_count > MAX_HEVC_NON_VBR_ENH_LAYER_SLIDING_WINDOW)
+					layer_count = MAX_HEVC_NON_VBR_ENH_LAYER_SLIDING_WINDOW;
+			}
 		}
 	}
 
