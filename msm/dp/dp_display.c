@@ -2575,6 +2575,7 @@ static int dp_display_post_enable(struct dp_display *dp_display, void *panel)
 		dp_panel->audio->on(dp_panel->audio);
 	}
 
+	dp->aux->state &= ~DP_STATE_CTRL_POWERED_OFF;
 	dp->aux->state |= DP_STATE_CTRL_POWERED_ON;
 	complete_all(&dp->notification_comp);
 	DP_DEBUG("display post enable complete. state: 0x%x\n", dp->state);
@@ -2799,7 +2800,9 @@ static int dp_display_unprepare(struct dp_display *dp_display, void *panel)
 	}
 
 	dp_display_state_remove(DP_STATE_ENABLED);
-	dp->aux->state = DP_STATE_CTRL_POWERED_OFF;
+
+	dp->aux->state &= ~DP_STATE_CTRL_POWERED_ON;
+	dp->aux->state |= DP_STATE_CTRL_POWERED_OFF;
 
 	complete_all(&dp->notification_comp);
 
