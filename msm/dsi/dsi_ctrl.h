@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -573,13 +574,28 @@ int dsi_ctrl_set_roi(struct dsi_ctrl *dsi_ctrl, struct dsi_rect *roi,
  * dsi_ctrl_set_tpg_state() - enable/disable test pattern on the controller
  * @dsi_ctrl:          DSI controller handle.
  * @on:                enable/disable test pattern.
+ * @type:              type of test pattern to generate.
+ * @init_val:          seed value for generating test pattern.
+ * @pattern:           test pattern to generate.
  *
  * Test pattern can be enabled only after Video engine (for video mode panels)
  * or command engine (for cmd mode panels) is enabled.
  *
  * Return: error code.
  */
-int dsi_ctrl_set_tpg_state(struct dsi_ctrl *dsi_ctrl, bool on);
+int dsi_ctrl_set_tpg_state(struct dsi_ctrl *dsi_ctrl, bool on,
+		enum dsi_test_pattern type, u32 init_val,
+		enum dsi_ctrl_tpg_pattern pattern);
+
+/**
+ * dsi_ctrl_trigger_test_pattern() - trigger a command mode frame update with test pattern
+ * @dsi_ctrl:          DSI controller handle.
+ *
+ * Trigger a command mode frame update with chosen test pattern.
+ *
+ * Return: error code.
+ */
+int dsi_ctrl_trigger_test_pattern(struct dsi_ctrl *dsi_ctrl);
 
 /**
  * dsi_ctrl_transfer_prepare() - Set up a command transfer

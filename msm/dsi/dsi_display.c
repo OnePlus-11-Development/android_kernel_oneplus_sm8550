@@ -7763,7 +7763,10 @@ error:
 	return rc;
 }
 
-int dsi_display_set_tpg_state(struct dsi_display *display, bool enable)
+int dsi_display_set_tpg_state(struct dsi_display *display, bool enable,
+			enum dsi_test_pattern type,
+			u32 init_val,
+			enum dsi_ctrl_tpg_pattern pattern)
 {
 	int rc = 0;
 	int i;
@@ -7776,11 +7779,17 @@ int dsi_display_set_tpg_state(struct dsi_display *display, bool enable)
 
 	display_for_each_ctrl(i, display) {
 		ctrl = &display->ctrl[i];
-		rc = dsi_ctrl_set_tpg_state(ctrl->ctrl, enable);
+		rc = dsi_ctrl_set_tpg_state(ctrl->ctrl, enable, type, init_val, pattern);
 		if (rc) {
-			DSI_ERR("[%s] failed to set tpg state for host_%d\n",
-			       display->name, i);
+			DSI_ERR("[%s] failed to set tpg state for host_%d\n", display->name, i);
 			goto error;
+		}
+		if (enable && ctrl->ctrl->host_config.panel_mode == DSI_OP_CMD_MODE) {
+			rc = dsi_ctrl_trigger_test_pattern(ctrl->ctrl);
+			if (rc) {
+				DSI_ERR("[%s] failed to start tpg for host_%d\n", display->name, i);
+				goto error;
+			}
 		}
 	}
 
