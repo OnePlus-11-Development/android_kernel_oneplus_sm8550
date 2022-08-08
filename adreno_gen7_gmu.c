@@ -177,7 +177,7 @@ void gen7_load_rsc_ucode(struct adreno_device *adreno_dev)
 	_regwrite(rscc, GEN7_RSCC_HIDDEN_TCS_CMD0_DATA + RSC_CMD_OFFSET, 0);
 	_regwrite(rscc, GEN7_RSCC_HIDDEN_TCS_CMD0_ADDR + RSC_CMD_OFFSET, 0);
 	_regwrite(rscc, GEN7_RSCC_HIDDEN_TCS_CMD0_DATA + RSC_CMD_OFFSET * 2,
-		adreno_is_gen7_2_x(adreno_dev) ?  0x80000001 : 0x80000000);
+		adreno_is_gen7_2_x(adreno_dev) ?  0x80000021 : 0x80000000);
 	_regwrite(rscc, GEN7_RSCC_HIDDEN_TCS_CMD0_ADDR + RSC_CMD_OFFSET * 2, 0);
 	_regwrite(rscc, GEN7_RSCC_OVERRIDE_START_ADDR, 0);
 	_regwrite(rscc, GEN7_RSCC_PDC_SEQ_START_ADDR, 0x4520);
