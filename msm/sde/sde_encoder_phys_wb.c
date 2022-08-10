@@ -1024,8 +1024,8 @@ static int sde_encoder_phys_wb_atomic_check(struct sde_encoder_phys *phys_enc,
 	/* bypass check if commit with no framebuffer */
 	fb = sde_wb_connector_state_get_output_fb(conn_state);
 	if (!fb) {
-		SDE_DEBUG("[enc:%d wb:%d] no out fb\n", DRMID(phys_enc->parent), WBID(wb_enc));
-		return 0;
+		SDE_ERROR("[enc:%d wb:%d] no out fb\n", DRMID(phys_enc->parent), WBID(wb_enc));
+		return -EINVAL;
 	}
 
 	fmt = sde_get_sde_format_ext(fb->format->format, fb->modifier);
