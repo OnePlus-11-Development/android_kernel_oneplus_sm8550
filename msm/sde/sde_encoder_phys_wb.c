@@ -1426,22 +1426,31 @@ static void _sde_encoder_phys_wb_setup_dnsc_blur(struct sde_encoder_phys *phys_e
 	int i;
 	bool enable;
 
-	if (!sde_kms->catalog->dnsc_blur_count || !hw_dnsc_blur || !hw_pp
-			|| !hw_dnsc_blur->ops.setup_dnsc_blur)
+	if (!sde_kms->catalog->dnsc_blur_count || !hw_pp)
 		return;
 
 	sde_conn = to_sde_connector(wb_dev->connector);
 	sde_conn_state = to_sde_connector_state(wb_dev->connector->state);
 
-	if (sde_conn_state->dnsc_blur_count && !hw_dnsc_blur) {
+	if (sde_conn_state->dnsc_blur_count
+			&& (!hw_dnsc_blur || !hw_dnsc_blur->ops.setup_dnsc_blur)) {
 		SDE_ERROR("[enc:%d wb:%d] invalid config - dnsc_blur block not reserved\n",
 			DRMID(phys_enc->parent), WBID(wb_enc));
-		sde_kms->catalog->dnsc_blur_count = 0;
 		return;
 	}
 
 	/* swap between 0 & 1 lut idx on each config change for gaussian lut */
 	sde_conn_state->dnsc_blur_lut = 1 - sde_conn_state->dnsc_blur_lut;
+
+	/*
+	 * disable dnsc_blur case - safe to update the opmode as dynamic switching of
+	 * dnsc_blur hw block between WBs are not supported currently.
+	 */
+	if (hw_dnsc_blur && !sde_conn_state->dnsc_blur_count) {
+		hw_dnsc_blur->ops.setup_dnsc_blur(hw_dnsc_blur, NULL, 0);
+		SDE_EVT32(DRMID(phys_enc->parent), WBID(wb_enc), SDE_EVTLOG_FUNC_CASE1);
+		return;
+	}
 
 	for (i = 0; i < sde_conn_state->dnsc_blur_count; i++) {
 		cfg = &sde_conn_state->dnsc_blur_cfg[i];
