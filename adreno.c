@@ -19,7 +19,6 @@
 #include <linux/soc/qcom/llcc-qcom.h>
 #include <linux/trace.h>
 #include <soc/qcom/dcvs.h>
-#include <soc/qcom/socinfo.h>
 
 #include "adreno.h"
 #include "adreno_a3xx.h"
@@ -748,42 +747,18 @@ static int adreno_of_get_pwrlevels(struct adreno_device *adreno_dev,
 {
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	struct device_node *node, *child;
-	int feature_code, pcode;
-	u32 soc_code;
+	unsigned int bin = 0;
 
 	node = of_find_node_by_name(parent, "qcom,gpu-pwrlevel-bins");
 	if (node == NULL)
 		return adreno_of_get_legacy_pwrlevels(adreno_dev, parent);
 
-	feature_code = max_t(int, socinfo_get_feature_code(), SOCINFO_FC_UNKNOWN);
-	pcode = (feature_code >= SOCINFO_FC_Y0 && feature_code < SOCINFO_FC_INT_RESERVE) ?
-		max_t(int, socinfo_get_pcode(), SOCINFO_PCODE_UNKNOWN) : SOCINFO_PCODE_UNKNOWN;
-
-	soc_code = FIELD_PREP(GENMASK(31, 16), pcode) | FIELD_PREP(GENMASK(15, 0), feature_code);
-
 	for_each_child_of_node(node, child) {
-		bool match = false;
-		int tbl_size;
-		u32 bin = 0;
 
-		if (!of_property_read_u32(child, "qcom,speed-bin", &bin))
-			match = bin == device->speed_bin;
-		else if (of_get_property(child, "qcom,sku-codes", &tbl_size)) {
-			int num_codes = tbl_size / sizeof(u32);
-			int i;
-			u32 sku_code;
+		if (of_property_read_u32(child, "qcom,speed-bin", &bin))
+			continue;
 
-			for (i = 0; i < num_codes; i++) {
-				if (!of_property_read_u32_index(child, "qcom,sku-codes",
-								i, &sku_code) &&
-					(sku_code == 0 || soc_code == sku_code)) {
-					match = true;
-					break;
-				}
-			}
-		}
-
-		if (match) {
+		if (bin == device->speed_bin) {
 			int ret;
 
 			ret = adreno_of_parse_pwrlevels(adreno_dev, child);
@@ -807,8 +782,8 @@ static int adreno_of_get_pwrlevels(struct adreno_device *adreno_dev,
 	}
 
 	dev_err(&device->pdev->dev,
-		"No match for speed_bin:%d or soc_code:0x%x\n",
-		device->speed_bin, soc_code);
+		"GPU speed_bin:%d mismatch for bin:%d\n",
+		device->speed_bin, bin);
 	return -ENODEV;
 }
 
