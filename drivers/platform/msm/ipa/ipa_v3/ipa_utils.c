@@ -989,6 +989,8 @@ static const struct ipa_qmb_outstanding ipa3_qmb_outstanding
 	[IPA_4_7][IPA_QMB_INSTANCE_DDR]	        = {13, 12, 120},
 	[IPA_4_9][IPA_QMB_INSTANCE_DDR]	        = {16, 8, 120},
 	[IPA_4_11][IPA_QMB_INSTANCE_DDR] = {13, 12, 120},
+	[IPA_5_5][IPA_QMB_INSTANCE_DDR]		= {16, 12, 0},
+	[IPA_5_5][IPA_QMB_INSTANCE_PCIE]	= {16, 8, 0},
 };
 
 enum ipa_tx_instance {
