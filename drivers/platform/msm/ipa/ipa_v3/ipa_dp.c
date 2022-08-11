@@ -6220,6 +6220,7 @@ void __ipa_gsi_irq_rx_scedule_poll(struct ipa3_sys_context *sys)
 		napi_schedule(sys->napi_obj);
 	} else if (!clk_off &&
 		(sys->ep->client == IPA_CLIENT_APPS_WAN_LOW_LAT_DATA_CONS)) {
+		trace_ipa3_napi_schedule(sys->ep->client);
 		napi_schedule(&sys->napi_rx);
 	} else if (!clk_off &&
 		IPA_CLIENT_IS_LOW_LAT_CONS(sys->ep->client)) {
