@@ -25,7 +25,7 @@
 
 #define DSI_CTRL_DEFAULT_LABEL "MDSS DSI CTRL"
 
-#define DSI_CTRL_TX_TO_MS     200
+#define DSI_CTRL_TX_TO_MS     1200
 
 #define TO_ON_OFF(x) ((x) ? "ON" : "OFF")
 
