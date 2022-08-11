@@ -403,9 +403,14 @@ void msm_vidc_stop_streaming(struct vb2_queue *q)
 	if (rc)
 		goto unlock;
 
-	/* Input port streamoff - flush timestamps list*/
-	if (q->type == INPUT_MPLANE)
+	/* Input port streamoff */
+	if (q->type == INPUT_MPLANE) {
+		/* flush timestamps list */
 		msm_vidc_flush_ts(inst);
+
+		/* flush buffer_stats list */
+		msm_vidc_flush_buffer_stats(inst);
+	}
 
 	i_vpr_h(inst, "Streamoff: %s successful\n", v4l2_type_name(q->type));
 

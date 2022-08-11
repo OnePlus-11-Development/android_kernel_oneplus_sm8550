@@ -83,16 +83,6 @@ u64 msm_vidc_calc_freq_iris3(struct msm_vidc_inst *inst, u32 data_size)
 		if (inst->capabilities->cap[REQUEST_PREPROCESS].value)
 			vpp_cycles = vpp_cycles + vpp_cycles / 2;
 
-		if (res_is_greater_than(inst->crop.width, inst->crop.height,
-			4096 + (4096 >> 1), 2176 + (2176 >> 1))) {
-			/*
-			 * 8k@30 fps encode has a very low margin for sw/fw at 338MHz.
-			 * Hence, increase core clock little bit(5%) to move to the next
-			 * corner i.e., 366MHz.
-			 */
-			vpp_cycles = div_u64(vpp_cycles * 21, 20);
-		}
-
 		/* VSP */
 		/* bitrate is based on fps, scale it using operating rate */
 		operating_rate = inst->capabilities->cap[OPERATING_RATE].value >> 16;
@@ -123,15 +113,6 @@ u64 msm_vidc_calc_freq_iris3(struct msm_vidc_inst *inst, u32 data_size)
 
 		vsp_cycles += mbs_per_second * base_cycles;
 
-		if (res_is_greater_than(inst->crop.width, inst->crop.height,
-			4096 + (4096 >> 1), 2176 + (2176 >> 1))) {
-			/*
-			 * 8k@30 fps encode has a very low margin for sw/fw at 338MHz.
-			 * Hence, increase core clock little bit(5%) to move to the next
-			 * corner i.e., 366MHz.
-			 */
-			vsp_cycles = div_u64(vsp_cycles * 21, 20);
-		}
 	} else if (inst->domain == MSM_VIDC_DECODER) {
 		/* VPP */
 		vpp_cycles = mbs_per_second * inst->capabilities->cap[MB_CYCLES_VPP].value /
@@ -279,7 +260,7 @@ static u64 __calculate_decoder(struct vidc_bus_vote_data *d)
 	fp_t dpb_read_compression_factor, dpb_opb_scaling_ratio,
 		dpb_write_compression_factor, opb_write_compression_factor,
 		qsmmu_bw_overhead_factor;
-	bool is_h264_category = true;
+	bool is_h264_category = (d->codec == MSM_VIDC_H264) ? true : false;
 
 	/* Derived parameters */
 	int lcu_per_frame, collocated_bytes_per_lcu, tnbr_per_lcu;
@@ -338,13 +319,6 @@ static u64 __calculate_decoder(struct vidc_bus_vote_data *d)
 
 	num_vpp_pipes = d->num_vpp_pipes;
 
-	if (d->codec == MSM_VIDC_HEVC ||
-		d->codec == MSM_VIDC_HEIC ||
-		d->codec == MSM_VIDC_VP9) {
-		/* H264, VP8, MPEG2 use the same settings */
-		/* HEVC, VP9 use the same setting */
-		is_h264_category = false;
-	}
 	if (d->use_sys_cache) {
 		llc_ref_read_l2_cache_enabled = true;
 		if (is_h264_category)
@@ -428,11 +402,8 @@ static u64 __calculate_decoder(struct vidc_bus_vote_data *d)
 	ddr.line_buffer_read =
 		fp_div(FP_INT(tnbr_per_lcu * lcu_per_frame * fps),
 			FP_INT(bps(1)));
-	/* This change is applicable for all IRIS3 targets,
-	 * but currently being done for IRIS3 with 2 pipes
-	 * only due to timeline constraints.
-	 */
-	if((num_vpp_pipes == 2) && (is_h264_category))
+
+	if (is_h264_category)
 		ddr.line_buffer_write = fp_div(ddr.line_buffer_read,FP_INT(2));
 	else
 		ddr.line_buffer_write = ddr.line_buffer_read;

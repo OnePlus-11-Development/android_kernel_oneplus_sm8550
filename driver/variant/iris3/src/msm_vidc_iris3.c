@@ -110,6 +110,7 @@
 #define WRAPPER_DEBUG_BRIDGE_LPI_STATUS_IRIS3	(WRAPPER_BASE_OFFS_IRIS3 + 0x58)
 #define WRAPPER_IRIS_CPU_NOC_LPI_CONTROL	(WRAPPER_BASE_OFFS_IRIS3 + 0x5C)
 #define WRAPPER_IRIS_CPU_NOC_LPI_STATUS		(WRAPPER_BASE_OFFS_IRIS3 + 0x60)
+#define WRAPPER_CORE_POWER_STATUS		(WRAPPER_BASE_OFFS_IRIS3 + 0x80)
 #define WRAPPER_CORE_CLOCK_CONFIG_IRIS3		(WRAPPER_BASE_OFFS_IRIS3 + 0x88)
 
 /*
@@ -448,14 +449,47 @@ static int __setup_ucregion_memory_map_iris3(struct msm_vidc_core *vidc_core)
 	return 0;
 }
 
+static bool is_iris3_hw_power_collapsed(struct msm_vidc_core *core)
+{
+	int rc = 0;
+	u32 value = 0, pwr_status = 0;
+
+	rc = __read_register(core, WRAPPER_CORE_POWER_STATUS, &value);
+	if (rc)
+		return false;
+
+	/* if BIT(1) is 1 then video hw power is on else off */
+	pwr_status = value & BIT(1);
+	return pwr_status ? false : true;
+}
+
 static int __power_off_iris3_hardware(struct msm_vidc_core *core)
 {
 	int rc = 0, i;
 	u32 value = 0;
+	bool pwr_collapsed = false;
 
+	/*
+	 * Incase hw power control is enabled, when CPU WD occurred, check for power
+	 * status to decide on executing NOC reset sequence before disabling power.
+	 * If there is no CPU WD and hw_power_control is enabled, fw is expected
+	 * to power collapse video hw always.
+	 */
 	if (core->hw_power_control) {
-		d_vpr_h("%s: hardware power control enabled\n", __func__);
-		goto disable_power;
+		pwr_collapsed = is_iris3_hw_power_collapsed(core);
+		if (core->cpu_watchdog) {
+			if (pwr_collapsed) {
+				d_vpr_e("%s: CPU WD and video hw power collapsed\n", __func__);
+				goto disable_power;
+			} else {
+				d_vpr_e("%s: CPU WD and video hw is power ON\n", __func__);
+			}
+		} else {
+			if (!pwr_collapsed)
+				d_vpr_e("%s: video hw is not power collapsed\n", __func__);
+
+			goto disable_power;
+		}
 	}
 
 	/*

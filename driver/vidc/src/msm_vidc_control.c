@@ -3020,6 +3020,41 @@ int msm_vidc_adjust_dec_outbuf_fence(void *instance, struct v4l2_ctrl *ctrl)
 	return 0;
 }
 
+int msm_vidc_adjust_dec_slice_mode(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst_capability *capability;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	u32 adjusted_value = 0;
+	s32 low_latency = -1;
+	s32 picture_order = -1;
+	s32 outbuf_fence = V4L2_MPEG_VIDC_META_DISABLE;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val : capability->cap[SLICE_DECODE].value;
+
+	if (msm_vidc_get_parent_value(inst, SLICE_DECODE, LOWLATENCY_MODE,
+		&low_latency, __func__) ||
+	    msm_vidc_get_parent_value(inst, SLICE_DECODE, OUTPUT_ORDER,
+		&picture_order, __func__) ||
+	    msm_vidc_get_parent_value(inst, SLICE_DECODE, META_OUTBUF_FENCE,
+		&outbuf_fence, __func__))
+		return -EINVAL;
+
+	if (!low_latency || !picture_order ||
+	    !is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE))
+		adjusted_value = V4L2_MPEG_MSM_VIDC_DISABLE;
+
+	msm_vidc_update_cap_value(inst, SLICE_DECODE,
+		adjusted_value, __func__);
+
+	return 0;
+}
+
 int msm_vidc_adjust_delivery_mode(void *instance, struct v4l2_ctrl *ctrl)
 {
 	struct msm_vidc_inst_capability *capability;
@@ -4702,6 +4737,36 @@ int msm_vidc_set_pipe(void *instance,
 	pipe = inst->capabilities->cap[PIPE].value;
 	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_U32,
 			&pipe, sizeof(u32), __func__);
+	if (rc)
+		return rc;
+
+	return rc;
+}
+
+int msm_vidc_set_vui_timing_info(void *instance,
+	enum msm_vidc_inst_capability_type cap_id)
+{
+	int rc = 0;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+	u32 hfi_value;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	/*
+	 * hfi is HFI_PROP_DISABLE_VUI_TIMING_INFO and v4l2 cap is
+	 * V4L2_CID_MPEG_VIDC_VUI_TIMING_INFO and hence reverse
+	 * the hfi_value from cap_id value.
+	 */
+	if (inst->capabilities->cap[cap_id].value == V4L2_MPEG_MSM_VIDC_ENABLE)
+		hfi_value = 0;
+	else
+		hfi_value = 1;
+
+	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_U32,
+		&hfi_value, sizeof(u32), __func__);
 	if (rc)
 		return rc;
 

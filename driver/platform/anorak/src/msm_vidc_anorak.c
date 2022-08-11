@@ -390,10 +390,14 @@ static struct msm_platform_inst_capability instance_cap_data_anorak[] = {
 		V4L2_CID_MPEG_VIDC_SUPERFRAME, 0,
 		CAP_FLAG_NONE},
 
-	{SLICE_INTERFACE, DEC, CODECS_ALL,
-		0, 0, 0, 0,
+	{SLICE_DECODE, DEC, H264|HEVC|AV1,
+		V4L2_MPEG_MSM_VIDC_DISABLE,
+		V4L2_MPEG_MSM_VIDC_ENABLE,
+		1,
+		V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_CID_MPEG_VIDEO_DECODER_SLICE_INTERFACE,
-		0},
+		HFI_PROP_SLICE_DECODE,
+		CAP_FLAG_INPUT_PORT},
 
 	{HEADER_MODE, ENC, CODECS_ALL,
 		V4L2_MPEG_VIDEO_HEADER_MODE_SEPARATE,
@@ -410,6 +414,14 @@ static struct msm_platform_inst_capability instance_cap_data_anorak[] = {
 		V4L2_MPEG_MSM_VIDC_ENABLE,
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_CID_MPEG_VIDEO_PREPEND_SPSPPS_TO_IDR},
+
+	{VUI_TIMING_INFO, ENC, CODECS_ALL,
+		V4L2_MPEG_MSM_VIDC_DISABLE,
+		V4L2_MPEG_MSM_VIDC_ENABLE,
+		1, V4L2_MPEG_MSM_VIDC_DISABLE,
+		V4L2_CID_MPEG_VIDC_VUI_TIMING_INFO,
+		HFI_PROP_DISABLE_VUI_TIMING_INFO,
+		CAP_FLAG_OUTPUT_PORT},
 
 	{WITHOUT_STARTCODE, ENC, CODECS_ALL,
 		V4L2_MPEG_MSM_VIDC_DISABLE,
@@ -496,6 +508,9 @@ static struct msm_platform_inst_capability instance_cap_data_anorak[] = {
 
 	{LOWLATENCY_MAX_BITRATE, ENC, H264|HEVC, 0,
 		70000000, 1, 70000000},
+
+	{NUM_COMV, DEC, CODECS_ALL,
+		0, INT_MAX, 1, 0},
 
 	{LOSSLESS, ENC, HEVC,
 		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,
@@ -1455,6 +1470,11 @@ static struct msm_platform_inst_capability instance_cap_data_anorak[] = {
 		HFI_PROP_AV1_DRAP_CONFIG,
 		CAP_FLAG_INPUT_PORT},
 
+	{LAST_FLAG_EVENT_ENABLE, DEC, CODECS_ALL,
+		V4L2_MPEG_MSM_VIDC_DISABLE, V4L2_MPEG_MSM_VIDC_ENABLE,
+		1, V4L2_MPEG_MSM_VIDC_DISABLE,
+		V4L2_CID_MPEG_VIDC_LAST_FLAG_EVENT_ENABLE},
+
 	{META_BITSTREAM_RESOLUTION, DEC, AV1,
 		V4L2_MPEG_VIDC_META_DISABLE,
 		V4L2_MPEG_VIDC_META_ENABLE | V4L2_MPEG_VIDC_META_RX_INPUT |
@@ -1824,7 +1844,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_anor
 
 	{META_OUTBUF_FENCE, DEC, H264|HEVC|VP9|AV1,
 		{OUTPUT_ORDER},
-		{LOWLATENCY_MODE},
+		{LOWLATENCY_MODE, SLICE_DECODE},
 		msm_vidc_adjust_dec_outbuf_fence,
 		NULL},
 
@@ -1851,6 +1871,12 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_anor
 		{INPUT_BUF_HOST_MAX_COUNT, OUTPUT_BUF_HOST_MAX_COUNT},
 		NULL,
 		NULL},
+
+	{SLICE_DECODE, DEC, H264|HEVC|AV1,
+		{LOWLATENCY_MODE, META_OUTBUF_FENCE, OUTPUT_ORDER},
+		{0},
+		msm_vidc_adjust_dec_slice_mode,
+		msm_vidc_set_u32},
 
 	{HEADER_MODE, ENC, CODECS_ALL,
 		{0},
@@ -1971,7 +1997,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_anor
 
 	{LOWLATENCY_MODE, DEC, H264|HEVC|VP9|AV1,
 		{META_OUTBUF_FENCE},
-		{STAGE},
+		{STAGE, SLICE_DECODE},
 		msm_vidc_adjust_dec_lowlatency_mode,
 		NULL},
 
@@ -2268,7 +2294,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_anor
 
 	{OUTPUT_ORDER, DEC, H264|HEVC|VP9|AV1,
 		{THUMBNAIL_MODE, DISPLAY_DELAY, DISPLAY_DELAY_ENABLE},
-		{META_OUTBUF_FENCE},
+		{META_OUTBUF_FENCE, SLICE_DECODE},
 		msm_vidc_adjust_output_order,
 		msm_vidc_set_u32},
 
@@ -2418,6 +2444,12 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_anor
 		{SLICE_MODE}, {LOWLATENCY_MODE, OUTPUT_BUF_HOST_MAX_COUNT},
 		msm_vidc_adjust_delivery_mode,
 		msm_vidc_set_u32},
+
+	{VUI_TIMING_INFO, ENC, CODECS_ALL,
+		{0},
+		{0},
+		NULL,
+		msm_vidc_set_vui_timing_info},
 };
 
 /* Default UBWC config for LPDDR5 */

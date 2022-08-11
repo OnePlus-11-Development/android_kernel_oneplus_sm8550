@@ -843,8 +843,6 @@ static int msm_vidc_populate_context_bank(struct device *dev,
 	}
 
 	INIT_LIST_HEAD(&cb->list);
-	list_add_tail(&cb->list, &core->dt->context_banks);
-
 	rc = of_property_read_string(np, "label", &cb->name);
 	if (rc) {
 		d_vpr_h("Failed to read cb label from device tree\n");
@@ -874,13 +872,16 @@ static int msm_vidc_populate_context_bank(struct device *dev,
 		goto err_setup_cb;
 	}
 
+	core_lock(core, __func__);
+	list_add_tail(&cb->list, &core->dt->context_banks);
+	core_unlock(core, __func__);
+
 	iommu_set_fault_handler(cb->domain,
 		msm_vidc_smmu_fault_handler, (void *)core);
 
 	return 0;
 
 err_setup_cb:
-	list_del(&cb->list);
 	return rc;
 }
 

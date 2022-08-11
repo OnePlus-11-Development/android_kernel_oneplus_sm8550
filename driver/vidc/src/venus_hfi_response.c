@@ -856,6 +856,9 @@ static int handle_input_buffer(struct msm_vidc_inst *inst,
 	print_vidc_buffer(VIDC_HIGH, "high", "dqbuf", inst, buf);
 	msm_vidc_update_stats(inst, buf, MSM_VIDC_DEBUGFS_EVENT_EBD);
 
+	/* etd: update end timestamp and flags in stats entry */
+	msm_vidc_remove_buffer_stats(inst, buf);
+
 	return rc;
 }
 
@@ -1018,6 +1021,9 @@ static int handle_output_buffer(struct msm_vidc_inst *inst,
 
 	print_vidc_buffer(VIDC_HIGH, "high", "dqbuf", inst, buf);
 	msm_vidc_update_stats(inst, buf, MSM_VIDC_DEBUGFS_EVENT_FBD);
+
+	/* fbd: print stats and remove entry */
+	msm_vidc_remove_buffer_stats(inst, buf);
 
 	return rc;
 }

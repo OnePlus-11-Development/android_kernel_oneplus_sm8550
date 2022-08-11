@@ -2209,6 +2209,11 @@ void venus_hfi_interface_queues_deinit(struct msm_vidc_core *core)
 
 	d_vpr_h("%s()\n", __func__);
 
+	if (!core->iface_q_table.align_virtual_addr) {
+		d_vpr_h("%s: queues already deallocated\n", __func__);
+		return;
+	}
+
 	msm_vidc_memory_unmap(core, &core->iface_q_table.map);
 	msm_vidc_memory_free(core, &core->iface_q_table.alloc);
 	msm_vidc_memory_unmap(core, &core->sfr.map);
@@ -2239,6 +2244,11 @@ int venus_hfi_interface_queues_init(struct msm_vidc_core *core)
 	u32 i;
 
 	d_vpr_h("%s()\n", __func__);
+
+	if (core->iface_q_table.align_virtual_addr) {
+		d_vpr_h("%s: queues already allocated\n", __func__);
+		return 0;
+	}
 
 	memset(&alloc, 0, sizeof(alloc));
 	alloc.type       = MSM_VIDC_BUF_QUEUE;
@@ -2456,6 +2466,7 @@ int __load_fw(struct msm_vidc_core *core)
 	d_vpr_h("%s\n", __func__);
 	core->handoff_done = false;
 	core->hw_power_control = false;
+	core->cpu_watchdog = false;
 
 	trace_msm_v4l2_vidc_fw_load("START");
 	rc = __init_resources(core);
@@ -2499,10 +2510,13 @@ int __load_fw(struct msm_vidc_core *core)
 
 	/* configure interface_queues memory to firmware */
 	rc = call_venus_op(core, setup_ucregion_memmap, core);
-	if (rc)
-		return rc;
+	if (rc) {
+		d_vpr_e("%s: failed to setup ucregion\n");
+		goto fail_setup_ucregion;
+	}
 
 	return rc;
+fail_setup_ucregion:
 fail_protect_mem:
 	if (core->dt->fw_cookie)
 		qcom_scm_pas_shutdown(core->dt->fw_cookie);
@@ -2533,6 +2547,8 @@ void __unload_fw(struct msm_vidc_core *core)
 	__venus_power_off(core);
 	__deinit_resources(core);
 
+	core->cpu_watchdog = false;
+
 	d_vpr_h("%s done\n", __func__);
 }
 
@@ -2542,6 +2558,8 @@ static int __response_handler(struct msm_vidc_core *core)
 
 	if (call_venus_op(core, watchdog, core, core->intr_status)) {
 		struct hfi_packet pkt = {.type = HFI_SYS_ERROR_WD_TIMEOUT};
+		core->cpu_watchdog = true;
+		d_vpr_e("%s: CPU WD error received\n", __func__);
 
 		return handle_system_error(core, &pkt);
 	}
@@ -2700,6 +2718,10 @@ int venus_hfi_core_init(struct msm_vidc_core *core)
 	rc = __strict_check(core, __func__);
 	if (rc)
 		return rc;
+
+	rc = venus_hfi_interface_queues_init(core);
+	if (rc)
+		goto error;
 
 	rc = __load_fw(core);
 	if (rc)

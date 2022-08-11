@@ -117,7 +117,6 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{FENCE_ID,                       "FENCE_ID"                   },
 	{FENCE_FD,                       "FENCE_FD"                   },
 	{TS_REORDER,                     "TS_REORDER"                 },
-	{SLICE_INTERFACE,                "SLICE_INTERFACE"            },
 	{HFLIP,                          "HFLIP"                      },
 	{VFLIP,                          "VFLIP"                      },
 	{ROTATION,                       "ROTATION"                   },
@@ -229,6 +228,8 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{INPUT_BUF_HOST_MAX_COUNT,       "INPUT_BUF_HOST_MAX_COUNT"   },
 	{OUTPUT_BUF_HOST_MAX_COUNT,      "OUTPUT_BUF_HOST_MAX_COUNT"  },
 	{DELIVERY_MODE,                  "DELIVERY_MODE"              },
+	{VUI_TIMING_INFO,                "VUI_TIMING_INFO"            },
+	{SLICE_DECODE,                   "SLICE_DECODE"               },
 	{INST_CAP_MAX,                   "INST_CAP_MAX"               },
 };
 
@@ -481,6 +482,25 @@ void print_vb2_buffer(const char *str, struct msm_vidc_inst *inst,
 	}
 }
 
+static void print_buffer_stats(u32 tag, const char *tag_str, struct msm_vidc_inst *inst,
+		struct msm_vidc_buffer_stats *stats)
+{
+	if (!tag_str || !inst || !stats)
+		return;
+
+	/* skip flushed buffer stats */
+	if (!stats->etb_time_ms || !stats->ebd_time_ms ||
+	    !stats->ftb_time_ms || !stats->fbd_time_ms)
+		return;
+
+	dprintk_inst(tag, tag_str, inst,
+		"f.no %4u ts %16llu (etb ebd ftb fbd)ms %6u %6u %6u %6u (ebd-etb fbd-etb etb-ftb)ms %4d %4d %4d size %8u attr %#x\n",
+		stats->frame_num, stats->timestamp, stats->etb_time_ms, stats->ebd_time_ms,
+		stats->ftb_time_ms, stats->fbd_time_ms, stats->ebd_time_ms - stats->etb_time_ms,
+		stats->fbd_time_ms - stats->etb_time_ms, stats->etb_time_ms - stats->ftb_time_ms,
+		stats->data_size, stats->flags);
+}
+
 static void __fatal_error(bool fatal)
 {
 	WARN_ON(fatal);
@@ -496,6 +516,135 @@ static int __strict_check(struct msm_vidc_core *core, const char *function)
 		d_vpr_e("%s: strict check failed\n", function);
 
 	return fatal ? -EINVAL : 0;
+}
+
+static u32 msm_vidc_get_buffer_stats_flag(struct msm_vidc_inst *inst)
+{
+	u32 flags = 0;
+
+	if (inst->hfi_frame_info.data_corrupt)
+		flags |= MSM_VIDC_STATS_FLAG_CORRUPT;
+
+	if (inst->hfi_frame_info.overflow)
+		flags |= MSM_VIDC_STATS_FLAG_OVERFLOW;
+
+	if (inst->hfi_frame_info.no_output)
+		flags |= MSM_VIDC_STATS_FLAG_NO_OUTPUT;
+
+	return flags;
+}
+
+int msm_vidc_add_buffer_stats(struct msm_vidc_inst *inst,
+	struct msm_vidc_buffer *buf)
+{
+	struct msm_vidc_buffer_stats *stats = NULL;
+
+	if (!inst || !buf) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	/* stats applicable only to input & output buffers */
+	if (buf->type != MSM_VIDC_BUF_INPUT && buf->type != MSM_VIDC_BUF_OUTPUT)
+		return -EINVAL;
+
+	/* update start timestamp */
+	buf->start_time_ms = (ktime_get_ns() / 1000 - inst->initial_time_us) / 1000;
+
+	/* add buffer stats only in ETB path */
+	if (buf->type != MSM_VIDC_BUF_INPUT)
+		return 0;
+
+	stats = msm_memory_pool_alloc(inst, MSM_MEM_POOL_BUF_STATS);
+	if (!stats)
+		return -ENOMEM;
+	INIT_LIST_HEAD(&stats->list);
+	list_add_tail(&stats->list, &inst->buffer_stats_list);
+
+	stats->frame_num = inst->debug_count.etb;
+	stats->timestamp = buf->timestamp;
+	stats->etb_time_ms = buf->start_time_ms;
+	if (is_decode_session(inst))
+		stats->data_size =  buf->data_size;
+
+	return 0;
+}
+
+int msm_vidc_remove_buffer_stats(struct msm_vidc_inst *inst,
+	struct msm_vidc_buffer *buf)
+{
+	struct msm_vidc_buffer_stats *stats = NULL, *dummy_stats = NULL;
+
+	if (!inst || !buf) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	/* stats applicable only to input & output buffers */
+	if (buf->type != MSM_VIDC_BUF_INPUT && buf->type != MSM_VIDC_BUF_OUTPUT)
+		return -EINVAL;
+
+	/* update end timestamp */
+	buf->end_time_ms = (ktime_get_ns() / 1000 - inst->initial_time_us) / 1000;
+
+	list_for_each_entry_safe(stats, dummy_stats, &inst->buffer_stats_list, list) {
+		if (stats->timestamp == buf->timestamp) {
+			if (buf->type == MSM_VIDC_BUF_INPUT) {
+				/* skip - already updated(multiple input - single output case) */
+				if (stats->ebd_time_ms)
+					continue;
+
+				/* ebd: update end ts and return */
+				stats->ebd_time_ms = buf->end_time_ms;
+				stats->flags |= msm_vidc_get_buffer_stats_flag(inst);
+
+				/* remove entry - no output attached */
+				if (stats->flags & MSM_VIDC_STATS_FLAG_NO_OUTPUT) {
+					list_del_init(&stats->list);
+					msm_memory_pool_free(inst, stats);
+				}
+			} else if (buf->type == MSM_VIDC_BUF_OUTPUT) {
+				/* skip - ebd not arrived(single input - multiple output case) */
+				if (!stats->ebd_time_ms)
+					continue;
+
+				/* fbd: update end ts and remove entry */
+				list_del_init(&stats->list);
+				stats->ftb_time_ms = buf->start_time_ms;
+				stats->fbd_time_ms = buf->end_time_ms;
+				stats->flags |= msm_vidc_get_buffer_stats_flag(inst);
+				if (is_encode_session(inst))
+					stats->data_size = buf->data_size;
+
+				print_buffer_stats(VIDC_STAT, "stat", inst, stats);
+
+				msm_memory_pool_free(inst, stats);
+			}
+		}
+	}
+
+	return 0;
+}
+
+int msm_vidc_flush_buffer_stats(struct msm_vidc_inst *inst)
+{
+	struct msm_vidc_buffer_stats *stats, *dummy_stats;
+
+	if (!inst) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	i_vpr_l(inst, "%s: flush buffer_stats list\n", __func__);
+	list_for_each_entry_safe(stats, dummy_stats, &inst->buffer_stats_list, list) {
+		list_del_init(&stats->list);
+		msm_memory_pool_free(inst, stats);
+	}
+
+	/* reset initial ts as well to avoid huge delta */
+	inst->initial_time_us = ktime_get_ns() / 1000;
+
+	return 0;
 }
 
 enum msm_vidc_buffer_type v4l2_type_to_driver(u32 type, const char *func)
@@ -1496,7 +1645,6 @@ bool msm_vidc_allow_metadata_subscription(struct msm_vidc_inst *inst, u32 cap_id
 		case META_SEI_MASTERING_DISP:
 		case META_SEI_CLL:
 		case META_HDR10PLUS:
-		case META_PICTURE_TYPE:
 			if (!is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE)) {
 				i_vpr_h(inst,
 					"%s: cap: %24s not allowed as output buffer fence is disabled\n",
@@ -3501,7 +3649,7 @@ void msm_vidc_print_stats(struct msm_vidc_inst *inst)
 	achieved_fps = (fbd * 1000) / dt_ms;
 	bitrate_kbps = (inst->stats.data_size * 8 * 1000) / (dt_ms * 1024);
 
-	i_vpr_hp(inst,
+	i_vpr_hs(inst,
 		"stats: counts (etb,ebd,ftb,fbd): %u %u %u %u (total %llu %llu %llu %llu), achieved bitrate %lldKbps fps %u/s, frame rate %u, operating rate %u, priority %u, dt %ums\n",
 		etb, ebd, ftb, fbd, inst->debug_count.etb, inst->debug_count.ebd,
 		inst->debug_count.ftb, inst->debug_count.fbd,
@@ -3712,6 +3860,9 @@ int msm_vidc_queue_buffer_single(struct msm_vidc_inst *inst, struct vb2_buffer *
 	buf = msm_vidc_get_driver_buf(inst, vb2);
 	if (!buf)
 		return -EINVAL;
+
+	/* update start timestamp */
+	msm_vidc_add_buffer_stats(inst, buf);
 
 	if (is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE) &&
 		is_output_buffer(buf->type)) {
@@ -5677,6 +5828,7 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 	struct msm_vidc_timestamp *ts, *dummy_ts;
 	struct msm_memory_dmabuf *dbuf, *dummy_dbuf;
 	struct msm_vidc_input_timer *timer, *dummy_timer;
+	struct msm_vidc_buffer_stats *stats, *dummy_stats;
 	struct msm_vidc_inst_cap_entry *entry, *dummy_entry;
 	struct msm_vidc_fence *fence, *dummy_fence;
 
@@ -5763,7 +5915,14 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 	list_for_each_entry_safe(timer, dummy_timer, &inst->input_timer_list, list) {
 		i_vpr_e(inst, "%s: removing input_timer %lld\n",
 			__func__, timer->time_us);
+		list_del(&timer->list);
 		msm_memory_pool_free(inst, timer);
+	}
+
+	list_for_each_entry_safe(stats, dummy_stats, &inst->buffer_stats_list, list) {
+		print_buffer_stats(VIDC_ERR, "err ", inst, stats);
+		list_del(&stats->list);
+		msm_memory_pool_free(inst, stats);
 	}
 
 	list_for_each_entry_safe(dbuf, dummy_dbuf, &inst->dmabuf_tracker, list) {
