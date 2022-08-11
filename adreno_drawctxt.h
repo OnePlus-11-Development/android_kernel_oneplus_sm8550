@@ -75,6 +75,8 @@ struct adreno_context {
 
 	struct list_head active_node;
 	unsigned long active_time;
+	/** @gmu_context_queue: Queue to dispatch submissions to GMU */
+	struct kgsl_memdesc gmu_context_queue;
 };
 
 /* Flag definitions for flag field in adreno_context */

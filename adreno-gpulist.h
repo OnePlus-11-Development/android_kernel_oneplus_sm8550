@@ -1504,6 +1504,7 @@ static const struct adreno_a6xx_core adreno_gpu_core_a610 = {
 		.uche_gmem_alignment = SZ_1M,
 		.gmem_size = (SZ_128K + SZ_4K),
 		.bus_width = 32,
+		.snapshot_size = SZ_1M,
 	},
 	.prim_fifo_threshold = 0x00080000,
 	.sqefw_name = "a630_sqe.fw",
@@ -2068,13 +2069,13 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_2_1 = {
 		.compatible = "qcom,adreno-gpu-gen7-2-1",
 		.features = ADRENO_APRIV | ADRENO_IOCOHERENT | ADRENO_IFPC |
 				ADRENO_CONTENT_PROTECTION | ADRENO_LPAC |
-				ADRENO_BCL | ADRENO_L3_VOTE,
+				ADRENO_BCL | ADRENO_L3_VOTE | ADRENO_ACD,
 		.gpudev = &adreno_gen7_hwsched_gpudev.base,
 		.perfcounters = &adreno_gen7_2_0_perfcounters,
 		.uche_gmem_alignment = SZ_16M,
 		.gmem_size = 3 * SZ_1M,
 		.bus_width = 32,
-		.snapshot_size = SZ_4M,
+		.snapshot_size = SZ_8M,
 	},
 	.sqefw_name = "a740_sqe.fw",
 	.gmufw_name = "gmu_gen70200.bin",

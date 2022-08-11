@@ -15,10 +15,13 @@ ifeq ($(CONFIG_ARCH_WAIPIO), y)
 	include $(KGSL_PATH)/config/gki_waipiodisp.conf
 endif
 ifeq ($(CONFIG_ARCH_KALAMA), y)
-	include $(KGSL_PATH)/config/gki_waipiodisp.conf
+	include $(KGSL_PATH)/config/gki_kalama.conf
 endif
 ifeq ($(CONFIG_ARCH_SA8155), y)
 	include $(KGSL_PATH)/config/gki_sa8155.conf
+endif
+ifeq ($(CONFIG_ARCH_KHAJE), y)
+	include $(KGSL_PATH)/config/gki_khajedisp.conf
 endif
 
 ccflags-y += -I$(KGSL_PATH) -I$(KGSL_PATH)/include/linux -I$(KGSL_PATH)/include -I$(KERNEL_SRC)/drivers/devfreq -I$(KERNEL_SRC)/drivers/iommu
