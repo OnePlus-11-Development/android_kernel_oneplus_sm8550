@@ -542,6 +542,7 @@ struct sde_misr_sign {
  * @hdr_min_luminance: desired min luminance obtained from HDR block
  * @hdr_supported: does the sink support HDR content
  * @color_enc_fmt: Colorimetry encoding formats of sink
+ * @lm_mask: preferred LM mask for connector
  * @allow_bl_update: Flag to indicate if BL update is allowed currently or not
  * @dimming_bl_notify_enabled: Flag to indicate if dimming bl notify is enabled or not
  * @qsync_mode: Cached Qsync mode, 0=disabled, 1=continuous mode
@@ -616,6 +617,7 @@ struct sde_connector {
 	bool hdr_supported;
 
 	u32 color_enc_fmt;
+	u32 lm_mask;
 
 	u8 hdr_plus_app_ver;
 	u32 qsync_mode;
@@ -1213,6 +1215,24 @@ static inline int sde_connector_state_get_compression_info(
 	memcpy(comp_info, &sde_conn_state->mode_info.comp_info,
 		sizeof(struct msm_compression_info));
 	return 0;
+}
+
+static inline bool sde_connector_is_3d_merge_enabled(struct drm_connector *conn)
+{
+	enum sde_rm_topology_name topology;
+
+	if (!conn)
+		return false;
+
+	topology = sde_connector_get_topology_name(conn);
+	if ((topology == SDE_RM_TOPOLOGY_DUALPIPE_3DMERGE)
+			|| (topology == SDE_RM_TOPOLOGY_DUALPIPE_3DMERGE_DSC)
+			|| (topology == SDE_RM_TOPOLOGY_DUALPIPE_3DMERGE_VDC)
+			|| (topology == SDE_RM_TOPOLOGY_QUADPIPE_3DMERGE)
+			|| (topology == SDE_RM_TOPOLOGY_QUADPIPE_3DMERGE_DSC))
+		return true;
+
+	return false;
 }
 
 /**

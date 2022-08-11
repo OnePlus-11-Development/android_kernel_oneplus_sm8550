@@ -2574,12 +2574,12 @@ static int dp_display_post_enable(struct dp_display *dp_display, void *panel)
 		dp_panel->audio->lane_count = dp->link->link_params.lane_count;
 		dp_panel->audio->on(dp_panel->audio);
 	}
-end:
-	dp->aux->state |= DP_STATE_CTRL_POWERED_ON;
 
+	dp->aux->state |= DP_STATE_CTRL_POWERED_ON;
 	complete_all(&dp->notification_comp);
-	mutex_unlock(&dp->session_lock);
 	DP_DEBUG("display post enable complete. state: 0x%x\n", dp->state);
+end:
+	mutex_unlock(&dp->session_lock);
 	SDE_EVT32_EXTERNAL(SDE_EVTLOG_FUNC_EXIT, dp->state);
 	return 0;
 }
@@ -3052,37 +3052,38 @@ static void dp_display_convert_to_dp_mode(struct dp_display *dp_display,
 
 	memset(dp_mode, 0, sizeof(*dp_mode));
 
-	free_dsc_blks = dp_display->max_dsc_count -
+	if (dp_panel->dsc_en) {
+		free_dsc_blks = dp_display->max_dsc_count -
 				dp->tot_dsc_blks_in_use +
 				dp_panel->dsc_blks_in_use;
-	DP_DEBUG_V("Before: in_use:%d, max:%d, free:%d\n",
+		DP_DEBUG_V("Before: in_use:%d, max:%d, free:%d\n",
 				dp->tot_dsc_blks_in_use,
 				dp_display->max_dsc_count, free_dsc_blks);
 
-	rc = msm_get_dsc_count(dp->priv, drm_mode->hdisplay,
-			&required_dsc_blks);
-	if (rc) {
-		DP_ERR("error getting dsc count. rc:%d\n", rc);
-		return;
-	}
+		rc = msm_get_dsc_count(dp->priv, drm_mode->hdisplay,
+				&required_dsc_blks);
+		if (rc) {
+			DP_ERR("error getting dsc count. rc:%d\n", rc);
+			return;
+		}
 
-	curr_dsc = dp_panel->dsc_blks_in_use;
-	dp->tot_dsc_blks_in_use -= dp_panel->dsc_blks_in_use;
-	dp_panel->dsc_blks_in_use = 0;
+		curr_dsc = dp_panel->dsc_blks_in_use;
+		dp->tot_dsc_blks_in_use -= dp_panel->dsc_blks_in_use;
+		dp_panel->dsc_blks_in_use = 0;
 
-	if (free_dsc_blks >= required_dsc_blks) {
-		dp_mode->capabilities |= DP_PANEL_CAPS_DSC;
-		new_dsc = max(curr_dsc, required_dsc_blks);
-		dp_panel->dsc_blks_in_use = new_dsc;
-		dp->tot_dsc_blks_in_use += new_dsc;
-	}
+		if (free_dsc_blks >= required_dsc_blks) {
+			dp_mode->capabilities |= DP_PANEL_CAPS_DSC;
+			new_dsc = max(curr_dsc, required_dsc_blks);
+			dp_panel->dsc_blks_in_use = new_dsc;
+			dp->tot_dsc_blks_in_use += new_dsc;
+		}
 
-	if (dp_mode->capabilities & DP_PANEL_CAPS_DSC)
 		DP_DEBUG_V("After: in_use:%d, max:%d, free:%d, req:%d, caps:0x%x\n",
 				dp->tot_dsc_blks_in_use,
 				dp_display->max_dsc_count,
 				free_dsc_blks, required_dsc_blks,
 				dp_mode->capabilities);
+	}
 
 	dp_panel->convert_to_dp_mode(dp_panel, drm_mode, dp_mode);
 }
@@ -3346,6 +3347,7 @@ static int dp_display_mst_connector_uninstall(struct dp_display *dp_display,
 	struct sde_connector *sde_conn;
 	struct dp_panel *dp_panel;
 	struct dp_display_private *dp;
+	struct dp_audio *audio = NULL;
 
 	if (!dp_display || !connector) {
 		DP_ERR("invalid input\n");
@@ -3371,13 +3373,17 @@ static int dp_display_mst_connector_uninstall(struct dp_display *dp_display,
 	}
 
 	dp_panel = sde_conn->drv_panel;
-	dp_audio_put(dp_panel->audio);
+
+	/* Make a copy of audio structure to call into dp_audio_put later */
+	audio = dp_panel->audio;
 	dp_panel_put(dp_panel);
 
 	DP_MST_DEBUG("dp mst connector uninstalled. conn:%d\n",
 			connector->base.id);
 
 	mutex_unlock(&dp->session_lock);
+
+	dp_audio_put(audio);
 	SDE_EVT32_EXTERNAL(SDE_EVTLOG_FUNC_EXIT, dp->state);
 
 	return rc;

@@ -650,7 +650,10 @@ int sde_plane_wait_input_fence(struct drm_plane *plane, uint32_t wait_ms)
 				break;
 			}
 
-			SDE_EVT32_VERBOSE(DRMID(plane), -ret, prefix);
+			if (ret)
+				SDE_EVT32(DRMID(plane), -ret, prefix, SDE_EVTLOG_ERROR);
+			else
+				SDE_EVT32_VERBOSE(DRMID(plane), -ret, prefix);
 		} else {
 			ret = 0;
 		}
@@ -4593,7 +4596,7 @@ void sde_plane_get_frame_data(struct drm_plane *plane,
 	if (ubwc_stats->error || ubwc_stats->meta_error) {
 		SDE_EVT32(DRMID(plane),  ubwc_stats->error, ubwc_stats->meta_error,
 				SDE_EVTLOG_ERROR);
-		SDE_DEBUG_PLANE(psde, "plane%d ubwc_error %d meta_error %d\n",
+		SDE_DEBUG_PLANE(psde, "ubwc_error:0x%x meta_error:0x%x\n",
 				ubwc_stats->error, ubwc_stats->meta_error);
 	}
 }

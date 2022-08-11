@@ -340,18 +340,21 @@ static void _sde_enc_phys_wb_get_out_resolution(struct drm_crtc_state *crtc_stat
 	sde_crtc_get_ds_io_res(crtc_state, &ds_res);
 	sde_connector_get_dnsc_blur_io_res(conn_state, &dnsc_blur_res);
 
-	if (ds_res.enabled) {
+	if (dnsc_blur_res.enabled) {
+		*out_width = dnsc_blur_res.dst_w;
+		*out_height = dnsc_blur_res.dst_h;
+	} else if (ds_res.enabled) {
 		if (ds_tap_pt == CAPTURE_DSPP_OUT) {
 			*out_width = ds_res.dst_w;
 			*out_height = ds_res.dst_h;
 		} else if (ds_tap_pt == CAPTURE_MIXER_OUT) {
 			*out_width = ds_res.src_w;
 			*out_height = ds_res.src_h;
+		} else {
+			*out_width = mode->hdisplay;
+			*out_height = mode->vdisplay;
 		}
-	} else if (dnsc_blur_res.enabled) {
-		*out_width = dnsc_blur_res.dst_w;
-		*out_height = dnsc_blur_res.dst_h;
-	} else {
+	}  else {
 		*out_width = mode->hdisplay;
 		*out_height = mode->vdisplay;
 	}
@@ -551,6 +554,7 @@ static void _sde_encoder_phys_wb_setup_cwb(struct sde_encoder_phys *phys_enc, bo
 	struct sde_hw_pingpong *hw_pp = phys_enc->hw_pp;
 	struct sde_hw_dnsc_blur *hw_dnsc_blur = phys_enc->hw_dnsc_blur;
 	bool need_merge = (crtc->num_mixers > 1);
+	enum sde_dcwb;
 	int i = 0;
 	const int num_wb = 1;
 
@@ -575,10 +579,13 @@ static void _sde_encoder_phys_wb_setup_cwb(struct sde_encoder_phys *phys_enc, bo
 		intf_cfg.wb_count = num_wb;
 		intf_cfg.wb[0] = hw_wb->idx;
 
-		for (i = 0; i < crtc->num_mixers; i++)
-			intf_cfg.cwb[intf_cfg.cwb_count++] = (enum sde_cwb)
-				(test_bit(SDE_WB_DCWB_CTRL, &hw_wb->caps->features) ?
-					((hw_pp->idx % 2) + i) : (hw_pp->idx + i));
+		for (i = 0; i < crtc->num_mixers; i++) {
+			if (test_bit(SDE_WB_DCWB_CTRL, &hw_wb->caps->features))
+				intf_cfg.cwb[intf_cfg.cwb_count++] =
+						(enum sde_cwb)(hw_pp->dcwb_idx + i);
+			else
+				intf_cfg.cwb[intf_cfg.cwb_count++] = (enum sde_cwb)(hw_pp->idx + i);
+		}
 
 		if (hw_pp->merge_3d && (intf_cfg.merge_3d_count <
 				MAX_MERGE_3D_PER_CTL_V1) && need_merge)
@@ -790,16 +797,20 @@ static int _sde_enc_phys_wb_validate_dnsc_blur_ds(struct drm_crtc_state *crtc_st
 			struct sde_rect *wb_roi)
 {
 	struct sde_crtc_state *cstate = to_sde_crtc_state(crtc_state);
+	const struct drm_display_mode *mode = &crtc_state->mode;
 	struct sde_io_res ds_res = {0, }, dnsc_blur_res = {0, };
 	u32 ds_tap_pt = sde_crtc_get_property(cstate, CRTC_PROP_CAPTURE_OUTPUT);
 
 	sde_crtc_get_ds_io_res(crtc_state, &ds_res);
 	sde_connector_get_dnsc_blur_io_res(conn_state, &dnsc_blur_res);
 
-	if ((ds_res.enabled && (!ds_res.src_w || !ds_res.src_h
-					|| !ds_res.dst_w || !ds_res.dst_h))) {
-		SDE_ERROR("invalid ds cfg src:%ux%u dst:%ux%u\n",
-				ds_res.src_w, ds_res.src_h, ds_res.dst_w, ds_res.dst_h);
+	/* wb_roi should match with mode w/h if none of these features are enabled */
+	if ((!ds_res.enabled && !dnsc_blur_res.enabled && !cstate->cwb_enc_mask)
+			&& ((wb_roi->w && (wb_roi->w != mode->hdisplay))
+				|| (wb_roi->h && (wb_roi->h != mode->vdisplay)))) {
+		SDE_ERROR("invalid wb-roi {%u,%u,%u,%u} mode:%ux%u\n",
+				wb_roi->x, wb_roi->y, wb_roi->w, wb_roi->h,
+				mode->hdisplay, mode->vdisplay);
 		return -EINVAL;
 	}
 
@@ -1275,7 +1286,7 @@ static void _sde_encoder_phys_wb_update_cwb_flush(struct sde_encoder_phys *phys_
 	struct sde_hw_dnsc_blur *hw_dnsc_blur;
 	struct sde_crtc *crtc;
 	struct sde_crtc_state *crtc_state;
-	int i = 0, cwb_capture_mode = 0;
+	int cwb_capture_mode = 0;
 	enum sde_cwb cwb_idx = 0;
 	enum sde_dcwb dcwb_idx = 0;
 	enum sde_cwb src_pp_idx = 0;
@@ -1312,7 +1323,7 @@ static void _sde_encoder_phys_wb_update_cwb_flush(struct sde_encoder_phys *phys_
 	need_merge = (crtc->num_mixers > 1) ? true : false;
 
 	if (test_bit(SDE_WB_DCWB_CTRL, &hw_wb->caps->features)) {
-		dcwb_idx = (enum sde_dcwb) ((hw_pp->idx % 2) + i);
+		dcwb_idx = hw_pp->dcwb_idx;
 		if ((dcwb_idx + crtc->num_mixers) > DCWB_MAX) {
 			SDE_ERROR("[enc:%d, wb:%d] invalid DCWB config; dcwb=%d, num_lm=%d\n",
 				DRMID(phys_enc->parent), WBID(wb_enc), dcwb_idx, crtc->num_mixers);
@@ -1421,6 +1432,13 @@ static void _sde_encoder_phys_wb_setup_dnsc_blur(struct sde_encoder_phys *phys_e
 
 	sde_conn = to_sde_connector(wb_dev->connector);
 	sde_conn_state = to_sde_connector_state(wb_dev->connector->state);
+
+	if (sde_conn_state->dnsc_blur_count && !hw_dnsc_blur) {
+		SDE_ERROR("[enc:%d wb:%d] invalid config - dnsc_blur block not reserved\n",
+			DRMID(phys_enc->parent), WBID(wb_enc));
+		sde_kms->catalog->dnsc_blur_count = 0;
+		return;
+	}
 
 	/* swap between 0 & 1 lut idx on each config change for gaussian lut */
 	sde_conn_state->dnsc_blur_lut = 1 - sde_conn_state->dnsc_blur_lut;

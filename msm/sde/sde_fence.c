@@ -469,7 +469,7 @@ static int _reset_hw_fence_timeline(struct sde_hw_ctl *hw_ctl, u32 flags)
 }
 
 int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *hw_ctl, u32 debugfs_hw_fence,
-		struct sde_hw_mdp *hw_mdp)
+		struct sde_hw_mdp *hw_mdp, bool disable)
 {
 	struct sde_hw_fence_data *data;
 	u32 ipcc_signal_id;
@@ -485,6 +485,11 @@ int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *hw_ctl, u32 debugf
 
 	ctl_id = hw_ctl->idx - CTL_0;
 	data = &hw_ctl->hwfence_data;
+
+	if (disable) {
+		hw_ctl->ops.hw_fence_ctrl(hw_ctl, false, false, 0);
+		return -EPERM;
+	}
 
 	if ((debugfs_hw_fence & SDE_INPUT_HW_FENCE_TIMESTAMP)
 			&& hw_mdp->ops.hw_fence_input_timestamp_ctrl)
@@ -904,8 +909,8 @@ void sde_fence_signal(struct sde_fence_context *ctx, ktime_t ts,
 
 		if ((int)(ctx->done_count - ctx->commit_count) < 0) {
 			SDE_DEBUG(
-			  "timeline reset attempt! done count:%d commit:%d\n",
-				ctx->done_count, ctx->commit_count);
+			  "timeline reset attempt! ctx:0x%x done count:%d commit:%d\n",
+				ctx->drm_id, ctx->done_count, ctx->commit_count);
 			ctx->done_count = ctx->commit_count;
 			SDE_EVT32(ctx->drm_id, ctx->done_count,
 				ctx->commit_count, ktime_to_us(ts),

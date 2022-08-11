@@ -1353,11 +1353,13 @@ struct sde_ds_cfg {
  * @features           bit mask identifying sub-blocks/features
  * @sblk               sub-blocks information
  * @merge_3d_id        merge_3d block id
+ * @dcwb:              ID of DCWB, DCWB_MAX if invalid
  */
 struct sde_pingpong_cfg  {
 	SDE_HW_BLK_INFO;
 	const struct sde_pingpong_sub_blks *sblk;
 	int merge_3d_id;
+	u32 dcwb_id;
 };
 
 /**
@@ -1998,13 +2000,15 @@ struct sde_mdss_hw_cfg_handler {
 #define BLK_RC(s) ((s)->rc)
 
 /**
- * sde_hw_set_preference: populate the individual hw lm preferences,
- *                        overwrite if exists
- * @sde_cfg:              pointer to sspp cfg
- * @num_lm:               num lms to set preference
- * @disp_type:            is the given display primary/secondary
+ * sde_hw_mixer_set_preference: populate the individual hw lm preferences,
+ *                              overwrite if exists
+ * @sde_cfg:                    pointer to sspp cfg
+ * @num_lm:                     num lms to set preference
+ * @disp_type:                  is the given display primary/secondary
+ *
+ * Return:                      layer mixer mask allocated for the disp_type
  */
-void sde_hw_mixer_set_preference(struct sde_mdss_cfg *sde_cfg, u32 num_lm,
+u32 sde_hw_mixer_set_preference(struct sde_mdss_cfg *sde_cfg, u32 num_lm,
 		uint32_t disp_type);
 
 /**
