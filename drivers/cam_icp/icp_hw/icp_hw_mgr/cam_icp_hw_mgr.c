@@ -17,6 +17,7 @@
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/debugfs.h>
+#include <linux/rwsem.h>
 #include <media/cam_defs.h>
 #include <media/cam_icp.h>
 #include <media/cam_cpas.h>
@@ -53,6 +54,8 @@
 	((dev_type == CAM_ICP_RES_TYPE_BPS) ? ICP_CLK_HW_BPS : ICP_CLK_HW_IPE)
 
 #define ICP_DEVICE_IDLE_TIMEOUT 400
+
+DECLARE_RWSEM(frame_in_process_sem);
 
 static struct cam_icp_hw_mgr icp_hw_mgr;
 
@@ -2275,7 +2278,6 @@ static void cam_icp_mgr_dump_active_req_info(void)
 			continue;
 		}
 
-		memset(log_info, 0, buf_size);
 		len = 0;
 		for (j = 0; j < CAM_FRAME_CMD_MAX; j++) {
 			if (!ctx_data->hfi_frame_process.request_id[j])
@@ -2455,6 +2457,17 @@ static int cam_icp_mgr_handle_frame_process(uint32_t *msg_ptr, int flag)
 			ctx_data->ctxt_event_cb(ctx_data->context_priv, CAM_ICP_EVT_ID_ERROR,
 				&icp_err_evt);
 		mutex_unlock(&ctx_data->ctx_mutex);
+	}
+
+	if (cam_presil_mode_enabled()) {
+		if (!atomic_read(&icp_hw_mgr.frame_in_process)) {
+			CAM_ERR(CAM_PRESIL, "presil: frame_in_process not set");
+		} else {
+			icp_hw_mgr.frame_in_process_ctx_id = -1;
+			atomic_set(&icp_hw_mgr.frame_in_process, 0);
+			up_write(&frame_in_process_sem);
+			CAM_DBG(CAM_PRESIL, "presil: unlocked frame_in_process");
+		}
 	}
 
 	return 0;
@@ -2654,6 +2667,23 @@ static int cam_icp_mgr_process_direct_ack_msg(uint32_t *msg_ptr)
 		ioconfig_ack = (struct hfi_msg_ipebps_async_ack *)msg_ptr;
 		ctx_data = (struct cam_icp_hw_ctx_data *)
 			U64_TO_PTR(ioconfig_ack->user_data1);
+
+		if (cam_presil_mode_enabled()) {
+			if (atomic_read(&icp_hw_mgr.frame_in_process)) {
+				if (icp_hw_mgr.frame_in_process_ctx_id == ctx_data->ctx_id) {
+					CAM_DBG(CAM_PRESIL, "presil: frame process abort ctx %d",
+						icp_hw_mgr.frame_in_process_ctx_id);
+					icp_hw_mgr.frame_in_process_ctx_id = -1;
+					atomic_set(&icp_hw_mgr.frame_in_process, 0);
+					up_write(&frame_in_process_sem);
+				} else {
+					CAM_WARN(CAM_PRESIL, "presil: abort mismatch %d %d",
+						icp_hw_mgr.frame_in_process_ctx_id,
+						ctx_data->ctx_id);
+				}
+			}
+		}
+
 		if (ctx_data->state != CAM_ICP_CTX_STATE_FREE)
 			complete(&ctx_data->wait_complete);
 		CAM_DBG(CAM_ICP, "received IPE/BPS/ ABORT: ctx_state =%d",
@@ -3071,9 +3101,6 @@ static int cam_icp_alloc_secheap_mem(struct cam_mem_mgr_memory_desc *secheap)
 	struct cam_mem_mgr_memory_desc out;
 	struct cam_smmu_region_info secheap_info;
 
-	memset(&alloc, 0, sizeof(alloc));
-	memset(&out, 0, sizeof(out));
-
 	rc = cam_smmu_get_region_info(icp_hw_mgr.iommu_hdl,
 		CAM_SMMU_REGION_SECHEAP,
 		&secheap_info);
@@ -3107,8 +3134,6 @@ static int cam_icp_alloc_sfr_mem(struct cam_mem_mgr_memory_desc *sfr)
 	struct cam_mem_mgr_request_desc alloc;
 	struct cam_mem_mgr_memory_desc out;
 
-	memset(&alloc, 0, sizeof(alloc));
-	memset(&out, 0, sizeof(out));
 	alloc.size = SZ_8K;
 	alloc.align = 0;
 	alloc.flags = CAM_MEM_FLAG_HW_READ_WRITE |
@@ -3132,8 +3157,6 @@ static int cam_icp_alloc_shared_mem(struct cam_mem_mgr_memory_desc *qtbl)
 	struct cam_mem_mgr_request_desc alloc;
 	struct cam_mem_mgr_memory_desc out;
 
-	memset(&alloc, 0, sizeof(alloc));
-	memset(&out, 0, sizeof(out));
 	alloc.size = SZ_1M;
 	alloc.align = 0;
 	alloc.flags = CAM_MEM_FLAG_HW_READ_WRITE |
@@ -3261,9 +3284,6 @@ static int cam_icp_allocate_hfi_mem(void)
 		struct cam_mem_mgr_memory_desc out;
 		uint32_t offset;
 		uint64_t size;
-
-		memset(&alloc, 0, sizeof(alloc));
-		memset(&out, 0, sizeof(out));
 
 		alloc.size = fwuncached_region_info.iova_len;
 		alloc.align = 0;
@@ -4728,6 +4748,17 @@ static int cam_icp_mgr_config_hw(void *hw_mgr_priv, void *config_hw_args)
 	}
 
 	ctx_data = config_args->ctxt_to_hw_map;
+	if (cam_presil_mode_enabled()) {
+		CAM_DBG(CAM_PRESIL, "presil: locking frame_in_process %d req id %u",
+			atomic_read(&hw_mgr->frame_in_process), config_args->request_id);
+		down_write(&frame_in_process_sem);
+		atomic_set(&hw_mgr->frame_in_process, 1);
+		hw_mgr->frame_in_process_ctx_id = ctx_data->ctx_id;
+		CAM_DBG(CAM_PRESIL, "presil: locked frame_in_process req id %u ctx_id %d",
+			config_args->request_id, hw_mgr->frame_in_process_ctx_id);
+		msleep(100);
+	}
+
 	mutex_lock(&hw_mgr->hw_mgr_mutex);
 	mutex_lock(&ctx_data->ctx_mutex);
 	if (ctx_data->state != CAM_ICP_CTX_STATE_ACQUIRED) {
@@ -6967,6 +6998,9 @@ int cam_icp_hw_mgr_init(struct device_node *of_node, uint64_t *hw_mgr_hdl,
 	icp_hw_mgr.mini_dump_cb = mini_dump_cb;
 	mutex_init(&icp_hw_mgr.hw_mgr_mutex);
 	spin_lock_init(&icp_hw_mgr.hw_mgr_lock);
+
+	atomic_set(&icp_hw_mgr.frame_in_process, 0);
+	icp_hw_mgr.frame_in_process_ctx_id = -1;
 
 	for (i = 0; i < CAM_ICP_CTX_MAX; i++) {
 		mutex_init(&icp_hw_mgr.ctx_data[i].ctx_mutex);

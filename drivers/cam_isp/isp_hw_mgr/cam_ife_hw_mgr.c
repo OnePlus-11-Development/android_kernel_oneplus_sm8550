@@ -42,10 +42,20 @@
 #define CAM_ISP_GENERIC_BLOB_TYPE_MAX               \
 	(CAM_ISP_GENERIC_BLOB_TYPE_CSID_QCFA_CONFIG + 1)
 
-#define MAX_RETRY_ATTEMPTS 1
+#define MAX_INTERNAL_RECOVERY_ATTEMPTS    1
 
-#define CAM_ISP_CSID_ERROR_CAN_RECOVERY             \
-	CAM_ISP_HW_ERROR_RECOVERY_OVERFLOW
+#define CAM_ISP_NON_RECOVERABLE_CSID_ERRORS          \
+	(CAM_ISP_HW_ERROR_CSID_LANE_FIFO_OVERFLOW    |   \
+	 CAM_ISP_HW_ERROR_CSID_PKT_HDR_CORRUPTED     |   \
+	 CAM_ISP_HW_ERROR_CSID_MISSING_PKT_HDR_DATA  |   \
+	 CAM_ISP_HW_ERROR_CSID_FATAL                 |   \
+	 CAM_ISP_HW_ERROR_CSID_UNBOUNDED_FRAME       |   \
+	 CAM_ISP_HW_ERROR_CSID_MISSING_EOT           |   \
+	 CAM_ISP_HW_ERROR_CSID_PKT_PAYLOAD_CORRUPTED)
+
+#define CAM_ISP_RECOVERABLE_CSID_ERRORS              \
+	(CAM_ISP_HW_ERROR_CSID_SENSOR_SWITCH_ERROR   |   \
+	 CAM_ISP_HW_ERROR_CSID_SENSOR_FRAME_DROP)
 
 static uint32_t blob_type_hw_cmd_map[CAM_ISP_GENERIC_BLOB_TYPE_MAX] = {
 	CAM_ISP_HW_CMD_GET_HFR_UPDATE,
@@ -132,6 +142,14 @@ static int cam_isp_blob_drv_config(struct cam_ife_hw_mgr_ctx         *ctx,
 
 	ife_hw_mgr = ctx->hw_mgr;
 	drv_config = &prepare_hw_data->isp_drv_config;
+
+	if (debug_drv)
+		CAM_INFO(CAM_PERF,
+			"DRV config blob opcode:%u req_id:%llu disable_drv_override:%s ctx_idx:%u drv_en:%s path_idle_en:0x%x timeout_val:%u",
+			prepare_hw_data->packet_opcode_type, request_id,
+			CAM_BOOL_TO_YESNO(g_ife_hw_mgr.debug_cfg.disable_isp_drv),
+			ctx->ctx_index, CAM_BOOL_TO_YESNO(drv_config->drv_en),
+			drv_config->path_idle_en, drv_config->timeout_val);
 
 	CAM_DBG(CAM_PERF,
 		"DRV config blob opcode:%u req_id:%llu disable_drv_override:%s ctx_idx:%u drv_en:%u path_idle_en:0x%x timeout_val:%u",
@@ -6168,6 +6186,15 @@ static int cam_isp_blob_bw_update(
 	return rc;
 }
 
+static void cam_ife_mgr_send_frame_event(uint64_t request_id, uint32_t ctx_index)
+{
+	if (cam_presil_mode_enabled()) {
+		CAM_DBG(CAM_PRESIL, "PRESIL FRAME req_id=%llu ctx_index %d",
+			request_id, ctx_index);
+		cam_presil_send_event(CAM_PRESIL_EVENT_IFE_FRAME_RUN, request_id);
+	}
+}
+
 /* entry function: config_hw */
 static int cam_ife_mgr_config_hw(void *hw_mgr_priv,
 					void *config_hw_args)
@@ -6423,6 +6450,8 @@ static int cam_ife_mgr_config_hw(void *hw_mgr_priv,
 				hw_update_data->mup_en = false;
 			}
 		}
+
+		cam_ife_mgr_send_frame_event(cfg->request_id, ctx->ctx_index);
 	} else {
 		CAM_ERR(CAM_ISP, "No commands to config");
 	}
@@ -9849,8 +9878,6 @@ static int cam_isp_packet_generic_blob_handler(void *user_data,
 
 		prepare_hw_data = (struct cam_isp_prepare_hw_update_data  *) prepare->priv;
 
-		memset(&prepare_hw_data->bw_clk_config.bw_config_v2, 0,
-			sizeof(prepare_hw_data->bw_clk_config.bw_config_v2));
 		prepare_hw_data->bw_clk_config.bw_config_v2.usage_type = bw_config->usage_type;
 		prepare_hw_data->bw_clk_config.bw_config_v2.num_paths = bw_config->num_paths;
 
@@ -9919,8 +9946,7 @@ static int cam_isp_packet_generic_blob_handler(void *user_data,
 		}
 
 		prepare_hw_data = (struct cam_isp_prepare_hw_update_data  *) prepare->priv;
-		memset(&prepare_hw_data->bw_clk_config.bw_config_v2, 0,
-			sizeof(prepare_hw_data->bw_clk_config.bw_config_v2));
+
 		prepare_hw_data->bw_clk_config.bw_config_v2.usage_type = bw_config->usage_type;
 		prepare_hw_data->bw_clk_config.bw_config_v2.num_paths = bw_config->num_paths;
 
@@ -10826,7 +10852,6 @@ static int cam_isp_sfe_send_scratch_buf_upd(
 	struct cam_isp_hw_get_wm_update    wm_update;
 	dma_addr_t                         io_addr[CAM_PACKET_MAX_PLANES];
 
-	memset(io_addr, 0, sizeof(io_addr));
 	update_buf.res = hw_res;
 	update_buf.cmd_type = cmd_type;
 	update_buf.cmd.cmd_buf_addr = cpu_addr;
@@ -12885,24 +12910,25 @@ end:
 	return 0;
 }
 
-static int cam_ife_hw_mgr_handle_csid_frame_drop(
+static int cam_ife_hw_mgr_handle_csid_secondary_err_evts(
+	uint32_t                              err_type,
 	struct cam_isp_hw_event_info         *event_info,
 	struct cam_ife_hw_mgr_ctx            *ctx)
 {
-	int rc = 0;
+	int rc = -EINVAL;
+	struct cam_isp_hw_secondary_event_data sec_evt_data = {0};
 	cam_hw_event_cb_func ife_hw_irq_cb = ctx->common.event_cb;
 
 	/*
 	 * Support frame drop as secondary event
 	 */
-	if (event_info->is_secondary_evt) {
-		struct cam_isp_hw_secondary_event_data sec_evt_data;
+	if (err_type & CAM_ISP_HW_ERROR_CSID_SENSOR_FRAME_DROP) {
+		sec_evt_data.evt_type = CAM_ISP_HW_SEC_EVENT_OUT_OF_SYNC_FRAME_DROP;
 
 		CAM_DBG(CAM_ISP,
-			"Received CSID[%u] sensor sync frame drop res: %d as secondary evt",
-			event_info->hw_idx, event_info->res_id);
+			"Received CSID[%u] sensor sync frame drop res: %d as secondary evt on ctx: %u",
+			event_info->hw_idx, event_info->res_id, ctx->ctx_index);
 
-		sec_evt_data.evt_type = CAM_ISP_HW_SEC_EVENT_OUT_OF_SYNC_FRAME_DROP;
 		rc = ife_hw_irq_cb(ctx->common.cb_priv,
 			CAM_ISP_HW_SECONDARY_EVENT, (void *)&sec_evt_data);
 	}
@@ -12915,6 +12941,7 @@ static int cam_ife_hw_mgr_handle_csid_error(
 	struct cam_isp_hw_event_info   *event_info)
 {
 	int                                      rc = -EINVAL;
+	bool                                     recoverable = true;
 	uint32_t                                 err_type;
 	struct cam_isp_hw_error_event_info      *err_evt_info;
 	struct cam_isp_hw_error_event_data       error_event_data = {0};
@@ -12933,72 +12960,68 @@ static int cam_ife_hw_mgr_handle_csid_error(
 	CAM_DBG(CAM_ISP, "Entry CSID[%u] error %d", event_info->hw_idx, err_type);
 
 	spin_lock(&g_ife_hw_mgr.ctx_lock);
-	if (err_type & CAM_ISP_HW_ERROR_CSID_SENSOR_FRAME_DROP)
-		cam_ife_hw_mgr_handle_csid_frame_drop(event_info, ctx);
 
-	recovery_data.error_type = CAM_ISP_HW_ERROR_OVERFLOW;
-
-	if ((err_type & (CAM_ISP_HW_ERROR_CSID_LANE_FIFO_OVERFLOW |
-		CAM_ISP_HW_ERROR_CSID_PKT_HDR_CORRUPTED |
-		CAM_ISP_HW_ERROR_CSID_MISSING_PKT_HDR_DATA |
-		CAM_ISP_HW_ERROR_CSID_SENSOR_SWITCH_ERROR |
-		CAM_ISP_HW_ERROR_CSID_FATAL |
-		CAM_ISP_HW_ERROR_CSID_UNBOUNDED_FRAME |
-		CAM_ISP_HW_ERROR_CSID_MISSING_EOT |
-		CAM_ISP_HW_ERROR_CSID_PKT_PAYLOAD_CORRUPTED)) &&
-		g_ife_hw_mgr.debug_cfg.enable_csid_recovery) {
-
-		error_event_data.error_type |= err_type;
-		recovery_data.error_type = err_type;
-		rc = cam_ife_hw_mgr_find_affected_ctx(&error_event_data,
-			event_info->hw_idx, &recovery_data);
-		goto end;
+	/* Secondary event handling */
+	if (event_info->is_secondary_evt) {
+		rc = cam_ife_hw_mgr_handle_csid_secondary_err_evts(err_type, event_info, ctx);
+		if (rc)
+			CAM_ERR(CAM_ISP,
+				"Failed to handle CSID[%u] sec event for res: %d err: 0x%x on ctx: %u",
+				event_info->hw_idx, event_info->res_id, err_type, ctx->ctx_index);
+		spin_unlock(&g_ife_hw_mgr.ctx_lock);
+		return rc;
 	}
 
+	/* Default error types */
+	recovery_data.error_type = CAM_ISP_HW_ERROR_OVERFLOW;
+	error_event_data.error_type = CAM_ISP_HW_ERROR_CSID_FATAL;
+
+	/* Notify IFE/SFE devices, determine bus overflow */
 	if (err_type & (CAM_ISP_HW_ERROR_CSID_OUTPUT_FIFO_OVERFLOW |
 		CAM_ISP_HW_ERROR_RECOVERY_OVERFLOW |
-		CAM_ISP_HW_ERROR_CSID_FRAME_SIZE)) {
-
+		CAM_ISP_HW_ERROR_CSID_FRAME_SIZE))
 		cam_ife_hw_mgr_check_and_notify_overflow(event_info,
 			ctx, &is_bus_overflow);
 
-		/*
-		 * When CSID overflow IRQ comes, we need read bus overflow
-		 * status, to check if it's a bus overflow issue,
-		 * only do recovery in bus overflow cases.
-		 */
-		if ((err_type & CAM_ISP_CSID_ERROR_CAN_RECOVERY) &&
-			is_bus_overflow) {
-			if (ctx->try_recovery_cnt < MAX_RETRY_ATTEMPTS) {
-				error_event_data.try_internal_recovery = true;
-				if (!atomic_read(&ctx->overflow_pending))
-					ctx->try_recovery_cnt++;
-				if (!ctx->recovery_req_id)
-					ctx->recovery_req_id = ctx->applied_req_id;
-			}
-			CAM_DBG(CAM_ISP, "CSID[%u] Try recovery count %u on req %llu",
-				event_info->hw_idx,
-				ctx->try_recovery_cnt,
-				ctx->recovery_req_id);
+	if (err_type & CAM_ISP_NON_RECOVERABLE_CSID_ERRORS) {
+		error_event_data.error_type |= err_type;
+		recovery_data.error_type = err_type;
+		recoverable = false;
+	}
+
+	if (recoverable && (is_bus_overflow ||
+		(err_type & CAM_ISP_RECOVERABLE_CSID_ERRORS))) {
+		if (ctx->try_recovery_cnt < MAX_INTERNAL_RECOVERY_ATTEMPTS) {
+			error_event_data.try_internal_recovery = true;
+
+			if (!atomic_read(&ctx->overflow_pending))
+				ctx->try_recovery_cnt++;
+
+			if (!ctx->recovery_req_id)
+				ctx->recovery_req_id = ctx->applied_req_id;
 		}
+
+		CAM_DBG(CAM_ISP,
+			"CSID[%u] error: %u current_recovery_cnt: %u  recovery_req: %llu on ctx: %u",
+			event_info->hw_idx, err_type, ctx->try_recovery_cnt,
+			ctx->recovery_req_id, ctx->ctx_index);
 
 		error_event_data.error_type |= err_type;
 		recovery_data.error_type = err_type;
-		rc = cam_ife_hw_mgr_find_affected_ctx(&error_event_data,
-			event_info->hw_idx, &recovery_data);
 	}
 
-end:
-
+	rc = cam_ife_hw_mgr_find_affected_ctx(&error_event_data,
+			event_info->hw_idx, &recovery_data);
 	if (rc || !recovery_data.no_of_context)
-		goto skip_recovery;
+		goto end;
 
 	if (!error_event_data.try_internal_recovery)
 		cam_ife_hw_mgr_do_error_recovery(&recovery_data);
-	CAM_DBG(CAM_ISP, "Exit CSID[%u] error %d", event_info->hw_idx,
-		err_type);
 
-skip_recovery:
+	CAM_DBG(CAM_ISP, "Exit CSID[%u] error %d",
+		event_info->hw_idx, err_type);
+
+end:
 	spin_unlock(&g_ife_hw_mgr.ctx_lock);
 	return 0;
 }
@@ -14744,8 +14767,6 @@ int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl)
 
 	atomic_set(&g_ife_hw_mgr.active_ctx_cnt, 0);
 	for (i = 0; i < CAM_IFE_CTX_MAX; i++) {
-		memset(&g_ife_hw_mgr.ctx_pool[i], 0,
-			sizeof(g_ife_hw_mgr.ctx_pool[i]));
 		INIT_LIST_HEAD(&g_ife_hw_mgr.ctx_pool[i].list);
 
 		INIT_LIST_HEAD(&g_ife_hw_mgr.ctx_pool[i].res_list_ife_in.list);

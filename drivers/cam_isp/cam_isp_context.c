@@ -2406,7 +2406,7 @@ static int __cam_isp_ctx_apply_pending_req(
 	struct cam_isp_context *ctx_isp = priv;
 	struct cam_ctx_request *req;
 	struct cam_isp_ctx_req *req_isp;
-	struct cam_hw_config_args cfg;
+	struct cam_hw_config_args cfg = {0};
 
 	if (!ctx_isp) {
 		CAM_ERR(CAM_ISP, "Invalid ctx_isp:%pK", ctx);
@@ -2447,14 +2447,11 @@ static int __cam_isp_ctx_apply_pending_req(
 		req->request_id, ctx_isp->substate_activated, ctx->ctx_id);
 	req_isp = (struct cam_isp_ctx_req *) req->req_priv;
 
-	memset(&cfg, 0, sizeof(cfg));
-
 	cfg.ctxt_to_hw_map = ctx_isp->hw_ctx;
 	cfg.request_id = req->request_id;
 	cfg.hw_update_entries = req_isp->cfg;
 	cfg.num_hw_update_entries = req_isp->num_cfg;
-	cfg.priv  = &req_isp->hw_update_data;
-	cfg.init_packet = 0;
+	cfg.priv = &req_isp->hw_update_data;
 
 	/*
 	 * Offline mode may receive the SOF and REG_UPD earlier than
@@ -3162,7 +3159,7 @@ static int __cam_isp_ctx_epoch_in_bubble_applied(
 	list_add_tail(&req->list, &ctx->active_req_list);
 	ctx_isp->active_req_cnt++;
 	CAM_DBG(CAM_ISP, "move request %lld to active list(cnt = %d) ctx %u",
-		req->request_id, ctx_isp->active_req_cnt);
+		req->request_id, ctx_isp->active_req_cnt, ctx->ctx_id);
 
 	if (!req_isp->bubble_report) {
 		if (req->request_id > ctx_isp->reported_req_id) {
@@ -7484,8 +7481,8 @@ static int __cam_isp_ctx_reset_and_recover(
 	__cam_isp_ctx_notify_v4l2_error_event(CAM_REQ_MGR_WARN_TYPE_KMD_RECOVERY,
 		0, req->request_id, ctx);
 
-	CAM_DBG(CAM_ISP, "Internal Start HW success ctx %u on link: 0x%x",
-		ctx->ctx_id, ctx->link_hdl);
+	CAM_INFO(CAM_ISP, "Internal Start HW success ctx %u on link: 0x%x for req: %llu",
+		ctx->ctx_id, ctx->link_hdl, req->request_id);
 
 end:
 	return rc;
