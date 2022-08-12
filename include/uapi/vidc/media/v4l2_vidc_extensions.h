@@ -473,18 +473,6 @@ struct v4l2_event_vidc_metadata {
 	__u8                                 reserved[44];
 };
 
-#define V4L2_EVENT_VIDC_LAST_FLAG                                             \
-	(V4L2_EVENT_PRIVATE_START + 0x2)
-
-enum v4l2_event_last_flag {
-	LAST_FLAG_DRC         = (1 << 0),
-	LAST_FLAG_DRAIN       = (1 << 1),
-};
-
-struct v4l2_event_vidc_last_flag {
-	enum v4l2_event_last_flag flag_type;
-};
-
 /* vendor events end */
 
 /* Default metadata size (align to 4KB) */

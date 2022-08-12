@@ -640,7 +640,7 @@ static int get_driver_buffer_flags(struct msm_vidc_inst *inst, u32 hfi_flags)
 	 * attach last flag to the buffer for encode session.
 	 * For decode session attach only if control(LAST_FLAG_EVENT_ENABLE)
 	 * is not set by client. If this control is enabled, last flag
-	 * info will be sent via event(V4L2_EVENT_VIDC_LAST_FLAG) to client.
+	 * info will be sent via event(V4L2_EVENT_EOS) to client.
 	 */
 	if ((is_encode_session(inst) &&
 		(hfi_flags & HFI_BUF_FW_FLAG_LAST)) ||
