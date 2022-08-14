@@ -2764,7 +2764,7 @@ void sde_crtc_get_frame_data(struct drm_crtc *crtc)
 
 	/* Collect plane specific data */
 	drm_for_each_plane_mask(plane, crtc->dev, sde_crtc->plane_mask_old)
-		sde_plane_get_frame_data(plane, &data->plane_frame_data[i]);
+		sde_plane_get_frame_data(plane, &data->plane_frame_data[i++]);
 
 	if (frame_data->cnt)
 		_sde_crtc_frame_data_notify(crtc, data);
