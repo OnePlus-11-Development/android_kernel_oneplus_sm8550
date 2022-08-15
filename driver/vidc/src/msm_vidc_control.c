@@ -1723,13 +1723,54 @@ int msm_vidc_adjust_chroma_qp_index_offset(void *instance,
 	return 0;
 }
 
+static bool msm_vidc_check_all_layer_bitrate_set(struct msm_vidc_inst *inst)
+{
+	bool layer_bitrate_set = true;
+	u32 cap_id = 0, i, enh_layer_count;
+	u32 layer_br_caps[6] = {L0_BR, L1_BR, L2_BR, L3_BR, L4_BR, L5_BR};
+
+	enh_layer_count = inst->capabilities->cap[ENH_LAYER_COUNT].value;
+
+	for (i = 0; i <= enh_layer_count; i++) {
+		if (i >= ARRAY_SIZE(layer_br_caps))
+			break;
+		cap_id = layer_br_caps[i];
+		if (!(inst->capabilities->cap[cap_id].flags & CAP_FLAG_CLIENT_SET)) {
+			layer_bitrate_set = false;
+			break;
+		}
+	}
+
+	return layer_bitrate_set;
+}
+
+static u32 msm_vidc_get_cumulative_bitrate(struct msm_vidc_inst *inst)
+{
+	int i;
+	u32 cap_id = 0;
+	u32 cumulative_br = 0;
+	s32 enh_layer_count;
+	u32 layer_br_caps[6] = {L0_BR, L1_BR, L2_BR, L3_BR, L4_BR, L5_BR};
+
+	enh_layer_count = inst->capabilities->cap[ENH_LAYER_COUNT].value;
+
+	for (i = 0; i <= enh_layer_count; i++) {
+		if (i >= ARRAY_SIZE(layer_br_caps))
+			break;
+		cap_id = layer_br_caps[i];
+		cumulative_br += inst->capabilities->cap[cap_id].value;
+	}
+
+	return cumulative_br;
+}
+
 int msm_vidc_adjust_slice_count(void *instance, struct v4l2_ctrl *ctrl)
 {
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
 	struct msm_vidc_inst_capability *capability;
 	struct v4l2_format *output_fmt;
-	s32 adjusted_value, rc_type = -1, slice_mode, all_intra = 0;
-	u32 slice_val, mbpf = 0, mbps = 0, max_mbpf = 0, max_mbps = 0;
+	s32 adjusted_value, rc_type = -1, slice_mode, all_intra, enh_layer_count = 0;
+	u32 slice_val, mbpf = 0, mbps = 0, max_mbpf = 0, max_mbps = 0, bitrate = 0;
 	u32 update_cap, max_avg_slicesize, output_width, output_height;
 	u32 min_width, min_height, max_width, max_height, fps;
 
@@ -1748,8 +1789,23 @@ int msm_vidc_adjust_slice_count(void *instance, struct v4l2_ctrl *ctrl)
 	if (msm_vidc_get_parent_value(inst, SLICE_MODE,
 		BITRATE_MODE, &rc_type, __func__) ||
 		msm_vidc_get_parent_value(inst, SLICE_MODE,
-		ALL_INTRA, &all_intra, __func__))
+		ALL_INTRA, &all_intra, __func__) ||
+		msm_vidc_get_parent_value(inst, SLICE_MODE,
+		ENH_LAYER_COUNT, &enh_layer_count, __func__))
 		return -EINVAL;
+
+	if (capability->cap[BIT_RATE].flags & CAP_FLAG_CLIENT_SET) {
+		bitrate = capability->cap[BIT_RATE].value;
+	} else if (msm_vidc_check_all_layer_bitrate_set(inst)) {
+		bitrate = msm_vidc_get_cumulative_bitrate(inst);
+	} else {
+		adjusted_value = V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_SINGLE;
+		update_cap = SLICE_MODE;
+		i_vpr_h(inst,
+			"%s: client did not set bitrate & layerwise bitrates\n",
+			__func__);
+		goto exit;
+	}
 
 	fps = capability->cap[FRAME_RATE].value >> 16;
 	if (fps > MAX_SLICES_FRAME_RATE ||
@@ -1818,8 +1874,7 @@ int msm_vidc_adjust_slice_count(void *instance, struct v4l2_ctrl *ctrl)
 		slice_val = capability->cap[SLICE_MAX_BYTES].value;
 		update_cap = SLICE_MAX_BYTES;
 		if (rc_type != HFI_RC_OFF) {
-			max_avg_slicesize = ((capability->cap[BIT_RATE].value /
-				fps) / 8) /
+			max_avg_slicesize = ((bitrate / fps) / 8) /
 				MAX_SLICES_PER_FRAME;
 			slice_val = max(slice_val, max_avg_slicesize);
 		}
@@ -2043,47 +2098,6 @@ int msm_vidc_adjust_b_frame(void *instance, struct v4l2_ctrl *ctrl)
 exit:
 	msm_vidc_update_cap_value(inst, B_FRAME, adjusted_value, __func__);
 	return 0;
-}
-
-static bool msm_vidc_check_all_layer_bitrate_set(struct msm_vidc_inst *inst)
-{
-	bool layer_bitrate_set = true;
-	u32 cap_id = 0, i, enh_layer_count;
-	u32 layer_br_caps[6] = {L0_BR, L1_BR, L2_BR, L3_BR, L4_BR, L5_BR};
-
-	enh_layer_count = inst->capabilities->cap[ENH_LAYER_COUNT].value;
-
-	for (i = 0; i <= enh_layer_count; i++) {
-		if (i >= ARRAY_SIZE(layer_br_caps))
-			break;
-		cap_id = layer_br_caps[i];
-		if (!(inst->capabilities->cap[cap_id].flags & CAP_FLAG_CLIENT_SET)) {
-			layer_bitrate_set = false;
-			break;
-		}
-	}
-
-	return layer_bitrate_set;
-}
-
-static u32 msm_vidc_get_cumulative_bitrate(struct msm_vidc_inst *inst)
-{
-	int i;
-	u32 cap_id = 0;
-	u32 cumulative_br = 0;
-	s32 enh_layer_count;
-	u32 layer_br_caps[6] = {L0_BR, L1_BR, L2_BR, L3_BR, L4_BR, L5_BR};
-
-	enh_layer_count = inst->capabilities->cap[ENH_LAYER_COUNT].value;
-
-	for (i = 0; i <= enh_layer_count; i++) {
-		if (i >= ARRAY_SIZE(layer_br_caps))
-			break;
-		cap_id = layer_br_caps[i];
-		cumulative_br += inst->capabilities->cap[cap_id].value;
-	}
-
-	return cumulative_br;
 }
 
 int msm_vidc_adjust_bitrate(void *instance, struct v4l2_ctrl *ctrl)

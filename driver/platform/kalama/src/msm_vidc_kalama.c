@@ -2150,7 +2150,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kala
 
 	{ENH_LAYER_COUNT, ENC, H264|HEVC,
 		{BITRATE_MODE, META_EVA_STATS},
-		{GOP_SIZE, B_FRAME, BIT_RATE, MIN_QUALITY},
+		{GOP_SIZE, B_FRAME, BIT_RATE, MIN_QUALITY, SLICE_MODE},
 		msm_vidc_adjust_layer_count,
 		msm_vidc_set_layer_count_and_type},
 
@@ -2257,7 +2257,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kala
 		msm_vidc_set_deblock_mode},
 
 	{SLICE_MODE, ENC, H264|HEVC,
-		{BITRATE_MODE, ALL_INTRA},
+		{BITRATE_MODE, ALL_INTRA, ENH_LAYER_COUNT},
 		{STAGE, DELIVERY_MODE},
 		msm_vidc_adjust_slice_count,
 		msm_vidc_set_slice_count},
