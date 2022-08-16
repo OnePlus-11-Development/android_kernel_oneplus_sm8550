@@ -2593,7 +2593,6 @@ int msm_vdec_subscribe_event(struct msm_vidc_inst *inst,
 	switch (sub->type) {
 	case V4L2_EVENT_EOS:
 	case V4L2_EVENT_VIDC_METADATA:
-	case V4L2_EVENT_VIDC_LAST_FLAG:
 		rc = v4l2_event_subscribe(&inst->event_handler, sub, MAX_EVENTS, NULL);
 		break;
 	case V4L2_EVENT_SOURCE_CHANGE:

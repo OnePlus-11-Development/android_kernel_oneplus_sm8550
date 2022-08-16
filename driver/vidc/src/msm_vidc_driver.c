@@ -2339,7 +2339,6 @@ int msm_vidc_process_drain_last_flag(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
 	struct v4l2_event event = {0};
-	struct v4l2_event_vidc_last_flag *event_data = NULL;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -2356,9 +2355,7 @@ int msm_vidc_process_drain_last_flag(struct msm_vidc_inst *inst)
 		return 0;
 	}
 
-	event.type = V4L2_EVENT_VIDC_LAST_FLAG;
-	event_data = (struct v4l2_event_vidc_last_flag *)event.u.data;
-	event_data->flag_type = LAST_FLAG_DRAIN;
+	event.type = V4L2_EVENT_EOS;
 	v4l2_event_queue_fh(&inst->event_handler, &event);
 
 	return rc;
@@ -2368,7 +2365,6 @@ int msm_vidc_process_psc_last_flag(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
 	struct v4l2_event event = {0};
-	struct v4l2_event_vidc_last_flag *event_data = NULL;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -2385,9 +2381,7 @@ int msm_vidc_process_psc_last_flag(struct msm_vidc_inst *inst)
 		return 0;
 	}
 
-	event.type = V4L2_EVENT_VIDC_LAST_FLAG;
-	event_data = (struct v4l2_event_vidc_last_flag *)event.u.data;
-	event_data->flag_type = LAST_FLAG_DRC;
+	event.type = V4L2_EVENT_EOS;
 	v4l2_event_queue_fh(&inst->event_handler, &event);
 
 	return rc;
