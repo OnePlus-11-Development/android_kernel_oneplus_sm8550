@@ -1191,7 +1191,6 @@ void sde_evtlog_dump_all(struct sde_dbg_evtlog *evtlog)
 	char buf[SDE_EVTLOG_BUF_MAX];
 	bool update_last_entry = true;
 	u32 in_log, in_mem, in_dump;
-	u32 log_size = 0;
 	char *dump_addr = NULL;
 	int i;
 
@@ -1202,21 +1201,22 @@ void sde_evtlog_dump_all(struct sde_dbg_evtlog *evtlog)
 	in_mem = evtlog->dump_mode & SDE_DBG_DUMP_IN_MEM;
 	in_dump = evtlog->dump_mode & SDE_DBG_DUMP_IN_COREDUMP;
 
-	log_size = sde_evtlog_count(evtlog);
-	if (!log_size)
-		return;
-
 	if (!evtlog->dumped_evtlog) {
-		if (in_mem)
-			log_size = SDE_EVTLOG_ENTRY;
-		evtlog->dumped_evtlog = kvzalloc((log_size * SDE_EVTLOG_BUF_MAX), GFP_KERNEL);
-		evtlog->log_size = log_size;
+		evtlog->dumped_evtlog = kvzalloc((SDE_EVTLOG_ENTRY * SDE_EVTLOG_BUF_MAX),
+				GFP_KERNEL);
+		if (!evtlog->dumped_evtlog)
+			return;
+
+		evtlog->log_size = SDE_EVTLOG_ENTRY;
 	}
 	dump_addr = evtlog->dumped_evtlog;
 
 	if ((in_mem || in_dump) && dump_addr && (!sde_dbg_base.coredump_reading)) {
-		while (sde_evtlog_dump_to_buffer(evtlog, dump_addr, SDE_EVTLOG_BUF_MAX,
-				update_last_entry, true)) {
+		for (i =  0; i < evtlog->log_size; i++) {
+			if (!sde_evtlog_dump_to_buffer(evtlog, dump_addr, SDE_EVTLOG_BUF_MAX,
+					update_last_entry, true))
+				break;
+
 			dump_addr += SDE_EVTLOG_BUF_MAX;
 			update_last_entry = false;
 		}
@@ -1232,8 +1232,11 @@ void sde_evtlog_dump_all(struct sde_dbg_evtlog *evtlog)
 	}
 
 	if (in_log) {
-		while (sde_evtlog_dump_to_buffer(evtlog, buf, sizeof(buf),
-					update_last_entry, false)) {
+		for (i =  0; i < evtlog->log_size; i++) {
+			if (!sde_evtlog_dump_to_buffer(evtlog, buf, SDE_EVTLOG_BUF_MAX,
+					update_last_entry, false))
+				break;
+
 			pr_info("%s\n", buf);
 			update_last_entry = false;
 		}
