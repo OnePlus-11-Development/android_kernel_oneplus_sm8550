@@ -549,7 +549,6 @@ static void _sde_encoder_phys_wb_setup_cwb(struct sde_encoder_phys *phys_enc, bo
 {
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
 	struct sde_hw_wb *hw_wb = wb_enc->hw_wb;
-	struct sde_hw_wb_cfg *wb_cfg = &wb_enc->wb_cfg;
 	struct sde_hw_ctl *hw_ctl = phys_enc->hw_ctl;
 	struct sde_crtc *crtc = to_sde_crtc(wb_enc->crtc);
 	struct sde_hw_pingpong *hw_pp = phys_enc->hw_pp;
@@ -606,9 +605,6 @@ static void _sde_encoder_phys_wb_setup_cwb(struct sde_encoder_phys *phys_enc, bo
 		if ((hw_wb->ops.bind_dcwb_pp_blk) &&
 				test_bit(SDE_WB_DCWB_CTRL, &hw_wb->caps->features))
 			hw_wb->ops.bind_dcwb_pp_blk(hw_wb, enable, hw_pp->idx);
-
-		if (hw_wb->ops.setup_crop && !enable)
-			hw_wb->ops.setup_crop(hw_wb, wb_cfg, false);
 
 		if (hw_ctl->ops.update_intf_cfg) {
 			hw_ctl->ops.update_intf_cfg(hw_ctl, &intf_cfg, enable);
