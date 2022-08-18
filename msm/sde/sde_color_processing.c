@@ -1617,8 +1617,6 @@ static int _sde_cp_crtc_checkfeature(u32 feature,
 
 	hw_cfg.num_of_mixers = sde_crtc->num_mixers;
 	hw_cfg.last_feature = 0;
-	hw_cfg.panel_width = sde_crtc_state->base.adjusted_mode.hdisplay;
-	hw_cfg.panel_height = sde_crtc_state->base.adjusted_mode.vdisplay;
 
 	for (i = 0; i < num_mixers; i++) {
 		hw_dspp = sde_crtc->mixers[i].hw_dspp;
@@ -1627,7 +1625,6 @@ static int _sde_cp_crtc_checkfeature(u32 feature,
 		hw_cfg.dspp[i] = hw_dspp;
 	}
 
-	SDE_EVT32(feature, hw_cfg.panel_width, hw_cfg.panel_height);
 	for (i = 0; i < num_mixers && !ret; i++) {
 		hw_lm = sde_crtc->mixers[i].hw_lm;
 		hw_dspp = sde_crtc->mixers[i].hw_dspp;
@@ -1642,6 +1639,8 @@ static int _sde_cp_crtc_checkfeature(u32 feature,
 		hw_cfg.displayh = num_mixers *
 				sde_crtc_state->lm_roi[i].w;
 		hw_cfg.displayv = sde_crtc_state->lm_roi[i].h;
+		hw_cfg.panel_width = sde_crtc->base.state->adjusted_mode.hdisplay;
+		hw_cfg.panel_height = sde_crtc->base.state->adjusted_mode.vdisplay;
 		DRM_DEBUG_DRIVER("check cp feature %d on mixer %d\n",
 				feature, hw_lm->idx - LM_0);
 		ret = check_feature(hw_dspp, &hw_cfg, sde_crtc);
@@ -1686,7 +1685,7 @@ static void _sde_cp_crtc_commit_feature(struct sde_cp_node *prop_node,
 
 	hw_cfg.num_ds_enabled = sde_crtc_state->num_ds_enabled;
 
-	SDE_EVT32(prop_node->feature, hw_cfg.panel_width, hw_cfg.panel_height);
+	SDE_EVT32(hw_cfg.panel_width, hw_cfg.panel_height);
 
 	for (i = 0; i < num_mixers; i++) {
 		hw_dspp = sde_crtc->mixers[i].hw_dspp;
@@ -1889,9 +1888,6 @@ static int _sde_cp_crtc_check_pu_features(struct drm_crtc *crtc)
 	hw_cfg.num_of_mixers = sde_crtc->num_mixers;
 	hw_cfg.payload = &sde_crtc_state->user_roi_list;
 	hw_cfg.len = sizeof(sde_crtc_state->user_roi_list);
-	hw_cfg.panel_height = sde_crtc_state->base.adjusted_mode.vdisplay;
-	hw_cfg.panel_width = sde_crtc_state->base.adjusted_mode.hdisplay;
-
 	for (i = 0; i < hw_cfg.num_of_mixers; i++)
 		hw_cfg.dspp[i] = sde_crtc->mixers[i].hw_dspp;
 
@@ -1903,7 +1899,6 @@ static int _sde_cp_crtc_check_pu_features(struct drm_crtc *crtc)
 				!(sde_crtc->cp_pu_feature_mask & BIT(i)))
 			continue;
 
-		SDE_EVT32(i, hw_cfg.panel_width, hw_cfg.panel_height);
 		for (j = 0; j < hw_cfg.num_of_mixers; j++) {
 			hw_dspp = sde_crtc->mixers[j].hw_dspp;
 
@@ -1913,7 +1908,8 @@ static int _sde_cp_crtc_check_pu_features(struct drm_crtc *crtc)
 			hw_cfg.displayh = hw_cfg.num_of_mixers *
 					sde_crtc_state->lm_roi[j].w;
 			hw_cfg.displayv = sde_crtc_state->lm_roi[j].h;
-
+			hw_cfg.panel_height = sde_crtc->base.state->adjusted_mode.vdisplay;
+			hw_cfg.panel_width = sde_crtc->base.state->adjusted_mode.hdisplay;
 			ret = check_pu_feature(hw_dspp, &hw_cfg, sde_crtc);
 			if (ret) {
 				DRM_ERROR("failed pu feature %d in mixer %d\n",
@@ -2066,7 +2062,6 @@ static int _sde_cp_crtc_update_pu_features(struct drm_crtc *crtc, bool *need_flu
 				!(sde_crtc->cp_pu_feature_mask & BIT(i)))
 			continue;
 
-		SDE_EVT32(i, hw_cfg.panel_width, hw_cfg.panel_height);
 		for (j = 0; j < hw_cfg.num_of_mixers; j++) {
 			hw_lm = sde_crtc->mixers[j].hw_lm;
 			hw_dspp = sde_crtc->mixers[j].hw_dspp;
@@ -2076,6 +2071,8 @@ static int _sde_cp_crtc_update_pu_features(struct drm_crtc *crtc, bool *need_flu
 			hw_cfg.displayh = hw_cfg.num_of_mixers *
 					hw_lm->cfg.out_width;
 			hw_cfg.displayv = hw_lm->cfg.out_height;
+			hw_cfg.panel_width = sde_crtc->base.state->adjusted_mode.hdisplay;
+			hw_cfg.panel_height = sde_crtc->base.state->adjusted_mode.vdisplay;
 
 			ret = set_pu_feature(hw_dspp, &hw_cfg, sde_crtc);
 			/* feature does not need flush when ret > 0 */
