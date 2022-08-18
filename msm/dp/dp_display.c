@@ -202,7 +202,6 @@ struct dp_display_private {
 	struct work_struct connect_work;
 	struct work_struct attention_work;
 	struct mutex session_lock;
-	struct mutex accounting_lock;
 	bool hdcp_delayed_off;
 	bool no_aux_switch;
 
@@ -210,7 +209,6 @@ struct dp_display_private {
 	struct dp_mst mst;
 
 	u32 tot_dsc_blks_in_use;
-	u32 tot_lm_blks_in_use;
 
 	bool process_hpd_connect;
 	struct dev_pm_qos_request pm_qos_req[NR_CPUS];
@@ -1485,25 +1483,6 @@ static int dp_display_usbpd_configure_cb(struct device *dev)
 	return 0;
 }
 
-static void dp_display_clear_reservation(struct dp_display *dp, struct dp_panel *panel)
-{
-	struct dp_display_private *dp_display;
-
-	if (!dp || !panel) {
-		DP_ERR("invalid params\n");
-		return;
-	}
-
-	dp_display = container_of(dp, struct dp_display_private, dp_display);
-
-	mutex_lock(&dp_display->accounting_lock);
-
-	dp_display->tot_lm_blks_in_use -= panel->max_lm;
-	panel->max_lm = 0;
-
-	mutex_unlock(&dp_display->accounting_lock);
-}
-
 static void dp_display_clear_dsc_resources(struct dp_display_private *dp,
 		struct dp_panel *panel)
 {
@@ -1583,7 +1562,6 @@ static void dp_display_clean(struct dp_display_private *dp)
 
 		dp_display_stream_pre_disable(dp, dp_panel);
 		dp_display_stream_disable(dp, dp_panel);
-		dp_display_clear_reservation(&dp->dp_display, dp_panel);
 		dp_panel->deinit(dp_panel, 0);
 	}
 
@@ -1610,8 +1588,6 @@ static int dp_display_handle_disconnect(struct dp_display_private *dp)
 		dp_display_clean(dp);
 
 	dp_display_host_unready(dp);
-
-	dp->tot_lm_blks_in_use = 0;
 
 	mutex_unlock(&dp->session_lock);
 
@@ -2026,7 +2002,6 @@ static int dp_init_sub_modules(struct dp_display_private *dp)
 	};
 
 	mutex_init(&dp->session_lock);
-	mutex_init(&dp->accounting_lock);
 
 	dp->parser = dp_parser_get(dp->pdev);
 	if (IS_ERR(dp->parser)) {
@@ -2197,7 +2172,6 @@ static int dp_init_sub_modules(struct dp_display_private *dp)
 
 	dp->cached_connector_status = connector_status_disconnected;
 	dp->tot_dsc_blks_in_use = 0;
-	dp->tot_lm_blks_in_use = 0;
 
 	dp->debug->hdcp_disabled = hdcp_disabled;
 	dp_display_update_hdcp_status(dp, true);
@@ -2832,8 +2806,6 @@ static int dp_display_unprepare(struct dp_display *dp_display, void *panel)
 	/* log this as it results from user action of cable dis-connection */
 	DP_INFO("[OK]\n");
 end:
-	dp->tot_lm_blks_in_use -= dp_panel->max_lm;
-	dp_panel->max_lm = 0;
 	dp_panel->deinit(dp_panel, flags);
 	mutex_unlock(&dp->session_lock);
 	SDE_EVT32_EXTERNAL(SDE_EVTLOG_FUNC_EXIT, dp->state);
@@ -2892,14 +2864,11 @@ static int dp_display_validate_topology(struct dp_display_private *dp,
 	u32 num_lm = 0, num_dsc = 0, num_3dmux = 0;
 	bool dsc_capable = dp_mode->capabilities & DP_PANEL_CAPS_DSC;
 	u32 fps = dp_mode->timing.refresh_rate;
-	int avail_lm = 0;
-
-	mutex_lock(&dp->accounting_lock);
 
 	rc = msm_get_mixer_count(priv, mode, avail_res, &num_lm);
 	if (rc) {
 		DP_ERR("error getting mixer count. rc:%d\n", rc);
-		goto end;
+		return rc;
 	}
 
 	/* Merge using DSC, if enabled */
@@ -2907,7 +2876,7 @@ static int dp_display_validate_topology(struct dp_display_private *dp,
 		rc = msm_get_dsc_count(priv, mode->hdisplay, &num_dsc);
 		if (rc) {
 			DP_ERR("error getting dsc count. rc:%d\n", rc);
-			goto end;
+			return rc;
 		}
 
 		num_dsc = max(num_lm, num_dsc);
@@ -2917,8 +2886,7 @@ static int dp_display_validate_topology(struct dp_display_private *dp,
 					avail_res->num_lm);
 			/* Clear DSC caps and retry */
 			dp_mode->capabilities &= ~DP_PANEL_CAPS_DSC;
-			rc = -EAGAIN;
-			goto end;
+			return -EAGAIN;
 		} else {
 			/* Only DSCMERGE is supported on DP */
 			num_lm = num_dsc;
@@ -2929,36 +2897,24 @@ static int dp_display_validate_topology(struct dp_display_private *dp,
 		num_3dmux = 1;
 	}
 
-	avail_lm = avail_res->num_lm + avail_res->num_lm_in_use - dp->tot_lm_blks_in_use;
-	if ((num_lm > dp_panel->max_lm) && (num_lm > avail_lm)) {
+	if (num_lm > avail_res->num_lm) {
 		DP_DEBUG("mode %sx%d is invalid, not enough lm %d %d\n",
-				mode->name, fps, num_lm, avail_res->num_lm);
-		rc = -EPERM;
-		goto end;
+				mode->name, fps, num_lm, num_lm, avail_res->num_lm);
+		return -EPERM;
 	} else if (!num_dsc && (num_lm == dual && !num_3dmux)) {
 		DP_DEBUG("mode %sx%d is invalid, not enough 3dmux %d %d\n",
 				mode->name, fps, num_3dmux, avail_res->num_3dmux);
-		rc = -EPERM;
-		goto end;
+		return -EPERM;
 	} else if (num_lm == quad && num_dsc != quad)  {
 		DP_DEBUG("mode %sx%d is invalid, unsupported DP topology lm:%d dsc:%d\n",
 				mode->name, fps, num_lm, num_dsc);
-		rc = -EPERM;
-		goto end;
+		return -EPERM;
 	}
 
 	DP_DEBUG_V("mode %sx%d is valid, supported DP topology lm:%d dsc:%d 3dmux:%d\n",
 				mode->name, fps, num_lm, num_dsc, num_3dmux);
 
-	dp->tot_lm_blks_in_use -= dp_panel->max_lm;
-	dp_panel->max_lm = num_lm > avail_res->num_lm_in_use ? max(dp_panel->max_lm, num_lm) : 0;
-	dp->tot_lm_blks_in_use += dp_panel->max_lm;
-
-	rc = 0;
-
-end:
-	mutex_unlock(&dp->accounting_lock);
-	return rc;
+	return 0;
 }
 
 static enum drm_mode_status dp_display_validate_mode(
@@ -3014,8 +2970,6 @@ static enum drm_mode_status dp_display_validate_mode(
 
 	mode_status = MODE_OK;
 end:
-	if (mode_status != MODE_OK)
-		dp_display_clear_reservation(dp_display, dp_panel);
 	mutex_unlock(&dp->session_lock);
 
 	DP_DEBUG_V("[%s] mode is %s\n", mode->name,
@@ -3688,7 +3642,6 @@ static int dp_display_probe(struct platform_device *pdev)
 	g_dp_display->set_colorspace = dp_display_setup_colospace;
 	g_dp_display->get_available_dp_resources =
 					dp_display_get_available_dp_resources;
-	g_dp_display->clear_reservation = dp_display_clear_reservation;
 
 	rc = component_add(&pdev->dev, &dp_display_comp_ops);
 	if (rc) {

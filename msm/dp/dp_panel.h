@@ -137,7 +137,6 @@ struct dp_panel {
 	u32 pbn;
 
 	u32 dsc_blks_in_use;
-	u32 max_lm;
 	/* DRM connector assosiated with this panel */
 	struct drm_connector *connector;
 
