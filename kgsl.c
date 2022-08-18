@@ -1677,6 +1677,20 @@ static long kgsl_prop_query_capabilities(struct kgsl_device_private *dev_priv,
 	return ret;
 }
 
+static long kgsl_get_gpu_va64_size(struct kgsl_device_private *dev_priv,
+		struct kgsl_device_getproperty *param)
+{
+	u64 va_size = KGSL_IOMMU_VA_END64 - KGSL_IOMMU_VA_BASE64;
+
+	if (param->sizebytes != sizeof(va_size))
+		return -EINVAL;
+
+	if (copy_to_user(param->value, &va_size, sizeof(va_size)))
+		return -EFAULT;
+
+	return 0;
+}
+
 static const struct {
 	int type;
 	long (*func)(struct kgsl_device_private *dev_priv,
@@ -1688,6 +1702,7 @@ static const struct {
 	{ KGSL_PROP_SECURE_CTXT_SUPPORT, kgsl_prop_secure_ctxt_support },
 	{ KGSL_PROP_QUERY_CAPABILITIES, kgsl_prop_query_capabilities },
 	{ KGSL_PROP_CONTEXT_PROPERTY, kgsl_get_ctxt_properties },
+	{ KGSL_PROP_GPU_VA64_SIZE, kgsl_get_gpu_va64_size },
 };
 
 /*call all ioctl sub functions with driver locked*/
