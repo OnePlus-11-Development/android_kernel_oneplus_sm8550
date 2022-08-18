@@ -1360,17 +1360,15 @@ static int _sde_crtc_check_rois(struct drm_crtc *crtc,
 {
 	struct sde_crtc *sde_crtc;
 	struct sde_crtc_state *sde_crtc_state;
-	struct msm_mode_info *mode_info;
+	struct msm_mode_info mode_info;
 	u32 crtc_width, crtc_height, mixer_width, mixer_height;
 	struct drm_display_mode *adj_mode;
-	int rc = 0, lm_idx, i;
+	int rc, lm_idx, i;
 
 	if (!crtc || !state)
 		return -EINVAL;
 
-	mode_info = kzalloc(sizeof(struct msm_mode_info), GFP_KERNEL);
-	if (!mode_info)
-		return -ENOMEM;
+	memset(&mode_info, 0, sizeof(mode_info));
 
 	sde_crtc = to_sde_crtc(crtc);
 	sde_crtc_state = to_sde_crtc_state(state);
@@ -1385,8 +1383,7 @@ static int _sde_crtc_check_rois(struct drm_crtc *crtc,
 		SDE_ERROR("%s: invalid w/h crtc:%d,%d, mixer:%d,%d, num_mixers:%d\n",
 				sde_crtc->name, crtc_width, crtc_height, mixer_width, mixer_height,
 				sde_crtc->num_mixers);
-		rc = -EINVAL;
-		goto end;
+		return -EINVAL;
 	}
 
 	/*
@@ -1399,58 +1396,54 @@ static int _sde_crtc_check_rois(struct drm_crtc *crtc,
 		if (!conn || !conn->state)
 			continue;
 
-		rc = sde_connector_state_get_mode_info(conn->state, mode_info);
+		rc = sde_connector_state_get_mode_info(conn->state, &mode_info);
 		if (rc) {
 			SDE_ERROR("failed to get mode info\n");
-			rc =  -EINVAL;
-			goto end;
+			return -EINVAL;
 		}
 
 		if (sde_connector_is_3d_merge_enabled(conn) && (mixer_width % 2)) {
 			SDE_ERROR(
 			  "%s: invalid width w/ 3d-merge - mixer_w:%d, crtc_w:%d, num_mixers:%d\n",
 				sde_crtc->name, crtc_width, mixer_width, sde_crtc->num_mixers);
-			rc = -EINVAL;
-			goto end;
+			return -EINVAL;
 		}
 
-		if (!mode_info->roi_caps.enabled)
+		if (!mode_info.roi_caps.enabled)
 			continue;
 
 		if (sde_crtc_state->user_roi_list.num_rects >
-				mode_info->roi_caps.num_roi) {
+				mode_info.roi_caps.num_roi) {
 			SDE_ERROR("roi count is exceeding limit, %d > %d\n",
 					sde_crtc_state->user_roi_list.num_rects,
-					mode_info->roi_caps.num_roi);
-			rc = -E2BIG;
-			goto end;
+					mode_info.roi_caps.num_roi);
+			return -E2BIG;
 		}
 
 		rc = _sde_crtc_set_crtc_roi(crtc, state);
 		if (rc)
-			goto end;
+			return rc;
 
 		rc = _sde_crtc_check_autorefresh(crtc, state);
 		if (rc)
-			goto end;
+			return rc;
 
 		for (lm_idx = 0; lm_idx < sde_crtc->num_mixers; lm_idx++) {
 			rc = _sde_crtc_set_lm_roi(crtc, state, lm_idx);
 			if (rc)
-				goto end;
+				return rc;
 		}
 
 		rc = _sde_crtc_check_rois_centered_and_symmetric(crtc, state);
 		if (rc)
-			goto end;
+			return rc;
 
 		rc = _sde_crtc_check_planes_within_crtc_roi(crtc, state);
 		if (rc)
-			goto end;
+			return rc;
 	}
-end:
-	kfree(mode_info);
-	return rc;
+
+	return 0;
 }
 
 static u32 _sde_crtc_calc_gcd(u32 a, u32 b)
