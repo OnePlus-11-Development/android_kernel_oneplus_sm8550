@@ -597,11 +597,11 @@ static void dsi_pll_enable_global_clk(struct dsi_pll_resource *rsc)
 	DSI_PLL_REG_W(rsc->phy_base, PHY_CMN_CLK_CFG1, (data | BIT(5) | BIT(4)));
 }
 
-static void dsi_pll_phy_dig_reset(struct dsi_pll_resource *rsc)
+static void dsi_pll_phy_analog_reset(struct dsi_pll_resource *rsc)
 {
 	/*
-	 * Reset the PHY digital domain. This would be needed when
-	 * coming out of a CX or analog rail power collapse while
+	 * Reset the PHY analog domain. This would be needed when
+	 * coming out of a 0p9 power collapse while
 	 * ensuring that the pads maintain LP00 or LP11 state
 	 */
 	DSI_PLL_REG_W(rsc->phy_base, PHY_CMN_GLBL_DIGTOP_SPARE4, BIT(0));
@@ -1391,15 +1391,6 @@ static int dsi_pll_4nm_enable(struct dsi_pll_resource *rsc)
 		goto error;
 	}
 
-	/*
-	 * assert power on reset for PHY digital in case the PLL is
-	 * enabled after CX of analog domain power collapse. This needs
-	 * to be done before enabling the global clk.
-	 */
-	dsi_pll_phy_dig_reset(rsc);
-	if (rsc->slave)
-		dsi_pll_phy_dig_reset(rsc->slave);
-
 	dsi_pll_enable_global_clk(rsc);
 	if (rsc->slave)
 		dsi_pll_enable_global_clk(rsc->slave);
@@ -1436,11 +1427,52 @@ static int dsi_pll_4nm_disable(struct dsi_pll_resource *rsc)
 	return rc;
 }
 
+void dsi_pll_assert_pll_reset(struct dsi_pll_resource *rsc)
+{
+	u32 data = 0;
+
+	DSI_PLL_REG_W(rsc->phy_base, PHY_CMN_CTRL_1, data | BIT(7));
+
+	/* Ensure Assert is through */
+	wmb();
+
+	DSI_PLL_REG_W(rsc->phy_base, PHY_CMN_CTRL_1, data & ~BIT(7));
+
+	/* Ensure deassert is through */
+	wmb();
+}
+
+void dsi_pll_4nm_trigger_resets_pre_enable(struct dsi_pll_resource *rsc)
+{
+	/*
+	 * Assert power on reset on DSI PHY Analog immeditately
+	 * after 0P9 resume to make sure PHY starts in a
+	 * clean state
+	 */
+	dsi_pll_phy_analog_reset(rsc);
+	if (rsc->slave)
+		dsi_pll_phy_analog_reset(rsc->slave);
+
+	/*
+	 * Trigger PLL reset as well to clear out any jitter
+	 * introduced as result of 0p9 collapse
+	 */
+	dsi_pll_assert_pll_reset(rsc);
+	if (rsc->slave)
+		dsi_pll_assert_pll_reset(rsc->slave);
+}
+
 int dsi_pll_4nm_configure(void *pll, bool commit)
 {
 
 	int rc = 0;
 	struct dsi_pll_resource *rsc = (struct dsi_pll_resource *)pll;
+
+	/* These resets are needed for resetting Analog and PLL portions
+	 * of DSI PHY before PLL is enabled and locked
+	 */
+	if (commit)
+		dsi_pll_4nm_trigger_resets_pre_enable(rsc);
 
 	dsi_pll_config_slave(rsc);
 
