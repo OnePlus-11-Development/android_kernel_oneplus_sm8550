@@ -2778,8 +2778,10 @@ void sde_crtc_get_frame_data(struct drm_crtc *crtc)
 	data->frame_count = sde_crtc->fps_info.frame_count;
 
 	/* Collect plane specific data */
-	drm_for_each_plane_mask(plane, crtc->dev, sde_crtc->plane_mask_old)
-		sde_plane_get_frame_data(plane, &data->plane_frame_data[i++]);
+	drm_for_each_plane_mask(plane, crtc->dev, sde_crtc->plane_mask_old) {
+		if (i < SDE_FRAME_DATA_MAX_PLANES)
+			sde_plane_get_frame_data(plane, &data->plane_frame_data[i++]);
+	}
 
 	if (frame_data->cnt)
 		_sde_crtc_frame_data_notify(crtc, data);

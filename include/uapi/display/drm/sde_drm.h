@@ -580,7 +580,7 @@ struct sde_drm_ubwc_stats_data {
  */
 #define SDE_FRAME_DATA_BUFFER_MAX	0x3
 #define SDE_FRAME_DATA_GUARD_BYTES	0xFF
-#define SDE_FRAME_DATA_MAX_PLANES	0x10
+#define SDE_FRAME_DATA_MAX_PLANES	0x14
 
 /**
  * struct sde_drm_frame_data_buffers_ctrl - control frame data buffers
