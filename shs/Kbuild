@@ -3,6 +3,7 @@ obj-m += rmnet_shs.o
 ccflags-y := -I$(RMNET_CORE_INC_DIR) \
              $(call cc-option,-Wno-misleading-indentation)
 rmnet_shs-y :=  rmnet_shs_config.o \
+		rmnet_shs_ll.o \
 		rmnet_shs_main.o \
 		rmnet_shs_common.o \
 		rmnet_shs_wq.o \
