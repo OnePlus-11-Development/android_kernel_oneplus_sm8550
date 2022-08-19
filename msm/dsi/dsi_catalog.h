@@ -164,7 +164,9 @@ void dsi_ctrl_hw_cmn_cmd_test_pattern_setup(struct dsi_ctrl_hw *ctrl,
 			       enum dsi_test_pattern  type,
 			       u32 init_val,
 			       u32 stream_id);
-void dsi_ctrl_hw_cmn_test_pattern_enable(struct dsi_ctrl_hw *ctrl, bool enable);
+void dsi_ctrl_hw_cmn_test_pattern_enable(struct dsi_ctrl_hw *ctrl, bool enable,
+				enum dsi_ctrl_tpg_pattern pattern,
+				enum dsi_op_mode panel_mode);
 void dsi_ctrl_hw_cmn_trigger_cmd_test_pattern(struct dsi_ctrl_hw *ctrl,
 				 u32 stream_id);
 

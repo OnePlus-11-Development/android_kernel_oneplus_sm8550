@@ -749,6 +749,7 @@ int sde_hw_rc_check_mask(struct sde_hw_dspp *hw_dspp, void *cfg)
 
 	if ((hw_cfg->len == 0 && hw_cfg->payload == NULL)) {
 		SDE_DEBUG("RC feature disabled, skip mask checks\n");
+		SDE_EVT32(RC_IDX(hw_dspp));
 		return 0;
 	}
 
@@ -802,6 +803,7 @@ int sde_hw_rc_check_pu_roi(struct sde_hw_dspp *hw_dspp, void *cfg)
 		SDE_DEBUG("full frame update\n");
 		memset(&empty_roi_list, 0, sizeof(struct msm_roi_list));
 		roi_list = &empty_roi_list;
+		SDE_EVT32(RC_IDX(hw_dspp));
 	}
 
 	rc_mask_cfg = RC_STATE(hw_dspp).last_rc_mask_cfg;
@@ -810,6 +812,7 @@ int sde_hw_rc_check_pu_roi(struct sde_hw_dspp *hw_dspp, void *cfg)
 	/* early return when there is no mask in memory */
 	if (!mask_programmed || !rc_mask_cfg) {
 		SDE_DEBUG("no previous rc mask programmed\n");
+		SDE_EVT32(RC_IDX(hw_dspp));
 		return SDE_HW_RC_PU_SKIP_OP;
 	}
 
@@ -869,10 +872,12 @@ int sde_hw_rc_setup_pu_roi(struct sde_hw_dspp *hw_dspp, void *cfg)
 
 	rc_mask_cfg = RC_STATE(hw_dspp).last_rc_mask_cfg;
 	mask_programmed = RC_STATE(hw_dspp).mask_programmed;
+	SDE_EVT32(RC_IDX(hw_dspp), roi_list, rc_mask_cfg, mask_programmed);
 
 	/* early return when there is no mask in memory */
 	if (!mask_programmed || !rc_mask_cfg) {
 		SDE_DEBUG("no previous rc mask programmed\n");
+		SDE_EVT32(RC_IDX(hw_dspp));
 		return SDE_HW_RC_PU_SKIP_OP;
 	}
 
@@ -936,7 +941,9 @@ int sde_hw_rc_setup_mask(struct sde_hw_dspp *hw_dspp, void *cfg)
 		memset(RC_STATE(hw_dspp).last_roi_list, 0,
 				sizeof(struct msm_roi_list));
 		RC_STATE(hw_dspp).roi_programmed = false;
-
+		SDE_EVT32(RC_IDX(hw_dspp), RC_STATE(hw_dspp).last_rc_mask_cfg,
+				RC_STATE(hw_dspp).mask_programmed,
+				RC_STATE(hw_dspp).roi_programmed);
 		return 0;
 	}
 
@@ -957,6 +964,7 @@ int sde_hw_rc_setup_mask(struct sde_hw_dspp *hw_dspp, void *cfg)
 		SDE_DEBUG("partial frame update\n");
 		sde_kms_rect_merge_rectangles(last_roi_list, &merged_roi);
 	}
+	SDE_EVT32(RC_IDX(hw_dspp), roi_programmed);
 
 	rc = _sde_hw_rc_get_ajusted_roi(hw_cfg, &merged_roi, &rc_roi);
 	if (rc) {
@@ -1003,6 +1011,7 @@ int sde_hw_rc_setup_data_dma(struct sde_hw_dspp *hw_dspp, void *cfg)
 
 	if ((hw_cfg->len == 0 && hw_cfg->payload == NULL)) {
 		SDE_DEBUG("RC feature disabled, skip data programming\n");
+		SDE_EVT32(RC_IDX(hw_dspp));
 		return 0;
 	}
 
@@ -1016,6 +1025,7 @@ int sde_hw_rc_setup_data_dma(struct sde_hw_dspp *hw_dspp, void *cfg)
 
 	if (rc_mask_cfg->flags & SDE_HW_RC_SKIP_DATA_PROG) {
 		SDE_DEBUG("skip data programming\n");
+		SDE_EVT32(RC_IDX(hw_dspp));
 		return 0;
 	}
 
@@ -1042,6 +1052,7 @@ int sde_hw_rc_setup_data_ahb(struct sde_hw_dspp *hw_dspp, void *cfg)
 
 	if ((hw_cfg->len == 0 && hw_cfg->payload == NULL)) {
 		SDE_DEBUG("rc feature disabled, skip data programming\n");
+		SDE_EVT32(RC_IDX(hw_dspp));
 		return 0;
 	}
 
@@ -1055,6 +1066,7 @@ int sde_hw_rc_setup_data_ahb(struct sde_hw_dspp *hw_dspp, void *cfg)
 
 	if (rc_mask_cfg->flags & SDE_HW_RC_SKIP_DATA_PROG) {
 		SDE_DEBUG("skip data programming\n");
+		SDE_EVT32(RC_IDX(hw_dspp));
 		return 0;
 	}
 
