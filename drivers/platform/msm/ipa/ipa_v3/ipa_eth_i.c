@@ -833,8 +833,15 @@ static int ipa_eth_setup_ntn_gsi_channel(
 			(u32)((u64)(pipe->info.data_buff_list[0].iova) >> 32);
 	}
 
-	if (pipe->dir == IPA_ETH_PIPE_DIR_TX)
-		ch_scratch.ntn.ioc_mod_threshold = IPA_ETH_NTN_MODT;
+	if (pipe->dir == IPA_ETH_PIPE_DIR_TX) {
+		if (pipe->info.client_info.ntn.ioc_mod_threshold &&
+		    pipe->info.client_info.ntn.ioc_mod_threshold < len / GSI_EVT_RING_RE_SIZE_16B) {
+			ch_scratch.ntn.ioc_mod_threshold =
+				pipe->info.client_info.ntn.ioc_mod_threshold;
+		} else {
+			ch_scratch.ntn.ioc_mod_threshold = IPA_ETH_NTN_MODT;
+		}
+	}
 
 	result = gsi_write_channel_scratch(ep->gsi_chan_hdl, ch_scratch);
 	if (result != GSI_STATUS_SUCCESS) {
