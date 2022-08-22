@@ -443,10 +443,25 @@ struct map_src_dst_addr_s {
 	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_HW_A7_EE, 19), \
 		(u32 *)&ipa_reg_save.gsi.ch_cntxt.a7[19].var_name, \
 		GEN_REG_ATTR(reg_name) }, \
-	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_REG_SAVE_HWP_GSI_EE, 1),	\
+	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_HW_A7_EE, 20), \
+		(u32 *)&ipa_reg_save.gsi.ch_cntxt.a7[20].var_name, \
+		GEN_REG_ATTR(reg_name) }, \
+	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_HW_A7_EE, 21), \
+		(u32 *)&ipa_reg_save.gsi.ch_cntxt.a7[21].var_name, \
+		GEN_REG_ATTR(reg_name) }, \
+	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_HW_A7_EE, 22), \
+		(u32 *)&ipa_reg_save.gsi.ch_cntxt.a7[22].var_name, \
+		GEN_REG_ATTR(reg_name) }, \
+	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_HW_A7_EE, 23), \
+		(u32 *)&ipa_reg_save.gsi.ch_cntxt.a7[23].var_name, \
+		GEN_REG_ATTR(reg_name) }, \
+	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_HW_A7_EE, 24), \
+		(u32 *)&ipa_reg_save.gsi.ch_cntxt.a7[24].var_name, \
+		GEN_REG_ATTR(reg_name) }, \
+	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_HW_UC_EE, 0),	\
 		(u32 *)&ipa_reg_save.gsi.ch_cntxt.uc[0].var_name, \
 		GEN_REG_ATTR(reg_name) }, \
-	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_REG_SAVE_HWP_GSI_EE, 3), \
+	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_HW_UC_EE, 3), \
 		(u32 *)&ipa_reg_save.gsi.ch_cntxt.uc[1].var_name, \
 		GEN_REG_ATTR(reg_name) }, \
 	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_HW_Q6_EE, 0),	\
@@ -600,6 +615,24 @@ struct map_src_dst_addr_s {
 		GEN_REG_ATTR(reg_name) }, \
 	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_HW_A7_EE, 18), \
 		(u32 *)&ipa_reg_save.gsi.evt_cntxt.a7[18].var_name, \
+		GEN_REG_ATTR(reg_name) }, \
+	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_HW_A7_EE, 19), \
+		(u32 *)&ipa_reg_save.gsi.evt_cntxt.a7[19].var_name, \
+		GEN_REG_ATTR(reg_name) }, \
+	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_HW_A7_EE, 20), \
+		(u32 *)&ipa_reg_save.gsi.evt_cntxt.a7[20].var_name, \
+		GEN_REG_ATTR(reg_name) }, \
+	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_HW_A7_EE, 21), \
+		(u32 *)&ipa_reg_save.gsi.evt_cntxt.a7[21].var_name, \
+		GEN_REG_ATTR(reg_name) }, \
+	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_HW_A7_EE, 22), \
+		(u32 *)&ipa_reg_save.gsi.evt_cntxt.a7[22].var_name, \
+		GEN_REG_ATTR(reg_name) }, \
+	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_HW_A7_EE, 23), \
+		(u32 *)&ipa_reg_save.gsi.evt_cntxt.a7[23].var_name, \
+		GEN_REG_ATTR(reg_name) }, \
+	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_HW_A7_EE, 24), \
+		(u32 *)&ipa_reg_save.gsi.evt_cntxt.a7[24].var_name, \
 		GEN_REG_ATTR(reg_name) }, \
 	{ GEN_2xVECTOR_REG_OFST(reg_name, IPA_REG_SAVE_HWP_GSI_EE, 1), \
 		(u32 *)&ipa_reg_save.gsi.evt_cntxt.uc[0].var_name, \
@@ -1465,6 +1498,14 @@ struct ipa_reg_save_dst_rsrc_cnt_s {
 	  ipa_dst_rsrc_grp_4567_rsrc_type_cnt_n;
 };
 
+/* GSI fw version data */
+struct ipa_reg_save_gsi_fw_version_s {
+	u32 raw_version;
+	u32 hw_version;
+	u32 flavor;
+	u32 fw_version;
+};
+
 /* GSI General register save data struct */
 struct ipa_reg_save_gsi_gen_s {
 	struct gsi_hwio_def_gsi_cfg_s
@@ -1867,7 +1908,7 @@ struct ipa_regs_save_hierarchy_s {
 
 /* Top level GSI register save data struct */
 struct gsi_regs_save_hierarchy_s {
-	u32 fw_ver;
+	struct ipa_reg_save_gsi_fw_version_s	fw_ver;
 	struct ipa_reg_save_gsi_gen_s		gen;
 	struct ipa_reg_save_gsi_gen_ee_s	gen_ee[IPA_REG_SAVE_GSI_NUM_EE];
 	struct ipa_reg_save_gsi_ch_cntxt_s	ch_cntxt;
