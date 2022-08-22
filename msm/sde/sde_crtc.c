@@ -1391,9 +1391,9 @@ static int _sde_crtc_check_rois(struct drm_crtc *crtc,
 	} else if (state->state) {
 		for_each_new_connector_in_state(state->state, conn, conn_state, i) {
 			if (conn_state && (conn_state->crtc == crtc)
-				&& ((sde_connector_is_dualpipe_3d_merge_enabled(conn)
+				&& ((sde_connector_is_dualpipe_3d_merge_enabled(conn_state)
 						&& (crtc_width % 4))
-					|| (sde_connector_is_quadpipe_3d_merge_enabled(conn)
+					|| (sde_connector_is_quadpipe_3d_merge_enabled(conn_state)
 							&& (crtc_width % 8)))) {
 				SDE_ERROR(
 				  "%s: invalid 3d-merge_w - mixer_w:%d, crtc_w:%d, num_mixers:%d\n",
@@ -1421,7 +1421,7 @@ static int _sde_crtc_check_rois(struct drm_crtc *crtc,
 			goto end;
 		}
 
-		if (sde_connector_is_3d_merge_enabled(conn) && (mixer_width % 2)) {
+		if (sde_connector_is_3d_merge_enabled(conn->state) && (mixer_width % 2)) {
 			SDE_ERROR(
 			  "%s: invalid width w/ 3d-merge - mixer_w:%d, crtc_w:%d, num_mixers:%d\n",
 				sde_crtc->name, crtc_width, mixer_width, sde_crtc->num_mixers);
