@@ -461,17 +461,6 @@ enum meta_picture_type {
  *      ...
  *  }
  */
-#define V4L2_EVENT_VIDC_METADATA                                             \
-	(V4L2_EVENT_PRIVATE_START + 0x1)
-
-struct v4l2_event_vidc_metadata {
-	__u32                                type;
-	__s32                                fd;
-	__u32                                index;
-	__u32                                bytesused;
-	__u32                                offset;
-	__u8                                 reserved[44];
-};
 
 /* vendor events end */
 
