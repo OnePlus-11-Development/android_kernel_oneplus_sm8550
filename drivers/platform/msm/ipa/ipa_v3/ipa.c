@@ -8397,6 +8397,11 @@ static int ipa_firmware_load(const char *sub_sys)
 	scnprintf(fw_name, ARRAY_SIZE(fw_name), "%s.mdt", sub_sys);
 	ret = of_property_read_u32_index(dev->of_node, "pas-ids", index,
 					  &pas_id);
+	if(ret) {
+		dev_err(dev, "error %d getting \"pass-ids\" property\n",
+			ret);
+		return ret;
+	}
 
 	ret = request_firmware(&fw, fw_name, dev);
 	if (ret) {
