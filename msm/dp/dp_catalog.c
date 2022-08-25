@@ -1118,6 +1118,7 @@ static void dp_catalog_panel_config_ctrl(struct dp_catalog_panel *panel,
 	struct dp_catalog_private *catalog;
 	struct dp_io_data *io_data;
 	u32 strm_reg_off = 0, mainlink_ctrl;
+	u32 reg;
 
 	if (!panel) {
 		DP_ERR("invalid input\n");
@@ -1150,6 +1151,10 @@ static void dp_catalog_panel_config_ctrl(struct dp_catalog_panel *panel,
 		dp_write(MMSS_DP_ASYNC_FIFO_CONFIG, 0x01);
 	else
 		dp_write(MMSS_DP_ASYNC_FIFO_CONFIG, 0x00);
+
+	reg = dp_read(MMSS_DP_TIMING_ENGINE_EN);
+	reg |= BIT(8);
+	dp_write(MMSS_DP_TIMING_ENGINE_EN, reg);
 }
 
 static void dp_catalog_panel_config_dto(struct dp_catalog_panel *panel,
@@ -1419,6 +1424,77 @@ static void dp_catalog_ctrl_usb_reset(struct dp_catalog_ctrl *ctrl, bool flip)
 	wmb();
 }
 
+static int dp_catalog_ctrl_setup_misr(struct dp_catalog_ctrl *ctrl)
+{
+	struct dp_catalog_private *catalog;
+	struct dp_io_data *io_data;
+	u32 val;
+
+	if (!ctrl) {
+		DP_ERR("invalid input\n");
+		return -EINVAL;
+	}
+
+	catalog = dp_catalog_get_priv(ctrl);
+
+	io_data = catalog->io.dp_phy;
+	dp_write(DP_PHY_MISR_CTRL, 0x3);
+	/* make sure misr hw is reset */
+	wmb();
+	dp_write(DP_PHY_MISR_CTRL, 0x1);
+	/* make sure misr is brought out of reset */
+	wmb();
+
+	io_data = catalog->io.dp_link;
+	val = 1;	// frame count
+	val |= BIT(10); // clear status
+	val |= BIT(8);  // enable
+	dp_write(DP_MISR40_CTRL, val);
+	/* make sure misr control is applied */
+	wmb();
+
+	return 0;
+}
+
+static int dp_catalog_ctrl_read_misr(struct dp_catalog_ctrl *ctrl, struct dp_misr40_data *data)
+{
+	struct dp_catalog_private *catalog;
+	struct dp_io_data *io_data;
+	u32 val;
+	int i, j;
+	u32 addr;
+
+	if (!ctrl) {
+		DP_ERR("invalid input\n");
+		return -EINVAL;
+	}
+
+	catalog = dp_catalog_get_priv(ctrl);
+
+	io_data = catalog->io.dp_phy;
+	val = dp_read(DP_PHY_MISR_STATUS);
+	if (!val) {
+		DP_WARN("phy misr not ready!");
+		return -EAGAIN;
+	}
+
+	addr = DP_PHY_MISR_TX0;
+	for (i = 0; i < 8; i++) {
+		data->phy_misr[i] = 0;
+		for (j = 0; j < 4; j++) {
+			val = dp_read(addr) & 0xff;
+			data->phy_misr[i] |= val << (j * 8);
+			addr += 4;
+		}
+	}
+
+	io_data = catalog->io.dp_link;
+	for (i = 0; i < 8; i++)
+		data->ctrl_misr[i] = dp_read(DP_MISR40_TX0 + (i * 4));
+
+	return 0;
+}
+
 static void dp_catalog_panel_tpg_cfg(struct dp_catalog_panel *panel, u32 pattern)
 {
 	struct dp_catalog_private *catalog;
@@ -1625,6 +1701,34 @@ static bool dp_catalog_panel_dhdr_busy(struct dp_catalog_panel *panel)
 	dp_flush = dp_read(MMSS_DP_FLUSH + offset);
 
 	return dp_flush & BIT(DP_DHDR_FLUSH) ? true : false;
+}
+
+static int dp_catalog_panel_get_src_crc(struct dp_catalog_panel *panel, u16 *crc)
+{
+	struct dp_catalog_private *catalog;
+	struct dp_io_data *io_data;
+	u32 offset;
+	u32 reg;
+
+	if (panel->stream_id >= DP_STREAM_MAX) {
+		DP_ERR("invalid stream_id:%d\n", panel->stream_id);
+		return -EINVAL;
+	}
+
+	catalog = dp_catalog_get_priv(panel);
+	io_data = catalog->io.dp_link;
+
+	if (panel->stream_id == DP_STREAM_0)
+		offset = MMSS_DP_PSR_CRC_RG;
+	else
+		offset = MMSS_DP1_CRC_RG;
+
+	reg = dp_read(offset); //GR
+	crc[0] = reg & 0xffff;
+	crc[1] = reg >> 16;
+	crc[2] = dp_read(offset + 4); //B
+
+	return 0;
 }
 
 static void dp_catalog_ctrl_reset(struct dp_catalog_ctrl *ctrl)
@@ -2896,6 +3000,8 @@ struct dp_catalog *dp_catalog_get(struct device *dev, struct dp_parser *parser)
 		.fec_config = dp_catalog_ctrl_fec_config,
 		.mainlink_levels = dp_catalog_ctrl_mainlink_levels,
 		.late_phy_init = dp_catalog_ctrl_late_phy_init,
+		.setup_misr = dp_catalog_ctrl_setup_misr,
+		.read_misr = dp_catalog_ctrl_read_misr,
 	};
 	struct dp_catalog_hpd hpd = {
 		.config_hpd	= dp_catalog_hpd_config_hpd,
@@ -2925,6 +3031,7 @@ struct dp_catalog *dp_catalog_get(struct device *dev, struct dp_parser *parser)
 		.pps_flush = dp_catalog_panel_pps_flush,
 		.dhdr_flush = dp_catalog_panel_dhdr_flush,
 		.dhdr_busy = dp_catalog_panel_dhdr_busy,
+		.get_src_crc = dp_catalog_panel_get_src_crc,
 	};
 
 	if (!dev || !parser) {

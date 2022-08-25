@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -32,6 +33,8 @@ struct dp_ctrl {
 			enum dp_stream_id strm,
 			u32 ch_start_slot, u32 ch_tot_slots);
 	void (*set_sim_mode)(struct dp_ctrl *dp_ctrl, bool en);
+	int (*setup_misr)(struct dp_ctrl *dp_ctrl);
+	int (*read_misr)(struct dp_ctrl *dp_ctrl, struct dp_misr40_data *data);
 };
 
 struct dp_ctrl_in {
