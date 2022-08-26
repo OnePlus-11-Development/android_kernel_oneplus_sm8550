@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
  */
 
@@ -41,10 +42,11 @@ struct dp_audio {
 	 * playback should be stopped on the external display.
 	 *
 	 * @dp_audio: an instance of struct dp_audio.
+	 * @skip_wait: flag to skip any waits
 	 *
 	 * Returns the error code in case of failure, 0 in success case.
 	 */
-	int (*off)(struct dp_audio *dp_audio);
+	int (*off)(struct dp_audio *dp_audio, bool skip_wait);
 };
 
 /**

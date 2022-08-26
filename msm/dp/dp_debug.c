@@ -2466,6 +2466,8 @@ static void dp_debug_abort(struct dp_debug *dp_debug)
 	debug = container_of(dp_debug, struct dp_debug_private, dp_debug);
 
 	mutex_lock(&debug->lock);
+	// disconnect has already been handled. so clear hotplug
+	debug->hotplug = false;
 	dp_debug_set_sim_mode(debug, false);
 	mutex_unlock(&debug->lock);
 }
