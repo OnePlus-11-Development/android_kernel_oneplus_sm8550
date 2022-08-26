@@ -983,8 +983,18 @@ static int dp_display_send_hpd_notification(struct dp_display_private *dp, bool 
 			(!!dp_display_state_is(DP_STATE_ENABLED) == hpd))
 		goto skip_wait;
 
-	if (!wait_for_completion_timeout(&dp->notification_comp,
-						HZ * 5)) {
+	// wait 2 seconds
+	if (wait_for_completion_timeout(&dp->notification_comp, HZ * 2))
+		goto skip_wait;
+
+	//resend notification
+	if (dp->mst.mst_active)
+		dp->mst.cbs.hpd(&dp->dp_display, hpd);
+	else
+		dp_display_send_hpd_event(dp);
+
+	// wait another 3 seconds
+	if (!wait_for_completion_timeout(&dp->notification_comp, HZ * 3)) {
 		DP_WARN("%s timeout\n", hpd ? "connect" : "disconnect");
 		ret = -EINVAL;
 	}
