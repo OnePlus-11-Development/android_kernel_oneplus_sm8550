@@ -1217,14 +1217,15 @@ static inline int sde_connector_state_get_compression_info(
 	return 0;
 }
 
-static inline bool sde_connector_is_quadpipe_3d_merge_enabled(struct drm_connector *conn)
+static inline bool sde_connector_is_quadpipe_3d_merge_enabled(
+		struct drm_connector_state *conn_state)
 {
 	enum sde_rm_topology_name topology;
 
-	if (!conn)
+	if (!conn_state)
 		return false;
 
-	topology = sde_connector_get_topology_name(conn);
+	topology = sde_connector_get_property(conn_state, CONNECTOR_PROP_TOPOLOGY_NAME);
 	if ((topology == SDE_RM_TOPOLOGY_QUADPIPE_3DMERGE)
 			|| (topology == SDE_RM_TOPOLOGY_QUADPIPE_3DMERGE_DSC))
 		return true;
@@ -1232,14 +1233,15 @@ static inline bool sde_connector_is_quadpipe_3d_merge_enabled(struct drm_connect
 	return false;
 }
 
-static inline bool sde_connector_is_dualpipe_3d_merge_enabled(struct drm_connector *conn)
+static inline bool sde_connector_is_dualpipe_3d_merge_enabled(
+		struct drm_connector_state *conn_state)
 {
 	enum sde_rm_topology_name topology;
 
-	if (!conn)
+	if (!conn_state)
 		return false;
 
-	topology = sde_connector_get_topology_name(conn);
+	topology = sde_connector_get_property(conn_state, CONNECTOR_PROP_TOPOLOGY_NAME);
 	if ((topology == SDE_RM_TOPOLOGY_DUALPIPE_3DMERGE)
 			|| (topology == SDE_RM_TOPOLOGY_DUALPIPE_3DMERGE_DSC)
 			|| (topology == SDE_RM_TOPOLOGY_DUALPIPE_3DMERGE_VDC))
@@ -1248,10 +1250,10 @@ static inline bool sde_connector_is_dualpipe_3d_merge_enabled(struct drm_connect
 	return false;
 }
 
-static inline bool sde_connector_is_3d_merge_enabled(struct drm_connector *conn)
+static inline bool sde_connector_is_3d_merge_enabled(struct drm_connector_state *conn_state)
 {
-	return sde_connector_is_dualpipe_3d_merge_enabled(conn)
-		|| sde_connector_is_quadpipe_3d_merge_enabled(conn);
+	return sde_connector_is_dualpipe_3d_merge_enabled(conn_state)
+		|| sde_connector_is_quadpipe_3d_merge_enabled(conn_state);
 }
 
 /**
