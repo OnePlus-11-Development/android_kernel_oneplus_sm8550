@@ -291,8 +291,10 @@ struct dsi_phy_hw_ops {
 	/**
 	 * phy_idle_off() - Disable PHY hardware when exiting idle screen
 	 * @phy:      Pointer to DSI PHY hardware object.
+	 * @cfg:      Per lane configurations for timing, strength and lane
+	 *	      configurations.
 	 */
-	void (*phy_idle_off)(struct dsi_phy_hw *phy);
+	void (*phy_idle_off)(struct dsi_phy_hw *phy, struct dsi_phy_cfg *cfg);
 
 	/**
 	 * calculate_timing_params() - calculates timing parameters.
