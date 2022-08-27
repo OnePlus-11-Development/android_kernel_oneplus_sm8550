@@ -167,6 +167,7 @@
 #define PHY_CMN_GLBL_CTRL	0x018
 #define PHY_CMN_RBUF_CTRL	0x01C
 #define PHY_CMN_CTRL_0		0x024
+#define PHY_CMN_CTRL_1          0x028
 #define PHY_CMN_CTRL_2		0x02C
 #define PHY_CMN_CTRL_3		0x030
 #define PHY_CMN_PLL_CNTRL	0x03C
