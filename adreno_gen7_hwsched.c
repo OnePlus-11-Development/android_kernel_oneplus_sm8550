@@ -1449,9 +1449,6 @@ int gen7_hwsched_probe(struct platform_device *pdev,
 
 	adreno_dev->irq_mask = GEN7_HWSCHED_INT_MASK;
 
-	if (ADRENO_FEATURE(adreno_dev, ADRENO_PREEMPTION))
-		set_bit(ADRENO_DEVICE_PREEMPTION, &adreno_dev->priv);
-
 	if (ADRENO_FEATURE(adreno_dev, ADRENO_LPAC))
 		adreno_dev->lpac_enabled = true;
 

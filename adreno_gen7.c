@@ -1253,8 +1253,14 @@ int gen7_probe_common(struct platform_device *pdev,
 	adreno_dev->hwcg_enabled = true;
 	adreno_dev->uche_client_pf = 1;
 
-	adreno_dev->preempt.skipsaverestore = true;
-	adreno_dev->preempt.usesgmem = true;
+	if (ADRENO_FEATURE(adreno_dev, ADRENO_PREEMPTION)) {
+		const struct adreno_gen7_core *gen7_core = to_gen7_core(adreno_dev);
+
+		adreno_dev->preempt.preempt_level = gen7_core->preempt_level;
+		adreno_dev->preempt.skipsaverestore = true;
+		adreno_dev->preempt.usesgmem = true;
+		set_bit(ADRENO_DEVICE_PREEMPTION, &adreno_dev->priv);
+	}
 
 	ret = adreno_device_probe(pdev, adreno_dev);
 	if (ret)

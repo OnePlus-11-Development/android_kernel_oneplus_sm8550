@@ -673,14 +673,15 @@ int gen7_preemption_init(struct adreno_device *adreno_dev)
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	struct kgsl_iommu *iommu = KGSL_IOMMU(device);
 	struct adreno_preemption *preempt = &adreno_dev->preempt;
-	const struct adreno_gen7_core *gen7_core = to_gen7_core(adreno_dev);
 	struct adreno_ringbuffer *rb;
 	int ret;
 	unsigned int i;
 
 	/* We are dependent on IOMMU to make preemption go on the CP side */
-	if (kgsl_mmu_get_mmutype(device) != KGSL_MMU_TYPE_IOMMU)
-		return -ENODEV;
+	if (kgsl_mmu_get_mmutype(device) != KGSL_MMU_TYPE_IOMMU) {
+		ret = -ENODEV;
+		goto done;
+	}
 
 	INIT_WORK(&preempt->work, _gen7_preemption_worker);
 
@@ -688,13 +689,13 @@ int gen7_preemption_init(struct adreno_device *adreno_dev)
 	FOR_EACH_RINGBUFFER(adreno_dev, rb, i) {
 		ret = gen7_preemption_ringbuffer_init(adreno_dev, rb);
 		if (ret)
-			return ret;
+			goto done;
 	}
 
 	ret = adreno_allocate_global(device, &preempt->scratch, PAGE_SIZE,
 			0, 0, 0, "preempt_scratch");
 	if (ret)
-		return ret;
+		goto done;
 
 	/* Allocate mem for storing preemption smmu record */
 	if (kgsl_mmu_is_perprocess(&device->mmu)) {
@@ -702,7 +703,7 @@ int gen7_preemption_init(struct adreno_device *adreno_dev)
 			KGSL_MEMFLAGS_GPUREADONLY, KGSL_MEMDESC_PRIVILEGED,
 			"smmu_info");
 		if (ret)
-			return ret;
+			goto done;
 	}
 
 	/*
@@ -730,9 +731,10 @@ int gen7_preemption_init(struct adreno_device *adreno_dev)
 		preempt->postamble_len = count;
 	}
 
-	set_bit(ADRENO_DEVICE_PREEMPTION, &adreno_dev->priv);
-	adreno_dev->preempt.preempt_level = gen7_core->preempt_level;
 	return 0;
+done:
+	clear_bit(ADRENO_DEVICE_PREEMPTION, &adreno_dev->priv);
+	return ret;
 }
 
 int gen7_preemption_context_init(struct kgsl_context *context)
