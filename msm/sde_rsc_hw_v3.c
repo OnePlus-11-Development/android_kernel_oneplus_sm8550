@@ -429,6 +429,11 @@ static int sde_rsc_state_update_v3(struct sde_rsc_priv *rsc,
 							reg, rsc->debug_mode);
 		wmb(); /* make sure that solver is enabled */
 
+		if (rsc->hw_ops.bwi_status) {
+			rsc->bwi_update = BW_NO_CHANGE;
+			rsc->hw_ops.bwi_status(rsc);
+		}
+
 		break;
 
 	case SDE_RSC_VID_STATE:
