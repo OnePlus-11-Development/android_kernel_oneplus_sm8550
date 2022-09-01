@@ -896,6 +896,7 @@ void *msm_vidc_open(void *vidc_core, u32 session_type)
 	inst->ipsc_properties_set = false;
 	inst->opsc_properties_set = false;
 	inst->has_bframe = false;
+	inst->iframe = false;
 	inst->auto_framerate = DEFAULT_FPS << 16;
 	inst->initial_time_us = ktime_get_ns() / 1000;
 	kref_init(&inst->kref);

@@ -186,5 +186,6 @@ struct msm_vidc_inst {
 	bool                               has_bframe;
 	bool                               ir_enabled;
 	u32                                adjust_priority;
+	bool                               iframe;
 };
 #endif // _MSM_VIDC_INST_H_

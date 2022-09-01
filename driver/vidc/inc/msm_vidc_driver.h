@@ -363,6 +363,18 @@ static inline bool is_sub_state(struct msm_vidc_inst *inst,
 	return (inst->sub_state & sub_state);
 }
 
+static inline bool is_hevc_10bit_decode_session(struct msm_vidc_inst *inst)
+{
+	bool is10bit = false;
+	if (inst->fmts[OUTPUT_PORT].fmt.pix_mp.pixelformat == V4L2_PIX_FMT_VIDC_TP10C ||
+		inst->fmts[OUTPUT_PORT].fmt.pix_mp.pixelformat == V4L2_PIX_FMT_VIDC_P010)
+		is10bit = true;
+
+	return inst->domain == MSM_VIDC_DECODER &&
+				inst->codec == MSM_VIDC_HEVC &&
+				is10bit;
+}
+
 const char *cap_name(enum msm_vidc_inst_capability_type cap_id);
 const char *v4l2_pixelfmt_name(u32 pixelfmt);
 const char *v4l2_type_name(u32 port);
@@ -593,5 +605,6 @@ int msm_vidc_get_input_rate(struct msm_vidc_inst *inst);
 int msm_vidc_get_frame_rate(struct msm_vidc_inst *inst);
 int msm_vidc_get_operating_rate(struct msm_vidc_inst *inst);
 int msm_vidc_alloc_and_queue_input_internal_buffers(struct msm_vidc_inst *inst);
+
 #endif // _MSM_VIDC_DRIVER_H_
 
