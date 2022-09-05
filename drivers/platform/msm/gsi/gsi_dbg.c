@@ -71,6 +71,8 @@ static ssize_t gsi_dump_evt(struct file *file,
 		return -EINVAL;
 	}
 
+	gsi_ctx->per.vote_clk_cb();
+
 	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_CNTXT_0,
 		gsi_ctx->per.ee, arg1);
 	TERR("EV%2d CTX0  0x%x\n", arg1, val);
@@ -119,6 +121,8 @@ static ssize_t gsi_dump_evt(struct file *file,
 	val = gsihal_read_reg_nk(GSI_EE_n_EV_CH_k_SCRATCH_1,
 		gsi_ctx->per.ee, arg1);
 	TERR("EV%2d SCR1  0x%x\n", arg1, val);
+
+	gsi_ctx->per.unvote_clk_cb();
 
 	if (arg2) {
 		ctx = &gsi_ctx->evtr[arg1];
@@ -183,7 +187,9 @@ static ssize_t gsi_dump_ch(struct file *file,
 		return -EINVAL;
 	}
 
+	gsi_ctx->per.vote_clk_cb();
 	gsi_dump_ch_info(arg1);
+	gsi_ctx->per.unvote_clk_cb();
 
 	if (arg2) {
 		ctx = &gsi_ctx->chan[arg1];
@@ -354,7 +360,6 @@ static ssize_t gsi_set_max_elem_dp_stats(struct file *file,
 	unsigned long missing;
 	char *sptr, *token;
 
-
 	if (count >= sizeof(dbg_buff))
 		goto error;
 
@@ -432,6 +437,8 @@ static void gsi_dbg_update_ch_dp_stats(struct gsi_chan_ctx *ctx)
 	int ee = gsi_ctx->per.ee;
 	uint16_t used_hw;
 
+	gsi_ctx->per.vote_clk_cb();
+
 	rp_hw = gsihal_read_reg_nk(GSI_EE_n_GSI_CH_k_CNTXT_4,
 		ee, ctx->props.ch_id);
 	rp_hw |= ((uint64_t)gsihal_read_reg_nk(GSI_EE_n_GSI_CH_k_CNTXT_5,
@@ -441,6 +448,8 @@ static void gsi_dbg_update_ch_dp_stats(struct gsi_chan_ctx *ctx)
 		ee, ctx->props.ch_id);
 	wp_hw |= ((uint64_t)gsihal_read_reg_nk(GSI_EE_n_GSI_CH_k_CNTXT_7,
 		ee, ctx->props.ch_id)) << 32;
+
+	gsi_ctx->per.unvote_clk_cb();
 
 	start_hw = gsi_find_idx_from_addr(&ctx->ring, rp_hw);
 	end_hw = gsi_find_idx_from_addr(&ctx->ring, wp_hw);
@@ -590,7 +599,7 @@ static ssize_t gsi_read_gsi_hw_profiling_stats(struct file *file,
 	char __user *buf, size_t count, loff_t *ppos)
 {
 	struct gsi_hw_profiling_data stats;
-	int nbytes, cnt = 0;
+	int ret, nbytes, cnt = 0;
 	u64 totalCycles = 0, util = 0;
 
 	if (gsi_ctx->per.ver < GSI_VER_2_9) {
@@ -599,7 +608,12 @@ static ssize_t gsi_read_gsi_hw_profiling_stats(struct file *file,
 		cnt += nbytes;
 		goto done;
 	}
-	if (!gsi_get_hw_profiling_stats(&stats)) {
+
+	gsi_ctx->per.vote_clk_cb();
+	ret = gsi_get_hw_profiling_stats(&stats);
+	gsi_ctx->per.unvote_clk_cb();
+
+	if (!ret) {
 		totalCycles = stats.mcs_busy_cnt + stats.mcs_idle_cnt +
 			stats.bp_and_pending_cnt;
 		if (totalCycles != 0)
@@ -636,7 +650,7 @@ static ssize_t gsi_read_gsi_fw_version(struct file *file,
 	char __user *buf, size_t count, loff_t *ppos)
 {
 	struct gsi_fw_version ver;
-	int nbytes, cnt = 0;
+	int ret, nbytes, cnt = 0;
 
 	if (gsi_ctx->per.ver < GSI_VER_2_9) {
 		nbytes = scnprintf(dbg_buff, GSI_MAX_MSG_LEN,
@@ -644,7 +658,12 @@ static ssize_t gsi_read_gsi_fw_version(struct file *file,
 		cnt += nbytes;
 		goto done;
 	}
-	if (!gsi_get_fw_version(&ver)) {
+
+	gsi_ctx->per.vote_clk_cb();
+	ret = gsi_get_fw_version(&ver);
+	gsi_ctx->per.unvote_clk_cb();
+
+	if (!ret) {
 		nbytes = scnprintf(dbg_buff, GSI_MAX_MSG_LEN,
 			"hw=%d\nflavor=%d\nfw=%d\n",
 			ver.hw,
