@@ -1762,16 +1762,15 @@ static void dp_display_attention_work(struct work_struct *work)
 
 	if (dp->link->sink_request & DS_PORT_STATUS_CHANGED) {
 		SDE_EVT32_EXTERNAL(dp->state, DS_PORT_STATUS_CHANGED);
-		if (!dp->mst.mst_active) {
-			if (dp_display_is_sink_count_zero(dp)) {
-				dp_display_handle_disconnect(dp);
-			} else {
-				/*
-				 * connect work should take care of sending
-				 * the HPD notification.
-				 */
+		if (dp_display_is_sink_count_zero(dp)) {
+			dp_display_handle_disconnect(dp);
+		} else {
+			/*
+			 * connect work should take care of sending
+			 * the HPD notification.
+			 */
+			if (!dp->mst.mst_active)
 				queue_work(dp->wq, &dp->connect_work);
-			}
 		}
 
 		goto mst_attention;
