@@ -177,7 +177,7 @@ void gen7_load_rsc_ucode(struct adreno_device *adreno_dev)
 	_regwrite(rscc, GEN7_RSCC_HIDDEN_TCS_CMD0_DATA + RSC_CMD_OFFSET, 0);
 	_regwrite(rscc, GEN7_RSCC_HIDDEN_TCS_CMD0_ADDR + RSC_CMD_OFFSET, 0);
 	_regwrite(rscc, GEN7_RSCC_HIDDEN_TCS_CMD0_DATA + RSC_CMD_OFFSET * 2,
-		adreno_is_gen7_2_x(adreno_dev) ?  0x80000001 : 0x80000000);
+		adreno_is_gen7_2_x(adreno_dev) ?  0x80000021 : 0x80000000);
 	_regwrite(rscc, GEN7_RSCC_HIDDEN_TCS_CMD0_ADDR + RSC_CMD_OFFSET * 2, 0);
 	_regwrite(rscc, GEN7_RSCC_OVERRIDE_START_ADDR, 0);
 	_regwrite(rscc, GEN7_RSCC_PDC_SEQ_START_ADDR, 0x4520);
@@ -970,11 +970,15 @@ static int insert_va(struct gmu_vma_entry *vma, u32 addr, u32 size)
 	return 0;
 }
 
-static u32 find_unmapped_va(struct gmu_vma_entry *vma, u32 size)
+static u32 find_unmapped_va(struct gmu_vma_entry *vma, u32 size, u32 va_align)
 {
 	struct rb_node *node = rb_first(&vma->vma_root);
 	u32 cur = vma->start;
 	bool found = false;
+
+	va_align = hfi_get_gmu_va_alignment(va_align);
+
+	cur = ALIGN(cur, va_align);
 
 	while (node) {
 		struct gmu_vma_node *data = rb_entry(node, struct gmu_vma_node, node);
@@ -983,7 +987,8 @@ static u32 find_unmapped_va(struct gmu_vma_entry *vma, u32 size)
 			found = true;
 			break;
 		}
-		cur = data->va + data->size;
+
+		cur = ALIGN(data->va + data->size, va_align);
 		node = rb_next(node);
 	}
 
@@ -995,7 +1000,7 @@ static u32 find_unmapped_va(struct gmu_vma_entry *vma, u32 size)
 
 static int _map_gmu_dynamic(struct gen7_gmu_device *gmu,
 	struct kgsl_memdesc *md,
-	u32 addr, u32 vma_id, int attrs)
+	u32 addr, u32 vma_id, int attrs, u32 va_align)
 {
 	int ret;
 	struct gmu_vma_entry *vma = &gmu->vma[vma_id];
@@ -1004,7 +1009,7 @@ static int _map_gmu_dynamic(struct gen7_gmu_device *gmu,
 
 	spin_lock(&vma->lock);
 	if (!addr) {
-		addr = find_unmapped_va(vma, size);
+		addr = find_unmapped_va(vma, size, va_align);
 		if (addr == 0) {
 			spin_unlock(&vma->lock);
 			dev_err(&gmu->pdev->dev,
@@ -1043,13 +1048,13 @@ static int _map_gmu_dynamic(struct gen7_gmu_device *gmu,
 
 static int _map_gmu_static(struct gen7_gmu_device *gmu,
 	struct kgsl_memdesc *md,
-	u32 addr, u32 vma_id, int attrs)
+	u32 addr, u32 vma_id, int attrs, u32 va_align)
 {
 	int ret;
 	struct gmu_vma_entry *vma = &gmu->vma[vma_id];
 
 	if (!addr)
-		addr = vma->next_va;
+		addr = ALIGN(vma->next_va, hfi_get_gmu_va_alignment(va_align));
 
 	ret = gmu_core_map_memdesc(gmu->domain, md, addr, attrs);
 	if (ret) {
@@ -1065,21 +1070,21 @@ static int _map_gmu_static(struct gen7_gmu_device *gmu,
 
 static int _map_gmu(struct gen7_gmu_device *gmu,
 	struct kgsl_memdesc *md,
-	u32 addr, u32 vma_id, int attrs)
+	u32 addr, u32 vma_id, int attrs, u32 va_align)
 {
 	return vma_is_dynamic(vma_id) ?
-			_map_gmu_dynamic(gmu, md, addr, vma_id, attrs) :
-			_map_gmu_static(gmu, md, addr, vma_id, attrs);
+			_map_gmu_dynamic(gmu, md, addr, vma_id, attrs, va_align) :
+			_map_gmu_static(gmu, md, addr, vma_id, attrs, va_align);
 }
 
 int gen7_gmu_import_buffer(struct gen7_gmu_device *gmu, u32 vma_id,
 				struct kgsl_memdesc *md, u32 size, u32 attrs)
 {
-	return _map_gmu(gmu, md, 0, vma_id, attrs);
+	return _map_gmu(gmu, md, 0, vma_id, attrs, 0);
 }
 
 struct kgsl_memdesc *gen7_reserve_gmu_kernel_block(struct gen7_gmu_device *gmu,
-	u32 addr, u32 size, u32 vma_id)
+	u32 addr, u32 size, u32 vma_id, u32 va_align)
 {
 	int ret;
 	struct kgsl_memdesc *md;
@@ -1097,7 +1102,7 @@ struct kgsl_memdesc *gen7_reserve_gmu_kernel_block(struct gen7_gmu_device *gmu,
 		return ERR_PTR(-ENOMEM);
 	}
 
-	ret = _map_gmu(gmu, md, addr, vma_id, attrs);
+	ret = _map_gmu(gmu, md, addr, vma_id, attrs, va_align);
 	if (ret) {
 		kgsl_sharedmem_free(md);
 		memset(md, 0x0, sizeof(*md));
@@ -1110,7 +1115,7 @@ struct kgsl_memdesc *gen7_reserve_gmu_kernel_block(struct gen7_gmu_device *gmu,
 }
 
 struct kgsl_memdesc *gen7_reserve_gmu_kernel_block_fixed(struct gen7_gmu_device *gmu,
-	u32 addr, u32 size, u32 vma_id, const char *resource, int attrs)
+	u32 addr, u32 size, u32 vma_id, const char *resource, int attrs, u32 va_align)
 {
 	int ret;
 	struct kgsl_memdesc *md;
@@ -1125,7 +1130,7 @@ struct kgsl_memdesc *gen7_reserve_gmu_kernel_block_fixed(struct gen7_gmu_device 
 	if (ret)
 		return ERR_PTR(ret);
 
-	ret = _map_gmu(gmu, md, addr, vma_id, attrs);
+	ret = _map_gmu(gmu, md, addr, vma_id, attrs, va_align);
 
 	sg_free_table(md->sgt);
 	kfree(md->sgt);
@@ -1153,7 +1158,7 @@ int gen7_alloc_gmu_kernel_block(struct gen7_gmu_device *gmu,
 	if (ret)
 		return ret;
 
-	ret = _map_gmu(gmu, md, 0, vma_id, attrs);
+	ret = _map_gmu(gmu, md, 0, vma_id, attrs, 0);
 	if (ret)
 		kgsl_sharedmem_free(md);
 
@@ -1211,7 +1216,7 @@ static int gen7_gmu_process_prealloc(struct gen7_gmu_device *gmu,
 	if (md != NULL)
 		return 0;
 
-	md = gen7_reserve_gmu_kernel_block(gmu, blk->addr, blk->value, id);
+	md = gen7_reserve_gmu_kernel_block(gmu, blk->addr, blk->value, id, 0);
 
 	return PTR_ERR_OR_ZERO(md);
 }
@@ -1285,7 +1290,7 @@ int gen7_gmu_memory_init(struct adreno_device *adreno_dev)
 	/* GMU master log */
 	if (IS_ERR_OR_NULL(gmu->gmu_log))
 		gmu->gmu_log = gen7_reserve_gmu_kernel_block(gmu, 0,
-				GMU_LOG_SIZE, GMU_NONCACHED_KERNEL);
+				GMU_LOG_SIZE, GMU_NONCACHED_KERNEL, 0);
 
 	return PTR_ERR_OR_ZERO(gmu->gmu_log);
 }
@@ -1441,8 +1446,6 @@ void gen7_gmu_suspend(struct adreno_device *adreno_dev)
 {
 	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
-
-	gen7_gmu_irq_disable(adreno_dev);
 
 	gen7_gmu_pwrctrl_suspend(adreno_dev);
 
@@ -1852,20 +1855,17 @@ static int gen7_gmu_first_boot(struct adreno_device *adreno_dev)
 
 	device->gmu_fault = false;
 
-	if (ADRENO_FEATURE(adreno_dev, ADRENO_BCL))
-		adreno_dev->bcl_enabled = true;
-
 	kgsl_pwrctrl_set_state(device, KGSL_STATE_AWARE);
 
 	return 0;
 
 err:
+	gen7_gmu_irq_disable(adreno_dev);
+
 	if (device->gmu_fault) {
 		gen7_gmu_suspend(adreno_dev);
 		return ret;
 	}
-
-	gen7_gmu_irq_disable(adreno_dev);
 
 clks_gdsc_off:
 	clk_bulk_disable_unprepare(gmu->num_clks, gmu->clks);
@@ -1932,12 +1932,12 @@ static int gen7_gmu_boot(struct adreno_device *adreno_dev)
 	return 0;
 
 err:
+	gen7_gmu_irq_disable(adreno_dev);
+
 	if (device->gmu_fault) {
 		gen7_gmu_suspend(adreno_dev);
 		return ret;
 	}
-
-	gen7_gmu_irq_disable(adreno_dev);
 
 clks_gdsc_off:
 	clk_bulk_disable_unprepare(gmu->num_clks, gmu->clks);
@@ -2570,6 +2570,7 @@ static int gen7_gmu_power_off(struct adreno_device *adreno_dev)
 	return 0;
 
 error:
+	gen7_gmu_irq_disable(adreno_dev);
 	gen7_hfi_stop(adreno_dev);
 	gen7_gmu_suspend(adreno_dev);
 
@@ -2749,6 +2750,17 @@ static int gen7_first_boot(struct adreno_device *adreno_dev)
 
 	set_bit(GMU_PRIV_FIRST_BOOT_DONE, &gmu->flags);
 	set_bit(GMU_PRIV_GPU_STARTED, &gmu->flags);
+
+	/*
+	 * BCL needs respective Central Broadcast register to
+	 * be programed from TZ. This programing happens only
+	 * when zap shader firmware load is successful. Zap firmware
+	 * load can fail in boot up path hence enable BCL only after we
+	 * successfully complete first boot to ensure that Central
+	 * Broadcast register was programed before enabling BCL.
+	 */
+	if (ADRENO_FEATURE(adreno_dev, ADRENO_BCL))
+		adreno_dev->bcl_enabled = true;
 
 	/*
 	 * There is a possible deadlock scenario during kgsl firmware reading
@@ -3114,9 +3126,11 @@ int gen7_gmu_reset(struct adreno_device *adreno_dev)
 {
 	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
 
-	gen7_hfi_stop(adreno_dev);
-
 	gen7_disable_gpu_irq(adreno_dev);
+
+	gen7_gmu_irq_disable(adreno_dev);
+
+	gen7_hfi_stop(adreno_dev);
 
 	/* Hard reset the gmu and gpu */
 	gen7_gmu_suspend(adreno_dev);

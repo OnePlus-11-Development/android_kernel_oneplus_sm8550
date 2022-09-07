@@ -109,6 +109,8 @@ struct adreno_gen7_core {
 	 * gmu fw sets default throttle levels.
 	 */
 	u32 bcl_data;
+	/** @preempt_level: Preemption level valid ranges [0 to 2] */
+	u32 preempt_level;
 };
 
 /**

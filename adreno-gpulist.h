@@ -1369,6 +1369,8 @@ static const struct adreno_a6xx_core adreno_gpu_core_a650v2 = {
 static const struct adreno_a6xx_core adreno_gpu_core_a680 = {
 	.base = {
 		DEFINE_ADRENO_REV(ADRENO_REV_A680, 6, 8, 0, ANY_ID),
+		.features = ADRENO_IOCOHERENT | ADRENO_CONTENT_PROTECTION |
+			ADRENO_IFPC | ADRENO_PREEMPTION,
 		.gpudev = &adreno_a6xx_gmu_gpudev.base,
 		.perfcounters = &adreno_a6xx_legacy_perfcounters,
 		.uche_gmem_alignment = SZ_1M,
@@ -1931,6 +1933,7 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_0_0 = {
 	.protected_regs = gen7_0_0_protected_regs,
 	.highest_bank_bit = 16,
 	.gen7_snapshot_block_list = &gen7_0_0_snapshot_block_list,
+	.preempt_level = 1,
 };
 
 static const struct adreno_gen7_core adreno_gpu_core_gen7_0_1 = {
@@ -1963,6 +1966,7 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_0_1 = {
 	.protected_regs = gen7_0_0_protected_regs,
 	.highest_bank_bit = 16,
 	.gen7_snapshot_block_list = &gen7_0_0_snapshot_block_list,
+	.preempt_level = 1,
 };
 
 extern const struct gen7_snapshot_block_list gen7_2_0_snapshot_block_list;
@@ -2124,6 +2128,7 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_4_0 = {
 	.protected_regs = gen7_0_0_protected_regs,
 	.highest_bank_bit = 16,
 	.gen7_snapshot_block_list = &gen7_0_0_snapshot_block_list,
+	.preempt_level = 1,
 };
 
 static const struct adreno_gpu_core *adreno_gpulist[] = {

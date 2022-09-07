@@ -440,6 +440,7 @@ int gen7_start(struct adreno_device *adreno_dev)
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	const struct adreno_gen7_core *gen7_core = to_gen7_core(adreno_dev);
 	u32 bank_bit, mal;
+	struct cpu_gpu_lock *pwrup_lock = adreno_dev->pwrup_reglist->hostptr;
 
 	/* Set up GBIF registers from the GPU core definition */
 	kgsl_regmap_multi_write(&device->regmap, gen7_core->gbif,
@@ -481,6 +482,13 @@ int gen7_start(struct adreno_device *adreno_dev)
 			FIELD_PREP(GENMASK(11, 8), 9) |
 			BIT(3) | BIT(2) |
 			FIELD_PREP(GENMASK(1, 0), 2));
+
+	/*
+	 * CP takes care of the restore during IFPC exit. We need to restore at slumber
+	 * boundary as well
+	 */
+	if (pwrup_lock->dynamic_list_len > 0)
+		kgsl_regwrite(device, GEN7_RBBM_PERFCTR_CNTL, 0x1);
 
 	/* Turn on the IFPC counter (countable 4 on XOCLK4) */
 	kgsl_regwrite(device, GEN7_GMU_CX_GMU_POWER_COUNTER_SELECT_1,
@@ -1241,7 +1249,6 @@ int gen7_probe_common(struct platform_device *pdev,
 	adreno_dev->hwcg_enabled = true;
 	adreno_dev->uche_client_pf = 1;
 
-	adreno_dev->preempt.preempt_level = 1;
 	adreno_dev->preempt.skipsaverestore = true;
 	adreno_dev->preempt.usesgmem = true;
 

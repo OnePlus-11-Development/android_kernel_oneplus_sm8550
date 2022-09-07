@@ -673,6 +673,7 @@ int gen7_preemption_init(struct adreno_device *adreno_dev)
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	struct kgsl_iommu *iommu = KGSL_IOMMU(device);
 	struct adreno_preemption *preempt = &adreno_dev->preempt;
+	const struct adreno_gen7_core *gen7_core = to_gen7_core(adreno_dev);
 	struct adreno_ringbuffer *rb;
 	int ret;
 	unsigned int i;
@@ -730,6 +731,7 @@ int gen7_preemption_init(struct adreno_device *adreno_dev)
 	}
 
 	set_bit(ADRENO_DEVICE_PREEMPTION, &adreno_dev->priv);
+	adreno_dev->preempt.preempt_level = gen7_core->preempt_level;
 	return 0;
 }
 

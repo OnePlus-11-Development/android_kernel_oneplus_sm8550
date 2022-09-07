@@ -147,6 +147,7 @@ static void log_profiling_info(struct adreno_device *adreno_dev, u32 *rcvd)
 	struct hfi_ts_retire_cmd *cmd = (struct hfi_ts_retire_cmd *)rcvd;
 	struct kgsl_context *context;
 	struct retire_info info = {0};
+	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
 
 	context = kgsl_context_get(KGSL_DEVICE(adreno_dev), cmd->ctxt_id);
 	if (context == NULL)
@@ -158,6 +159,10 @@ static void log_profiling_info(struct adreno_device *adreno_dev, u32 *rcvd)
 	info.submitted_to_rb = cmd->submitted_to_rb;
 	info.sop = cmd->sop;
 	info.eop = cmd->eop;
+	if (GMU_VER_MINOR(gmu->ver.hfi) < 4)
+		info.active = cmd->eop - cmd->sop;
+	else
+		info.active = cmd->active;
 	info.retired_on_gmu = cmd->retired_on_gmu;
 
 	trace_adreno_cmdbatch_retired(context, &info, 0, 0, 0);
@@ -813,7 +818,7 @@ int gen7_hwsched_hfi_init(struct adreno_device *adreno_dev)
 		hw_hfi->big_ib = gen7_reserve_gmu_kernel_block(
 				to_gen7_gmu(adreno_dev), 0,
 				HWSCHED_MAX_IBS * sizeof(struct hfi_issue_ib),
-				GMU_NONCACHED_KERNEL);
+				GMU_NONCACHED_KERNEL, 0);
 		if (IS_ERR(hw_hfi->big_ib))
 			return PTR_ERR(hw_hfi->big_ib);
 	}
@@ -823,7 +828,7 @@ int gen7_hwsched_hfi_init(struct adreno_device *adreno_dev)
 		hw_hfi->big_ib_recurring = gen7_reserve_gmu_kernel_block(
 				to_gen7_gmu(adreno_dev), 0,
 				HWSCHED_MAX_IBS * sizeof(struct hfi_issue_ib),
-				GMU_NONCACHED_KERNEL);
+				GMU_NONCACHED_KERNEL, 0);
 		if (IS_ERR(hw_hfi->big_ib_recurring))
 			return PTR_ERR(hw_hfi->big_ib_recurring);
 	}
@@ -831,7 +836,7 @@ int gen7_hwsched_hfi_init(struct adreno_device *adreno_dev)
 	if (IS_ERR_OR_NULL(hfi->hfi_mem)) {
 		hfi->hfi_mem = gen7_reserve_gmu_kernel_block(
 				to_gen7_gmu(adreno_dev),
-				0, HFIMEM_SIZE, GMU_NONCACHED_KERNEL);
+				0, HFIMEM_SIZE, GMU_NONCACHED_KERNEL, 0);
 		if (IS_ERR(hfi->hfi_mem))
 			return PTR_ERR(hfi->hfi_mem);
 		init_queues(hfi, adreno_dev->lpac_enabled);
@@ -930,18 +935,21 @@ static struct hfi_mem_alloc_entry *get_mem_alloc_entry(
 	if (desc->flags & HFI_MEMFLAG_GFX_SECURE)
 		flags |= KGSL_MEMFLAGS_SECURE;
 
-	if (!(desc->flags & HFI_MEMFLAG_GFX_ACC)) {
+	if (!(desc->flags & HFI_MEMFLAG_GFX_ACC) &&
+		(desc->mem_kind != HFI_MEMKIND_HW_FENCE)) {
 		if (desc->mem_kind == HFI_MEMKIND_MMIO_IPC_CORE)
 			entry->md = gen7_reserve_gmu_kernel_block_fixed(gmu, 0,
 					desc->size,
 					(desc->flags & HFI_MEMFLAG_GMU_CACHEABLE) ?
 					GMU_CACHE : GMU_NONCACHED_KERNEL,
-					"qcom,ipc-core", get_attrs(desc->flags));
+					"qcom,ipc-core", get_attrs(desc->flags),
+					desc->va_align);
 		else
 			entry->md = gen7_reserve_gmu_kernel_block(gmu, 0,
 					desc->size,
 					(desc->flags & HFI_MEMFLAG_GMU_CACHEABLE) ?
-					GMU_CACHE : GMU_NONCACHED_KERNEL);
+					GMU_CACHE : GMU_NONCACHED_KERNEL,
+					desc->va_align);
 
 		if (IS_ERR(entry->md)) {
 			int ret = PTR_ERR(entry->md);
@@ -955,8 +963,22 @@ static struct hfi_mem_alloc_entry *get_mem_alloc_entry(
 		goto done;
 	}
 
-	entry->md = kgsl_allocate_global(device, desc->size, 0, flags, priv,
-		memkind_string);
+	/*
+	 * Use pre-allocated memory descriptors to map the HFI_MEMKIND_HW_FENCE and
+	 * HFI_MEMKIND_MEMSTORE
+	 */
+	switch (desc->mem_kind) {
+	case HFI_MEMKIND_HW_FENCE:
+		entry->md = &adreno_dev->hwsched.hw_fence.memdesc;
+		break;
+	case HFI_MEMKIND_MEMSTORE:
+		entry->md = device->memstore;
+		break;
+	default:
+		entry->md = kgsl_allocate_global(device, desc->size, 0, flags,
+			priv, memkind_string);
+		break;
+	}
 	if (IS_ERR(entry->md)) {
 		int ret = PTR_ERR(entry->md);
 
@@ -1015,22 +1037,25 @@ static int process_mem_alloc(struct adreno_device *adreno_dev,
 
 static int mem_alloc_reply(struct adreno_device *adreno_dev, void *rcvd)
 {
-	struct hfi_mem_alloc_cmd *in = (struct hfi_mem_alloc_cmd *)rcvd;
+	struct hfi_mem_alloc_desc desc = {0};
 	struct hfi_mem_alloc_reply_cmd out = {0};
 	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
 	int ret;
 
-	ret = process_mem_alloc(adreno_dev, &in->desc);
+	hfi_get_mem_alloc_desc(rcvd, &desc);
+
+	ret = process_mem_alloc(adreno_dev, &desc);
 	if (ret)
 		return ret;
 
-	memcpy(&out.desc, &in->desc, sizeof(out.desc));
+	memcpy(&out.desc, &desc, sizeof(out.desc));
 
 	out.hdr = ACK_MSG_HDR(F2H_MSG_MEM_ALLOC, sizeof(out));
+
 	out.hdr = MSG_HDR_SET_SEQNUM(out.hdr,
 			atomic_inc_return(&gmu->hfi.seqnum));
 
-	out.req_hdr = in->hdr;
+	out.req_hdr = *(u32 *)rcvd;
 
 	return gen7_hfi_cmdq_write(adreno_dev, (u32 *)&out);
 }
@@ -1140,6 +1165,13 @@ void gen7_hwsched_hfi_stop(struct adreno_device *adreno_dev)
 
 	hfi->irq_mask &= ~HFI_IRQ_MSGQ_MASK;
 
+	/*
+	 * In some corner cases, it is possible that GMU put TS_RETIRE
+	 * on the msgq after we have turned off gmu interrupts. Hence,
+	 * drain the queue one last time before we reset HFI queues.
+	 */
+	gen7_hwsched_process_msgq(adreno_dev);
+
 	reset_hfi_queues(adreno_dev);
 
 	kgsl_pwrctrl_axi(KGSL_DEVICE(adreno_dev), false);
@@ -1239,6 +1271,25 @@ done:
 	return pending_ack.results[2];
 }
 
+static int gen7_hfi_send_hw_fence_feature_ctrl(struct adreno_device *adreno_dev)
+{
+	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
+	struct adreno_hwsched *hwsched = &adreno_dev->hwsched;
+	int ret;
+
+	if (!test_bit(ADRENO_HWSCHED_HW_FENCE, &hwsched->flags))
+		return 0;
+
+	ret = gen7_hfi_send_feature_ctrl(adreno_dev, HFI_FEATURE_HW_FENCE, 1, 0);
+	if (ret && (ret == -ENOENT)) {
+		dev_err(&gmu->pdev->dev, "GMU doesn't support HW_FENCE feature\n");
+		adreno_hwsched_deregister_hw_fence(hwsched->hw_fence.handle);
+		return 0;
+	}
+
+	return ret;
+}
+
 int gen7_hwsched_hfi_start(struct adreno_device *adreno_dev)
 {
 	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
@@ -1283,6 +1334,10 @@ int gen7_hwsched_hfi_start(struct adreno_device *adreno_dev)
 		if (ret)
 			goto err;
 	}
+
+	ret = gen7_hfi_send_hw_fence_feature_ctrl(adreno_dev);
+	if (ret)
+		goto err;
 
 	ret = gen7_hfi_send_perfcounter_feature_ctrl(adreno_dev);
 	if (ret)
@@ -1903,12 +1958,17 @@ skipib:
 
 	cmdobj->submit_ticks = time.ticks;
 
+	/*
+	 * Put the profiling information in the user profiling buffer.
+	 * The gmu_core_regwrite below has a wmb() before the actual
+	 * register write to ensure any pending writes are complete
+	 * before the register write.
+	 */
+	adreno_profile_submit_time(&time);
+
 	/* Send interrupt to GMU to receive the message */
 	gmu_core_regwrite(KGSL_DEVICE(adreno_dev), GEN7_GMU_HOST2GMU_INTR_SET,
 		DISPQ_IRQ_BIT(get_irq_bit(adreno_dev, drawobj)));
-
-	/* Put the profiling information in the user profiling buffer */
-	adreno_profile_submit_time(&time);
 
 	return ret;
 }

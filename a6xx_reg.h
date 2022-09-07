@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _A6XX_REG_H
@@ -113,6 +114,8 @@
 #define A6XX_CP_IB2_REM_SIZE             0x92D
 #define A6XX_CP_ALWAYS_ON_COUNTER_LO     0x980
 #define A6XX_CP_ALWAYS_ON_COUNTER_HI     0x981
+#define A6XX_CP_ALWAYS_ON_CONTEXT_LO     0x982
+#define A6XX_CP_ALWAYS_ON_CONTEXT_HI     0x983
 #define A6XX_CP_AHB_CNTL                 0x98D
 #define A6XX_CP_APERTURE_CNTL_HOST       0xA00
 #define A6XX_CP_APERTURE_CNTL_CD         0xA03

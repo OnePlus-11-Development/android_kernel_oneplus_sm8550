@@ -686,6 +686,12 @@ void a6xx_start(struct adreno_device *adreno_dev)
 		break;
 	}
 
+	/* macrotilingmode 0: 4 channels (default)
+	 * overwrite to 1: 8 channels for A680
+	 */
+	if (adreno_is_a680(adreno_dev))
+		kgsl_regwrite(device, A6XX_RBBM_NC_MODE_CNTL, 1);
+
 	if (!WARN_ON(!adreno_dev->highest_bank_bit)) {
 		hbb_lo = (adreno_dev->highest_bank_bit - 13) & 3;
 		hbb_hi = ((adreno_dev->highest_bank_bit - 13) >> 2) & 1;
