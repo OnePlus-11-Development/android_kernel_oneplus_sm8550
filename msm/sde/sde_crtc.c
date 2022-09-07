@@ -1364,8 +1364,6 @@ static int _sde_crtc_check_rois(struct drm_crtc *crtc,
 	u32 crtc_width, crtc_height, mixer_width, mixer_height;
 	struct drm_display_mode *adj_mode;
 	int rc = 0, lm_idx, i;
-	struct drm_connector *conn;
-	struct drm_connector_state *conn_state;
 
 	if (!crtc || !state)
 		return -EINVAL;
@@ -1381,27 +1379,14 @@ static int _sde_crtc_check_rois(struct drm_crtc *crtc,
 	sde_crtc_get_resolution(crtc, state, adj_mode, &crtc_width, &crtc_height);
 	sde_crtc_get_mixer_resolution(crtc, state, adj_mode, &mixer_width, &mixer_height);
 	/* check cumulative mixer w/h is equal full crtc w/h */
-	if (sde_crtc->num_mixers && (((mixer_width * sde_crtc->num_mixers) != crtc_width)
+	if (sde_crtc->num_mixers
+			&& (((mixer_width * sde_crtc->num_mixers) != crtc_width)
 				|| (mixer_height != crtc_height))) {
 		SDE_ERROR("%s: invalid w/h crtc:%d,%d, mixer:%d,%d, num_mixers:%d\n",
 				sde_crtc->name, crtc_width, crtc_height, mixer_width, mixer_height,
 				sde_crtc->num_mixers);
 		rc = -EINVAL;
 		goto end;
-	} else if (state->state) {
-		for_each_new_connector_in_state(state->state, conn, conn_state, i) {
-			if (conn_state && (conn_state->crtc == crtc)
-				&& ((sde_connector_is_dualpipe_3d_merge_enabled(conn)
-						&& (crtc_width % 4))
-					|| (sde_connector_is_quadpipe_3d_merge_enabled(conn)
-							&& (crtc_width % 8)))) {
-				SDE_ERROR(
-				  "%s: invalid 3d-merge_w - mixer_w:%d, crtc_w:%d, num_mixers:%d\n",
-					sde_crtc->name, mixer_width,
-					crtc_width, sde_crtc->num_mixers);
-				return -EINVAL;
-			}
-		}
 	}
 
 	/*
