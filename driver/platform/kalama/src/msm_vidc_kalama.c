@@ -213,32 +213,6 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 
 	{SECURE_MBPF, ENC, HEVC, 36, 36864, 1, 36864},
 
-	/* ((1920 * 1088) / 256) * 480 fps */
-	{MBPS, ENC, CODECS_ALL, 64, 3916800, 1, 3916800},
-
-	{MBPS, ENC, HEVC, 36, 3916800, 1, 3916800},
-
-	/* ((16384x16384)/256)@1fps */
-	{MBPS, ENC, HEIC, 36, 1048576, 1, 1048576},
-
-	/* ((1920 * 1088) / 256) * 960 fps */
-	{MBPS, DEC, CODECS_ALL, 64, 7833600, 1, 7833600},
-
-	/* ((4096 * 2304) / 256) * 120 */
-	{MBPS, DEC, VP9, 36, 4423680, 1, 4423680},
-
-	/* ((8192x8192)/256)@1fps */
-	{MBPS, DEC, HEIC, 64, 262144,  1, 262144 },
-
-	/* ((4096 * 2304) / 256) * 60 fps */
-	{POWER_SAVE_MBPS, ENC, CODECS_ALL, 0, 2211840, 1, 2211840},
-
-	/* Enable check mbps for encoder */
-	{CHECK_MBPS, ENC, CODECS_ALL, 0, 1, 1, 1},
-
-	/* Disable check mbps for encoder */
-	{CHECK_MBPS, DEC, CODECS_ALL, 0, 1, 1, 0},
-
 	{FRAME_RATE, ENC, CODECS_ALL,
 		(MINIMUM_FPS << 16), (MAXIMUM_FPS << 16),
 		1, (DEFAULT_FPS << 16),
@@ -1075,7 +1049,7 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 
 	{LEVEL, ENC, HEVC|HEIC,
 		V4L2_MPEG_VIDEO_HEVC_LEVEL_1,
-		V4L2_MPEG_VIDEO_HEVC_LEVEL_6,
+		V4L2_MPEG_VIDEO_HEVC_LEVEL_6_2,
 		BIT(V4L2_MPEG_VIDEO_HEVC_LEVEL_1) |
 		BIT(V4L2_MPEG_VIDEO_HEVC_LEVEL_2) |
 		BIT(V4L2_MPEG_VIDEO_HEVC_LEVEL_2_1) |
@@ -1086,7 +1060,9 @@ static struct msm_platform_inst_capability instance_cap_data_kalama[] = {
 		BIT(V4L2_MPEG_VIDEO_HEVC_LEVEL_5) |
 		BIT(V4L2_MPEG_VIDEO_HEVC_LEVEL_5_1) |
 		BIT(V4L2_MPEG_VIDEO_HEVC_LEVEL_5_2) |
-		BIT(V4L2_MPEG_VIDEO_HEVC_LEVEL_6),
+		BIT(V4L2_MPEG_VIDEO_HEVC_LEVEL_6) |
+		BIT(V4L2_MPEG_VIDEO_HEVC_LEVEL_6_1) |
+		BIT(V4L2_MPEG_VIDEO_HEVC_LEVEL_6_2),
 		V4L2_MPEG_VIDEO_HEVC_LEVEL_5,
 		V4L2_CID_MPEG_VIDEO_HEVC_LEVEL,
 		HFI_PROP_LEVEL,
@@ -2150,7 +2126,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kala
 
 	{ENH_LAYER_COUNT, ENC, H264|HEVC,
 		{BITRATE_MODE, META_EVA_STATS},
-		{GOP_SIZE, B_FRAME, BIT_RATE, MIN_QUALITY},
+		{GOP_SIZE, B_FRAME, BIT_RATE, MIN_QUALITY, SLICE_MODE},
 		msm_vidc_adjust_layer_count,
 		msm_vidc_set_layer_count_and_type},
 
@@ -2257,7 +2233,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kala
 		msm_vidc_set_deblock_mode},
 
 	{SLICE_MODE, ENC, H264|HEVC,
-		{BITRATE_MODE, ALL_INTRA},
+		{BITRATE_MODE, ALL_INTRA, ENH_LAYER_COUNT},
 		{STAGE, DELIVERY_MODE},
 		msm_vidc_adjust_slice_count,
 		msm_vidc_set_slice_count},

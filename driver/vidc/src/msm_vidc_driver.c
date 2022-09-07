@@ -99,9 +99,6 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{BATCH_FPS,                      "BATCH_FPS"                  },
 	{LOSSLESS_MBPF,                  "LOSSLESS_MBPF"              },
 	{SECURE_MBPF,                    "SECURE_MBPF"                },
-	{MBPS,                           "MBPS"                       },
-	{POWER_SAVE_MBPS,                "POWER_SAVE_MBPS"            },
-	{CHECK_MBPS,                     "CHECK_MPBS"                 },
 	{FRAME_RATE,                     "FRAME_RATE"                 },
 	{OPERATING_RATE,                 "OPERATING_RATE"             },
 	{INPUT_RATE,                     "INPUT_RATE"                 },
@@ -1596,7 +1593,6 @@ bool msm_vidc_allow_s_ctrl(struct msm_vidc_inst *inst, u32 id)
 			case V4L2_CID_MPEG_VIDEO_H264_HIER_CODING_L5_BR:
 			case V4L2_CID_MPEG_VIDEO_USE_LTR_FRAMES:
 			case V4L2_CID_MPEG_VIDEO_FRAME_LTR_INDEX:
-			case V4L2_CID_MPEG_VIDC_VIDEO_BLUR_TYPES:
 			case V4L2_CID_MPEG_VIDC_VIDEO_BLUR_RESOLUTION:
 			case V4L2_CID_MPEG_VIDEO_CONSTANT_QUALITY:
 			case V4L2_CID_MPEG_VIDC_ENC_INPUT_COMPRESSION_RATIO:
@@ -2340,7 +2336,6 @@ int msm_vidc_process_drain_last_flag(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
 	struct v4l2_event event = {0};
-	struct v4l2_event_vidc_last_flag *event_data = NULL;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -2357,9 +2352,7 @@ int msm_vidc_process_drain_last_flag(struct msm_vidc_inst *inst)
 		return 0;
 	}
 
-	event.type = V4L2_EVENT_VIDC_LAST_FLAG;
-	event_data = (struct v4l2_event_vidc_last_flag *)event.u.data;
-	event_data->flag_type = LAST_FLAG_DRAIN;
+	event.type = V4L2_EVENT_EOS;
 	v4l2_event_queue_fh(&inst->event_handler, &event);
 
 	return rc;
@@ -2369,7 +2362,6 @@ int msm_vidc_process_psc_last_flag(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
 	struct v4l2_event event = {0};
-	struct v4l2_event_vidc_last_flag *event_data = NULL;
 
 	if (!inst || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -2386,9 +2378,7 @@ int msm_vidc_process_psc_last_flag(struct msm_vidc_inst *inst)
 		return 0;
 	}
 
-	event.type = V4L2_EVENT_VIDC_LAST_FLAG;
-	event_data = (struct v4l2_event_vidc_last_flag *)event.u.data;
-	event_data->flag_type = LAST_FLAG_DRC;
+	event.type = V4L2_EVENT_EOS;
 	v4l2_event_queue_fh(&inst->event_handler, &event);
 
 	return rc;
@@ -4245,7 +4235,7 @@ int msm_vidc_release_internal_buffers(struct msm_vidc_inst *inst,
 	return 0;
 }
 
-static int msm_vidc_vb2_buffer_done(struct msm_vidc_inst *inst,
+int msm_vidc_vb2_buffer_done(struct msm_vidc_inst *inst,
 	struct msm_vidc_buffer *buf)
 {
 	int type, port, state;
@@ -4308,56 +4298,6 @@ static int msm_vidc_vb2_buffer_done(struct msm_vidc_inst *inst,
 	vb2->timestamp = buf->timestamp;
 	vb2->planes[0].bytesused = buf->data_size + vb2->planes[0].data_offset;
 	vb2_buffer_done(vb2, state);
-
-	return 0;
-}
-
-static int msm_vidc_v4l2_buffer_event(struct msm_vidc_inst *inst,
-		struct msm_vidc_buffer *buf)
-{
-	int rc = 0;
-	struct v4l2_event event = {0};
-	struct v4l2_event_vidc_metadata *event_data = NULL;
-
-	if (!inst || !buf) {
-		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
-
-	if (buf->type != MSM_VIDC_BUF_INPUT_META) {
-		i_vpr_e(inst, "%s: unsupported buffer type %s\n",
-			__func__, buf_name(buf->type));
-		return -EINVAL;
-	}
-
-	event.type = V4L2_EVENT_VIDC_METADATA;
-	event_data = (struct v4l2_event_vidc_metadata *)event.u.data;
-	event_data->type = INPUT_META_PLANE;
-	event_data->fd = buf->fd;
-	event_data->index = buf->index;
-	event_data->bytesused = buf->data_size;
-	event_data->offset = buf->data_offset;
-
-	v4l2_event_queue_fh(&inst->event_handler, &event);
-
-	return rc;
-}
-
-int msm_vidc_buffer_done(struct msm_vidc_inst *inst,
-	struct msm_vidc_buffer *buf)
-{
-	if (!inst || !inst->capabilities || !buf) {
-		d_vpr_e("%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
-
-	if (buf->type == MSM_VIDC_BUF_INPUT_META &&
-		inst->capabilities->cap[INPUT_META_VIA_REQUEST].value) {
-		if (is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE))
-			return msm_vidc_v4l2_buffer_event(inst, buf);
-	} else {
-		return msm_vidc_vb2_buffer_done(inst, buf);
-	}
 
 	return 0;
 }
@@ -5747,7 +5687,7 @@ int msm_vidc_flush_buffers(struct msm_vidc_inst *inst,
 				buf->attr & MSM_VIDC_ATTR_DEFERRED) {
 				print_vidc_buffer(VIDC_HIGH, "high", "flushing buffer", inst, buf);
 				if (!(buf->attr & MSM_VIDC_ATTR_BUFFER_DONE))
-					msm_vidc_buffer_done(inst, buf);
+					msm_vidc_vb2_buffer_done(inst, buf);
 				msm_vidc_put_driver_buf(inst, buf);
 			}
 		}
@@ -5892,7 +5832,7 @@ void msm_vidc_destroy_buffers(struct msm_vidc_inst *inst)
 		list_for_each_entry_safe(buf, dummy, &buffers->list, list) {
 			print_vidc_buffer(VIDC_ERR, "err ", "destroying ", inst, buf);
 			if (!(buf->attr & MSM_VIDC_ATTR_BUFFER_DONE))
-				msm_vidc_buffer_done(inst, buf);
+				msm_vidc_vb2_buffer_done(inst, buf);
 			msm_vidc_put_driver_buf(inst, buf);
 		}
 		msm_vidc_unmap_buffers(inst, ext_buf_types[i]);
