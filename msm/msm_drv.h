@@ -117,6 +117,7 @@ enum msm_mdp_plane_property {
 	PLANE_PROP_DMA_GC,
 	PLANE_PROP_FP16_GC,
 	PLANE_PROP_FP16_CSC,
+	PLANE_PROP_UBWC_STATS_ROI,
 
 	/* # of blob properties */
 	PLANE_PROP_BLOBCOUNT,
@@ -140,7 +141,6 @@ enum msm_mdp_plane_property {
 	PLANE_PROP_INVERSE_PMA,
 	PLANE_PROP_FP16_IGC,
 	PLANE_PROP_FP16_UNMULT,
-	PLANE_PROP_UBWC_STATS_ROI,
 
 	/* enum/bitmask properties */
 	PLANE_PROP_BLEND_OP,
@@ -1114,6 +1114,8 @@ void __msm_fence_worker(struct work_struct *work);
 struct drm_atomic_state *msm_atomic_state_alloc(struct drm_device *dev);
 void msm_atomic_state_clear(struct drm_atomic_state *state);
 void msm_atomic_state_free(struct drm_atomic_state *state);
+
+void msm_atomic_flush_display_threads(struct msm_drm_private *priv);
 
 int msm_gem_init_vma(struct msm_gem_address_space *aspace,
 		struct msm_gem_vma *vma, int npages);

@@ -896,13 +896,15 @@ static int _set_spr_init_feature(struct sde_hw_dspp *hw_dspp,
 {
 	int ret = 0;
 
-	if (!sde_crtc || !hw_dspp || !hw_dspp->ops.setup_spr_init_config) {
+	if (!sde_crtc || !hw_dspp) {
 		DRM_ERROR("invalid arguments\n");
 		ret = -EINVAL;
 	} else {
-		hw_dspp->ops.setup_spr_init_config(hw_dspp, hw_cfg);
-		_update_pu_feature_enable(sde_crtc, SDE_CP_CRTC_DSPP_SPR_PU,
+		if (hw_dspp->ops.setup_spr_init_config) {
+			hw_dspp->ops.setup_spr_init_config(hw_dspp, hw_cfg);
+			_update_pu_feature_enable(sde_crtc, SDE_CP_CRTC_DSPP_SPR_PU,
 				hw_cfg->payload != NULL);
+		}
 	}
 
 	return ret;
@@ -914,12 +916,14 @@ static int _set_demura_feature(struct sde_hw_dspp *hw_dspp,
 {
 	int ret = 0;
 
-	if (!hw_dspp || !hw_dspp->ops.setup_demura_cfg) {
+	if (!hw_dspp) {
 		ret = -EINVAL;
 	} else {
-		hw_dspp->ops.setup_demura_cfg(hw_dspp, hw_cfg);
-		_update_pu_feature_enable(sde_crtc, SDE_CP_CRTC_DSPP_DEMURA_PU,
+		if (hw_dspp->ops.setup_demura_cfg) {
+			hw_dspp->ops.setup_demura_cfg(hw_dspp, hw_cfg);
+			_update_pu_feature_enable(sde_crtc, SDE_CP_CRTC_DSPP_DEMURA_PU,
 				hw_cfg->payload != NULL);
+		}
 	}
 
 	return ret;

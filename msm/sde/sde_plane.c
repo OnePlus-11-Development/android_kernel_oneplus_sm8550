@@ -3992,8 +3992,8 @@ static void _sde_plane_install_properties(struct drm_plane *plane,
 			PLANE_PROP_FB_TRANSLATION_MODE);
 
 	if (psde->pipe_hw->ops.set_ubwc_stats_roi)
-		msm_property_install_range(&psde->property_info, "ubwc_stats_roi",
-				0, 0, 0xFFFFFFFF, 0, PLANE_PROP_UBWC_STATS_ROI);
+		msm_property_install_volatile_range(&psde->property_info, "ubwc_stats_roi",
+				0, 0, ~0, 0, PLANE_PROP_UBWC_STATS_ROI);
 	vfree(info);
 }
 

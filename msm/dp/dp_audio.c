@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -769,7 +770,7 @@ end:
 	return rc;
 }
 
-static int dp_audio_off(struct dp_audio *dp_audio)
+static int dp_audio_off(struct dp_audio *dp_audio, bool skip_wait)
 {
 	int rc = 0;
 	struct dp_audio_private *audio;
@@ -794,9 +795,11 @@ static int dp_audio_off(struct dp_audio *dp_audio)
 	if (work_pending)
 		DP_DEBUG("pending notification work completed\n");
 
-	rc = dp_audio_notify(audio, EXT_DISPLAY_CABLE_DISCONNECT);
-	if (rc)
-		goto end;
+	if (!skip_wait) {
+		rc = dp_audio_notify(audio, EXT_DISPLAY_CABLE_DISCONNECT);
+		if (rc)
+			goto end;
+	}
 
 	DP_DEBUG("success\n");
 end:

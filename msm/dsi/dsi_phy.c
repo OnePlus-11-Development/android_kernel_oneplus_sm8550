@@ -1167,11 +1167,8 @@ int dsi_phy_idle_ctrl(struct msm_dsi_phy *phy, bool enable)
 	} else {
 		phy->dsi_phy_state = DSI_PHY_ENGINE_OFF;
 
-		if (phy->hw.ops.disable)
-			phy->hw.ops.disable(&phy->hw, &phy->cfg);
-
 		if (phy->hw.ops.phy_idle_off)
-			phy->hw.ops.phy_idle_off(&phy->hw);
+			phy->hw.ops.phy_idle_off(&phy->hw, &phy->cfg);
 	}
 	mutex_unlock(&phy->phy_lock);
 

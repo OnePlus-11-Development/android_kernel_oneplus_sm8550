@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  *
  * Copyright (c) 2008 Keith Packard
@@ -38,6 +39,7 @@
 struct drm_dp_aux;
 
 #define DP_LINK_CAP_ENHANCED_FRAMING (1 << 0)
+#define DP_LINK_CAP_CRC (1 << 1)
 
 struct drm_dp_link {
 	unsigned char revision;
