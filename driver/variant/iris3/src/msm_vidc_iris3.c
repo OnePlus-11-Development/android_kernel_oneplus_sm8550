@@ -470,19 +470,22 @@ static int __power_off_iris3_hardware(struct msm_vidc_core *core)
 	bool pwr_collapsed = false;
 
 	/*
-	 * Incase hw power control is enabled, when CPU WD occurred, check for power
-	 * status to decide on executing NOC reset sequence before disabling power.
-	 * If there is no CPU WD and hw_power_control is enabled, fw is expected
+	 * Incase hw power control is enabled, for both CPU WD, video
+	 * hw unresponsive cases, check for power status to decide on
+	 * executing NOC reset sequence before disabling power. If there
+	 * is no CPU WD and hw_power_control is enabled, fw is expected
 	 * to power collapse video hw always.
 	 */
 	if (core->hw_power_control) {
 		pwr_collapsed = is_iris3_hw_power_collapsed(core);
-		if (core->cpu_watchdog) {
+		if (core->cpu_watchdog || core->video_unresponsive) {
 			if (pwr_collapsed) {
-				d_vpr_e("%s: CPU WD and video hw power collapsed\n", __func__);
+				d_vpr_e("%s: video hw power collapsed %d, %d\n",
+					__func__, core->cpu_watchdog, core->video_unresponsive);
 				goto disable_power;
 			} else {
-				d_vpr_e("%s: CPU WD and video hw is power ON\n", __func__);
+				d_vpr_e("%s: video hw is power ON %d, %d\n",
+					__func__, core->cpu_watchdog, core->video_unresponsive);
 			}
 		} else {
 			if (!pwr_collapsed)

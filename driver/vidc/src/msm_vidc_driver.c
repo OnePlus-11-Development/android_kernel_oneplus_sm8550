@@ -5201,6 +5201,7 @@ int msm_vidc_core_init_wait(struct msm_vidc_core *core)
 	} else {
 		d_vpr_h("%s: sys init wait timedout. state %s\n",
 			__func__, core_state_name(core->state));
+		core->video_unresponsive = true;
 		rc = -EINVAL;
 		goto unlock;
 	}
@@ -5275,6 +5276,8 @@ int msm_vidc_inst_timeout(struct msm_vidc_inst *inst)
 		rc = -EINVAL;
 		goto unlock;
 	}
+	/* mark video hw unresponsive */
+	core->video_unresponsive = true;
 
 	/* call core deinit for a valid instance timeout case */
 	msm_vidc_core_deinit_locked(core, true);
