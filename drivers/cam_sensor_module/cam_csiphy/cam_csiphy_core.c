@@ -1212,6 +1212,32 @@ static int __cam_csiphy_prgm_bist_reg(struct csiphy_device *csiphy_dev, bool is_
 	return 0;
 }
 
+static int cam_csiphy_program_secure_mode(struct csiphy_device *csiphy_dev,
+	bool protect, int32_t offset)
+{
+	int rc = 0;
+
+	if (!csiphy_dev->domain_id_security)
+		rc = cam_csiphy_notify_secure_mode(csiphy_dev, protect, offset);
+
+	 /* Else a new scm call here */
+	else {
+		if (protect && !csiphy_dev->csiphy_info[offset].secure_info_updated) {
+			CAM_ERR(CAM_CSIPHY, "Secure info not updated prior to stream on");
+			return -EINVAL;
+		}
+
+		csiphy_dev->csiphy_info[offset].secure_info.protect = protect;
+		CAM_DBG(CAM_CSIPHY, "To call new scm, protect: %d, offset: %d",
+			protect, offset);
+
+		if (!protect)
+			csiphy_dev->csiphy_info[offset].secure_info.protect = false;
+	}
+
+	return rc;
+}
+
 int32_t cam_csiphy_config_dev(struct csiphy_device *csiphy_dev,
 	int32_t dev_handle, uint8_t datarate_variant_idx)
 {
@@ -1374,7 +1400,7 @@ void cam_csiphy_shutdown(struct csiphy_device *csiphy_dev)
 	if (csiphy_dev->csiphy_state == CAM_CSIPHY_INIT)
 		return;
 
-	if (!csiphy_dev->acquire_count)
+	if (!csiphy_dev->acquire_count && !csiphy_dev->start_dev_count)
 		return;
 
 	if (csiphy_dev->acquire_count >= CSIPHY_MAX_INSTANCES_PER_PHY) {
@@ -1386,12 +1412,13 @@ void cam_csiphy_shutdown(struct csiphy_device *csiphy_dev)
 
 	csiphy_reg = csiphy_dev->ctrl_reg->csiphy_reg;
 
-	if (csiphy_dev->csiphy_state == CAM_CSIPHY_START) {
+	if ((csiphy_dev->csiphy_state == CAM_CSIPHY_START) ||
+		csiphy_dev->start_dev_count) {
 		soc_info = &csiphy_dev->soc_info;
 
 		for (i = 0; i < csiphy_dev->acquire_count; i++) {
 			if (csiphy_dev->csiphy_info[i].secure_mode)
-				cam_csiphy_notify_secure_mode(
+				cam_csiphy_program_secure_mode(
 					csiphy_dev,
 					CAM_SECURE_MODE_NON_SECURE, i);
 
@@ -1401,7 +1428,8 @@ void cam_csiphy_shutdown(struct csiphy_device *csiphy_dev)
 			cam_csiphy_reset_phyconfig_param(csiphy_dev, i);
 		}
 
-		if (csiphy_dev->prgm_cmn_reg_across_csiphy) {
+		if ((csiphy_dev->prgm_cmn_reg_across_csiphy) &&
+			(active_csiphy_hw_cnt > 0)) {
 			mutex_lock(&active_csiphy_cnt_mutex);
 			active_csiphy_hw_cnt--;
 			mutex_unlock(&active_csiphy_cnt_mutex);
@@ -2141,7 +2169,7 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 
 		if (--csiphy_dev->start_dev_count) {
 			if (csiphy_dev->csiphy_info[offset].secure_mode)
-				cam_csiphy_notify_secure_mode(
+				cam_csiphy_program_secure_mode(
 					csiphy_dev,
 					CAM_SECURE_MODE_NON_SECURE, offset);
 
@@ -2165,7 +2193,7 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 		}
 
 		if (csiphy_dev->csiphy_info[offset].secure_mode)
-			cam_csiphy_notify_secure_mode(
+			cam_csiphy_program_secure_mode(
 				csiphy_dev,
 				CAM_SECURE_MODE_NON_SECURE, offset);
 
@@ -2237,7 +2265,7 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 		}
 
 		if (csiphy_dev->csiphy_info[offset].secure_mode)
-			cam_csiphy_notify_secure_mode(
+			cam_csiphy_program_secure_mode(
 				csiphy_dev,
 				CAM_SECURE_MODE_NON_SECURE, offset);
 
@@ -2287,6 +2315,14 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 		CAM_DBG(CAM_CSIPHY, "CAM_RELEASE_PHYDEV: %u Type: %s",
 			soc_info->index,
 			g_phy_data[soc_info->index].is_3phase ? "CPHY" : "DPHY");
+
+		if (csiphy_dev->acquire_count < csiphy_dev->start_dev_count) {
+			rc = -EINVAL;
+			CAM_ERR(CAM_CSIPHY,
+				"PHYDEV %u streamon count:%u bigger than acquire count:%u, missing stream offs",
+				soc_info->index, csiphy_dev->start_dev_count,
+				csiphy_dev->acquire_count);
+		}
 
 		break;
 	}
@@ -2362,7 +2398,7 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 					goto release_mutex;
 				}
 
-				rc = cam_csiphy_notify_secure_mode(csiphy_dev,
+				rc = cam_csiphy_program_secure_mode(csiphy_dev,
 					CAM_SECURE_MODE_SECURE, offset);
 				if (rc < 0) {
 					csiphy_dev->csiphy_info[offset]
@@ -2428,7 +2464,7 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 				goto cpas_stop;
 			}
 
-			rc = cam_csiphy_notify_secure_mode(
+			rc = cam_csiphy_program_secure_mode(
 				csiphy_dev,
 				CAM_SECURE_MODE_SECURE, offset);
 			if (rc < 0) {

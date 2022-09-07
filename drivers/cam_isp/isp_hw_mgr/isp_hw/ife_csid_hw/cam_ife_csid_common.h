@@ -234,6 +234,8 @@ struct cam_ife_csid_csi2_rx_reg_info {
 	uint32_t epd_mode_shift_en;
 	uint32_t eotp_shift_en;
 	uint32_t dyn_sensor_switch_shift_en;
+	uint32_t rup_aup_latch_shift;
+	bool     rup_aup_latch_supported;
 	uint32_t phy_num_mask;
 	uint32_t vc_mask;
 	uint32_t wc_mask;
@@ -338,6 +340,7 @@ struct cam_ife_csid_debug_info {
  * @sfe_en:                 flag to indicate if SFE is enabled
  * @pf_err_detected:        flag to indicate if camnoc has encountered
  *                          error - page fault
+ * @domain_id_security      Flag to determine if target has domain-id based security
  */
 struct cam_ife_csid_hw_flags {
 	bool                  device_enabled;
@@ -353,6 +356,7 @@ struct cam_ife_csid_hw_flags {
 	bool                  rdi_lcr_en;
 	bool                  sfe_en;
 	bool                  pf_err_detected;
+	bool                  domain_id_security;
 };
 
 /*
