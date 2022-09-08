@@ -8397,6 +8397,11 @@ static int ipa_firmware_load(const char *sub_sys)
 	scnprintf(fw_name, ARRAY_SIZE(fw_name), "%s.mdt", sub_sys);
 	ret = of_property_read_u32_index(dev->of_node, "pas-ids", index,
 					  &pas_id);
+	if(ret) {
+		dev_err(dev, "error %d getting \"pass-ids\" property\n",
+			ret);
+		return ret;
+	}
 
 	ret = request_firmware(&fw, fw_name, dev);
 	if (ret) {
@@ -11180,6 +11185,7 @@ static int ipa_smmu_ap_cb_probe(struct device *dev)
 		IPADBG("ipa q6 smem size = %u\n", ipa_smem_size);
 	}
 
+	ipa3_ctx->ipa_smem_size = ipa_smem_size;
 	if (ipa3_ctx->platform_type != IPA_PLAT_TYPE_APQ) {
 		/* map SMEM memory for IPA table accesses */
 		ret = qcom_smem_alloc(SMEM_MODEM,

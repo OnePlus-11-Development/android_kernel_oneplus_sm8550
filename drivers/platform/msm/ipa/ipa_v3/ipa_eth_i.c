@@ -719,7 +719,7 @@ fail_get_gsi_ep_info:
 	return result;
 }
 
-static int ipa_eth_setup_ntn3_gsi_channel(
+static int ipa_eth_setup_ntn_gsi_channel(
 	struct ipa_eth_client_pipe_info *pipe,
 	struct ipa3_ep_context *ep)
 {
@@ -751,11 +751,8 @@ static int ipa_eth_setup_ntn3_gsi_channel(
 	gsi_evt_ring_props.int_modt = IPA_ETH_NTN_MODT;
 	/* len / RE_SIZE == len in counts (convert from bytes) */
 	len = pipe->info.transfer_ring_size;
-	/*
-	 * int_modc = 2 is experiments based best value for tput.
-	 * we shall use a framework setup in the future.
-	 */
-	gsi_evt_ring_props.int_modc = 2;
+	gsi_evt_ring_props.int_modc = len * IPA_ETH_AQC_MODC_FACTOR /
+		(100 * GSI_EVT_RING_RE_SIZE_16B);
 	gsi_evt_ring_props.exclusive = true;
 	gsi_evt_ring_props.err_cb = ipa_eth_gsi_evt_ring_err_cb;
 	gsi_evt_ring_props.user_data = NULL;
@@ -836,8 +833,15 @@ static int ipa_eth_setup_ntn3_gsi_channel(
 			(u32)((u64)(pipe->info.data_buff_list[0].iova) >> 32);
 	}
 
-	if (pipe->dir == IPA_ETH_PIPE_DIR_TX)
-		ch_scratch.ntn.ioc_mod_threshold = IPA_ETH_NTN_MODT;
+	if (pipe->dir == IPA_ETH_PIPE_DIR_TX) {
+		if (pipe->info.client_info.ntn.ioc_mod_threshold &&
+		    pipe->info.client_info.ntn.ioc_mod_threshold < len / GSI_EVT_RING_RE_SIZE_16B) {
+			ch_scratch.ntn.ioc_mod_threshold =
+				pipe->info.client_info.ntn.ioc_mod_threshold;
+		} else {
+			ch_scratch.ntn.ioc_mod_threshold = IPA_ETH_NTN_MODT;
+		}
+	}
 
 	result = gsi_write_channel_scratch(ep->gsi_chan_hdl, ch_scratch);
 	if (result != GSI_STATUS_SUCCESS) {
@@ -1018,7 +1022,7 @@ int ipa3_eth_connect(
 		result = ipa_eth_setup_aqc_gsi_channel(pipe, ep);
 		break;
 	case IPA_HW_PROTOCOL_NTN3:
-		result = ipa_eth_setup_ntn3_gsi_channel(pipe, ep);
+		result = ipa_eth_setup_ntn_gsi_channel(pipe, ep);
 		break;
 	default:
 		IPAERR("unknown protocol %d\n", prot);

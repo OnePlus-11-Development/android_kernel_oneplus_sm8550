@@ -989,6 +989,8 @@ static const struct ipa_qmb_outstanding ipa3_qmb_outstanding
 	[IPA_4_7][IPA_QMB_INSTANCE_DDR]	        = {13, 12, 120},
 	[IPA_4_9][IPA_QMB_INSTANCE_DDR]	        = {16, 8, 120},
 	[IPA_4_11][IPA_QMB_INSTANCE_DDR] = {13, 12, 120},
+	[IPA_5_5][IPA_QMB_INSTANCE_DDR]		= {16, 12, 0},
+	[IPA_5_5][IPA_QMB_INSTANCE_PCIE]	= {16, 8, 0},
 };
 
 enum ipa_tx_instance {
@@ -7531,15 +7533,17 @@ int ipa3_init_hw(void)
 	}
 
 	/* Configure COAL_MASTER_CFG */
-	memset(&master_cfg, 0, sizeof(master_cfg));
-	ipahal_read_reg_fields(IPA_COAL_MASTER_CFG, &master_cfg);
-	master_cfg.coal_ipv4_id_ignore = ipa3_ctx->coal_ipv4_id_ignore;
-	ipahal_write_reg_fields(IPA_COAL_MASTER_CFG, &master_cfg);
+	if(ipa3_ctx->ipa_hw_type >= IPA_HW_v5_5) {
+		memset(&master_cfg, 0, sizeof(master_cfg));
+		ipahal_read_reg_fields(IPA_COAL_MASTER_CFG, &master_cfg);
+		master_cfg.coal_ipv4_id_ignore = ipa3_ctx->coal_ipv4_id_ignore;
+		ipahal_write_reg_fields(IPA_COAL_MASTER_CFG, &master_cfg);
 
-	IPADBG(
-		": coal-ipv4-id-ignore = %s\n",
-		master_cfg.coal_ipv4_id_ignore ?
-		"True" : "False");
+		IPADBG(
+			": coal-ipv4-id-ignore = %s\n",
+			master_cfg.coal_ipv4_id_ignore ?
+			"True" : "False");
+	}
 
 	ipa_comp_cfg();
 

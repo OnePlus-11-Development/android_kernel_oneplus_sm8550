@@ -2584,6 +2584,7 @@ struct ipa3_context {
 	struct list_head minidump_list_head;
 	phys_addr_t per_stats_smem_pa;
 	void *per_stats_smem_va;
+	u32 ipa_smem_size;
 };
 
 struct ipa3_plat_drv_res {
