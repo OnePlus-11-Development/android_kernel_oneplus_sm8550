@@ -112,6 +112,8 @@ static int _sde_cp_crtc_cache_property(struct drm_crtc *crtc,
 				struct drm_property *property,
 				uint64_t val);
 
+static void _sde_cp_mark_active_dirty_internal(struct sde_crtc *crtc);
+
 #define setup_dspp_prop_install_funcs(func) \
 do { \
 	func[SDE_DSPP_PCC] = _dspp_pcc_install_property; \
@@ -2824,6 +2826,7 @@ void sde_cp_disable_features(struct drm_crtc *crtc)
 
 		mutex_unlock(&sde_crtc->crtc_cp_lock);
 	}
+	_sde_cp_mark_active_dirty_internal(sde_crtc);
 }
 
 void sde_cp_crtc_clear(struct drm_crtc *crtc)
@@ -4751,6 +4754,19 @@ static bool _sde_cp_feature_in_activelist(u32 feature, struct list_head *list)
 	return false;
 }
 
+/* this func needs to be called within crtc_cp_lock mutex */
+static struct sde_cp_node *_sde_cp_feature_getnode_activelist(u32 feature, struct list_head *list)
+{
+	struct sde_cp_node *node = NULL;
+
+	list_for_each_entry(node, list, cp_active_list) {
+		if (feature == node->feature)
+			return node;
+	}
+
+	return NULL;
+}
+
 void sde_cp_crtc_vm_primary_handoff(struct drm_crtc *crtc)
 {
 	struct sde_crtc *sde_crtc = NULL;
@@ -5012,3 +5028,26 @@ void sde_cp_set_skip_blend_plane_info(struct drm_crtc *drm_crtc,
 	mutex_unlock(&crtc->crtc_cp_lock);
 }
 
+void _sde_cp_mark_active_dirty_internal(struct sde_crtc *crtc)
+{
+	struct sde_cp_node *prop_node;
+	u32 i;
+	enum sde_cp_crtc_features features[] = {
+		SDE_CP_CRTC_DSPP_DEMURA_INIT,
+	};
+
+	mutex_lock(&crtc->crtc_cp_lock);
+
+	for (i = 0; i < ARRAY_SIZE(features); i++) {
+		if (_sde_cp_feature_in_dirtylist(features[i],
+							 &crtc->cp_dirty_list))
+			continue;
+		prop_node = _sde_cp_feature_getnode_activelist(features[i],
+				&crtc->cp_active_list);
+		if (prop_node) {
+			_sde_cp_update_list(prop_node, crtc, true);
+			list_del_init(&prop_node->cp_active_list);
+		}
+	}
+	mutex_unlock(&crtc->crtc_cp_lock);
+}
