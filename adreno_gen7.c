@@ -495,7 +495,7 @@ int gen7_start(struct adreno_device *adreno_dev)
 			FIELD_PREP(GENMASK(7, 0), 0x4));
 
 	/* Turn on counter to count total time spent in BCL throttle */
-	if (adreno_dev->bcl_enabled && adreno_is_gen7_2_x(adreno_dev))
+	if (adreno_dev->bcl_enabled && adreno_is_gen7_2_x_family(adreno_dev))
 		kgsl_regrmw(device, GEN7_GMU_CX_GMU_POWER_COUNTER_SELECT_1, GENMASK(15, 8),
 				FIELD_PREP(GENMASK(15, 8), 0x26));
 
@@ -1533,7 +1533,7 @@ static void gen7_power_stats(struct adreno_device *adreno_dev,
 		if (a || b || c)
 			trace_kgsl_bcl_clock_throttling(a, b, c);
 
-		if (adreno_is_gen7_2_x(adreno_dev)) {
+		if (adreno_is_gen7_2_x_family(adreno_dev)) {
 			u32 bcl_throttle = counter_delta(device,
 				GEN7_GMU_CX_GMU_POWER_COUNTER_XOCLK_5_L, &busy->bcl_throttle);
 			/*
@@ -1617,7 +1617,7 @@ static void gen7_set_isdb_breakpoint_registers(struct adreno_device *adreno_dev)
 	isdb_write(device->qdss_gfx_virt, 0x7000);
 
 	/* gen7_2_x has additional SPs */
-	if (adreno_is_gen7_2_x(adreno_dev)) {
+	if (adreno_is_gen7_2_x_family(adreno_dev)) {
 		isdb_write(device->qdss_gfx_virt, 0x8000);
 		isdb_write(device->qdss_gfx_virt, 0x9000);
 		isdb_write(device->qdss_gfx_virt, 0xa000);
