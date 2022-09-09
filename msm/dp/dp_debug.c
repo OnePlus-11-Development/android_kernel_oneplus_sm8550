@@ -74,18 +74,17 @@ static int dp_debug_attach_sim_bridge(struct dp_debug_private *debug)
 {
 	int ret;
 
-	if (debug->sim_bridge)
-		return 0;
+	if (!debug->sim_bridge) {
+		ret = dp_sim_create_bridge(debug->dev, &debug->sim_bridge);
+		if (ret)
+			return ret;
 
-	ret = dp_sim_create_bridge(debug->dev, &debug->sim_bridge);
-	if (ret)
-		return ret;
+		if (debug->sim_bridge->register_hpd)
+			debug->sim_bridge->register_hpd(debug->sim_bridge,
+					dp_debug_sim_hpd_cb, debug);
+	}
 
 	dp_sim_update_port_num(debug->sim_bridge, 1);
-
-	if (debug->sim_bridge->register_hpd)
-		debug->sim_bridge->register_hpd(debug->sim_bridge,
-				dp_debug_sim_hpd_cb, debug);
 
 	return 0;
 }

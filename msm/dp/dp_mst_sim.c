@@ -342,10 +342,7 @@ int dp_sim_update_port_num(struct dp_aux_bridge *bridge, u32 port_num)
 		return -EINVAL;
 
 	sim_dev = to_dp_sim_dev(bridge);
-	DP_INFO("Update port count from %d to %d\n", port_num, sim_dev->port_num);
-
-	if (sim_dev->port_num > port_num && sim_dev->ports)
-		sim_dev->port_num = port_num;
+	DP_INFO("Update port count from %d to %d\n", sim_dev->port_num, port_num);
 
 	if (port_num > sim_dev->port_num) {
 		ports = devm_kzalloc(sim_dev->dev,
@@ -365,10 +362,9 @@ int dp_sim_update_port_num(struct dp_aux_bridge *bridge, u32 port_num)
 			memcpy(&ports[i], &output_port, sizeof(*ports));
 			ports[i].peer_guid[0] = i;
 		}
-
-		sim_dev->port_num = port_num;
 	}
 
+	sim_dev->port_num = port_num;
 	rc = dp_mst_sim_update(sim_dev->bridge.mst_ctx,
 			port_num, sim_dev->ports);
 	if (rc)
