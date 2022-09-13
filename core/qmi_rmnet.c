@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -626,6 +626,7 @@ qmi_rmnet_setup_client(void *port, struct qmi_info *qmi, struct tcmsg *tcm)
 	}
 
 	qmi->flag = tcm->tcm_ifindex;
+	qmi->ps_enabled = true;
 	qmi->ps_ext = FLAG_TO_PS_EXT(qmi->flag);
 	svc.instance = tcm->tcm_handle;
 	svc.ep_type = tcm->tcm_info;
