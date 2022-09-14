@@ -2132,7 +2132,7 @@ static int _sde_kms_drm_obj_init(struct sde_kms *sde_kms)
 
 	u32 sspp_id[MAX_PLANES];
 	u32 master_plane_id[MAX_PLANES];
-	u32 num_virt_planes = 0;
+	u32 num_virt_planes = 0, dummy_mixer_count = 0;
 
 	if (!sde_kms || !sde_kms->dev || !sde_kms->dev->dev) {
 		SDE_ERROR("invalid sde_kms\n");
@@ -2153,7 +2153,11 @@ static int _sde_kms_drm_obj_init(struct sde_kms *sde_kms)
 	if (!_sde_kms_get_displays(sde_kms))
 		(void)_sde_kms_setup_displays(dev, priv, sde_kms);
 
-	max_crtc_count = min(catalog->mixer_count, priv->num_encoders);
+	for (i = 0; i < catalog->mixer_count; i++)
+		if (catalog->mixer[i].dummy_mixer)
+			dummy_mixer_count++;
+
+	max_crtc_count = catalog->mixer_count - dummy_mixer_count;
 
 	/* Create the planes */
 	for (i = 0; i < catalog->sspp_count; i++) {
