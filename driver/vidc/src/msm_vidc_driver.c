@@ -5689,8 +5689,10 @@ int msm_vidc_flush_buffers(struct msm_vidc_inst *inst,
 			if (buf->attr & MSM_VIDC_ATTR_QUEUED ||
 				buf->attr & MSM_VIDC_ATTR_DEFERRED) {
 				print_vidc_buffer(VIDC_HIGH, "high", "flushing buffer", inst, buf);
-				if (!(buf->attr & MSM_VIDC_ATTR_BUFFER_DONE))
+				if (!(buf->attr & MSM_VIDC_ATTR_BUFFER_DONE)) {
+					buf->data_size = 0;
 					msm_vidc_vb2_buffer_done(inst, buf);
+				}
 				msm_vidc_put_driver_buf(inst, buf);
 			}
 		}
