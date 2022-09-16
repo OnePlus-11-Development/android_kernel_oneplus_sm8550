@@ -1454,7 +1454,10 @@ int ipa3_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl)
 		goto fail_gen;
 	}
 
-	*clnt_hdl = 0;
+	/*checking for clnt_hdl having any previously updated
+	value or not, if not then assigning 0 */
+	if(*clnt_hdl == -1)
+		*clnt_hdl = 0;
 
 	if (sys_in->client >= IPA_CLIENT_MAX || sys_in->desc_fifo_sz == 0) {
 		IPAERR("bad parm client:%d fifo_sz:%d\n",
