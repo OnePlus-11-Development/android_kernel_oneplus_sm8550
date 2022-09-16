@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -114,6 +115,7 @@ enum sde_rm_topology_group {
  * @SDE_RM_TOPCTL_CWB  : Require layer mixers with CWB capabilities
  * @SDE_RM_TOPCTL_DCWB : Require layer mixers with DCWB capabilities
  * @SDE_RM_TOPCTL_DNSC_BLUR : Require writeback with downscale blur capabilities
+ * @SDE_RM_TOPCTL_CDM : Require writeback with CDM capabilities
  */
 enum sde_rm_topology_control {
 	SDE_RM_TOPCTL_RESERVE_LOCK,
@@ -123,6 +125,7 @@ enum sde_rm_topology_control {
 	SDE_RM_TOPCTL_CWB,
 	SDE_RM_TOPCTL_DCWB,
 	SDE_RM_TOPCTL_DNSC_BLUR,
+	SDE_RM_TOPCTL_CDM,
 };
 
 /**

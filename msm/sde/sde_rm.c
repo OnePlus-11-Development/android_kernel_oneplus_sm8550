@@ -37,6 +37,7 @@
 #define RM_RQ_CWB(r) ((r)->top_ctrl & BIT(SDE_RM_TOPCTL_CWB))
 #define RM_RQ_DCWB(r) ((r)->top_ctrl & BIT(SDE_RM_TOPCTL_DCWB))
 #define RM_RQ_DNSC_BLUR(r) ((r)->top_ctrl & BIT(SDE_RM_TOPCTL_DNSC_BLUR))
+#define RM_RQ_CDM(r) ((r)->top_ctrl & BIT(SDE_RM_TOPCTL_CDM))
 #define RM_IS_TOPOLOGY_MATCH(t, r) ((t).num_lm == (r).num_lm && \
 				(t).num_comp_enc == (r).num_enc && \
 				(t).num_intf == (r).num_intf && \
@@ -1882,8 +1883,11 @@ static int _sde_rm_reserve_intf_or_wb(struct sde_rm *rm, struct sde_rm_rsvp *rsv
 	}
 
 	/* Expected only one intf or wb will request cdm */
-	if (hw_res->needs_cdm)
+	if (hw_res->needs_cdm || RM_RQ_CDM(reqs)) {
 		ret = _sde_rm_reserve_cdm(rm, rsvp, id, type);
+		if (ret)
+			return ret;
+	}
 
 	if (RM_RQ_DNSC_BLUR(reqs))
 		ret = _sde_rm_reserve_dnsc_blur(rm, rsvp, id, type);
