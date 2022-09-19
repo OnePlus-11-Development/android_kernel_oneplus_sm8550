@@ -429,6 +429,7 @@ static enum ipa_client_type
 	return ipa_client_type;
 }
 
+#if  IPA_ETH_API_VER < 2
 static struct ipa_eth_client_pipe_info
 	*ipa_eth_get_pipe_from_hdl(ipa_eth_hdl_t hdl)
 {
@@ -440,6 +441,7 @@ static struct ipa_eth_client_pipe_info
 
 	return pipe;
 }
+#endif
 
 
 static int ipa_eth_client_connect_pipe(
