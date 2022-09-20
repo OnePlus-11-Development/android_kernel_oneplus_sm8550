@@ -507,7 +507,7 @@ static int ipa_pm_notify(struct notifier_block *b, unsigned long event, void *p)
 	switch (event) {
 		case PM_POST_SUSPEND:
 #ifdef CONFIG_DEEPSLEEP
-			if (mem_sleep_current == PM_SUSPEND_MEM && ipa3_ctx->deepsleep) {
+			if (pm_suspend_via_firmware() && ipa3_ctx->deepsleep) {
 				IPADBG("Enter deepsleep resume\n");
 				ipa3_deepsleep_resume();
 				IPADBG("Exit deepsleep resume\n");
@@ -979,6 +979,7 @@ struct ipa_smmu_cb_ctx *ipa3_get_smmu_ctx(enum ipa_smmu_cb_type cb_type)
 {
 	return &smmu_cb[cb_type];
 }
+EXPORT_SYMBOL(ipa3_get_smmu_ctx);
 
 static int ipa3_open(struct inode *inode, struct file *filp)
 {
@@ -6924,17 +6925,16 @@ void ipa3_active_clients_log_inc(struct ipa_active_client_logging_info *id,
 }
 
 /**
- * ipa3_inc_client_enable_clks() - Increase active clients counter, and
+ * ipa3_inc_client_enable_clks_no_log() - Increase active clients counter, and
  * enable ipa clocks if necessary
  *
  * Return codes:
  * None
  */
-void ipa3_inc_client_enable_clks(struct ipa_active_client_logging_info *id)
+static void ipa3_inc_client_enable_clks_no_log(void)
 {
 	int ret;
 
-	ipa3_active_clients_log_inc(id, false);
 	ret = atomic_inc_not_zero(&ipa3_ctx->ipa3_active_clients.cnt);
 	if (ret) {
 		IPADBG_LOW("active clients = %d\n",
@@ -6959,6 +6959,19 @@ void ipa3_inc_client_enable_clks(struct ipa_active_client_logging_info *id)
 	IPADBG_LOW("active clients = %d\n",
 		atomic_read(&ipa3_ctx->ipa3_active_clients.cnt));
 	mutex_unlock(&ipa3_ctx->ipa3_active_clients.mutex);
+}
+
+/**
+ * ipa3_inc_client_enable_clks() - Increase active clients counter and
+ * enable ipa clocks if necessary, log the caller
+ *
+ * Return codes:
+ * None
+ */
+void ipa3_inc_client_enable_clks(struct ipa_active_client_logging_info *id)
+{
+	ipa3_active_clients_log_inc(id, false);
+	ipa3_inc_client_enable_clks_no_log();
 }
 EXPORT_SYMBOL(ipa3_inc_client_enable_clks);
 
@@ -7064,7 +7077,23 @@ bail:
 }
 
 /**
- * ipa3_dec_client_disable_clks() - Decrease active clients counter
+ * ipa3_dec_client_disable_clks_no_log() - Decrease active clients counter
+ *
+ * In case that there are no active clients this function also starts
+ * TAG process. When TAG progress ends ipa clocks will be gated.
+ * start_tag_process_again flag is set during this function to signal TAG
+ * process to start again as there was another client that may send data to ipa
+ *
+ * Return codes:
+ * None
+ */
+static void ipa3_dec_client_disable_clks_no_log(void)
+{
+	__ipa3_dec_client_disable_clks();
+}
+
+/**
+ * ipa3_dec_client_disable_clks() - Decrease active clients counter and log caller
  *
  * In case that there are no active clients this function also starts
  * TAG process. When TAG progress ends ipa clocks will be gated.
@@ -8102,6 +8131,8 @@ static int ipa3_post_init(const struct ipa3_plat_drv_res *resource_p,
 	gsi_props.rel_clk_cb = NULL;
 	gsi_props.clk_status_cb = ipa3_active_clks_status;
 	gsi_props.enable_clk_bug_on = ipa3_handle_gsi_differ_irq;
+	gsi_props.vote_clk_cb = ipa3_inc_client_enable_clks_no_log;
+	gsi_props.unvote_clk_cb = ipa3_dec_client_disable_clks_no_log;
 
 	if (ipa3_ctx->ipa_config_is_mhi) {
 		gsi_props.mhi_er_id_limits_valid = true;
@@ -11708,7 +11739,7 @@ int ipa3_ap_suspend(struct device *dev)
 	}
 
 #ifdef CONFIG_DEEPSLEEP
-	if (mem_sleep_current == PM_SUSPEND_MEM) {
+	if (pm_suspend_via_firmware()) {
 		IPADBG("Enter deepsleep suspend\n");
 		ipa3_deepsleep_suspend();
 		IPADBG("Exit deepsleep suspend\n");
@@ -11902,6 +11933,7 @@ int ipa3_iommu_map(struct iommu_domain *domain,
 
 	return iommu_map(domain, iova, paddr, size, prot);
 }
+EXPORT_SYMBOL(ipa3_iommu_map);
 
 /**
  * ipa3_get_smmu_params()- Return the ipa3 smmu related params.
