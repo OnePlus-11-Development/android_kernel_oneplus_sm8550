@@ -4118,6 +4118,16 @@ int msm_vidc_queue_internal_buffers(struct msm_vidc_inst *inst,
 		return 0;
 	}
 
+	/*
+	 * Set HFI_PROP_COMV_BUFFER_COUNT to firmware even if COMV buffer
+	 * is reused.
+	 */
+	if (is_decode_session(inst) && buffer_type == MSM_VIDC_BUF_COMV) {
+		rc = msm_vdec_set_num_comv(inst);
+		if (rc)
+			return rc;
+	}
+
 	buffers = msm_vidc_get_buffers(inst, buffer_type, __func__);
 	if (!buffers)
 		return -EINVAL;
@@ -4126,12 +4136,6 @@ int msm_vidc_queue_internal_buffers(struct msm_vidc_inst *inst,
 		i_vpr_l(inst, "%s: reuse enabled for %s buf\n",
 			__func__, buf_name(buffer_type));
 		return 0;
-	}
-
-	if (is_decode_session(inst) && buffer_type == MSM_VIDC_BUF_COMV) {
-		rc = msm_vdec_set_num_comv(inst);
-		if (rc)
-			return rc;
 	}
 
 	list_for_each_entry_safe(buffer, dummy, &buffers->list, list) {
