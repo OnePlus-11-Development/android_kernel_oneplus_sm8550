@@ -19,7 +19,7 @@
 #define MAX_LTR_FRAME_COUNT     2
 #define MAX_BASE_LAYER_PRIORITY_ID 63
 #define MAX_OP_POINT            31
-#define MAX_BITRATE             220000000
+#define MAX_BITRATE             245000000
 #define DEFAULT_BITRATE         20000000
 #define MINIMUM_FPS             1
 #define MAXIMUM_FPS             480
@@ -478,7 +478,7 @@ static struct msm_platform_inst_capability instance_cap_data_anorak[] = {
 		220000000, 1, 220000000},
 
 	{ALLINTRA_MAX_BITRATE, ENC, H264|HEVC, 0,
-		220000000, 1, 220000000},
+		245000000, 1, 245000000},
 
 	{LOWLATENCY_MAX_BITRATE, ENC, H264|HEVC, 0,
 		70000000, 1, 70000000},

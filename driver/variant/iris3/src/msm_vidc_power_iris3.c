@@ -213,6 +213,11 @@ u64 msm_vidc_calc_freq_iris3(struct msm_vidc_inst *inst, u32 data_size)
 			if (fps >= 960)
 				vsp_cycles += div_u64(vpp_cycles * 25, 100);
 
+			/* Add 25 percent extra for HEVC 10bit all intra use case */
+			if (inst->iframe && is_hevc_10bit_decode_session(inst)) {
+				vsp_cycles += div_u64(vsp_cycles * 25, 100);
+			}
+
 			if (inst->codec == MSM_VIDC_VP9 &&
 					inst->capabilities->cap[STAGE].value ==
 						MSM_VIDC_STAGE_2 &&
@@ -228,11 +233,14 @@ u64 msm_vidc_calc_freq_iris3(struct msm_vidc_inst *inst, u32 data_size)
 	freq = max(vpp_cycles, vsp_cycles);
 	freq = max(freq, fw_cycles);
 
-	if (inst->codec != MSM_VIDC_AV1) {
+	if (inst->codec == MSM_VIDC_AV1 ||
+		(inst->iframe && is_hevc_10bit_decode_session(inst))) {
 		/*
-		 * for non-AV1 codecs limit the frequency to NOM only
-		 * index 0 is TURBO, index 1 is NOM clock rate
+		 * for AV1 or HEVC 10bit and iframe case only allow TURBO and
+		 * limit to NOM for all other cases
 		 */
+	} else {
+		/* limit to NOM, index 0 is TURBO, index 1 is NOM clock rate */
 		if (core->dt->allowed_clks_tbl_size >= 2 &&
 		    freq > core->dt->allowed_clks_tbl[1].clock_rate)
 			freq = core->dt->allowed_clks_tbl[1].clock_rate;
