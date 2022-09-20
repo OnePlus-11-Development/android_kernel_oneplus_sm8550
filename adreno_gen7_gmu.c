@@ -177,14 +177,14 @@ void gen7_load_rsc_ucode(struct adreno_device *adreno_dev)
 	_regwrite(rscc, GEN7_RSCC_HIDDEN_TCS_CMD0_DATA + RSC_CMD_OFFSET, 0);
 	_regwrite(rscc, GEN7_RSCC_HIDDEN_TCS_CMD0_ADDR + RSC_CMD_OFFSET, 0);
 	_regwrite(rscc, GEN7_RSCC_HIDDEN_TCS_CMD0_DATA + RSC_CMD_OFFSET * 2,
-		adreno_is_gen7_2_x(adreno_dev) ?  0x80000021 : 0x80000000);
+		adreno_is_gen7_2_x_family(adreno_dev) ?  0x80000021 : 0x80000000);
 	_regwrite(rscc, GEN7_RSCC_HIDDEN_TCS_CMD0_ADDR + RSC_CMD_OFFSET * 2, 0);
 	_regwrite(rscc, GEN7_RSCC_OVERRIDE_START_ADDR, 0);
 	_regwrite(rscc, GEN7_RSCC_PDC_SEQ_START_ADDR, 0x4520);
 	_regwrite(rscc, GEN7_RSCC_PDC_MATCH_VALUE_LO, 0x4510);
 	_regwrite(rscc, GEN7_RSCC_PDC_MATCH_VALUE_HI, 0x4514);
 
-	if (adreno_is_gen7_2_x(adreno_dev))
+	if (adreno_is_gen7_2_x_family(adreno_dev))
 		seq_offset = GEN7_2_0_RSCC_SEQ_MEM_0_DRV0;
 
 	/* Load RSC sequencer uCode for sleep and wakeup */
@@ -644,7 +644,7 @@ static int gen7_complete_rpmh_votes(struct gen7_gmu_device *gmu,
 	struct adreno_device *adreno_dev = gen7_gmu_to_adreno(gmu);
 	int ret = 0;
 
-	if (adreno_is_gen7_2_x(adreno_dev)) {
+	if (adreno_is_gen7_2_x_family(adreno_dev)) {
 		ret |= gen7_timed_poll_check_rscc(gmu,
 			GEN7_2_0_RSCC_TCS0_DRV0_STATUS, BIT(0), 1, BIT(0));
 		ret |= gen7_timed_poll_check_rscc(gmu,
@@ -3116,6 +3116,11 @@ int gen7_gmu_device_probe(struct platform_device *pdev,
 	INIT_WORK(&device->idle_check_ws, gmu_idle_check);
 
 	timer_setup(&device->idle_timer, gmu_idle_timer, 0);
+
+	if (ADRENO_FEATURE(adreno_dev, ADRENO_DMS)) {
+		set_bit(ADRENO_DEVICE_DMS, &adreno_dev->priv);
+		adreno_dev->dms_enabled = true;
+	}
 
 	adreno_dev->irq_mask = GEN7_INT_MASK;
 

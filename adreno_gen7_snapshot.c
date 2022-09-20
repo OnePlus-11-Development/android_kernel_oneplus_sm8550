@@ -1464,8 +1464,10 @@ void gen7_snapshot(struct adreno_device *adreno_dev,
 		kgsl_regwrite(device, GEN7_RBBM_CLOCK_CNTL3_TP0, cgc2);
 	}
 
-	if (!adreno_gx_is_on(adreno_dev))
+	if (!adreno_gx_is_on(adreno_dev)) {
+		gen7_snapshot_external_core_regs(device, snapshot);
 		return;
+	}
 
 	is_current_rt = rt_task(current);
 

@@ -126,6 +126,8 @@
 #define ADRENO_LSR BIT(15)
 /* GMU and kernel supports hardware fences */
 #define ADRENO_HW_FENCE BIT(16)
+/* Dynamic Mode Switching supported on this target */
+#define ADRENO_DMS BIT(17)
 
 
 /*
@@ -222,6 +224,7 @@ enum adreno_gpurev {
 	ADRENO_REV_GEN7_2_0 = 0x070200,
 	ADRENO_REV_GEN7_2_1 = 0x070201,
 	ADRENO_REV_GEN7_4_0 = 0x070400,
+	ADRENO_REV_GEN7_9_0 = 0x070900,
 };
 
 #define ADRENO_SOFT_FAULT BIT(0)
@@ -457,6 +460,8 @@ struct adreno_dispatch_ops {
 	void (*fault)(struct adreno_device *adreno_dev, u32 fault);
 	/* @idle: Wait for dipatcher to become idle */
 	int (*idle)(struct adreno_device *adreno_dev);
+	/* @create_hw_fence: Create a hardware fence */
+	void (*create_hw_fence)(struct adreno_device *adreno_dev, struct kgsl_sync_fence *kfence);
 };
 
 /**
@@ -586,6 +591,8 @@ struct adreno_device {
 	bool bcl_enabled;
 	/** @lpac_enabled: True if LPAC is enabled */
 	bool lpac_enabled;
+	/** @dms_enabled: True if DMS is enabled */
+	bool dms_enabled;
 	struct kgsl_memdesc *profile_buffer;
 	unsigned int profile_index;
 	struct kgsl_memdesc *pwrup_reglist;
@@ -710,6 +717,8 @@ enum adreno_device_flags {
 	ADRENO_DEVICE_GPMU_INITIALIZED = 11,
 	ADRENO_DEVICE_ISDB_ENABLED = 12,
 	ADRENO_DEVICE_CACHE_FLUSH_TS_SUSPENDED = 13,
+	/** @ADRENO_DEVICE_DMS: Set if DMS is enabled */
+	ADRENO_DEVICE_DMS = 14,
 };
 
 /**
@@ -1185,10 +1194,13 @@ ADRENO_TARGET(gen7_0_1, ADRENO_REV_GEN7_0_1)
 ADRENO_TARGET(gen7_2_0, ADRENO_REV_GEN7_2_0)
 ADRENO_TARGET(gen7_2_1, ADRENO_REV_GEN7_2_1)
 ADRENO_TARGET(gen7_4_0, ADRENO_REV_GEN7_4_0)
+ADRENO_TARGET(gen7_9_0, ADRENO_REV_GEN7_9_0)
 
-static inline int adreno_is_gen7_2_x(struct adreno_device *adreno_dev)
+
+static inline int adreno_is_gen7_2_x_family(struct adreno_device *adreno_dev)
 {
-	return adreno_is_gen7_2_0(adreno_dev) || adreno_is_gen7_2_1(adreno_dev);
+	return adreno_is_gen7_2_0(adreno_dev) || adreno_is_gen7_2_1(adreno_dev) ||
+		adreno_is_gen7_9_0(adreno_dev);
 }
 
 /*

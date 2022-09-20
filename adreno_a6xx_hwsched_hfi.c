@@ -135,10 +135,13 @@ static void log_profiling_info(struct adreno_device *adreno_dev, u32 *rcvd)
 	struct kgsl_context *context;
 	struct retire_info info = {0};
 	struct a6xx_gmu_device *gmu = to_a6xx_gmu(adreno_dev);
+	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 
-	context = kgsl_context_get(KGSL_DEVICE(adreno_dev), cmd->ctxt_id);
+	context = kgsl_context_get(device, cmd->ctxt_id);
 	if (context == NULL)
 		return;
+
+	kgsl_proc_work_period_update(device, context->proc_priv, cmd->active);
 
 	info.timestamp = cmd->ts;
 	info.rb_id = adreno_get_level(context);
@@ -1108,7 +1111,7 @@ static int enable_preemption(struct adreno_device *adreno_dev)
 	 * Bits[31:4] contain the timeout in ms
 	 */
 	return a6xx_hfi_send_set_value(adreno_dev, HFI_VALUE_BIN_TIME, 1,
-			FIELD_PREP(GENMASK(31, 4), 3000) |
+			FIELD_PREP(GENMASK(31, 4), ADRENO_PREEMPT_TIMEOUT) |
 			FIELD_PREP(GENMASK(3, 0), 0xf));
 }
 
@@ -1596,13 +1599,13 @@ static void populate_ibs(struct adreno_device *adreno_dev,
 
 #define DISPQ_IRQ_BIT(_idx) BIT((_idx) + HFI_DSP_IRQ_BASE)
 
-int a6xx_hwsched_submit_cmdobj(struct adreno_device *adreno_dev,
-	struct kgsl_drawobj_cmd *cmdobj)
+int a6xx_hwsched_submit_drawobj(struct adreno_device *adreno_dev,
+	struct kgsl_drawobj *drawobj)
 {
 	struct a6xx_hfi *hfi = to_a6xx_hfi(adreno_dev);
 	int ret = 0;
 	u32 cmd_sizebytes;
-	struct kgsl_drawobj *drawobj = DRAWOBJ(cmdobj);
+	struct kgsl_drawobj_cmd *cmdobj = CMDOBJ(drawobj);
 	struct hfi_submit_cmd *cmd;
 	struct adreno_submit_time time = {0};
 	static void *cmdbuf;
