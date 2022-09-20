@@ -121,6 +121,8 @@ static void dp_debug_disable_sim_mode(struct dp_debug_private *debug,
 	debug->sim_mode &= ~mode_mask;
 	dp_sim_set_sim_mode(debug->sim_bridge, debug->sim_mode);
 
+	dp_sim_update_port_num(debug->sim_bridge, 0);
+
 	/* switch to normal mode */
 	if (!debug->sim_mode)
 		debug->aux->set_sim_mode(debug->aux, NULL);
