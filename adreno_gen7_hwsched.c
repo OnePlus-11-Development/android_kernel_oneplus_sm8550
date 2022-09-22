@@ -346,7 +346,7 @@ static int gen7_hwsched_gmu_first_boot(struct adreno_device *adreno_dev)
 	if (ret)
 		return ret;
 
-	ret = gen7_gmu_enable_clks(adreno_dev);
+	ret = gen7_gmu_enable_clks(adreno_dev, GMU_MAX_PWRLEVELS - 1);
 	if (ret)
 		goto gdsc_off;
 
@@ -438,7 +438,7 @@ static int gen7_hwsched_gmu_boot(struct adreno_device *adreno_dev)
 	if (ret)
 		return ret;
 
-	ret = gen7_gmu_enable_clks(adreno_dev);
+	ret = gen7_gmu_enable_clks(adreno_dev, GMU_MAX_PWRLEVELS - 1);
 	if (ret)
 		goto gdsc_off;
 

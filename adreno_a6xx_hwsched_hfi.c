@@ -18,6 +18,7 @@
 #include "kgsl_eventlog.h"
 #include "kgsl_pwrctrl.h"
 #include "kgsl_trace.h"
+#include "kgsl_util.h"
 
 #define HFI_QUEUE_MAX (HFI_QUEUE_DEFAULT_CNT + HFI_QUEUE_DISPATCH_MAX_CNT)
 
@@ -1218,6 +1219,17 @@ int a6xx_hwsched_hfi_start(struct adreno_device *adreno_dev)
 
 	/* Request default BW vote */
 	ret = kgsl_pwrctrl_axi(device, true);
+	if (ret)
+		goto err;
+
+	/* Switch to min GMU clock */
+	a6xx_rdpm_cx_freq_update(gmu, gmu->freqs[0] / 1000);
+
+	ret = kgsl_clk_set_rate(gmu->clks, gmu->num_clks, "gmu_clk",
+			gmu->freqs[0]);
+	if (ret)
+		dev_err(&gmu->pdev->dev, "GMU clock:%d set failed:%d\n",
+			gmu->freqs[0], ret);
 
 err:
 	if (ret)
