@@ -2585,6 +2585,13 @@ struct ipa3_context {
 	phys_addr_t per_stats_smem_pa;
 	void *per_stats_smem_va;
 	u32 ipa_smem_size;
+	bool is_dual_pine_config;
+	struct workqueue_struct *collect_recycle_stats_wq;
+	struct ipa_lnx_pipe_page_recycling_stats recycle_stats;
+	struct ipa3_page_recycle_stats prev_coal_recycle_stats;
+	struct ipa3_page_recycle_stats prev_default_recycle_stats;
+	struct ipa3_page_recycle_stats prev_low_lat_data_recycle_stats;
+	struct mutex recycle_stats_collection_lock;
 };
 
 struct ipa3_plat_drv_res {
