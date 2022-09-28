@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -987,6 +987,7 @@ static int sde_encoder_phys_wb_atomic_check(struct sde_encoder_phys *phys_enc,
 	const struct drm_display_mode *mode = &crtc_state->mode;
 	int rc;
 	bool clone_mode_curr = false;
+	bool cwb_disable_pending = false;
 
 	SDE_DEBUG("[enc:%d wb:%d] atomic_check:\"%s\",%d,%d]\n", DRMID(phys_enc->parent),
 			WBID(wb_enc), mode->name, mode->hdisplay, mode->vdisplay);
@@ -1003,12 +1004,13 @@ static int sde_encoder_phys_wb_atomic_check(struct sde_encoder_phys *phys_enc,
 
 	sde_conn_state = to_sde_connector_state(conn_state);
 	clone_mode_curr = phys_enc->in_clone_mode;
+	cwb_disable_pending = phys_enc->cwb_disable_pending;
 
 	_sde_enc_phys_wb_detect_cwb(phys_enc, crtc_state);
 
-	if (clone_mode_curr && !cstate->cwb_enc_mask) {
-		SDE_ERROR("[enc:%d wb:%d] WB commit before CWB disable\n",
-				DRMID(phys_enc->parent), WBID(wb_enc));
+	if ((clone_mode_curr || cwb_disable_pending) && !cstate->cwb_enc_mask) {
+		SDE_ERROR("[enc:%d wb:%d] WB commit before CWB disable, Clone mode %d %d\n",
+		 DRMID(phys_enc->parent), WBID(wb_enc), clone_mode_curr, cwb_disable_pending);
 		return -EINVAL;
 	}
 

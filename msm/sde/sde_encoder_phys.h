@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -315,6 +315,8 @@ struct sde_encoder_irq {
  *				mode display
  * @recovered:			flag set to true when recovered from pp timeout
  * @autorefresh_disable_trans:   flag set to true during autorefresh disable transition
+ * @cwb_disable_pending:  Set to true when cwb disable is in progress
+ *                       and HW is still attached to CTL
  */
 struct sde_encoder_phys {
 	struct drm_encoder *parent;
@@ -363,6 +365,7 @@ struct sde_encoder_phys {
 	enum frame_trigger_mode_type frame_trigger_mode;
 	bool recovered;
 	bool autorefresh_disable_trans;
+	bool cwb_disable_pending;
 };
 
 static inline int sde_encoder_phys_inc_pending(struct sde_encoder_phys *phys)

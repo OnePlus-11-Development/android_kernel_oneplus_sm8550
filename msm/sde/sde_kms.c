@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -1601,6 +1601,7 @@ static void sde_kms_wait_for_commit_done(struct msm_kms *kms,
 {
 	struct sde_kms *sde_kms;
 	struct drm_encoder *encoder;
+	struct drm_encoder *cwb_encoder = NULL;
 	struct drm_device *dev;
 	int ret;
 	bool cwb_disabling;
@@ -1634,8 +1635,12 @@ static void sde_kms_wait_for_commit_done(struct msm_kms *kms,
 		if (encoder->crtc != crtc) {
 			cwb_disabling = sde_encoder_is_cwb_disabling(encoder,
 					crtc);
-			if (!cwb_disabling)
+			if (cwb_disabling) {
+				cwb_encoder = encoder;
+				sde_encoder_set_cwb_pending(encoder, true);
+			} else {
 				continue;
+			}
 		}
 
 		/*
@@ -1660,6 +1665,9 @@ static void sde_kms_wait_for_commit_done(struct msm_kms *kms,
 		if (cwb_disabling)
 			sde_encoder_virt_reset(encoder);
 	}
+
+	if (cwb_encoder)
+		sde_encoder_set_cwb_pending(cwb_encoder, false);
 
 	/* avoid system cache update to set rd-noalloc bit when NSE feature is enabled */
 	if (!test_bit(SDE_FEATURE_SYS_CACHE_NSE, sde_kms->catalog->features))

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -652,6 +652,13 @@ ktime_t sde_encoder_calc_last_vsync_timestamp(struct drm_encoder *drm_enc);
  * @drm_enc:    Pointer to drm encoder structure
  */
 void sde_encoder_cancel_delayed_work(struct drm_encoder *encoder);
+
+/**
+ * sde_encoder_set_cwb_pending - set cwb_disable_pending flag
+ * @drm_enc: Pointer to drm encoder structure
+ * @enable:	set or reset cwb_disable_pending
+ */
+void sde_encoder_set_cwb_pending(struct drm_encoder *drm_enc, bool enable);
 
 /**
  * sde_encoder_get_kms - retrieve the kms from encoder
