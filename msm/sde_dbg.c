@@ -2434,10 +2434,10 @@ static ssize_t sde_dbg_reg_base_reg_read(struct file *file,
 
 			if (cur_offset == 0) {
 				tot += scnprintf(dbg->buf + tot, dbg->buf_len - tot,
-					"0x%08x:", ((int) dbg->off) - cur_offset);
+					"0x%08x:", ((int) dbg->off) + cur_offset);
 			} else if (!(cur_offset % ROW_BYTES)) { // Header
 				tot += scnprintf(dbg->buf + tot, dbg->buf_len - tot,
-					"\n0x%08x:", ((int) dbg->off) - cur_offset);
+					"\n0x%08x:", ((int) dbg->off) + cur_offset);
 			}
 
 			reg_val = SDE_REG_READ(&c, cur_offset);
