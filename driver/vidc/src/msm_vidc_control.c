@@ -3331,7 +3331,7 @@ int msm_vidc_set_header_mode(void *instance,
 	else
 		hfi_value = HFI_SEQ_HEADER_SEPERATE_FRAME;
 
-	if (is_meta_rx_inp_enabled(inst, META_SEQ_HDR_NAL))
+	if (is_meta_rx_out_enabled(inst, META_SEQ_HDR_NAL))
 		hfi_value |= HFI_SEQ_HEADER_METADATA;
 
 	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_U32_ENUM,
