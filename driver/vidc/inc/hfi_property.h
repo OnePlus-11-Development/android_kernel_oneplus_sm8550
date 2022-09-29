@@ -571,6 +571,12 @@ enum hfi_saliency_type {
 
 #define HFI_PROP_SLICE_DECODE                                   0x03000196
 
+#define HFI_PROP_EARLY_NOTIFY_ENABLE                            0x03000198
+
+#define HFI_PROP_EARLY_NOTIFY_LINE_COUNT                        0x03000199
+
+#define HFI_PROP_EARLY_NOTIFY_FENCE_COUNT                       0x0300019A
+
 #define HFI_PROP_END                                            0x03FFFFFF
 
 #define HFI_SESSION_ERROR_BEGIN                                 0x04000000

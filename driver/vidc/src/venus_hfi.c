@@ -3702,6 +3702,7 @@ int venus_hfi_queue_buffer(struct msm_vidc_inst *inst,
 	int rc = 0;
 	struct msm_vidc_core *core;
 	struct hfi_buffer hfi_buffer;
+	enum hfi_packet_payload_info payload_type;
 
 	if (!inst || !inst->core || !inst->packet || !inst->capabilities) {
 		d_vpr_e("%s: invalid params\n", __func__);
@@ -3755,22 +3756,26 @@ int venus_hfi_queue_buffer(struct msm_vidc_inst *inst,
 
 	if (is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE) &&
 		is_output_buffer(buffer->type)) {
-		if (!buffer->fence_id) {
-			i_vpr_e(inst, "%s: fence id cannot be 0\n", __func__);
+		payload_type = buffer->fence_count == 1 ? HFI_PAYLOAD_U64 : HFI_PAYLOAD_U64_ARRAY;
+		if (buffer->fence_count > MAX_FENCE_COUNT) {
+			i_vpr_e(inst, "%s: invalid fence count %d\n",
+				__func__, buffer->fence_count);
 			rc = -EINVAL;
 			goto unlock;
 		}
+
 		rc = hfi_create_packet(inst->packet,
 			inst->packet_size,
 			HFI_PROP_FENCE,
 			0,
-			HFI_PAYLOAD_U64,
+			payload_type,
 			HFI_PORT_RAW,
 			core->packet_id++,
-			&buffer->fence_id,
-			sizeof(u64));
+			&buffer->fence_id[0],
+			buffer->fence_count * sizeof(u64));
 		if (rc)
 			goto unlock;
+
 	}
 
 	rc = venus_hfi_add_pending_packets(inst);

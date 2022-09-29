@@ -373,6 +373,35 @@ static struct msm_platform_inst_capability instance_cap_data_anorak[] = {
 		HFI_PROP_SLICE_DECODE,
 		CAP_FLAG_INPUT_PORT},
 
+	/**
+	 * Disable this feature for now,
+	 * Todo: Enable it back once firmware dependency is ready.
+	 */
+	{EARLY_NOTIFY_ENABLE, DEC, H264|HEVC|AV1,
+		V4L2_MPEG_MSM_VIDC_DISABLE,
+		V4L2_MPEG_MSM_VIDC_DISABLE,
+		1,
+		V4L2_MPEG_MSM_VIDC_DISABLE,
+		V4L2_CID_MPEG_VIDC_EARLY_NOTIFY_ENABLE,
+		HFI_PROP_EARLY_NOTIFY_ENABLE,
+		CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED},
+
+	/**
+	 * Disable this feature for now,
+	 * Todo: Enable it back once firmware dependency is ready.
+	 */
+	{EARLY_NOTIFY_LINE_COUNT, DEC, H264|HEVC|AV1,
+		0, 0, 1, 0,
+		V4L2_CID_MPEG_VIDC_EARLY_NOTIFY_LINE_COUNT,
+		HFI_PROP_EARLY_NOTIFY_LINE_COUNT,
+		CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED},
+
+	{EARLY_NOTIFY_FENCE_COUNT, DEC, H264|HEVC|AV1,
+		0, MAX_FENCE_COUNT, 1, 0,
+		0,
+		HFI_PROP_EARLY_NOTIFY_FENCE_COUNT,
+		CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED},
+
 	{HEADER_MODE, ENC, CODECS_ALL,
 		V4L2_MPEG_VIDEO_HEADER_MODE_SEPARATE,
 		V4L2_MPEG_VIDEO_HEADER_MODE_JOINED_WITH_1ST_FRAME,
@@ -1818,7 +1847,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_anor
 
 	{META_OUTBUF_FENCE, DEC, H264|HEVC|VP9|AV1,
 		{OUTPUT_ORDER},
-		{LOWLATENCY_MODE, SLICE_DECODE},
+		{LOWLATENCY_MODE, SLICE_DECODE, EARLY_NOTIFY_ENABLE},
 		msm_vidc_adjust_dec_outbuf_fence,
 		NULL},
 
@@ -1850,6 +1879,24 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_anor
 		{LOWLATENCY_MODE, META_OUTBUF_FENCE, OUTPUT_ORDER},
 		{0},
 		msm_vidc_adjust_dec_slice_mode,
+		msm_vidc_set_u32},
+
+	{EARLY_NOTIFY_ENABLE, DEC, H264|HEVC|AV1,
+		{LOWLATENCY_MODE, META_OUTBUF_FENCE, OUTPUT_ORDER},
+		{EARLY_NOTIFY_LINE_COUNT},
+		msm_vidc_adjust_early_notify_enable,
+		msm_vidc_set_u32},
+
+	{EARLY_NOTIFY_LINE_COUNT, DEC, H264|HEVC|AV1,
+		{EARLY_NOTIFY_ENABLE},
+		{EARLY_NOTIFY_FENCE_COUNT},
+		msm_vidc_adjust_early_notify_line_count,
+		msm_vidc_set_u32},
+
+	{EARLY_NOTIFY_FENCE_COUNT, DEC, H264|HEVC|AV1,
+		{EARLY_NOTIFY_LINE_COUNT},
+		{0},
+		msm_vidc_adjust_early_notify_fence_count,
 		msm_vidc_set_u32},
 
 	{HEADER_MODE, ENC, CODECS_ALL,
@@ -1971,7 +2018,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_anor
 
 	{LOWLATENCY_MODE, DEC, H264|HEVC|VP9|AV1,
 		{META_OUTBUF_FENCE},
-		{STAGE, SLICE_DECODE},
+		{STAGE, SLICE_DECODE, EARLY_NOTIFY_ENABLE},
 		msm_vidc_adjust_dec_lowlatency_mode,
 		NULL},
 
@@ -2268,7 +2315,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_anor
 
 	{OUTPUT_ORDER, DEC, H264|HEVC|VP9|AV1,
 		{THUMBNAIL_MODE, DISPLAY_DELAY, DISPLAY_DELAY_ENABLE},
-		{META_OUTBUF_FENCE, SLICE_DECODE},
+		{META_OUTBUF_FENCE, SLICE_DECODE, EARLY_NOTIFY_ENABLE},
 		msm_vidc_adjust_output_order,
 		msm_vidc_set_u32},
 
