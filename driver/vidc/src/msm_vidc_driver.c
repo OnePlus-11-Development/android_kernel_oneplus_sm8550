@@ -4118,6 +4118,16 @@ int msm_vidc_queue_internal_buffers(struct msm_vidc_inst *inst,
 		return 0;
 	}
 
+	/*
+	 * Set HFI_PROP_COMV_BUFFER_COUNT to firmware even if COMV buffer
+	 * is reused.
+	 */
+	if (is_decode_session(inst) && buffer_type == MSM_VIDC_BUF_COMV) {
+		rc = msm_vdec_set_num_comv(inst);
+		if (rc)
+			return rc;
+	}
+
 	buffers = msm_vidc_get_buffers(inst, buffer_type, __func__);
 	if (!buffers)
 		return -EINVAL;
@@ -4126,12 +4136,6 @@ int msm_vidc_queue_internal_buffers(struct msm_vidc_inst *inst,
 		i_vpr_l(inst, "%s: reuse enabled for %s buf\n",
 			__func__, buf_name(buffer_type));
 		return 0;
-	}
-
-	if (is_decode_session(inst) && buffer_type == MSM_VIDC_BUF_COMV) {
-		rc = msm_vdec_set_num_comv(inst);
-		if (rc)
-			return rc;
 	}
 
 	list_for_each_entry_safe(buffer, dummy, &buffers->list, list) {
@@ -5201,6 +5205,7 @@ int msm_vidc_core_init_wait(struct msm_vidc_core *core)
 	} else {
 		d_vpr_h("%s: sys init wait timedout. state %s\n",
 			__func__, core_state_name(core->state));
+		core->video_unresponsive = true;
 		rc = -EINVAL;
 		goto unlock;
 	}
@@ -5275,6 +5280,8 @@ int msm_vidc_inst_timeout(struct msm_vidc_inst *inst)
 		rc = -EINVAL;
 		goto unlock;
 	}
+	/* mark video hw unresponsive */
+	core->video_unresponsive = true;
 
 	/* call core deinit for a valid instance timeout case */
 	msm_vidc_core_deinit_locked(core, true);
@@ -5686,8 +5693,10 @@ int msm_vidc_flush_buffers(struct msm_vidc_inst *inst,
 			if (buf->attr & MSM_VIDC_ATTR_QUEUED ||
 				buf->attr & MSM_VIDC_ATTR_DEFERRED) {
 				print_vidc_buffer(VIDC_HIGH, "high", "flushing buffer", inst, buf);
-				if (!(buf->attr & MSM_VIDC_ATTR_BUFFER_DONE))
+				if (!(buf->attr & MSM_VIDC_ATTR_BUFFER_DONE)) {
+					buf->data_size = 0;
 					msm_vidc_vb2_buffer_done(inst, buf);
+				}
 				msm_vidc_put_driver_buf(inst, buf);
 			}
 		}

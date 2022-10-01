@@ -120,6 +120,7 @@ struct msm_vidc_core {
 	bool                                   hw_power_control;
 	bool                                   pm_suspended;
 	bool                                   cpu_watchdog;
+	bool                                   video_unresponsive;
 };
 
 #endif // _MSM_VIDC_CORE_H_
