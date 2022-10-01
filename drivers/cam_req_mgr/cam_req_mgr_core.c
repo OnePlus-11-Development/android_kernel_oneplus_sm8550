@@ -864,7 +864,7 @@ static void __cam_req_mgr_validate_crm_wd_timer(
 	struct cam_req_mgr_core_link *link)
 {
 	int idx = 0;
-	int next_frame_timeout = 0, current_frame_timeout = 0;
+	int next_frame_timeout, current_frame_timeout, max_frame_timeout;
 	int64_t current_req_id, next_req_id;
 	struct cam_req_mgr_req_queue *in_q = link->req.in_q;
 
@@ -900,9 +900,13 @@ static void __cam_req_mgr_validate_crm_wd_timer(
 			"Skip modifying wd timer, continue with same timeout");
 		return;
 	}
+
+	max_frame_timeout = (current_frame_timeout > next_frame_timeout) ?
+		current_frame_timeout : next_frame_timeout;
+
 	spin_lock_bh(&link->link_state_spin_lock);
 	if (link->watchdog) {
-		if ((next_frame_timeout + CAM_REQ_MGR_WATCHDOG_TIMEOUT) >
+		if ((max_frame_timeout + CAM_REQ_MGR_WATCHDOG_TIMEOUT) >
 			link->watchdog->expires) {
 			CAM_DBG(CAM_CRM,
 				"Modifying wd timer expiry from %d ms to %d ms",
@@ -910,18 +914,18 @@ static void __cam_req_mgr_validate_crm_wd_timer(
 				(next_frame_timeout +
 				 CAM_REQ_MGR_WATCHDOG_TIMEOUT));
 			crm_timer_modify(link->watchdog,
-				next_frame_timeout +
+				max_frame_timeout +
 				CAM_REQ_MGR_WATCHDOG_TIMEOUT);
-		} else if (current_frame_timeout) {
+		} else if (max_frame_timeout) {
 			CAM_DBG(CAM_CRM,
 				"Reset wd timer to frame from %d ms to %d ms",
 				link->watchdog->expires,
-				(current_frame_timeout +
+				(max_frame_timeout +
 				 CAM_REQ_MGR_WATCHDOG_TIMEOUT));
 			crm_timer_modify(link->watchdog,
-				current_frame_timeout +
+				max_frame_timeout +
 				CAM_REQ_MGR_WATCHDOG_TIMEOUT);
-		} else if (!next_frame_timeout && (link->watchdog->expires >
+		} else if (!max_frame_timeout && (link->watchdog->expires >
 			CAM_REQ_MGR_WATCHDOG_TIMEOUT)) {
 			CAM_DBG(CAM_CRM,
 				"Reset wd timer to default from %d ms to %d ms",
