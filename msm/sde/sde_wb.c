@@ -545,6 +545,9 @@ int sde_wb_connector_set_info_blob(struct drm_connector *connector,
 	sde_kms_info_add_keyint(info, "has_cwb_dither", test_bit(SDE_FEATURE_CWB_DITHER,
 				catalog->features));
 
+	if (catalog->cdm_count)
+		sde_kms_info_add_keyint(info, "cdm_count", catalog->cdm_count);
+
 	if (catalog->dnsc_blur_count && catalog->dnsc_blur_filters) {
 		sde_kms_info_add_keyint(info, "dnsc_blur_count", catalog->dnsc_blur_count);
 

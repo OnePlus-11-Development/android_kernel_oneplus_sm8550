@@ -2132,7 +2132,7 @@ static int _sde_kms_drm_obj_init(struct sde_kms *sde_kms)
 
 	u32 sspp_id[MAX_PLANES];
 	u32 master_plane_id[MAX_PLANES];
-	u32 num_virt_planes = 0;
+	u32 num_virt_planes = 0, dummy_mixer_count = 0;
 
 	if (!sde_kms || !sde_kms->dev || !sde_kms->dev->dev) {
 		SDE_ERROR("invalid sde_kms\n");
@@ -2153,7 +2153,11 @@ static int _sde_kms_drm_obj_init(struct sde_kms *sde_kms)
 	if (!_sde_kms_get_displays(sde_kms))
 		(void)_sde_kms_setup_displays(dev, priv, sde_kms);
 
-	max_crtc_count = min(catalog->mixer_count, priv->num_encoders);
+	for (i = 0; i < catalog->mixer_count; i++)
+		if (catalog->mixer[i].dummy_mixer)
+			dummy_mixer_count++;
+
+	max_crtc_count = catalog->mixer_count - dummy_mixer_count;
 
 	/* Create the planes */
 	for (i = 0; i < catalog->sspp_count; i++) {
@@ -2579,6 +2583,38 @@ static void _sde_kms_plane_force_remove(struct drm_plane *plane,
 	drm_atomic_set_fb_for_plane(plane_state, NULL);
 }
 
+static int _sde_kms_connector_add_refcount(struct sde_kms *sde_kms,
+		struct drm_atomic_state *state)
+{
+	struct drm_device *dev = sde_kms->dev;
+	struct drm_connector *conn;
+	struct drm_connector_state *conn_state;
+	struct drm_connector_list_iter conn_iter;
+	struct sde_connector_state *c_state;
+	int ret = 0;
+
+	drm_connector_list_iter_begin(dev, &conn_iter);
+	drm_for_each_connector_iter(conn, &conn_iter) {
+		/*
+		 * Acquire a connector reference to avoid removing
+		 * connector in drm_release for splash and recovery cases.
+		 */
+		conn_state = drm_atomic_get_connector_state(state, conn);
+		if (IS_ERR(conn_state)) {
+			ret = PTR_ERR(conn_state);
+			SDE_ERROR("error %d getting connector %d state\n",
+					ret, DRMID(conn));
+			return ret;
+		}
+		c_state = to_sde_connector_state(conn_state);
+		if (c_state->out_fb)
+			drm_framebuffer_put(c_state->out_fb);
+	}
+	drm_connector_list_iter_end(&conn_iter);
+
+	return ret;
+}
+
 static int _sde_kms_remove_fbs(struct sde_kms *sde_kms, struct drm_file *file,
 		struct drm_atomic_state *state)
 {
@@ -2611,6 +2647,8 @@ static int _sde_kms_remove_fbs(struct sde_kms *sde_kms, struct drm_file *file,
 
 	if (list_empty(&fbs)) {
 		SDE_DEBUG("skip commit as no fb(s)\n");
+		if (sde_kms->dsi_display_count == sde_kms->splash_data.num_splash_displays)
+			_sde_kms_connector_add_refcount(sde_kms, state);
 		return 0;
 	}
 

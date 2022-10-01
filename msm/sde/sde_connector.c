@@ -57,6 +57,7 @@ static const struct drm_prop_enum_list e_topology_control[] = {
 	{SDE_RM_TOPCTL_DSPP,		"dspp"},
 	{SDE_RM_TOPCTL_DS,		"ds"},
 	{SDE_RM_TOPCTL_DNSC_BLUR,	"dnsc_blur"},
+	{SDE_RM_TOPCTL_CDM,		"cdm"},
 };
 static const struct drm_prop_enum_list e_power_mode[] = {
 	{SDE_MODE_DPMS_ON,	"ON"},
