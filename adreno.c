@@ -21,6 +21,7 @@
 #include <linux/version.h>
 #include <soc/qcom/dcvs.h>
 #include <soc/qcom/socinfo.h>
+#include <soc/qcom/boot_stats.h>
 
 #include "adreno.h"
 #include "adreno_a3xx.h"
@@ -1163,6 +1164,8 @@ int adreno_device_probe(struct platform_device *pdev,
 	int status;
 	u32 size;
 
+	place_marker("M - DRIVER GPU Init");
+
 	/* Initialize the adreno device structure */
 	adreno_setup_device(adreno_dev);
 
@@ -1315,6 +1318,8 @@ int adreno_device_probe(struct platform_device *pdev,
 #endif
 
 	kgsl_qcom_va_md_register(device);
+
+	place_marker("M - DRIVER GPU Ready");
 
 	return 0;
 err:

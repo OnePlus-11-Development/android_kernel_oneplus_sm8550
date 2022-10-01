@@ -25,6 +25,7 @@
 #include <linux/sort.h>
 #include <soc/qcom/of_common.h>
 #include <soc/qcom/secure_buffer.h>
+#include <soc/qcom/boot_stats.h>
 
 #include "kgsl_compat.h"
 #include "kgsl_debugfs.h"
@@ -5041,6 +5042,8 @@ int __init kgsl_core_init(void)
 {
 	int result = 0;
 
+	place_marker("M - DRIVER KGSL Init");
+
 	/* alloc major and minor device numbers */
 	result = alloc_chrdev_region(&kgsl_driver.major, 0,
 		ARRAY_SIZE(kgsl_driver.devp), "kgsl");
@@ -5136,6 +5139,8 @@ int __init kgsl_core_init(void)
 
 	memfree.list = kcalloc(MEMFREE_ENTRIES, sizeof(struct memfree_entry),
 		GFP_KERNEL);
+
+	place_marker("M - DRIVER KGSL Ready");
 
 	return 0;
 
