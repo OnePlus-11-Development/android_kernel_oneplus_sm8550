@@ -105,11 +105,12 @@ struct rx_event_ring_ele
 }__packed;
 
 static inline void ipa_test_ntn_set_client_params(enum ipa_client_type cons_type,
-	enum ipa_client_type prod_type, int inst_id)
+	enum ipa_client_type prod_type, int inst_id, enum ipa_eth_client_type eth_client_type)
 {
 	test_ntn_ctx->cons_client_type = cons_type;
 	test_ntn_ctx->prod_client_type = prod_type;
 	test_ntn_ctx->eth_client_inst_id = inst_id;
+	test_ntn_ctx->client.client_type = eth_client_type;
 }
 
 static void ipa_test_ntn_free_dma_buff(struct ipa_mem_buffer *mem)
@@ -408,7 +409,8 @@ static int ipa_test_ntn_suite_setup(void **priv)
 		return -ENOMEM;
 	}
 
-	ipa_test_ntn_set_client_params(IPA_CLIENT_ETHERNET_CONS, IPA_CLIENT_ETHERNET_PROD, 0);
+	ipa_test_ntn_set_client_params(IPA_CLIENT_ETHERNET_CONS, IPA_CLIENT_ETHERNET_PROD, 0,
+			IPA_ETH_CLIENT_NTN3);
 
 	init_completion(&test_ntn_ctx->init_completion_obj);
 
@@ -546,13 +548,20 @@ static int ipa_ntn_test_setup_pipes(void)
 	struct ipa_eth_client *client;
 	int ret, i;
 #if IPA_ETH_API_VER >= 2
-	struct net_device dummy_net_dev;
+	struct net_device *dummy_net_dev;
 	unsigned char dummy_dev_addr = 1;
 
-	memset(dummy_net_dev.name, 0, sizeof(dummy_net_dev.name));
-	dummy_net_dev.dev_addr = &dummy_dev_addr;
+	dummy_net_dev = kzalloc(sizeof(*dummy_net_dev), GFP_KERNEL);
+	if (dummy_net_dev == NULL){
+		IPA_UT_ERR("kzalloc failed\n");
+		return -ENOMEM;
+	}
 
-	test_ntn_ctx->client.client_type = IPA_ETH_CLIENT_NTN3;
+	memset(dummy_net_dev->name, 0, sizeof(dummy_net_dev->name));
+	dummy_net_dev->dev_addr = &dummy_dev_addr;
+
+
+	/* client_type is set in ipa_test_ntn_set_client_params */
 	test_ntn_ctx->client.inst_id = test_ntn_ctx->eth_client_inst_id;
 #else
 	test_ntn_ctx->client.client_type = IPA_ETH_CLIENT_NTN;
@@ -560,7 +569,7 @@ static int ipa_ntn_test_setup_pipes(void)
 #endif
 	test_ntn_ctx->client.traffic_type = IPA_ETH_PIPE_BEST_EFFORT;
 #if IPA_ETH_API_VER >= 2
-	test_ntn_ctx->client.net_dev = &dummy_net_dev;
+	test_ntn_ctx->client.net_dev = dummy_net_dev;
 #endif
 
 	/* RX pipe */
@@ -688,21 +697,22 @@ static int ipa_ntn_test_setup_pipes(void)
 	ret = ipa_eth_client_conn_pipes(client);
 	if(ret) {
 		IPA_UT_ERR("ipa_eth_client_conn_pipes failed ret %d\n", ret);
-		goto conn_failed;
+		ipa_ntn_test_del_client_list();
 	}
 
-	return 0;
+#if IPA_ETH_API_VER >= 2
+	kfree(dummy_net_dev);
+#endif
 
-conn_failed:
-	ipa_ntn_test_del_client_list();
 	return ret;
+
 }
 
 static int ipa_ntn_test_reg_intf(void)
 {
 	struct ipa_eth_intf_info intf;
 #if IPA_ETH_API_VER >= 2
-	struct net_device dummy_net_dev;
+	struct net_device *dummy_net_dev;
 	unsigned char dummy_dev_addr[ETH_ALEN] = { 0 };
 #else
 	char netdev_name[IPA_RESOURCE_NAME_MAX] = { 0 };
@@ -712,11 +722,17 @@ static int ipa_ntn_test_reg_intf(void)
 
 	memset(&intf, 0, sizeof(intf));
 #if IPA_ETH_API_VER >= 2
-	memset(dummy_net_dev.name, 0, sizeof(dummy_net_dev.name));
+	dummy_net_dev = kzalloc(sizeof(*dummy_net_dev), GFP_KERNEL);
+	if (dummy_net_dev == NULL){
+		IPA_UT_ERR("kzalloc failed\n");
+		return -ENOMEM;
+	}
 
-	intf.net_dev = &dummy_net_dev;
+	memset(dummy_net_dev->name, 0, sizeof(dummy_net_dev->name));
+	intf.net_dev = dummy_net_dev;
 	intf.net_dev->dev_addr = (unsigned char *)dummy_dev_addr;
 	intf.is_conn_evt = true;
+	intf.client = &test_ntn_ctx->client;
 
 	snprintf(intf.net_dev->name, sizeof(intf.net_dev->name), "ntn_test");
 	IPA_UT_INFO("netdev name: %s strlen: %lu\n", intf.net_dev->name, strlen(intf.net_dev->name));
@@ -756,6 +772,7 @@ static int ipa_ntn_test_reg_intf(void)
 	}
 
 #if IPA_ETH_API_VER >= 2
+	kfree(dummy_net_dev);
 #else
 	kfree(intf.pipe_hdl_list);
 #endif
@@ -766,17 +783,24 @@ static int ipa_ntn_test_reg_intf(void)
 static int ipa_ntn_test_unreg_intf(void)
 {
 	struct ipa_eth_intf_info intf;
+	int ret = 0;
 #if IPA_ETH_API_VER >= 2
-	struct net_device dummy_net_dev;
+	struct net_device *dummy_net_dev;
 #else
 	char netdev_name[IPA_RESOURCE_NAME_MAX] = { 0 };
 #endif
 
 	memset(&intf, 0, sizeof(intf));
 #if IPA_ETH_API_VER >= 2
-	memset(dummy_net_dev.name, 0, sizeof(dummy_net_dev.name));
+	dummy_net_dev = kzalloc(sizeof(*dummy_net_dev), GFP_KERNEL);
+	if (dummy_net_dev == NULL){
+		IPA_UT_ERR("kzalloc failed\n");
+		return -ENOMEM;
+	}
 
-	intf.net_dev = &dummy_net_dev;
+	memset(dummy_net_dev->name, 0, sizeof(dummy_net_dev->name));
+	intf.net_dev = dummy_net_dev;
+	intf.client = &test_ntn_ctx->client;
 
 	snprintf(intf.net_dev->name, sizeof(intf.net_dev->name), "ntn_test");
 	IPA_UT_INFO("netdev name: %s strlen: %lu\n", intf.net_dev->name, strlen(intf.net_dev->name));
@@ -787,7 +811,14 @@ static int ipa_ntn_test_unreg_intf(void)
 		strlen(intf.netdev_name));
 #endif
 
-	return (ipa_eth_client_unreg_intf(&intf));
+	ret = ipa_eth_client_unreg_intf(&intf);
+
+#if IPA_ETH_API_VER >= 2
+	kfree(dummy_net_dev);
+#endif
+
+	return ret;
+
 }
 
 static void ipa_ntn_test_advance_db(u32 *db, int steps,
@@ -970,7 +1001,7 @@ static int ipa_ntn_teardown_pipes(void)
 }
 static int ipa_ntn_test_prepare_test(void)
 {
-	struct ipa_ep_cfg ep_cfg = { { 0 } };
+	struct ipa_ep_cfg *ep_cfg;
 	int offset = 0;
 	int ret = 0;
 
@@ -1013,21 +1044,29 @@ static int ipa_ntn_test_prepare_test(void)
 	}
 
 	/* configure NTN RX EP in DMA mode */
-	ep_cfg.mode.mode = IPA_DMA;
-	ep_cfg.mode.dst = test_ntn_ctx->cons_client_type;
+	ep_cfg = kzalloc(sizeof(*ep_cfg), GFP_KERNEL);
+	if (ep_cfg == NULL){
+		IPA_UT_ERR("kzalloc failed\n");
+		return -ENOMEM;
+	}
 
-	ep_cfg.seq.set_dynamic = true;
+	ep_cfg->mode.mode = IPA_DMA;
+	ep_cfg->mode.dst = test_ntn_ctx->cons_client_type;
+	ep_cfg->seq.set_dynamic = true;
 
-	if (ipa3_cfg_ep(ipa_get_ep_mapping(test_ntn_ctx->prod_client_type),
-		&ep_cfg)) {
+
+	if (ipa3_cfg_ep(ipa_get_ep_mapping(test_ntn_ctx->prod_client_type), ep_cfg)) {
 		IPA_UT_ERR("fail to configure DMA mode.\n");
 		ret = -EFAULT;
 		goto unreg;
 	}
 
+	kfree(ep_cfg);
+
 	return 0;
 
 unreg:
+	kfree(ep_cfg);
 	if (ipa_ntn_test_unreg_intf()) {
 		IPA_UT_ERR("fail to unregister interface.\n");
 		ret = -EFAULT;
@@ -1418,6 +1457,7 @@ static int ipa_ntn_test_multi_transfer_burst(void *priv)
 	}
 	IPA_UT_INFO("sent the last packet succesfully!\n");
 
+
 	ipa_ntn_test_print_stats();
 
 fail:
@@ -1431,16 +1471,20 @@ fail:
 	return ret;
 }
 
-static int ipa_ntn_test_clients2_multi_transfer_burst(void *priv)
+#if IPA_ETH_API_VER >= 2
+static int ipa_ntn_test_eth1_multi_transfer_burst(void *priv)
 {
 	int ret;
 
-	ipa_test_ntn_set_client_params(IPA_CLIENT_ETHERNET2_CONS, IPA_CLIENT_ETHERNET2_PROD, 1);
+	ipa_test_ntn_set_client_params(IPA_CLIENT_ETHERNET2_CONS, IPA_CLIENT_ETHERNET2_PROD, 1,
+		IPA_ETH_CLIENT_NTN3);
 	ret = ipa_ntn_test_multi_transfer_burst(priv);
-	ipa_test_ntn_set_client_params(IPA_CLIENT_ETHERNET_CONS, IPA_CLIENT_ETHERNET_PROD, 0);
+	ipa_test_ntn_set_client_params(IPA_CLIENT_ETHERNET_CONS, IPA_CLIENT_ETHERNET_PROD, 0,
+		IPA_ETH_CLIENT_NTN3);
 
 	return ret;
 }
+#endif
 
 /* Suite definition block */
 IPA_UT_DEFINE_SUITE_START(ntn, "NTN3 tests",
@@ -1471,10 +1515,12 @@ IPA_UT_DEFINE_SUITE_START(ntn, "NTN3 tests",
 			ipa_ntn_test_multi_transfer_burst,
 			true, IPA_HW_v5_0, IPA_HW_MAX),
 
-	IPA_UT_ADD_TEST(clients2_multi_transfer_burst,
-			"Clients pair 2 send entire ring in one shot",
-			ipa_ntn_test_clients2_multi_transfer_burst,
+#if IPA_ETH_API_VER >= 2
+	IPA_UT_ADD_TEST(eth1_multi_transfer_burst,
+			"eth1: send entire ring in one shot",
+			ipa_ntn_test_eth1_multi_transfer_burst,
 			true, IPA_HW_v5_0, IPA_HW_MAX),
+#endif
 } IPA_UT_DEFINE_SUITE_END(ntn);
 
 
