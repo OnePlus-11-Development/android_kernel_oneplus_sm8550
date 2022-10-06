@@ -2319,9 +2319,39 @@ static void cam_icp_mgr_compute_fw_avg_response_time(struct cam_icp_hw_ctx_data 
 		(perf_stats->total_resp_time / perf_stats->total_requests));
 }
 
+static int cam_icp_mgr_dump_clk(struct cam_icp_hw_ctx_data *ctx_data)
+{
+	uint32_t id, rc = 0;
+	uint32_t *cmd_args = NULL;
+	struct cam_hw_intf *ipe_dev_intf = NULL;
+	struct cam_hw_intf *bps_dev_intf = NULL;
+
+	ipe_dev_intf = icp_hw_mgr.ipe0_dev_intf;
+	bps_dev_intf = icp_hw_mgr.bps_dev_intf;
+
+	if ((!ipe_dev_intf) || (!bps_dev_intf)) {
+		CAM_ERR(CAM_ICP, "dev intfs are wrong, failed to dump clk");
+		return -EINVAL;
+	}
+
+	//dump bps clock
+	id = CAM_ICP_BPS_CMD_DUMP_CLK;
+	bps_dev_intf->hw_ops.process_cmd(
+		bps_dev_intf->hw_priv, id,
+		cmd_args, 0);
+
+	//dump ipe clock
+	id = CAM_ICP_IPE_CMD_DUMP_CLK;
+	ipe_dev_intf->hw_ops.process_cmd(
+		ipe_dev_intf->hw_priv, id,
+		cmd_args, 0);
+
+	return rc;
+}
+
 static int cam_icp_mgr_handle_frame_process(uint32_t *msg_ptr, int flag)
 {
-	int i;
+	int i, rc;
 	uint32_t idx;
 	uint64_t request_id;
 	struct cam_icp_hw_ctx_data *ctx_data = NULL;
@@ -2392,6 +2422,7 @@ static int cam_icp_mgr_handle_frame_process(uint32_t *msg_ptr, int flag)
 				ctx_data->icp_dev_acquire_info->dev_type,
 				request_id);
 			event_id = CAM_CTX_EVT_ID_ERROR;
+			rc = cam_icp_mgr_dump_clk(ctx_data);
 		}
 		buf_data.evt_param = cam_icp_handle_err_type_to_evt_param(ioconfig_ack->err_type);
 	} else {
