@@ -1630,6 +1630,23 @@ static int _sde_connector_set_prop_out_fb(struct drm_connector *connector,
 	return rc;
 }
 
+static struct drm_encoder *
+sde_connector_best_encoder(struct drm_connector *connector)
+{
+	struct sde_connector *c_conn = to_sde_connector(connector);
+
+	if (!connector) {
+		SDE_ERROR("invalid connector\n");
+		return NULL;
+	}
+
+	/*
+	 * This is true for now, revisit this code when multiple encoders are
+	 * supported.
+	 */
+	return c_conn->encoder;
+}
+
 static int _sde_connector_set_prop_retire_fence(struct drm_connector *connector,
 		struct drm_connector_state *state,
 		uint64_t val)
@@ -1665,9 +1682,13 @@ static int _sde_connector_set_prop_retire_fence(struct drm_connector *connector,
 		 */
 		offset++;
 
-		/* get hw_ctl for a wb connector */
-		if (c_conn->connector_type == DRM_MODE_CONNECTOR_VIRTUAL)
-			hw_ctl = sde_encoder_get_hw_ctl(c_conn);
+		/* get hw_ctl for a wb connector not in cwb mode */
+		if (c_conn->connector_type == DRM_MODE_CONNECTOR_VIRTUAL) {
+			struct drm_encoder *drm_enc = sde_connector_best_encoder(connector);
+
+			if (drm_enc && !sde_encoder_in_clone_mode(drm_enc))
+				hw_ctl = sde_encoder_get_hw_ctl(c_conn);
+		}
 
 		rc = sde_fence_create(c_conn->retire_fence,
 					&fence_user_fd, offset, hw_ctl);
@@ -2643,23 +2664,6 @@ sde_connector_mode_valid(struct drm_connector *connector,
 
 	/* assume all modes okay by default */
 	return MODE_OK;
-}
-
-static struct drm_encoder *
-sde_connector_best_encoder(struct drm_connector *connector)
-{
-	struct sde_connector *c_conn = to_sde_connector(connector);
-
-	if (!connector) {
-		SDE_ERROR("invalid connector\n");
-		return NULL;
-	}
-
-	/*
-	 * This is true for now, revisit this code when multiple encoders are
-	 * supported.
-	 */
-	return c_conn->encoder;
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
