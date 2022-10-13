@@ -87,6 +87,18 @@
 		} \
 	} while (0)
 
+#define GSIERR_RL(fmt, args...) \
+	do { \
+		dev_err_ratelimited(gsi_ctx->dev, "%s:%d " fmt, __func__, __LINE__, \
+		## args);\
+		if (gsi_ctx) { \
+			GSI_IPC_LOGGING(gsi_ctx->ipc_logbuf, \
+				"%s:%d " fmt, ## args); \
+			GSI_IPC_LOGGING(gsi_ctx->ipc_logbuf_low, \
+				"%s:%d " fmt, ## args); \
+		} \
+	} while (0)
+
 #define GSI_IPC_LOG_PAGES 50
 #define GSI_MAX_NUM_MSI 2
 
