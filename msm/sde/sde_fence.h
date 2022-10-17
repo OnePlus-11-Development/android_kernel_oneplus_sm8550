@@ -73,6 +73,8 @@ enum sde_fence_event {
  * @ipcc_out_signal_pp_idx: index of the output signal ping-pong
  * @ipcc_out_client: destination client id (APPS for the FCTL)
  * @ipcc_this_client: ipcc dpu client id (For Waipio: APPS, For Kailua: DPU HW)
+ * @dma_context: per client dma context used to create join fences
+ * @hw_fence_array_seqno: per-client seq number counter for join fences
  */
 struct sde_hw_fence_data {
 	int client_id;
@@ -85,6 +87,8 @@ struct sde_hw_fence_data {
 	u32 ipcc_out_signal_pp_idx;
 	u32 ipcc_out_client;
 	u32 ipcc_this_client;
+	u64 dma_context;
+	u32 hw_fence_array_seqno;
 };
 
 #if IS_ENABLED(CONFIG_SYNC_FILE)
