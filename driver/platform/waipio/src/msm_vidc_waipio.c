@@ -307,7 +307,7 @@ static struct msm_platform_inst_capability instance_cap_data_waipio[] = {
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_CID_MPEG_VIDC_TS_REORDER},
 
-	{HFLIP, ENC, CODECS_ALL,
+	{HFLIP, ENC, H264|HEVC,
 		V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_MPEG_MSM_VIDC_ENABLE,
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
@@ -316,7 +316,7 @@ static struct msm_platform_inst_capability instance_cap_data_waipio[] = {
 		CAP_FLAG_OUTPUT_PORT |
 			CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED},
 
-	{VFLIP, ENC, CODECS_ALL,
+	{VFLIP, ENC, H264|HEVC,
 		V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_MPEG_MSM_VIDC_ENABLE,
 		1, V4L2_MPEG_MSM_VIDC_DISABLE,
@@ -325,7 +325,7 @@ static struct msm_platform_inst_capability instance_cap_data_waipio[] = {
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_INPUT_PORT |
 			CAP_FLAG_DYNAMIC_ALLOWED},
 
-	{ROTATION, ENC, CODECS_ALL,
+	{ROTATION, ENC, H264|HEVC,
 		0, 270, 90, 0,
 		V4L2_CID_ROTATE,
 		HFI_PROP_ROTATION,
@@ -1595,19 +1595,19 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_waip
 		NULL,
 		NULL},
 
-	{HFLIP, ENC, CODECS_ALL,
+	{HFLIP, ENC, H264|HEVC,
 		{0},
 		{0},
 		NULL,
 		msm_vidc_set_flip},
 
-	{VFLIP, ENC, CODECS_ALL,
+	{VFLIP, ENC, H264|HEVC,
 		{0},
 		{0},
 		NULL,
 		msm_vidc_set_flip},
 
-	{ROTATION, ENC, CODECS_ALL,
+	{ROTATION, ENC, H264|HEVC,
 		{0},
 		{0},
 		NULL,
