@@ -1223,9 +1223,7 @@ static void _sde_encoder_phys_cmd_pingpong_config(
 static void sde_encoder_phys_cmd_enable_helper(
 		struct sde_encoder_phys *phys_enc)
 {
-	struct sde_encoder_virt *sde_enc;
 	struct sde_hw_intf *hw_intf;
-	u32 qsync_mode;
 
 	if (!phys_enc || !phys_enc->hw_ctl || !phys_enc->hw_pp ||
 			!phys_enc->hw_intf) {
@@ -1246,19 +1244,6 @@ static void sde_encoder_phys_cmd_enable_helper(
 	if (hw_intf->ops.enable_wide_bus)
 		hw_intf->ops.enable_wide_bus(hw_intf,
 			sde_encoder_is_widebus_enabled(phys_enc->parent));
-
-	/*
-	* Override internal rd_ptr value when coming out of IPC.
-	* This is required on QSYNC panel with low refresh rate to
-	* avoid out of sync frame trigger as panel rd_ptr was still
-	* incrementing while MDP was power collapsed.
-	*/
-	sde_enc = to_sde_encoder_virt(phys_enc->parent);
-	if (sde_enc->idle_pc_restore) {
-		qsync_mode = sde_connector_get_qsync_mode(phys_enc->connector);
-		if (qsync_mode)
-			sde_encoder_override_tearcheck_rd_ptr(phys_enc);
-	}
 
 	/*
 	 * For pp-split, skip setting the flush bit for the slave intf, since
