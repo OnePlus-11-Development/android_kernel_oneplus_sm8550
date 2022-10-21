@@ -963,7 +963,6 @@ static void sde_encoder_phys_vid_update_txq(struct sde_encoder_phys *phys_enc)
 	if (!sde_enc)
 		return;
 
-	SDE_EVT32(DRMID(phys_enc->parent));
 	sde_encoder_helper_update_out_fence_txq(sde_enc, true);
 }
 
