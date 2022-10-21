@@ -2642,7 +2642,13 @@ static void sde_encoder_virt_mode_set(struct drm_encoder *drm_enc,
 
 	sde_enc->crtc = drm_enc->crtc;
 	sde_crtc = to_sde_crtc(drm_enc->crtc);
-	sde_crtc_set_qos_dirty(drm_enc->crtc);
+
+	crtc_state = sde_crtc->base.state;
+	sde_crtc_state = to_sde_crtc_state(crtc_state);
+
+	if (!((sde_enc->disp_info.intf_type == DRM_MODE_CONNECTOR_VIRTUAL) &&
+			((sde_crtc_state->cached_cwb_enc_mask & drm_encoder_mask(drm_enc)))))
+		sde_crtc_set_qos_dirty(drm_enc->crtc);
 
 	/* get and store the mode_info */
 	conn = sde_encoder_get_connector(sde_kms->dev, drm_enc);
@@ -2671,8 +2677,6 @@ static void sde_encoder_virt_mode_set(struct drm_encoder *drm_enc,
 	if (ret)
 		return;
 
-	crtc_state = sde_crtc->base.state;
-	sde_crtc_state = to_sde_crtc_state(crtc_state);
 	if ((sde_enc->disp_info.intf_type == DRM_MODE_CONNECTOR_VIRTUAL) &&
 			((sde_crtc_state->cached_cwb_enc_mask & drm_encoder_mask(drm_enc)))) {
 		SDE_EVT32(DRMID(drm_enc), sde_crtc_state->cwb_enc_mask,
