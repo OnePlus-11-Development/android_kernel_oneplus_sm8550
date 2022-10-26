@@ -373,25 +373,17 @@ static struct msm_platform_inst_capability instance_cap_data_anorak[] = {
 		HFI_PROP_SLICE_DECODE,
 		CAP_FLAG_INPUT_PORT},
 
-	/**
-	 * Disable this feature for now,
-	 * Todo: Enable it back once firmware dependency is ready.
-	 */
 	{EARLY_NOTIFY_ENABLE, DEC, H264|HEVC|AV1,
 		V4L2_MPEG_MSM_VIDC_DISABLE,
-		V4L2_MPEG_MSM_VIDC_DISABLE,
+		V4L2_MPEG_MSM_VIDC_ENABLE,
 		1,
 		V4L2_MPEG_MSM_VIDC_DISABLE,
 		V4L2_CID_MPEG_VIDC_EARLY_NOTIFY_ENABLE,
 		HFI_PROP_EARLY_NOTIFY_ENABLE,
 		CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED},
 
-	/**
-	 * Disable this feature for now,
-	 * Todo: Enable it back once firmware dependency is ready.
-	 */
 	{EARLY_NOTIFY_LINE_COUNT, DEC, H264|HEVC|AV1,
-		0, 0, 1, 0,
+		0, 8192, 256, 0,
 		V4L2_CID_MPEG_VIDC_EARLY_NOTIFY_LINE_COUNT,
 		HFI_PROP_EARLY_NOTIFY_LINE_COUNT,
 		CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED},

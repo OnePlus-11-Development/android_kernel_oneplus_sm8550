@@ -659,8 +659,31 @@ static int msm_vidc_adjust_dynamic_property(struct msm_vidc_inst *inst,
 	if (rc)
 		goto error;
 
-	/* add children only if cap value modified */
-	if (capability->cap[cap_id].value == prev_value)
+	/* Add children only if cap value modified except EARLY_NOTIFY_LINE_COUNT cap ID
+	 *
+	 * Allow to invoke EARLY_NOTIFY_LINE_COUNT cap ID child(EARLY_NOTIFY_FENCE_COUNT)
+	 * adjust function even if parent cap value is not modified, otherwise Early notify
+	 * use-case will fail in some scenario.
+	 *
+	 * Ex: When client requesting two interrupt per frame
+	 * Before IPSC:
+	 *      HEIGHT: 240 (This is default value initialized for new session)
+	 *      adjusted_value(Line count): 256(This should be multiple of 256)
+	 *      Fence count: 1
+	 * After IPSC:
+	 *      HEIGHT: 480 (Height is updated after IPSC)
+	 *      adjusted_value(Line count): 256 (This will remain same because client is expecting
+	 *      two interrupt notification for 480p resolution)
+	 *      Fence count: 1
+	 *
+	 * After IPSC, Fence count should be updated as 2 for 480p resolution
+	 * But this is not happening because Line count(parent) does't change, so corresponding
+	 * child(EARLY_NOTIFY_FENCE_COUNT) adjust function will not be invoked.
+	 *
+	 * To handle this use-case need to call child adjust function
+	 * even if parent cap value does't changed.
+	 */
+	if (capability->cap[cap_id].value == prev_value && cap_id != EARLY_NOTIFY_LINE_COUNT)
 		return 0;
 
 	rc = msm_vidc_add_children(inst, cap_id);
