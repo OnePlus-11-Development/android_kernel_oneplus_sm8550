@@ -3707,7 +3707,7 @@ static struct sde_hw_ctl *_sde_crtc_get_hw_ctl(struct drm_crtc *drm_crtc)
 	struct sde_crtc *sde_crtc = to_sde_crtc(drm_crtc);
 
 	if (!sde_crtc || !sde_crtc->mixers[0].hw_ctl) {
-		DRM_ERROR("invalid crtc params %d\n", !sde_crtc);
+		SDE_DEBUG("invalid crtc params %d\n", !sde_crtc);
 		return NULL;
 	}
 
