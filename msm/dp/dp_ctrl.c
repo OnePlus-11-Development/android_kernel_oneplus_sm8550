@@ -1126,7 +1126,7 @@ static void dp_ctrl_mst_calculate_rg(struct dp_ctrl_private *ctrl,
 
 	lclk = drm_dp_bw_code_to_link_rate(ctrl->link->link_params.bw_code);
 	if (panel->pinfo.comp_info.enabled)
-		bpp = DSC_BPP(panel->pinfo.comp_info.dsc_info.config);
+		bpp = panel->pinfo.comp_info.tgt_bpp;
 
 	/* min_slot_cnt */
 	numerator = pclk * bpp * 64 * 1000;
