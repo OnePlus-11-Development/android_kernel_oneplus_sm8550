@@ -290,6 +290,8 @@ struct cam_isp_context_event_record {
  * @v4l2_event_sub_ids         contains individual bits representing subscribed v4l2 ids
  * @aeb_enabled:               Indicate if stream is for AEB
  * @do_internal_recovery:      Enable KMD halt/reset/resume internal recovery
+ * @last_sof_jiffies:          Record the jiffies of last sof
+ * @last_applied_jiffies:      Record the jiffiest of last applied req
  *
  */
 struct cam_isp_context {
@@ -348,6 +350,8 @@ struct cam_isp_context {
 	struct cam_hw_err_param              err_inject_params;
 	bool                                  aeb_enabled;
 	bool                                  do_internal_recovery;
+	uint64_t                              last_sof_jiffies;
+	uint64_t                              last_applied_jiffies;
 };
 
 /**
