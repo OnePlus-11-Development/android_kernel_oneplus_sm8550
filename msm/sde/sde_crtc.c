@@ -6869,6 +6869,7 @@ void sde_crtc_set_qos_dirty(struct drm_crtc *crtc)
 	struct drm_plane *plane;
 	struct drm_plane_state *state;
 	struct sde_plane_state *pstate;
+	u32 plane_mask = 0;
 
 	drm_atomic_crtc_for_each_plane(plane, crtc) {
 		state = plane->state;
@@ -6878,7 +6879,10 @@ void sde_crtc_set_qos_dirty(struct drm_crtc *crtc)
 		pstate = to_sde_plane_state(state);
 
 		pstate->dirty |= SDE_PLANE_DIRTY_QOS;
+		plane_mask |= drm_plane_mask(plane);
 	}
+	SDE_EVT32(DRMID(crtc), plane_mask);
+
 	sde_crtc_update_line_time(crtc);
 }
 
