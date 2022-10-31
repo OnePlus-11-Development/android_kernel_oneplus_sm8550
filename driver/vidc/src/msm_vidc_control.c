@@ -3074,6 +3074,113 @@ int msm_vidc_adjust_dec_slice_mode(void *instance, struct v4l2_ctrl *ctrl)
 	return 0;
 }
 
+int msm_vidc_adjust_early_notify_enable(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst_capability *capability;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	u32 adjusted_value = 0;
+	s32 low_latency = -1;
+	s32 picture_order = -1;
+	s32 outbuf_fence = V4L2_MPEG_VIDC_META_DISABLE;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val : capability->cap[EARLY_NOTIFY_ENABLE].value;
+
+	if (msm_vidc_get_parent_value(inst, EARLY_NOTIFY_ENABLE, LOWLATENCY_MODE,
+		&low_latency, __func__) ||
+	    msm_vidc_get_parent_value(inst, EARLY_NOTIFY_ENABLE, OUTPUT_ORDER,
+		&picture_order, __func__) ||
+	    msm_vidc_get_parent_value(inst, EARLY_NOTIFY_ENABLE, META_OUTBUF_FENCE,
+		&outbuf_fence, __func__))
+		return -EINVAL;
+
+	if (!low_latency || !picture_order ||
+	    !is_meta_rx_inp_enabled(inst, META_OUTBUF_FENCE))
+		adjusted_value = V4L2_MPEG_MSM_VIDC_DISABLE;
+
+	msm_vidc_update_cap_value(inst, EARLY_NOTIFY_ENABLE,
+		adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_early_notify_line_count(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst_capability *capability;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	u32 early_notify = 0, adjusted_value = 0;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val : capability->cap[EARLY_NOTIFY_LINE_COUNT].value;
+
+	if (msm_vidc_get_parent_value(inst, EARLY_NOTIFY_LINE_COUNT, EARLY_NOTIFY_ENABLE,
+		&early_notify, __func__))
+		return -EINVAL;
+
+	/* check if early notify feature is enabled */
+	if (!early_notify)
+		adjusted_value = 0;
+
+	msm_vidc_update_cap_value(inst, EARLY_NOTIFY_LINE_COUNT,
+		adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_early_notify_fence_count(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst_capability *capability;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *) instance;
+	u32 height = 0, line_cnt = 0, adjusted_value = 0;
+
+	if (!inst || !inst->capabilities) {
+		d_vpr_e("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	capability = inst->capabilities;
+
+	adjusted_value = ctrl ? ctrl->val : capability->cap[EARLY_NOTIFY_FENCE_COUNT].value;
+
+	if (msm_vidc_get_parent_value(inst, EARLY_NOTIFY_FENCE_COUNT, EARLY_NOTIFY_LINE_COUNT,
+		&line_cnt, __func__))
+		return -EINVAL;
+
+	if (!is_early_notify_enabled(inst)) {
+		adjusted_value = 0;
+		goto set_fence_count;
+	}
+
+	height = inst->fmts[INPUT_PORT].fmt.pix_mp.height;
+
+	if (!line_cnt)
+		adjusted_value = 1;
+	else
+		adjusted_value = (height % line_cnt == 0) ?
+			(height/line_cnt) : (height/line_cnt + 1);
+
+	if (adjusted_value > MAX_FENCE_COUNT) {
+		i_vpr_e(inst, "%s: invalid fence count %d, line count %d\n",
+			__func__, adjusted_value, line_cnt);
+		msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
+	}
+
+set_fence_count:
+	msm_vidc_update_cap_value(inst, EARLY_NOTIFY_FENCE_COUNT,
+		adjusted_value, __func__);
+
+	return 0;
+}
+
 int msm_vidc_adjust_delivery_mode(void *instance, struct v4l2_ctrl *ctrl)
 {
 	struct msm_vidc_inst_capability *capability;
@@ -3331,7 +3438,7 @@ int msm_vidc_set_header_mode(void *instance,
 	else
 		hfi_value = HFI_SEQ_HEADER_SEPERATE_FRAME;
 
-	if (is_meta_rx_inp_enabled(inst, META_SEQ_HDR_NAL))
+	if (is_meta_rx_out_enabled(inst, META_SEQ_HDR_NAL))
 		hfi_value |= HFI_SEQ_HEADER_METADATA;
 
 	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_U32_ENUM,

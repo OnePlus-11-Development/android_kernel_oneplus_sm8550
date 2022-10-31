@@ -187,5 +187,6 @@ struct msm_vidc_inst {
 	bool                               ir_enabled;
 	u32                                adjust_priority;
 	bool                               iframe;
+	u32                                fences_per_output_counter;
 };
 #endif // _MSM_VIDC_INST_H_

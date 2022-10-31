@@ -274,6 +274,12 @@ enum v4l2_h264_encode_delivery_mode {
 #define V4L2_CID_MPEG_VIDC_VUI_TIMING_INFO                                    \
 	(V4L2_CID_MPEG_VIDC_BASE + 0x43)
 
+#define V4L2_CID_MPEG_VIDC_EARLY_NOTIFY_ENABLE                                \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x44)
+
+#define V4L2_CID_MPEG_VIDC_EARLY_NOTIFY_LINE_COUNT                            \
+	(V4L2_CID_MPEG_VIDC_BASE + 0x45)
+
 /* add new controls above this line */
 /* Deprecate below controls once availble in gki and gsi bionic header */
 #ifndef V4L2_CID_MPEG_VIDEO_BASELAYER_PRIORITY_ID

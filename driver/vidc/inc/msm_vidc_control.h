@@ -57,6 +57,9 @@ int msm_vidc_adjust_dec_frame_rate(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_dec_operating_rate(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_dec_outbuf_fence(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_dec_slice_mode(void *instance, struct v4l2_ctrl *ctrl);
+int msm_vidc_adjust_early_notify_enable(void *instance, struct v4l2_ctrl *ctrl);
+int msm_vidc_adjust_early_notify_line_count(void *instance, struct v4l2_ctrl *ctrl);
+int msm_vidc_adjust_early_notify_fence_count(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_preprocess(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_delivery_mode(void *instance, struct v4l2_ctrl *ctrl);
 
