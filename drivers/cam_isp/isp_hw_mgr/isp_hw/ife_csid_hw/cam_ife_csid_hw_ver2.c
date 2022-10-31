@@ -2698,6 +2698,7 @@ static int cam_ife_csid_hw_ver2_config_rx(
 	case CAM_ISP_IFE_IN_RES_TPG:
 		csid_hw->rx_cfg.phy_sel = 0;
 		csid_hw->rx_cfg.tpg_mux_sel = 0;
+		fallthrough;
 	case CAM_ISP_IFE_IN_RES_CPHY_TPG_0:
 		csid_hw->rx_cfg.tpg_mux_sel = 1;
 		csid_hw->rx_cfg.tpg_num_sel = 1;
@@ -4407,7 +4408,7 @@ static int cam_ife_csid_ver2_enable_hw(
 		if (csid_hw->top_info_irq_handle < 1) {
 			CAM_ERR(CAM_ISP, "CSID[%d] Subscribe Top Info Irq fail",
 				csid_hw->hw_intf->hw_idx);
-			return -EINVAL;
+			rc = -EINVAL;
 			goto unsubscribe_top_err;
 		}
 	}
@@ -4944,6 +4945,7 @@ static int cam_ife_csid_ver2_top_cfg(
 
 	case CAM_IFE_CSID_INPUT_CORE_SFE:
 		csid_hw->top_cfg.out_ife_en = false;
+		fallthrough;
 	case CAM_IFE_CSID_INPUT_CORE_SFE_IFE:
 
 		if (top_args->core_idx == 0) {
@@ -5674,6 +5676,10 @@ static int cam_ife_csid_init_config_update(
 	}
 
 	path_cfg = (struct cam_ife_csid_ver2_path_cfg *)res->res_priv;
+	/* Skip epoch update if resource does not handle camif IRQs */
+	if (!path_cfg->handle_camif_irq)
+		goto end;
+
 	path_cfg->epoch_cfg = (path_cfg->end_line - path_cfg->start_line) *
 		init_cfg->init_config->epoch_cfg.epoch_factor / 100;
 
@@ -5686,7 +5692,7 @@ static int cam_ife_csid_init_config_update(
 	CAM_DBG(CAM_ISP,
 		"Init Update for res_name: %s epoch_factor: %x",
 		res->res_name, path_cfg->epoch_cfg);
-
+end:
 	return 0;
 }
 
