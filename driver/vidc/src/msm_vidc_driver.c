@@ -3933,7 +3933,8 @@ int msm_vidc_queue_buffer_single(struct msm_vidc_inst *inst, struct vb2_buffer *
 		return -EINVAL;
 
 	/* update start timestamp */
-	msm_vidc_add_buffer_stats(inst, buf);
+	if (!msm_vidc_is_super_buffer(inst))
+		msm_vidc_add_buffer_stats(inst, buf);
 
 	/* create array of fences */
 	if (is_output_buffer(buf->type)) {
