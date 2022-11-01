@@ -333,14 +333,15 @@ static int _sde_hw_rc_get_ajusted_roi(
 	if (pu_roi->w == 0 && pu_roi->h == 0) {
 		rc_roi->x = pu_roi->x;
 		rc_roi->y = pu_roi->y;
-		rc_roi->w = hw_cfg->displayh;
-		rc_roi->h = hw_cfg->displayv;
+		rc_roi->w = hw_cfg->panel_width;
+		rc_roi->h = hw_cfg->panel_height;
 	} else {
 		memcpy(rc_roi, pu_roi, sizeof(struct sde_rect));
 	}
 
-	SDE_DEBUG("displayh:%u, displayv:%u\n", hw_cfg->displayh,
-			hw_cfg->displayv);
+	SDE_EVT32(hw_cfg->displayh, hw_cfg->displayv, hw_cfg->panel_width, hw_cfg->panel_height);
+	SDE_DEBUG("displayh:%u, displayv:%u, panel_w:%u, panel_h:%u\n", hw_cfg->displayh,
+			hw_cfg->displayv, hw_cfg->panel_width, hw_cfg->panel_height);
 	SDE_DEBUG("pu_roi x:%u, y:%u, w:%u, h:%u\n", pu_roi->x, pu_roi->y,
 			pu_roi->w, pu_roi->h);
 	SDE_DEBUG("rc_roi x:%u, y:%u, w:%u, h:%u\n", rc_roi->x, rc_roi->y,
