@@ -418,4 +418,10 @@ void sde_plane_static_img_control(struct drm_plane *plane,
 		enum sde_sys_cache_state state, enum sde_sys_cache_type type);
 
 void sde_plane_add_data_to_minidump_va(struct drm_plane *plane);
+
+/**
+ * sde_plane_dump_input_fence - dumps plane input fence info
+ * @plane: Pointer to drm plane structure with the input fence we want to dump
+ */
+void sde_plane_dump_input_fence(struct drm_plane *plane);
 #endif /* _SDE_PLANE_H_ */
