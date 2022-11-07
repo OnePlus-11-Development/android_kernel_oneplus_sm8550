@@ -49,6 +49,7 @@ static const char * const ipa_eth_clients_strings[] = {
 	__stringify(NTN),
 	__stringify(NTN3),
 	__stringify(EMAC),
+	__stringify(IEMAC),
 };
 
 const char *ipa3_event_name[IPA_EVENT_MAX_NUM] = {
