@@ -433,7 +433,7 @@ static int __cam_req_mgr_notify_error_on_link(
 	struct cam_req_mgr_connected_device *dev)
 {
 	struct cam_req_mgr_core_session *session = NULL;
-	struct cam_req_mgr_message       msg;
+	struct cam_req_mgr_message       msg = {0};
 	int rc = 0, pd;
 
 	session = (struct cam_req_mgr_core_session *)link->parent;
@@ -2432,7 +2432,7 @@ static int __cam_req_mgr_process_sof_freeze(void *priv, void *data)
 	struct cam_req_mgr_core_link    *link = NULL;
 	struct cam_req_mgr_req_queue    *in_q = NULL;
 	struct cam_req_mgr_core_session *session = NULL;
-	struct cam_req_mgr_message       msg;
+	struct cam_req_mgr_message       msg = {0};
 	int rc = 0;
 	int64_t last_applied_req_id = -EINVAL;
 
