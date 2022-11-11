@@ -598,6 +598,7 @@ int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *hw_ctl, u32 debugf
 	u32 ipcc_signal_id;
 	u32 ipcc_client_id;
 	int ctl_id;
+	u64 qtime;
 
 	/* we must support sw_override as well, so check both functions */
 	if (!hw_mdp || !hw_ctl || !hw_ctl->ops.hw_fence_update_input_fence ||
@@ -623,13 +624,16 @@ int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *hw_ctl, u32 debugf
 
 	SDE_DEBUG("configure input signal:%d out client:%d ctl_id:%d\n", ipcc_signal_id,
 		ipcc_client_id, ctl_id);
-	SDE_EVT32(ctl_id, ipcc_signal_id, ipcc_client_id);
 
 	/* configure dpu hw for the client/signal pair signaling input-fence */
 	hw_ctl->ops.hw_fence_update_input_fence(hw_ctl, ipcc_client_id, ipcc_signal_id);
 
 	/* Enable hw-fence for this ctrl-path */
 	hw_ctl->ops.hw_fence_ctrl(hw_ctl, true, true, 1);
+
+	qtime = arch_timer_read_counter();
+	SDE_EVT32(ctl_id, ipcc_signal_id, ipcc_client_id, SDE_EVTLOG_H32(qtime),
+		SDE_EVTLOG_L32(qtime));
 
 	return 0;
 }
