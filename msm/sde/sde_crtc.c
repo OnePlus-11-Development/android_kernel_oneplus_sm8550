@@ -3707,7 +3707,7 @@ static struct sde_hw_ctl *_sde_crtc_get_hw_ctl(struct drm_crtc *drm_crtc)
 	struct sde_crtc *sde_crtc = to_sde_crtc(drm_crtc);
 
 	if (!sde_crtc || !sde_crtc->mixers[0].hw_ctl) {
-		DRM_ERROR("invalid crtc params %d\n", !sde_crtc);
+		SDE_DEBUG("invalid crtc params %d\n", !sde_crtc);
 		return NULL;
 	}
 
@@ -3724,7 +3724,6 @@ static struct dma_fence *_sde_plane_get_input_hw_fence(struct drm_plane *plane)
 	struct dma_fence *input_hw_fence = NULL;
 	struct dma_fence_array *array = NULL;
 	struct dma_fence *spec_fence = NULL;
-	bool spec_hw_fence = true;
 	int i;
 
 	if (!plane || !plane->state) {
@@ -3740,6 +3739,8 @@ static struct dma_fence *_sde_plane_get_input_hw_fence(struct drm_plane *plane)
 		fence = (struct dma_fence *)pstate->input_fence;
 
 		if (test_bit(SPEC_FENCE_FLAG_FENCE_ARRAY, &fence->flags)) {
+			bool spec_hw_fence = false;
+
 			array = container_of(fence, struct dma_fence_array, base);
 			if (IS_ERR_OR_NULL(array))
 				goto exit;
@@ -3750,9 +3751,18 @@ static struct dma_fence *_sde_plane_get_input_hw_fence(struct drm_plane *plane)
 
 			for (i = 0; i < array->num_fences; i++) {
 				spec_fence = array->fences[i];
-				if (IS_ERR_OR_NULL(spec_fence) ||
-					!(test_bit(MSM_HW_FENCE_FLAG_ENABLED_BIT,
-						&spec_fence->flags))) {
+
+				if (!IS_ERR_OR_NULL(spec_fence) &&
+					test_bit(MSM_HW_FENCE_FLAG_ENABLED_BIT,
+						&spec_fence->flags)) {
+					spec_hw_fence = true;
+				} else {
+					/*
+					 * all child-fences of the spec fence must be hw-fences for
+					 * this fence to be considered hw-fence. Otherwise just
+					 * fail here to set the hw-fences and driver will use
+					 * sw-fences instead.
+					 */
 					spec_hw_fence = false;
 					break;
 				}

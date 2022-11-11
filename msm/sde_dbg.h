@@ -31,6 +31,9 @@
 #define SDE_EVTLOG_FATAL	0xbad
 #define SDE_EVTLOG_ERROR	0xebad
 
+#define SDE_EVTLOG_H32(val) (val >> 32)
+#define SDE_EVTLOG_L32(val) (val & 0xffffffff)
+
 /* flags to enable the HW block dumping */
 #define SDE_DBG_SDE		BIT(0)
 #define SDE_DBG_RSC		BIT(1)
