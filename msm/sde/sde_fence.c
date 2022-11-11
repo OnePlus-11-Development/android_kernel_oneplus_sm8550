@@ -253,6 +253,7 @@ int sde_fence_register_hw_fences_wait(struct sde_hw_ctl *hw_ctl, struct dma_fenc
 	int array_childs = 0;
 	int array_count = 0;
 	int fence_list_index = 0;
+	u64 seqno;
 
 	if (!hw_ctl) {
 		SDE_ERROR("wrong ctl\n");
@@ -324,14 +325,18 @@ int sde_fence_register_hw_fences_wait(struct sde_hw_ctl *hw_ctl, struct dma_fenc
 			}
 		}
 
+		seqno = data->hw_fence_array_seqno++;
 		temp_array = dma_fence_array_create(fence_list_index, fence_list,
-				data->dma_context, data->hw_fence_array_seqno++, 0);
+				data->dma_context, seqno, 0);
 		if (!temp_array) {
 			SDE_ERROR("unable to create fence array, cant register for wait\n");
 			_cleanup_fences_refcount(fences, num_fences);
 			kfree(fence_list);
 			return -EINVAL;
 		}
+		SDE_EVT32(ctl_id, fence_list_index, SDE_EVTLOG_H32(data->dma_context),
+			SDE_EVTLOG_L32(data->dma_context), SDE_EVTLOG_H32(seqno),
+			SDE_EVTLOG_L32(seqno));
 
 		base_fence = &temp_array->base;
 		hw_fences = &base_fence;
