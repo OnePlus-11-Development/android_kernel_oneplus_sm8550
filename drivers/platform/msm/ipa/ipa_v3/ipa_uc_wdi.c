@@ -740,14 +740,14 @@ static void ipa_release_ap_smmu_mappings(enum ipa_client_type client)
 
 	if (IPA_CLIENT_IS_CONS(client)) {
 		start = IPA_WDI_TX_RING_RES;
-		if (ipa_get_wdi_version() == IPA_WDI_3)
+		if (ipa_get_wdi_version() >= IPA_WDI_3)
 			end = IPA_WDI_TX_DB_RES;
 		else
 			end = IPA_WDI_CE_DB_RES;
 	} else {
 		start = IPA_WDI_RX_RING_RES;
 		if (ipa3_ctx->ipa_wdi2 ||
-			(ipa_get_wdi_version() == IPA_WDI_3))
+			(ipa_get_wdi_version() >= IPA_WDI_3))
 			end = IPA_WDI_RX_COMP_RING_WP_RES;
 		else
 			end = IPA_WDI_RX_RING_RP_RES;
