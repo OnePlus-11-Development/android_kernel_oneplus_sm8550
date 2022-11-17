@@ -46,6 +46,9 @@ static int cam_tfe_hw_mgr_event_handler(
 	uint32_t                             evt_id,
 	void                                *evt_info);
 
+static int cam_tfe_mgr_cmd_get_sof_timestamp(struct cam_tfe_hw_mgr_ctx *tfe_ctx,
+	uint64_t *time_stamp, uint64_t *boot_time_stamp, uint64_t *prev_time_stamp);
+
 static int cam_tfe_mgr_regspace_data_cb(uint32_t reg_base_type,
 	void *hw_mgr_ctx, struct cam_hw_soc_info **soc_info_ptr,
 	uint32_t *reg_base_idx)
@@ -4830,9 +4833,15 @@ static int cam_tfe_mgr_cmd(void *hw_mgr_priv, void *cmd_args)
 			isp_hw_cmd_args->u.last_cdm_done =
 				ctx->last_cdm_done_req;
 			break;
+		case CAM_ISP_HW_MGR_GET_SOF_TS:
+			rc = cam_tfe_mgr_cmd_get_sof_timestamp(ctx,
+				&isp_hw_cmd_args->u.sof_ts.curr,
+				&isp_hw_cmd_args->u.sof_ts.boot,
+				&isp_hw_cmd_args->u.sof_ts.prev);
+			break;
 		default:
-			CAM_ERR(CAM_ISP, "Invalid HW mgr command:0x%x",
-				hw_cmd_args->cmd_type);
+			CAM_ERR(CAM_ISP, "Invalid HW mgr command:0x%x, ISP HW mgr cmd:0x%x",
+				hw_cmd_args->cmd_type, isp_hw_cmd_args->cmd_type);
 			rc = -EINVAL;
 			break;
 		}
@@ -4884,7 +4893,8 @@ static int cam_tfe_mgr_cmd(void *hw_mgr_priv, void *cmd_args)
 static int cam_tfe_mgr_cmd_get_sof_timestamp(
 	struct cam_tfe_hw_mgr_ctx            *tfe_ctx,
 	uint64_t                             *time_stamp,
-	uint64_t                             *boot_time_stamp)
+	uint64_t                             *boot_time_stamp,
+	uint64_t                             *prev_time_stamp)
 {
 	int                                        rc = -EINVAL;
 	uint32_t                                   i;
@@ -4917,6 +4927,7 @@ static int cam_tfe_mgr_cmd_get_sof_timestamp(
 
 			csid_get_time.node_res =
 				hw_mgr_res->hw_res[i];
+			csid_get_time.get_prev_timestamp = (prev_time_stamp != NULL);
 			rc = hw_intf->hw_ops.process_cmd(
 				hw_intf->hw_priv,
 				CAM_TFE_CSID_CMD_GET_TIME_STAMP,
@@ -4928,6 +4939,9 @@ static int cam_tfe_mgr_cmd_get_sof_timestamp(
 					csid_get_time.time_stamp_val;
 				*boot_time_stamp =
 					csid_get_time.boot_timestamp;
+				if (prev_time_stamp)
+					*prev_time_stamp =
+						csid_get_time.prev_time_stamp_val;
 				break;
 			}
 		}
@@ -5255,6 +5269,65 @@ end:
 	return 0;
 }
 
+static int cam_tfe_hw_mgr_handle_hw_dump_info(
+	void                                 *ctx,
+	void                                 *evt_info)
+{
+	struct cam_tfe_hw_mgr_ctx     *tfe_hw_mgr_ctx =
+		(struct cam_tfe_hw_mgr_ctx *)ctx;
+	struct cam_isp_hw_event_info  *event_info =
+		(struct cam_isp_hw_event_info *)evt_info;
+	struct cam_isp_hw_mgr_res     *hw_mgr_res = NULL;
+	struct cam_hw_intf            *hw_intf;
+	uint32_t i, out_port_id;
+	uint64_t dummy_args;
+	int rc = 0;
+
+	list_for_each_entry(hw_mgr_res,
+		&tfe_hw_mgr_ctx->res_list_tfe_csid, list) {
+		for (i = 0; i < CAM_ISP_HW_SPLIT_MAX; i++) {
+			if (!hw_mgr_res->hw_res[i])
+				continue;
+			hw_intf = hw_mgr_res->hw_res[i]->hw_intf;
+			if (hw_intf->hw_ops.process_cmd) {
+				rc = hw_intf->hw_ops.process_cmd(
+					hw_intf->hw_priv,
+					CAM_ISP_HW_CMD_CSID_CLOCK_DUMP,
+					&dummy_args,
+					sizeof(uint64_t));
+				if (rc)
+					CAM_ERR(CAM_ISP,
+						"CSID Clock Dump failed");
+			}
+		}
+	}
+
+	if (event_info->res_type == CAM_ISP_RESOURCE_VFE_OUT) {
+		out_port_id = event_info->res_id & 0xFF;
+		if (out_port_id >= CAM_TFE_HW_OUT_RES_MAX) {
+			CAM_ERR(CAM_ISP,
+				"Resource out of range");
+			goto end;
+		}
+		hw_mgr_res =
+			&tfe_hw_mgr_ctx->res_list_tfe_out[out_port_id];
+		for (i = 0; i < CAM_ISP_HW_SPLIT_MAX; i++) {
+			if (!hw_mgr_res->hw_res[i])
+				continue;
+			hw_intf = hw_mgr_res->hw_res[i]->hw_intf;
+			if (hw_intf->hw_ops.process_cmd) {
+				rc = hw_intf->hw_ops.process_cmd(
+					hw_intf->hw_priv,
+					CAM_ISP_HW_CMD_DUMP_BUS_INFO,
+					(void *)event_info,
+					sizeof(struct cam_isp_hw_event_info));
+			}
+		}
+	}
+end:
+	return rc;
+}
+
 static int cam_tfe_hw_mgr_handle_csid_event(
 	uint32_t                      err_type,
 	struct cam_isp_hw_event_info *event_info)
@@ -5284,9 +5357,11 @@ static int cam_tfe_hw_mgr_handle_csid_event(
 }
 
 static int cam_tfe_hw_mgr_handle_hw_err(
+	void                                *ctx,
 	void                                *evt_info)
 {
 	struct cam_isp_hw_error_event_info      *err_evt_info;
+	struct cam_tfe_hw_mgr_ctx               *tfe_hw_mgr_ctx;
 	struct cam_isp_hw_event_info            *event_info = evt_info;
 	struct cam_isp_hw_error_event_data       error_event_data = {0};
 	struct cam_tfe_hw_event_recovery_data    recovery_data = {0};
@@ -5312,6 +5387,18 @@ static int cam_tfe_hw_mgr_handle_hw_err(
 		rc = cam_tfe_hw_mgr_handle_csid_event(err_evt_info->err_type, event_info);
 		spin_unlock(&g_tfe_hw_mgr.ctx_lock);
 		return rc;
+	}
+
+	if (ctx) {
+		tfe_hw_mgr_ctx =
+			(struct cam_tfe_hw_mgr_ctx *)ctx;
+		if (event_info->res_type ==
+			CAM_ISP_RESOURCE_TFE_IN &&
+			!tfe_hw_mgr_ctx->is_rdi_only_context &&
+			event_info->res_id !=
+			CAM_ISP_HW_TFE_IN_CAMIF)
+			cam_tfe_hw_mgr_handle_hw_dump_info(
+				tfe_hw_mgr_ctx, event_info);
 	}
 
 	core_idx = event_info->hw_idx;
@@ -5445,7 +5532,7 @@ static int cam_tfe_hw_mgr_handle_hw_sof(
 	case CAM_ISP_HW_TFE_IN_CAMIF:
 		cam_tfe_mgr_cmd_get_sof_timestamp(tfe_hw_mgr_ctx,
 			&sof_done_event_data.timestamp,
-			&sof_done_event_data.boot_time);
+			&sof_done_event_data.boot_time, NULL);
 
 		if (atomic_read(&tfe_hw_mgr_ctx->overflow_pending))
 			break;
@@ -5462,7 +5549,7 @@ static int cam_tfe_hw_mgr_handle_hw_sof(
 			break;
 		cam_tfe_mgr_cmd_get_sof_timestamp(tfe_hw_mgr_ctx,
 			&sof_done_event_data.timestamp,
-			&sof_done_event_data.boot_time);
+			&sof_done_event_data.boot_time, NULL);
 		if (atomic_read(&tfe_hw_mgr_ctx->overflow_pending))
 			break;
 		tfe_hw_irq_sof_cb(tfe_hw_mgr_ctx->common.cb_priv,
@@ -5591,7 +5678,7 @@ static int cam_tfe_hw_mgr_event_handler(
 		break;
 
 	case CAM_ISP_HW_EVENT_ERROR:
-		rc = cam_tfe_hw_mgr_handle_hw_err(evt_info);
+		rc = cam_tfe_hw_mgr_handle_hw_err(priv, evt_info);
 		break;
 
 	default:

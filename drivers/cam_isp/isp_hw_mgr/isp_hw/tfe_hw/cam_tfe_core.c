@@ -349,13 +349,11 @@ static void cam_tfe_log_error_irq_status(
 	for (i = 0; i < top_priv->common_data.common_reg->num_debug_reg; i++) {
 		val_0 = cam_io_r(mem_base  +
 			top_priv->common_data.common_reg->debug_reg[i]);
-		CAM_INFO(CAM_ISP, "Top debug [i]:0x%x", i, val_0);
+		CAM_INFO(CAM_ISP, "Top debug [%d]:0x%x", i, val_0);
 	}
 
-	cam_cpas_reg_read(soc_private->cpas_handle,
-		CAM_CPAS_REG_CAMNOC, 0x20, true, &val_0);
-	CAM_INFO(CAM_ISP, "tfe_niu_MaxWr_Low offset 0x20 val 0x%x",
-		val_0);
+	cam_cpas_dump_camnoc_buff_fill_info(soc_private->cpas_handle);
+
 	for (i = 0; i < top_priv->common_data.common_reg->num_perf_cfg; i++) {
 		val_0 = cam_io_r(mem_base  +
 			top_priv->common_data.common_reg->perf_cfg[i].perf_pixel_count);
@@ -447,7 +445,7 @@ static void cam_tfe_log_error_irq_status(
 		"TFE clock rate:%d TFE total bw applied:%lld",
 		top_priv->hw_clk_rate,
 		top_priv->total_bw_applied);
-
+	cam_cpas_log_votes();
 }
 
 static int cam_tfe_error_irq_bottom_half(
@@ -2580,7 +2578,8 @@ int cam_tfe_init_hw(void *hw_priv, void *init_hw_args, uint32_t arg_size)
 	struct cam_tfe_hw_core_info       *core_info = NULL;
 	struct cam_tfe_top_priv           *top_priv;
 	void __iomem                      *mem_base;
-	int rc = 0;
+	int i, rc = 0;
+	unsigned long                      max_clk_rate = 0;
 	uint32_t                           reset_core_args =
 					CAM_TFE_HW_RESET_HW_AND_REG;
 
@@ -2603,9 +2602,14 @@ int cam_tfe_init_hw(void *hw_priv, void *init_hw_args, uint32_t arg_size)
 		return 0;
 	}
 	mutex_unlock(&tfe_hw->hw_mutex);
+	/* read clock value based on clock blob received */
+	for (i = 0; i < CAM_TFE_TOP_IN_PORT_MAX; i++) {
+		if (top_priv->req_clk_rate[i] > max_clk_rate)
+			max_clk_rate = top_priv->req_clk_rate[i];
+	}
 
 	/* Turn ON Regulators, Clocks and other SOC resources */
-	rc = cam_tfe_enable_soc_resources(soc_info);
+	rc = cam_tfe_enable_soc_resources(soc_info, max_clk_rate);
 	if (rc) {
 		CAM_ERR(CAM_ISP, "Enable SOC failed");
 		rc = -EFAULT;
@@ -2624,7 +2628,7 @@ int cam_tfe_init_hw(void *hw_priv, void *init_hw_args, uint32_t arg_size)
 		goto disable_soc;
 	}
 
-	top_priv->hw_clk_rate = 0;
+	top_priv->hw_clk_rate = max_clk_rate;
 	core_info->irq_err_config_cnt = 0;
 	core_info->irq_err_config = false;
 	rc = core_info->tfe_bus->hw_ops.init(core_info->tfe_bus->bus_priv,
