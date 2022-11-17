@@ -1302,6 +1302,7 @@ typedef enum {
     WMITLV_TAG_STRUC_wmi_wfa_config_ofdma,
     WMITLV_TAG_STRUC_wmi_livedump_request_cmd_fixed_param,
     WMITLV_TAG_STRUC_wmi_livedump_response_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_prb_resp_tmpl_ml_info,
 } WMITLV_TAG_ID;
 
 /*
@@ -2542,7 +2543,8 @@ WMITLV_CREATE_PARAM_STRUC(WMI_STA_UAPSD_AUTO_TRIG_CMDID);
 #define WMITLV_TABLE_WMI_PRB_TMPL_CMDID(id,op,buf,len) \
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_prb_tmpl_cmd_fixed_param, wmi_prb_tmpl_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX) \
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_bcn_prb_info, wmi_bcn_prb_info, bcn_prb_info, WMITLV_SIZE_FIX) \
-    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_BYTE, A_UINT8, bufp, WMITLV_SIZE_VAR)
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_BYTE, A_UINT8, bufp, WMITLV_SIZE_VAR) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_STRUC, wmi_prb_resp_tmpl_ml_info, ml_prb_resp_info, WMITLV_SIZE_VAR)
 
 WMITLV_CREATE_PARAM_STRUC(WMI_PRB_TMPL_CMDID);
 
@@ -3206,7 +3208,7 @@ WMITLV_CREATE_PARAM_STRUC(WMI_DFS_PHYERR_FILTER_DIS_CMDID);
 
 WMITLV_CREATE_PARAM_STRUC(WMI_PDEV_DFS_PHYERR_OFFLOAD_ENABLE_CMDID);
 
-/* DFS phyerr processing offload disble cmd */
+/* DFS phyerr processing offload disable cmd */
 #define WMITLV_TABLE_WMI_PDEV_DFS_PHYERR_OFFLOAD_DISABLE_CMDID(id,op,buf,len) \
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_pdev_dfs_phyerr_offload_disable_cmd_fixed_param, wmi_pdev_dfs_phyerr_offload_disable_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX)
 
@@ -4417,7 +4419,7 @@ WMITLV_CREATE_PARAM_STRUC(WMI_PEER_REORDER_QUEUE_SETUP_CMDID);
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_peer_reorder_queue_remove_cmd_fixed_param, wmi_peer_reorder_queue_remove_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX)
 WMITLV_CREATE_PARAM_STRUC(WMI_PEER_REORDER_QUEUE_REMOVE_CMDID);
 
-/* Filter in monitor mode paramters Cmd */
+/* Filter in monitor mode parameters Cmd */
 #define WMITLV_TABLE_WMI_MNT_FILTER_CMDID(id,op,buf,len) \
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_mnt_filter_cmd_fixed_param, wmi_mnt_filter_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX)
 WMITLV_CREATE_PARAM_STRUC(WMI_MNT_FILTER_CMDID);
@@ -5635,7 +5637,7 @@ WMITLV_CREATE_PARAM_STRUC(WMI_DIAG_EVENTID);
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_WMI_GTK_OFFLOAD_STATUS_EVENT_fixed_param, WMI_GTK_OFFLOAD_STATUS_EVENT_fixed_param, fixed_param, WMITLV_SIZE_FIX)
 WMITLV_CREATE_PARAM_STRUC(WMI_GTK_OFFLOAD_STATUS_EVENTID);
 
-/* DCA interferance Event */
+/* DCA interference Event */
 #define WMITLV_TABLE_WMI_DCS_INTERFERENCE_EVENTID(id,op,buf,len) \
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_dcs_interference_event_fixed_param, wmi_dcs_interference_event_fixed_param, fixed_param, WMITLV_SIZE_FIX) \
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_STRUC, wlan_dcs_cw_int, cw_int, WMITLV_SIZE_VAR) \
@@ -6064,7 +6066,7 @@ WMITLV_CREATE_PARAM_STRUC(WMI_NDP_CONFIRM_EVENTID);
 WMITLV_CREATE_PARAM_STRUC(WMI_NDP_END_INDICATION_EVENTID);
 
 /** NDL schedule update event
- * TLV (tag lenght value ) parameters follow the ndl_schedule_update
+ * TLV (tag length value) parameters follow the ndl_schedule_update
  * structure. The TLV's are:
  * A_UINT32 ndp_instance_list[];
  * wmi_channel ndl_channel_list[];
