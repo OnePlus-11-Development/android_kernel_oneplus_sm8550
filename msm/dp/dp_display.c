@@ -1962,7 +1962,7 @@ static int dp_display_usb_notifier(struct notifier_block *nb,
 		dp_display_state_add(DP_STATE_ABORTED);
 		dp->ctrl->abort(dp->ctrl, true);
 		dp->aux->abort(dp->aux, true);
-		dp_display_handle_disconnect(dp, true);
+		dp_display_handle_disconnect(dp, false);
 		dp->debug->abort(dp->debug);
 	}
 
