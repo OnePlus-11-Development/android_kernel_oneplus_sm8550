@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/debugfs.h>
@@ -586,7 +586,8 @@ int gen7_start(struct adreno_device *adreno_dev)
 	 * the prefetch granularity size.
 	 */
 	if (adreno_is_gen7_0_0(adreno_dev) || adreno_is_gen7_0_1(adreno_dev) ||
-		adreno_is_gen7_4_0(adreno_dev)) {
+		adreno_is_gen7_4_0(adreno_dev) || adreno_is_gen7_2_0(adreno_dev)
+		|| adreno_is_gen7_2_1(adreno_dev)) {
 		kgsl_regwrite(device, GEN7_CP_CHICKEN_DBG, 0x1);
 		kgsl_regwrite(device, GEN7_CP_BV_CHICKEN_DBG, 0x1);
 		kgsl_regwrite(device, GEN7_CP_LPAC_CHICKEN_DBG, 0x1);
