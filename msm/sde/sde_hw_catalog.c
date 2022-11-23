@@ -224,6 +224,7 @@ enum sde_prop {
 	TVM_INCLUDE_REG,
 	IPCC_PROTOCOL_ID,
 	SDE_EMULATED_ENV,
+	IPCC_CLIENT_DPU_PHYS_ID,
 	SDE_PROP_MAX,
 };
 
@@ -624,6 +625,7 @@ static struct sde_prop_type sde_prop[] = {
 	{TVM_INCLUDE_REG, "qcom,tvm-include-reg", false, PROP_TYPE_U32_ARRAY},
 	{IPCC_PROTOCOL_ID, "qcom,sde-ipcc-protocol-id", false, PROP_TYPE_U32},
 	{SDE_EMULATED_ENV, "qcom,sde-emulated-env", false, PROP_TYPE_BOOL},
+	{IPCC_CLIENT_DPU_PHYS_ID, "qcom,sde-ipcc-client-dpu-phys-id", false, PROP_TYPE_U32}
 };
 
 static struct sde_prop_type sde_perf_prop[] = {
@@ -4008,6 +4010,9 @@ static void _sde_top_parse_dt_helper(struct sde_mdss_cfg *cfg,
 		PROP_VALUE_ACCESS(props->values, SMART_PANEL_ALIGN_MODE, 0);
 
 	cfg->ipcc_protocol_id = PROP_VALUE_ACCESS(props->values, IPCC_PROTOCOL_ID, 0);
+	cfg->ipcc_client_phys_id = PROP_VALUE_ACCESS(props->values, IPCC_CLIENT_DPU_PHYS_ID, 0);
+	if (!cfg->ipcc_protocol_id || !cfg->ipcc_client_phys_id)
+		cfg->hw_fence_rev = 0; /* disable hw fences*/
 
 	if (props->exists[SEC_SID_MASK]) {
 		cfg->sec_sid_mask_count = props->counts[SEC_SID_MASK];

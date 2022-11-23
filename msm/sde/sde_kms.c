@@ -4368,7 +4368,7 @@ static int _sde_kms_mmu_init(struct sde_kms *sde_kms)
 				ret = _sde_kms_one2one_mem_map_ipcc_reg(sde_kms, resource_size(res),
 					HW_FENCE_IPCC_PROTOCOLp_CLIENTc(res->start,
 					sde_kms->catalog->ipcc_protocol_id,
-					HW_FENCE_IPCC_CLIENT_DPU));
+					sde_kms->catalog->ipcc_client_phys_id));
 				/* if mapping fails disable hw-fences */
 				if (ret)
 					sde_kms->catalog->hw_fence_rev = 0;
@@ -4424,7 +4424,8 @@ static void sde_kms_init_hw_fences(struct sde_kms *sde_kms)
 
 	if (sde_kms->hw_mdp->ops.setup_hw_fences)
 		sde_kms->hw_mdp->ops.setup_hw_fences(sde_kms->hw_mdp,
-			sde_kms->catalog->ipcc_protocol_id, sde_kms->ipcc_base_addr);
+			sde_kms->catalog->ipcc_protocol_id, sde_kms->catalog->ipcc_client_phys_id,
+			sde_kms->ipcc_base_addr);
 }
 
 static void sde_kms_init_shared_hw(struct sde_kms *sde_kms)
