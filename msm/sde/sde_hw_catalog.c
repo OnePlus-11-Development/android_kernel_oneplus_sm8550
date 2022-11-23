@@ -2124,7 +2124,7 @@ static int sde_mixer_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_c
 	struct sde_lm_cfg *mixer;
 	struct sde_lm_sub_blks *sblk;
 	int pp_count, dspp_count, ds_count, mixer_count;
-	u32 pp_idx, dspp_idx, ds_idx;
+	u32 pp_idx, dspp_idx, ds_idx, merge_3d_idx;
 	u32 mixer_base;
 	struct device_node *snp = NULL;
 	struct sde_dt_props *props, *blend_props, *blocks_props = NULL;
@@ -2165,8 +2165,8 @@ static int sde_mixer_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_c
 		goto put_blocks;
 	}
 
-	for (i = 0, mixer_count = 0, pp_idx = 0, dspp_idx = 0,
-			ds_idx = 0; i < off_count; i++) {
+	for (i = 0, mixer_count = 0, pp_idx = 0, dspp_idx = 0, ds_idx = 0,
+			merge_3d_idx = 0; i < off_count; i++) {
 		const char *disp_pref = NULL;
 		const char *cwb_pref = NULL;
 		const char *dcwb_pref = NULL;
@@ -2240,6 +2240,7 @@ static int sde_mixer_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_c
 		mixer->dspp = dspp_count > 0 ? dspp_idx + DSPP_0
 							: DSPP_MAX;
 		mixer->ds = ds_count > 0 ? ds_idx + DS_0 : DS_MAX;
+		mixer->merge_3d = merge_3d_idx + MERGE_3D_0;
 		pp_count--;
 		dspp_count--;
 		ds_count--;
@@ -2248,6 +2249,12 @@ static int sde_mixer_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_c
 		ds_idx++;
 
 		mixer_count++;
+		/*
+		 * Since each 3dmux is assigned to a pair of LM,
+		 * increment this idx only at even LM counts
+		 */
+		if ((mixer_count & 1) == 0)
+			merge_3d_idx++;
 
 		sblk->gc.id = SDE_MIXER_GC;
 		if (blocks_props && blocks_props->exists[MIXER_GC_PROP]) {

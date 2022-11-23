@@ -835,6 +835,7 @@ struct msm_mode_info {
  * @num_ctl             number of ctl available
  * @num_3dmux           number of 3d mux available
  * @max_mixer_width:    max width supported by layer mixer
+ * @merge_3d_mask:      bitmap of available 3d mux resource
  */
 struct msm_resource_caps_info {
 	uint32_t num_lm_in_use;
@@ -844,6 +845,7 @@ struct msm_resource_caps_info {
 	uint32_t num_ctl;
 	uint32_t num_3dmux;
 	uint32_t max_mixer_width;
+	unsigned long merge_3d_mask;
 };
 
 /**
