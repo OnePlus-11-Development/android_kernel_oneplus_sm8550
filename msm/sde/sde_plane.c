@@ -1100,7 +1100,7 @@ static void _sde_plane_setup_pixel_ext(struct sde_plane *psde,
 	}
 }
 
-static inline void _sde_plane_setup_csc(struct sde_plane *psde)
+static inline void _sde_plane_setup_csc(struct sde_plane *psde, struct sde_plane_state *pstate)
 {
 	static const struct sde_csc_cfg sde_csc_YUV2RGB_601L = {
 		{
@@ -1131,23 +1131,23 @@ static inline void _sde_plane_setup_csc(struct sde_plane *psde)
 		{ 0x00, 0x3ff, 0x00, 0x3ff, 0x00, 0x3ff,},
 	};
 
-	if (!psde) {
+	if (!psde || !pstate) {
 		SDE_ERROR("invalid plane\n");
 		return;
 	}
 
 	/* revert to kernel default if override not available */
-	if (psde->csc_usr_ptr)
-		psde->csc_ptr = psde->csc_usr_ptr;
+	if (pstate->csc_usr_ptr)
+		pstate->csc_ptr = pstate->csc_usr_ptr;
 	else if (BIT(SDE_SSPP_CSC_10BIT) & psde->features)
-		psde->csc_ptr = (struct sde_csc_cfg *)&sde_csc10_YUV2RGB_601L;
+		pstate->csc_ptr = (struct sde_csc_cfg *)&sde_csc10_YUV2RGB_601L;
 	else
-		psde->csc_ptr = (struct sde_csc_cfg *)&sde_csc_YUV2RGB_601L;
+		pstate->csc_ptr = (struct sde_csc_cfg *)&sde_csc_YUV2RGB_601L;
 
 	SDE_DEBUG_PLANE(psde, "using 0x%X 0x%X 0x%X...\n",
-			psde->csc_ptr->csc_mv[0],
-			psde->csc_ptr->csc_mv[1],
-			psde->csc_ptr->csc_mv[2]);
+			pstate->csc_ptr->csc_mv[0],
+			pstate->csc_ptr->csc_mv[1],
+			pstate->csc_ptr->csc_mv[2]);
 }
 
 static void sde_color_process_plane_setup(struct drm_plane *plane)
@@ -2776,8 +2776,8 @@ void sde_plane_flush(struct drm_plane *plane)
 	else if (psde->color_fill & SDE_PLANE_COLOR_FILL_FLAG)
 		/* force 100% alpha */
 		_sde_plane_color_fill(psde, psde->color_fill, 0xFF);
-	else if (psde->pipe_hw && psde->csc_ptr && psde->pipe_hw->ops.setup_csc)
-		psde->pipe_hw->ops.setup_csc(psde->pipe_hw, psde->csc_ptr);
+	else if (psde->pipe_hw && pstate->csc_ptr && psde->pipe_hw->ops.setup_csc)
+		psde->pipe_hw->ops.setup_csc(psde->pipe_hw, pstate->csc_ptr);
 
 	/* flag h/w flush complete */
 	if (plane->state)
@@ -3200,9 +3200,9 @@ static void _sde_plane_update_format_and_rects(struct sde_plane *psde,
 
 	/* update csc */
 	if (SDE_FORMAT_IS_YUV(fmt))
-		_sde_plane_setup_csc(psde);
+		_sde_plane_setup_csc(psde, pstate);
 	else
-		psde->csc_ptr = 0;
+		pstate->csc_ptr = 0;
 
 	if (psde->pipe_hw->ops.setup_inverse_pma) {
 		uint32_t pma_mode = 0;
@@ -3216,7 +3216,7 @@ static void _sde_plane_update_format_and_rects(struct sde_plane *psde,
 
 	if (psde->pipe_hw->ops.setup_dgm_csc)
 		psde->pipe_hw->ops.setup_dgm_csc(psde->pipe_hw,
-			pstate->multirect_index, psde->csc_usr_ptr);
+			pstate->multirect_index, pstate->csc_usr_ptr);
 
 	if (psde->pipe_hw->ops.set_ubwc_stats_roi) {
 		if (SDE_FORMAT_IS_UBWC(fmt) && !SDE_FORMAT_IS_YUV(fmt))
@@ -3998,17 +3998,17 @@ static void _sde_plane_install_properties(struct drm_plane *plane,
 }
 
 static inline void _sde_plane_set_csc_v1(struct sde_plane *psde,
-		void __user *usr_ptr)
+		void __user *usr_ptr, struct sde_plane_state *pstate)
 {
 	struct sde_drm_csc_v1 csc_v1;
 	int i;
 
-	if (!psde) {
+	if (!psde || !pstate) {
 		SDE_ERROR("invalid plane\n");
 		return;
 	}
 
-	psde->csc_usr_ptr = NULL;
+	pstate->csc_usr_ptr = NULL;
 	if (!usr_ptr) {
 		SDE_DEBUG_PLANE(psde, "csc data removed\n");
 		return;
@@ -4021,16 +4021,16 @@ static inline void _sde_plane_set_csc_v1(struct sde_plane *psde,
 
 	/* populate from user space */
 	for (i = 0; i < SDE_CSC_MATRIX_COEFF_SIZE; ++i)
-		psde->csc_cfg.csc_mv[i] = csc_v1.ctm_coeff[i] >> 16;
+		pstate->csc_cfg.csc_mv[i] = csc_v1.ctm_coeff[i] >> 16;
 	for (i = 0; i < SDE_CSC_BIAS_SIZE; ++i) {
-		psde->csc_cfg.csc_pre_bv[i] = csc_v1.pre_bias[i];
-		psde->csc_cfg.csc_post_bv[i] = csc_v1.post_bias[i];
+		pstate->csc_cfg.csc_pre_bv[i] = csc_v1.pre_bias[i];
+		pstate->csc_cfg.csc_post_bv[i] = csc_v1.post_bias[i];
 	}
 	for (i = 0; i < SDE_CSC_CLAMP_SIZE; ++i) {
-		psde->csc_cfg.csc_pre_lv[i] = csc_v1.pre_clamp[i];
-		psde->csc_cfg.csc_post_lv[i] = csc_v1.post_clamp[i];
+		pstate->csc_cfg.csc_pre_lv[i] = csc_v1.pre_clamp[i];
+		pstate->csc_cfg.csc_post_lv[i] = csc_v1.post_clamp[i];
 	}
-	psde->csc_usr_ptr = &psde->csc_cfg;
+	pstate->csc_usr_ptr = &pstate->csc_cfg;
 }
 
 static inline void _sde_plane_set_scaler_v1(struct sde_plane *psde,
@@ -4267,7 +4267,7 @@ static int sde_plane_atomic_set_property(struct drm_plane *plane,
 				break;
 			case PLANE_PROP_CSC_V1:
 			case PLANE_PROP_CSC_DMA_V1:
-				_sde_plane_set_csc_v1(psde, (void __user *)val);
+				_sde_plane_set_csc_v1(psde, (void __user *)val, pstate);
 				break;
 			case PLANE_PROP_SCALER_V1:
 				_sde_plane_set_scaler_v1(psde, pstate,

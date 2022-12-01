@@ -301,10 +301,26 @@ int sde_fence_register_hw_fences_wait(struct sde_hw_ctl *hw_ctl, struct dma_fenc
 					dma_fence_get(array->fences[j]);
 					fence_list[fence_list_index++] = array->fences[j];
 				}
+
+				if (array->num_fences) /* print the first fence from array */
+					SDE_EVT32(ctl_id, num_fences, array->num_fences, i,
+						SDE_EVTLOG_H32(array->fences[0]->context),
+						SDE_EVTLOG_L32(array->fences[0]->context),
+						SDE_EVTLOG_H32(array->fences[0]->seqno),
+						SDE_EVTLOG_L32(array->fences[0]->seqno));
+				else
+					SDE_EVT32(ctl_id, num_fences, array->num_fences, i,
+						SDE_EVTLOG_ERROR);
+
 				/* remove refcount on parent */
 				dma_fence_put(fences[i]);
 			} else {
 				fence_list[fence_list_index++] = fences[i];
+
+				SDE_EVT32(ctl_id, num_fences, i, SDE_EVTLOG_H32(fences[i]->context),
+					SDE_EVTLOG_L32(fences[i]->context),
+					SDE_EVTLOG_H32(fences[i]->seqno),
+					SDE_EVTLOG_L32(fences[i]->seqno));
 			}
 		}
 
@@ -322,8 +338,17 @@ int sde_fence_register_hw_fences_wait(struct sde_hw_ctl *hw_ctl, struct dma_fenc
 		num_hw_fences = 1;
 
 	} else {
+		struct dma_fence_array *tmp_array;
+
 		hw_fences = fences;
 		num_hw_fences = num_fences;
+		tmp_array = dma_fence_is_array(fences[0]) ?
+				container_of(fences[0], struct dma_fence_array, base) :
+				NULL;
+		SDE_EVT32(ctl_id, num_hw_fences, SDE_EVTLOG_H32(fences[0]->context),
+			SDE_EVTLOG_L32(fences[0]->context), SDE_EVTLOG_H32(fences[0]->seqno),
+			SDE_EVTLOG_L32(fences[0]->seqno), fences[0]->flags,
+			tmp_array ? tmp_array->num_fences : SDE_EVTLOG_FUNC_CASE2);
 	}
 
 	/* register for wait */
@@ -481,6 +506,8 @@ int sde_fence_update_hw_fences_txq(struct sde_fence_context *ctx, bool vid_mode,
 		}
 
 		/* update hw-fence tx queue */
+		SDE_EVT32(ctl_id, SDE_EVTLOG_H32(fc->hwfence_index),
+			SDE_EVTLOG_L32(fc->hwfence_index));
 		ret = msm_hw_fence_update_txq(data->hw_fence_handle, fc->hwfence_index, 0, 0);
 		if (ret) {
 			SDE_ERROR("fail txq update index:%llu fctx:%llu seqno:%llu client:%d\n",

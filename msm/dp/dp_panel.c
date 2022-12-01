@@ -388,7 +388,7 @@ static void dp_panel_update_tu_timings(struct dp_tu_calc_input *in,
 	tu->orig_lwidth          = in->hactive;
 	tu->hbp_relative_to_pclk_fp = drm_fixp_from_fraction(in->hporch, 1);
 	tu->orig_hbp             = in->hporch;
-	tu->rb2                  = (in->hporch <= 80) ? 1 : 0;
+	tu->rb2                  = (in->hporch < 160) ? 1 : 0;
 
 	if (tu->pixelEnc == 420) {
 		temp1_fp = drm_fixp_from_fraction(2, 1);
@@ -418,6 +418,8 @@ static void dp_panel_update_tu_timings(struct dp_tu_calc_input *in,
 
 	if (!in->dsc_en)
 		goto fec_check;
+
+	tu->bpp = 24; // hardcode to 24 if DSC is enabled.
 
 	temp1_fp = drm_fixp_from_fraction(in->compress_ratio, 100);
 	temp2_fp = drm_fixp_from_fraction(in->bpp, 1);
@@ -2840,7 +2842,8 @@ static void dp_panel_config_sdp(struct dp_panel *dp_panel,
 	panel = container_of(dp_panel, struct dp_panel_private, dp_panel);
 	panel->catalog->stream_id = dp_panel->stream_id;
 
-	panel->catalog->config_sdp(panel->catalog, en);
+	if (panel->panel_on)
+		panel->catalog->config_sdp(panel->catalog, en);
 }
 
 static int dp_panel_hw_cfg(struct dp_panel *dp_panel, bool enable)
