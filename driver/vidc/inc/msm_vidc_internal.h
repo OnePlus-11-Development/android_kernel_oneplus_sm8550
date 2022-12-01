@@ -515,6 +515,8 @@ enum msm_vidc_inst_capability_type {
 	BLUR_TYPES,
 	REQUEST_PREPROCESS,
 	SLICE_MODE,
+	EARLY_NOTIFY_ENABLE,
+	EARLY_NOTIFY_LINE_COUNT,
 	/* place all intermittent(having both parent and child) enums before this line */
 
 	MIN_FRAME_QP,
@@ -539,8 +541,6 @@ enum msm_vidc_inst_capability_type {
 	DELIVERY_MODE,
 	VUI_TIMING_INFO,
 	SLICE_DECODE,
-	EARLY_NOTIFY_ENABLE,
-	EARLY_NOTIFY_LINE_COUNT,
 	EARLY_NOTIFY_FENCE_COUNT,
 	/* place all leaf(no child) enums before this line */
 	INST_CAP_MAX,

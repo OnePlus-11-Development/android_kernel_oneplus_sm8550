@@ -205,6 +205,8 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{BLUR_TYPES,                     "BLUR_TYPES"                 },
 	{REQUEST_PREPROCESS,             "REQUEST_PREPROCESS"         },
 	{SLICE_MODE,                     "SLICE_MODE"                 },
+	{EARLY_NOTIFY_ENABLE,            "EARLY_NOTIFY_ENABLE"        },
+	{EARLY_NOTIFY_LINE_COUNT,        "EARLY_NOTIFY_LINE_COUNT"    },
 	{MIN_FRAME_QP,                   "MIN_FRAME_QP"               },
 	{MAX_FRAME_QP,                   "MAX_FRAME_QP"               },
 	{I_FRAME_QP,                     "I_FRAME_QP"                 },
@@ -227,8 +229,6 @@ static const struct msm_vidc_cap_name cap_name_arr[] = {
 	{DELIVERY_MODE,                  "DELIVERY_MODE"              },
 	{VUI_TIMING_INFO,                "VUI_TIMING_INFO"            },
 	{SLICE_DECODE,                   "SLICE_DECODE"               },
-	{EARLY_NOTIFY_ENABLE,            "EARLY_NOTIFY_ENABLE"        },
-	{EARLY_NOTIFY_LINE_COUNT,        "EARLY_NOTIFY_LINE_COUNT"    },
 	{EARLY_NOTIFY_FENCE_COUNT,       "EARLY_NOTIFY_FENCE_COUNT"   },
 	{INST_CAP_MAX,                   "INST_CAP_MAX"               },
 };
@@ -1555,6 +1555,7 @@ bool msm_vidc_allow_s_ctrl(struct msm_vidc_inst *inst, u32 id)
 			case V4L2_CID_MPEG_VIDC_FRAME_RATE:
 			case V4L2_CID_MPEG_VIDC_OPERATING_RATE:
 			case V4L2_CID_MPEG_VIDC_SW_FENCE_ID:
+			case V4L2_CID_MPEG_VIDC_EARLY_NOTIFY_LINE_COUNT:
 				allow = true;
 				break;
 			default:
@@ -3932,7 +3933,8 @@ int msm_vidc_queue_buffer_single(struct msm_vidc_inst *inst, struct vb2_buffer *
 		return -EINVAL;
 
 	/* update start timestamp */
-	msm_vidc_add_buffer_stats(inst, buf);
+	if (!msm_vidc_is_super_buffer(inst))
+		msm_vidc_add_buffer_stats(inst, buf);
 
 	/* create array of fences */
 	if (is_output_buffer(buf->type)) {
