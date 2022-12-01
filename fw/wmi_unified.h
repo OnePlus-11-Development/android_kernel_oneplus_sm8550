@@ -1531,6 +1531,8 @@ typedef enum {
     WMI_MLO_TEARDOWN_CMDID,
     /** WMI cmd used to setup Tid to Link Mapping for a MLO Peer */
     WMI_MLO_PEER_TID_TO_LINK_MAP_CMDID,
+    /** WMI cmd for dynamically deleting a link from a MLD VAP */
+    WMI_MLO_LINK_REMOVAL_CMDID,
 
     /** WMI commands specific to Service Aware WiFi (SAWF) */
     /** configure or reconfigure the parameters for a service class */
@@ -2331,6 +2333,8 @@ typedef enum {
     WMI_MLO_SETUP_COMPLETE_EVENTID,
     /* Response event for MLO teardown cmd */
     WMI_MLO_TEARDOWN_COMPLETE_EVENTID,
+    /* Response event for Link Removal Cmd */
+    WMI_MLO_LINK_REMOVAL_EVENTID,
 
     /* WMI event specific to Quiet handling */
     WMI_QUIET_HANDLING_EVENTID = WMI_EVT_GRP_START_ID(WMI_GRP_QUIET_OFL),
@@ -12693,6 +12697,10 @@ typedef struct {
 #define WMI_MLO_FLAGS_SET_EMLSR_SUPPORT(mlo_flags, value)   WMI_SET_BITS(mlo_flags, 6, 1, value)
 #define WMI_MLO_FLAGS_GET_FORCE_LINK_INACTIVE(mlo_flags)    WMI_GET_BITS(mlo_flags, 7, 1)
 #define WMI_MLO_FLAGS_SET_FORCE_LINK_INACTIVE(mlo_flags, value) WMI_SET_BITS(mlo_flags, 7, 1, value)
+#define WMI_MLO_FLAGS_GET_LINK_ADD(mlo_flags)               WMI_GET_BITS(mlo_flags, 8, 1)
+#define WMI_MLO_FLAGS_SET_LINK_ADD(mlo_flags, value)        WMI_SET_BITS(mlo_flags, 8, 1, value)
+#define WMI_MLO_FLAGS_GET_LINK_DEL(mlo_flags)               WMI_GET_BITS(mlo_flags, 9, 1)
+#define WMI_MLO_FLAGS_SET_LINK_DEL(mlo_flags, value)        WMI_SET_BITS(mlo_flags, 9, 1, value)
 
 /* this structure used for pass mlo flags*/
 typedef struct {
@@ -12706,7 +12714,9 @@ typedef struct {
                      mlo_mcast_vdev:1, /* indicate this is the MLO mcast primary vdev */
                      emlsr_support:1, /* indicate that eMLSR is supported */
                      mlo_force_link_inactive:1, /* indicate this link is forced inactive */
-                     unused: 24;
+                     mlo_link_add:1, /* Indicate dynamic link addition in an MLD VAP */
+                     mlo_link_del:1, /* Indicate dynamic link deletion in an MLD VAP */
+                     unused: 22;
         };
         A_UINT32 mlo_flags;
     };
@@ -12717,6 +12727,7 @@ typedef struct {
     A_UINT32 vdev_id; /** partner vdev_id */
     A_UINT32 hw_link_id; /** hw_link_id: Unique link id across SOCs, got as part of QMI handshake */
     wmi_mac_addr vdev_macaddr; /** VDEV MAC address */
+    wmi_mlo_flags mlo_flags;
 } wmi_partner_link_params;
 
 /* this TLV structure used for pass mlo parameters on vdev create*/
@@ -14271,13 +14282,11 @@ typedef enum {
     /** specify the setting that are valid for auto rate transmissions.
      * bits 7:0 (LTF): When bitmask is set, then corresponding LTF value is
      *                 used for auto rate.
-     *     BIT0   = 1 (WMI_HE_LTF_1X)
-     *     BIT1   = 1 (WMI_HE_LTF_2X)
-     *     BIT2   = 1 (WMI_HE_LTF_4X)
-     *     BIT3   = 1 (WMI_EHT_LTF_1X)
-     *     BIT4   = 1 (WMI_EHT_LTF_2X)
-     *     BIT5   = 1 (WMI_EHT_LTF_4X)
-     *     BIT6-7 = Reserved bits.
+     *     BIT0   = 1 (WMI_HE_LTF_1X or WMI_EHT_LTF_1X depending on
+     *                 current rate’s preamble type HE or EHT)
+     *     BIT1   = 1 (WMI_HE_LTF_2X or WMI_EHT_LTF_2X)
+     *     BIT2   = 1 (WMI_HE_LTF_4X or WMI_EHT_LTF_4X)
+     *     BIT3-7 = Reserved bits.
      * bits 15:8 (SGI): When bitmask is set, then corresponding SGI value is
      *                 used for auto rate.
      *     BIT8     = 1 (400 NS)
@@ -14863,6 +14872,15 @@ typedef enum {
          * for vdev offload stats
          */
         WMI_VDEV_PARAM_VDEV_STATS_ID_UPDATE,                 /* 0x8010 */
+
+        /*
+         * Enable or disable Extra LTF capability in Auto rate and
+         * Fixed rate EHT data packet transmissions.
+         * Even when this vdev param is enabled, Extra LTF may not be
+         * enabled for all rates in auto rate mode based on other conditions.
+         * valid values: 0 - Disable Extra LTF, 1- Enable Extra LTF.
+         */
+        WMI_VDEV_PARAM_EXTRA_EHT_LTF,                  /* 0x8011 */
 
     /*=== END VDEV_PARAM_PROTOTYPE SECTION ===*/
 } WMI_VDEV_PARAM;
@@ -32702,6 +32720,7 @@ static INLINE A_UINT8 *wmi_id_to_name(A_UINT32 wmi_command)
         WMI_RETURN_STRING(WMI_VDEV_PARAM_ENABLE_SR_PROHIBIT_CMDID);
         WMI_RETURN_STRING(WMI_XGAP_ENABLE_CMDID);
         WMI_RETURN_STRING(WMI_PDEV_MESH_RX_FILTER_ENABLE_CMDID);
+        WMI_RETURN_STRING(WMI_MLO_LINK_REMOVAL_CMDID);
     }
 
     return (A_UINT8 *) "Invalid WMI cmd";
@@ -35264,6 +35283,12 @@ typedef struct {
     };
     /* btm_req_dialog_token: dialog token number in BTM request frame */
     A_UINT32 btm_req_dialog_token;
+    /* data rssi in dBm when abort to roam scan */
+    A_UINT32 data_rssi;
+    /* data rssi threshold in dBm */
+    A_UINT32 data_rssi_threshold;
+    /* rx linkspeed status, 0:good linkspeed, 1:bad */
+    A_UINT32 rx_linkspeed_status;
 } wmi_roam_trigger_reason;
 
 #define WMI_GET_BTCONNECT_STATUS(flags)      WMI_GET_BITS(flags, 0, 1)
@@ -35300,6 +35325,11 @@ typedef struct {
 typedef struct {
     A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_roam_scan_channel_info_tlv_param */
     A_UINT32 channel;    /* Channel frequency in MHz */
+    A_UINT32 ch_dwell_type; /* indicates channel dwell type:
+                             * 0 -> unspecified
+                             * 1 -> active
+                             * 2 -> passive
+                             */
 } wmi_roam_scan_channel_info;
 
 typedef struct {
@@ -35381,6 +35411,14 @@ typedef enum {
     WMI_ROAM_FAIL_REASON_UNKNOWN = 255,
 } WMI_ROAM_FAIL_REASON_ID;
 
+typedef enum {
+    WMI_ROAM_ABORT_UNSPECIFIED = 0,            /* Target did not specify detailed reason for roam scan being aborted */
+    WMI_ROAM_ABORT_LOWRSSI_DATA_RSSI_HIGH = 1, /* Roam scan is not started due to high data RSSI during low-RSSI roaming */
+    WMI_ROAM_ABORT_LOWRSSI_LINK_SPEED_GOOD,    /* Roam scan is not started due to good link speed during low-RSSI roaming */
+    WMI_ROAM_ABORT_BG_DATA_RSSI_HIGH,          /* Roam scan is not started due to high data RSSI during background roaming */
+    WMI_ROAM_ABORT_BG_RSSI_ABOVE_THRESHOLD,    /* Roam scan is not started due to high beacon RSSI during background roaming */
+} WMI_ROAM_FAIL_SUB_REASON_ID;
+
 typedef struct {
     A_UINT32 tlv_header;    /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_roam_result_tlv_param */
     /*
@@ -35392,6 +35430,7 @@ typedef struct {
     A_UINT32 roam_status;   /* 0 - Roaming is success, 1 - Roaming is failed */
     A_UINT32 roam_fail_reason; /* from WMI_ROAM_FAIL_REASON_ID */
     wmi_mac_addr bssid; /* bssid corresponds to roam_fail_reason */
+    A_UINT32 roam_abort_reason; /* Detail reason for roam scan not start, from WMI_ROAM_FAIL_SUB_REASON_ID */
 } wmi_roam_result;
 
 typedef struct {
@@ -40171,6 +40210,62 @@ typedef struct {
      */
     A_UINT32 status;
 } wmi_livedump_response_event_fixed_param;
+
+#define WMI_MLO_LINK_REMOVAL_GET_VDEVID(tbtt_info)               WMI_GET_BITS(tbtt_info, 0, 8)
+#define WMI_MLO_LINK_REMOVAL_SET_VDEVID(tbtt_info, value)        WMI_SET_BITS(tbtt_info, 0, 8, value)
+#define WMI_MLO_LINK_REMOVAL_GET_LINKID(tbtt_info)               WMI_GET_BITS(tbtt_info, 8, 8)
+#define WMI_MLO_LINK_REMOVAL_SET_LINKID(tbtt_info, value)        WMI_SET_BITS(tbtt_info, 8, 8, value)
+#define WMI_MLO_LINK_REMOVAL_GET_TBTT_COUNT(tbtt_info)           WMI_GET_BITS(tbtt_info, 16, 16)
+#define WMI_MLO_LINK_REMOVAL_SET_TBTT_COUNT(tbtt_info, value)    WMI_SET_BITS(tbtt_info, 16, 16, value)
+
+typedef struct {
+    /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_mlo_link_removal_tbtt_count; */
+    A_UINT32 tlv_header;
+    union {
+        struct {
+            A_UINT32 vdev_id:8,
+                     link_id:8,
+                     tbtt_count:16;
+        };
+        A_UINT32 tbtt_info;
+    };
+} wmi_mlo_link_removal_tbtt_count;
+
+typedef struct {
+    /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_mlo_link_removal_tbtt_update; */
+    A_UINT32 tlv_header;
+
+    A_UINT32 tbtt_count;
+
+    A_UINT32 qtimer_ts_low; /* lower-32 bits */
+    A_UINT32 qtimer_ts_high; /* higher-32 bits */
+
+    A_UINT32 tsf_low; /* lower-32 bits */
+    A_UINT32 tsf_high; /* higher-32 bits */
+} wmi_mlo_link_removal_tbtt_update;
+
+typedef struct {
+   /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_mlo_link_removal_evt_fixed_param; */
+    A_UINT32 tlv_header;
+    A_UINT32 vdev_id;
+
+    /*
+     * Followed by TLVs:
+     *     wmi_mlo_link_removal_tbtt_update
+     */
+} wmi_mlo_link_removal_evt_fixed_param;
+
+typedef struct {
+    /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_mlo_link_removal_cmd_fixed_param */
+    A_UINT32 tlv_header;
+    A_UINT32 vdev_id;
+    A_UINT32 reconfig_ml_ie_num_bytes_valid;
+
+   /* This TLV is followed by array of bytes:
+    *   A_UINT8 reconfig_ml_ie[]; <-- Entire reconfiguration element (multi-link control + common-info + 1 per-sta profile)
+    */
+} wmi_mlo_link_removal_cmd_fixed_param;
+
 
 
 
