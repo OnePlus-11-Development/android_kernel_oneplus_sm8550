@@ -23,6 +23,7 @@
 #include "cam_req_mgr_debug.h"
 #include "cam_cpas_api.h"
 #include "cam_ife_hw_mgr.h"
+#include "cam_subdev.h"
 
 static const char isp_dev_name[] = "cam-isp";
 
@@ -36,6 +37,8 @@ static int cam_isp_context_dump_requests(void *data,
 	void *pf_args);
 
 static int cam_isp_context_hw_recovery(void *priv, void *data);
+static int cam_isp_context_handle_message(void *context,
+	uint32_t msg_type, void *data);
 
 static int __cam_isp_ctx_start_dev_in_ready(struct cam_context *ctx,
 	struct cam_start_stop_dev_cmd *cmd);
@@ -1932,6 +1935,13 @@ static int __cam_isp_ctx_handle_buf_done_for_request_verify_addr(
 
 		if (defer_buf_done) {
 			uint32_t deferred_indx = req_isp->num_deferred_acks;
+
+			if (deferred_indx >= CAM_ISP_CTX_RES_MAX) {
+				CAM_WARN(CAM_ISP, "ctx: %u req: %llu number of Deferred buf done %u is more than %u",
+				ctx->ctx_id, req->request_id,
+				deferred_indx, CAM_ISP_CTX_RES_MAX);
+				continue;
+			}
 
 			/*
 			 * If we are handling this BUF_DONE event for a request
@@ -5051,7 +5061,7 @@ static int __cam_isp_ctx_flush_req_in_top_state(
 
 	CAM_DBG(CAM_ISP, "Flush pending list");
 	spin_lock_bh(&ctx->lock);
-	rc = __cam_isp_ctx_flush_req(ctx, &ctx->pending_req_list, flush_req);
+	__cam_isp_ctx_flush_req(ctx, &ctx->pending_req_list, flush_req);
 	spin_unlock_bh(&ctx->lock);
 
 	if (flush_req->type == CAM_REQ_MGR_FLUSH_TYPE_ALL) {
@@ -5094,11 +5104,11 @@ static int __cam_isp_ctx_flush_req_in_top_state(
 
 		spin_lock_bh(&ctx->lock);
 		if (!list_empty(&ctx->wait_req_list))
-			rc = __cam_isp_ctx_flush_req(ctx, &ctx->wait_req_list,
+			__cam_isp_ctx_flush_req(ctx, &ctx->wait_req_list,
 				flush_req);
 
 		if (!list_empty(&ctx->active_req_list))
-			rc = __cam_isp_ctx_flush_req(ctx, &ctx->active_req_list,
+			__cam_isp_ctx_flush_req(ctx, &ctx->active_req_list,
 				flush_req);
 
 		ctx_isp->active_req_cnt = 0;
@@ -6578,7 +6588,7 @@ static int __cam_isp_ctx_acquire_hw_v1(struct cam_context *ctx,
 	}
 
 	ctx_isp->support_consumed_addr =
-		(param.op_flags & CAM_IFE_CTX_FRAME_HEADER_EN);
+		(param.op_flags & CAM_IFE_CTX_CONSUME_ADDR_EN);
 
 	/* Query the context has rdi only resource */
 	hw_cmd_args.ctxt_to_hw_map = param.ctxt_to_hw_map;
@@ -7917,6 +7927,7 @@ static struct cam_ctx_ops
 		.pagefault_ops = cam_isp_context_dump_requests,
 		.dumpinfo_ops = cam_isp_context_info_dump,
 		.err_inject_ops = cam_isp_context_inject_error,
+		.msg_cb_ops = cam_isp_context_handle_message,
 	},
 	/* Activated */
 	{
@@ -7941,6 +7952,7 @@ static struct cam_ctx_ops
 		.dumpinfo_ops = cam_isp_context_info_dump,
 		.recovery_ops = cam_isp_context_hw_recovery,
 		.err_inject_ops = cam_isp_context_inject_error,
+		.msg_cb_ops = cam_isp_context_handle_message,
 	},
 };
 
@@ -8061,6 +8073,34 @@ end:
 		CAM_ERR(CAM_ISP,
 			"Failed to notify PF event to userspace rc: %d", rc);
 
+	return rc;
+}
+
+static int cam_isp_context_handle_message(void *context,
+	uint32_t msg_type, void *data)
+{
+	int                            rc = -EINVAL;
+	struct cam_hw_cmd_args         hw_cmd_args = {0};
+	struct cam_isp_hw_cmd_args     isp_hw_cmd_args = {0};
+	struct cam_context            *ctx = (struct cam_context *)context;
+
+	hw_cmd_args.ctxt_to_hw_map = ctx->ctxt_to_hw_map;
+
+	switch (msg_type) {
+	case CAM_SUBDEV_MESSAGE_CLOCK_UPDATE:
+		hw_cmd_args.cmd_type = CAM_HW_MGR_CMD_INTERNAL;
+		isp_hw_cmd_args.cmd_type = CAM_ISP_HW_MGR_CMD_UPDATE_CLOCK;
+		isp_hw_cmd_args.cmd_data = data;
+		hw_cmd_args.u.internal_args = (void *)&isp_hw_cmd_args;
+		rc = ctx->hw_mgr_intf->hw_cmd(ctx->hw_mgr_intf->hw_mgr_priv,
+			&hw_cmd_args);
+
+		if (rc)
+			CAM_ERR(CAM_ISP, "Update clock rate failed rc: %d", rc);
+		break;
+	default:
+		CAM_ERR(CAM_ISP, "Invalid message type %d", msg_type);
+	}
 	return rc;
 }
 
