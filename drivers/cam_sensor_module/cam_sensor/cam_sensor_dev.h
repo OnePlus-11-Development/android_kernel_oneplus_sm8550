@@ -109,6 +109,7 @@ struct cam_sensor_dev_res_info {
  * @last_applied_req: Last applied request id
  * @is_stopped_by_user: Indicate if sensor has been stopped by userland
  * @stream_off_after_eof: Indicates if sensor needs to stream off after eof
+ * @hw_no_ops: To determine whether HW operations need to be disabled
  */
 struct cam_sensor_ctrl_t {
 	char                           device_name[CAM_CTX_DEV_NAME_MAX_LENGTH];
@@ -142,6 +143,7 @@ struct cam_sensor_ctrl_t {
 	int64_t                        last_applied_req;
 	bool                           is_stopped_by_user;
 	bool                           stream_off_after_eof;
+	bool                           hw_no_ops;
 };
 
 /**
