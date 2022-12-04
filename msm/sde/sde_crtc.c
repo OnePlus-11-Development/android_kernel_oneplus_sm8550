@@ -4509,6 +4509,14 @@ static void _sde_crtc_remove_pipe_flush(struct drm_crtc *crtc)
 	}
 }
 
+void sde_crtc_dump_fences(struct drm_crtc *crtc)
+{
+	struct drm_plane *plane = NULL;
+
+	drm_atomic_crtc_for_each_plane(plane, crtc)
+		sde_plane_dump_input_fence(plane);
+}
+
 /**
  * sde_crtc_reset_hw - attempt hardware reset on errors
  * @crtc: Pointer to DRM crtc instance

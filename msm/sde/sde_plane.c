@@ -592,6 +592,26 @@ static void _sde_plane_set_input_fence(struct sde_plane *psde,
 	SDE_DEBUG_PLANE(psde, "0x%llX\n", fd);
 }
 
+void sde_plane_dump_input_fence(struct drm_plane *plane)
+{
+	struct sde_plane *psde;
+	struct sde_plane_state *pstate;
+	void *input_fence;
+
+	if (!plane) {
+		SDE_ERROR("invalid plane\n");
+	} else if (!plane->state) {
+		SDE_ERROR_PLANE(to_sde_plane(plane), "invalid state\n");
+	} else {
+		psde = to_sde_plane(plane);
+		pstate = to_sde_plane_state(plane->state);
+		input_fence = pstate->input_fence;
+
+		if (input_fence)
+			sde_fence_dump(input_fence);
+	}
+}
+
 int sde_plane_wait_input_fence(struct drm_plane *plane, uint32_t wait_ms)
 {
 	struct sde_plane *psde;
