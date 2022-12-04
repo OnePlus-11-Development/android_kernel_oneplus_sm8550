@@ -107,15 +107,15 @@
 
 #define SDE_DBG_LOG_MARKER(name, marker, log) \
 	if (log) \
-		dev_info(sde_dbg_base.dev, "======== %s %s dump =========\n", marker, name)
+		dev_err(sde_dbg_base.dev, "======== %s %s dump =========\n", marker, name)
 
 #define SDE_DBG_LOG_ENTRY(off, x0, x4, x8, xc, log) \
 	if (log) \
-		dev_info(sde_dbg_base.dev, "0x%08x| %08x %08x %08x %08x\n", off, x0, x4, x8, xc)
+		dev_err(sde_dbg_base.dev, "0x%08x| %08x %08x %08x %08x\n", off, x0, x4, x8, xc)
 
 #define SDE_DBG_LOG_DUMP_ADDR(name, addr, size, off, log) \
 	if (log) \
-		dev_info(sde_dbg_base.dev, "%s: start_addr:0x%pK len:0x%x offset=0x%lx\n", \
+		dev_err(sde_dbg_base.dev, "%s: start_addr:0x%pK len:0x%x offset=0x%lx\n", \
 				name, addr, size, off)
 
 #define SDE_DBG_LOG_DEBUGBUS(name, addr, block_id, test_id, val) \
