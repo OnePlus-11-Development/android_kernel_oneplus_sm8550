@@ -4048,7 +4048,6 @@ static int cam_isp_tfe_packet_generic_blob_handler(void *user_data,
 	}
 		break;
 	case CAM_ISP_TFE_GENERIC_BLOB_TYPE_BW_CONFIG_V2: {
-		size_t bw_config_size = 0;
 		struct cam_isp_tfe_bw_config_v2    *bw_config =
 			(struct cam_isp_tfe_bw_config_v2 *)blob_data;
 		struct cam_isp_prepare_hw_update_data   *prepare_hw_data;
@@ -4107,13 +4106,13 @@ static int cam_isp_tfe_packet_generic_blob_handler(void *user_data,
 
 		for (i = 0; i < bw_config->num_paths; i++) {
 			path_vote = &prepare_hw_data->bw_clk_config.bw_config_v2.axi_path[i];
-			path_vote.usage_data = bw_config->axi_path[i].usage_data;
-			path_vote.transac_type = bw_config->axi_path[i].transac_type;
-			path_vote.path_data_type = bw_config->axi_path[i].path_data_type;
-			path_vote.vote_level = 0;
-			path_vote.camnoc_bw = bw_config->axi_path[i].camnoc_bw;
-			path_vote.mnoc_ab_bw = bw_config->axi_path[i].mnoc_ab_bw;
-			path_vote.mnoc_ib_bw = bw_config->axi_path[i].mnoc_ib_bw;
+			path_vote->usage_data = bw_config->axi_path[i].usage_data;
+			path_vote->transac_type = bw_config->axi_path[i].transac_type;
+			path_vote->path_data_type = bw_config->axi_path[i].path_data_type;
+			path_vote->vote_level = 0;
+			path_vote->camnoc_bw = bw_config->axi_path[i].camnoc_bw;
+			path_vote->mnoc_ab_bw = bw_config->axi_path[i].mnoc_ab_bw;
+			path_vote->mnoc_ib_bw = bw_config->axi_path[i].mnoc_ib_bw;
 		}
 
 		tfe_mgr_ctx->bw_config_version = CAM_ISP_BW_CONFIG_V2;
@@ -4744,10 +4743,10 @@ static void cam_tfe_mgr_dump_pf_data(
 	ctx = (struct cam_tfe_hw_mgr_ctx *)hw_cmd_args->ctxt_to_hw_map;
 
 	pf_cmd_args = hw_cmd_args->u.pf_cmd_args;
-	rc = cam_packet_util_get_packet_addr(packet,
+	rc = cam_packet_util_get_packet_addr(&packet,
 		pf_cmd_args->pf_req_info->packet_handle, pf_cmd_args->pf_req_info->packet_offset);
 	if (rc)
-		return rc;
+		return;
 	ctx_found = &pf_cmd_args->pf_args->pf_context_info.ctx_found;
 	resource_type = &pf_cmd_args->pf_args->pf_context_info.resource_type;
 
