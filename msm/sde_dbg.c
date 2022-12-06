@@ -2874,6 +2874,15 @@ void sde_dbg_reg_register_dump_range(const char *base_name,
 		return;
 	}
 
+	/* return if the node is already present in sub_range_list */
+	if (!list_empty(&reg_base->sub_range_list)) {
+		list_for_each_entry(range, &reg_base->sub_range_list, head) {
+			if (range->offset.start == offset_start &&
+				range->offset.end == offset_end)
+				return;
+		}
+	}
+
 	range = kzalloc(sizeof(*range), GFP_KERNEL);
 	if (!range)
 		return;
