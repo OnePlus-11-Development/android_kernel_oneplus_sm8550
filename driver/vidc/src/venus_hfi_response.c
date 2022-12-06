@@ -1561,7 +1561,7 @@ static int handle_session_early_notify_partial_frame(struct msm_vidc_inst *inst,
 	port = vidc_port_from_hfi(inst, pkt->port);
 	if (port >= MAX_PORT) {
 		i_vpr_e(inst,
-			"%s: invalid port: %d\n", __func__, pkt->port, pkt->type);
+			"%s: invalid port: %d\n", __func__, pkt->port);
 		return -EINVAL;
 	}
 
