@@ -3381,7 +3381,8 @@ static int dsi_host_detach(struct mipi_dsi_host *host,
 int dsi_host_transfer_sub(struct mipi_dsi_host *host, struct dsi_cmd_desc *cmd)
 {
 	struct dsi_display *display;
-	int rc = 0;
+	struct dsi_display_ctrl *ctrl;
+	int i, rc = 0;
 
 	if (!host || !cmd) {
 		DSI_ERR("Invalid params\n");
@@ -3393,6 +3394,16 @@ int dsi_host_transfer_sub(struct mipi_dsi_host *host, struct dsi_cmd_desc *cmd)
 	/* Avoid sending DCS commands when ESD recovery is pending */
 	if (atomic_read(&display->panel->esd_recovery_pending)) {
 		DSI_DEBUG("ESD recovery pending\n");
+		display_for_each_ctrl(i, display) {
+			ctrl = &display->ctrl[i];
+			if ((!ctrl) || (!ctrl->ctrl))
+				continue;
+			if ((ctrl->ctrl->pending_cmd_flags & DSI_CTRL_CMD_FETCH_MEMORY) &&
+				ctrl->ctrl->cmd_len != 0) {
+				dsi_ctrl_transfer_cleanup(ctrl->ctrl);
+				ctrl->ctrl->cmd_len = 0;
+			}
+		}
 		return 0;
 	}
 
