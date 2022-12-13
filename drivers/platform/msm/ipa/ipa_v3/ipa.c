@@ -8282,8 +8282,8 @@ static int ipa3_post_init(const struct ipa3_plat_drv_res *resource_p,
 	if (ipa3_ctx->gsi_msi_addr)
 		ipa_gsi_map_unmap_gsi_msi_addr(true);
 
-	if(!ipa_spearhead_stats_init())
-		IPADBG("Fail to init spearhead ipa lnx module");
+	if(!ipa_tlpd_stats_init())
+		IPADBG("Fail to init tlpd ipa lnx module");
 
 	pr_info("IPA driver initialization was successful.\n");
 #if IS_ENABLED(CONFIG_QCOM_VA_MINIDUMP)
