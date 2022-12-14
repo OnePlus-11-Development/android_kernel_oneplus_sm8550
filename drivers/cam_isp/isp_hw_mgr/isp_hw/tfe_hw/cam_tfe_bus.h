@@ -1,8 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 
@@ -71,6 +70,7 @@ enum cam_tfe_bus_rup_grp_id {
 	CAM_TFE_BUS_RUP_GRP_1,
 	CAM_TFE_BUS_RUP_GRP_2,
 	CAM_TFE_BUS_RUP_GRP_3,
+	CAM_TFE_BUS_RUP_GRP_4,
 	CAM_TFE_BUS_RUP_GRP_MAX,
 };
 
@@ -90,6 +90,9 @@ enum cam_tfe_bus_tfe_out_id {
 	CAM_TFE_BUS_TFE_OUT_DS4,
 	CAM_TFE_BUS_TFE_OUT_DS16,
 	CAM_TFE_BUS_TFE_OUT_AI,
+	CAM_TFE_BUS_TFE_OUT_PD_LCR_STATS,
+	CAM_TFE_BUS_TFE_OUT_PD_PREPROCESSED,
+	CAM_TFE_BUS_TFE_OUT_PD_PARSED,
 	CAM_TFE_BUS_TFE_OUT_MAX,
 };
 
@@ -199,6 +202,7 @@ struct cam_tfe_bus_tfe_out_hw_info {
  * @rdi_width:             RDI WM width
  * @support_consumed_addr: Indicate if bus support consumed address
  * @pdaf_rdi2_mux_en:      Indicate is PDAF is muxed with RDI2
+ * @pack_align_shift:      pack alignment shift
  */
 struct cam_tfe_bus_hw_info {
 	struct cam_tfe_bus_reg_offset_common common_reg;
@@ -218,6 +222,7 @@ struct cam_tfe_bus_hw_info {
 	uint32_t rdi_width;
 	bool support_consumed_addr;
 	bool pdaf_rdi2_mux_en;
+	uint32_t pack_align_shift;
 };
 
 /*
