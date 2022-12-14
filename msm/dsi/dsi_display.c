@@ -5222,7 +5222,12 @@ static int dsi_display_set_mode_sub(struct dsi_display *display,
 		dsi_display_validate_dms_fps(display->panel->cur_mode, mode);
 	}
 
-	if (priv_info->phy_timing_len) {
+	if (priv_info->phy_timing_len &&
+		!atomic_read(&display->clkrate_change_pending)) {
+		/*
+		 * In case of clkrate change, the PHY timing update will happen
+		 * together with the clock update.
+		 */
 		display_for_each_ctrl(i, display) {
 			ctrl = &display->ctrl[i];
 			 rc = dsi_phy_set_timing_params(ctrl->phy,
@@ -8445,8 +8450,11 @@ int dsi_display_pre_kickoff(struct drm_connector *connector,
 		struct dsi_display *display,
 		struct msm_display_kickoff_params *params)
 {
+	struct dsi_display_mode *mode;
 	int rc = 0, ret = 0;
 	int i;
+
+	mode = display->panel->cur_mode;
 
 	/* check and setup MISR */
 	if (display->misr_enable)
@@ -8473,6 +8481,24 @@ int dsi_display_pre_kickoff(struct drm_connector *connector,
 			ret = dsi_ctrl_wait_for_cmd_mode_mdp_idle(ctrl);
 			if (ret)
 				goto wait_failure;
+		}
+
+		if (mode->priv_info->phy_timing_len) {
+			display_for_each_ctrl(i, display) {
+				struct dsi_display_ctrl *ctrl;
+				bool commit_phy_timing = false;
+
+				if (mode->dsi_mode_flags & DSI_MODE_FLAG_DMS)
+					commit_phy_timing = true;
+
+				ctrl = &display->ctrl[i];
+				ret = dsi_phy_set_timing_params(ctrl->phy,
+						mode->priv_info->phy_timing_val,
+						mode->priv_info->phy_timing_len,
+						commit_phy_timing);
+				if (ret)
+					DSI_ERR("failed to add DSI PHY timing params\n");
+			}
 		}
 
 		/*
