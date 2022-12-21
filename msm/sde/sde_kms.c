@@ -3748,6 +3748,32 @@ static bool sde_kms_check_for_splash(struct msm_kms *kms)
 	return sde_kms->splash_data.num_splash_displays;
 }
 
+static int sde_kms_get_input_fence_timeout(const struct msm_kms *kms)
+{
+	struct msm_drm_private *priv;
+	struct sde_kms *sde_kms;
+	struct drm_device *dev;
+	struct drm_crtc *crtc = NULL;
+	uint64_t timeout = 0;
+
+	sde_kms = to_sde_kms(kms);
+	if (!sde_kms || !sde_kms->dev || !sde_kms->dev->dev_private)
+		return timeout;
+
+	dev = sde_kms->dev;
+	priv = sde_kms->dev->dev_private;
+
+	drm_for_each_crtc(crtc, dev)
+		if (priv->pending_crtcs & drm_crtc_mask(crtc))
+			timeout = max(timeout,
+				to_sde_crtc_state(crtc->state)->input_fence_timeout_ns);
+
+	/* convert to ms */
+	timeout /= 1000000L;
+
+	return timeout;
+}
+
 static int sde_kms_get_mixer_count(const struct msm_kms *kms,
 		const struct drm_display_mode *mode,
 		const struct msm_resource_caps_info *res, u32 *num_lm)
@@ -4291,6 +4317,7 @@ static const struct msm_kms_funcs kms_funcs = {
 	.postopen = _sde_kms_post_open,
 	.check_for_splash = sde_kms_check_for_splash,
 	.trigger_null_flush = sde_kms_trigger_null_flush,
+	.get_input_fence_timeout = sde_kms_get_input_fence_timeout,
 	.get_mixer_count = sde_kms_get_mixer_count,
 	.get_dsc_count = sde_kms_get_dsc_count,
 };
