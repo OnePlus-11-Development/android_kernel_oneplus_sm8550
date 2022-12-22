@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/ratelimit.h>
@@ -354,6 +355,47 @@ static int cam_tfe_bus_get_num_wm(
 		format, out_res_id);
 
 	return -EINVAL;
+}
+
+static int cam_tfe_lite_bus_get_wm_idx(
+	enum cam_tfe_bus_tfe_out_id tfe_out_res_id,
+	enum cam_tfe_bus_plane_type plane)
+{
+	int wm_idx = -1;
+
+	switch (tfe_out_res_id) {
+	case CAM_TFE_BUS_TFE_OUT_RDI0:
+		switch (plane) {
+		case PLANE_Y:
+			wm_idx = 0;
+			break;
+		default:
+			break;
+		}
+		break;
+	case CAM_TFE_BUS_TFE_OUT_RDI1:
+		switch (plane) {
+		case PLANE_Y:
+			wm_idx = 1;
+			break;
+		default:
+			break;
+		}
+		break;
+	case CAM_TFE_BUS_TFE_OUT_RDI2:
+		switch (plane) {
+		case PLANE_Y:
+			wm_idx = 2;
+			break;
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return wm_idx;
 }
 
 static int cam_tfe_bus_get_wm_idx(
@@ -709,11 +751,14 @@ static int cam_tfe_bus_acquire_wm(
 
 	*wm_res = NULL;
 	/* No need to allocate for BUS TFE OUT to WM is fixed. */
-	wm_idx = cam_tfe_bus_get_wm_idx(tfe_out_res_id, plane,
-		bus_priv->common_data.pdaf_rdi2_mux_en);
+	if (bus_priv->common_data.is_lite)
+		wm_idx = cam_tfe_lite_bus_get_wm_idx(tfe_out_res_id, plane);
+	else
+		wm_idx = cam_tfe_bus_get_wm_idx(tfe_out_res_id, plane,
+			bus_priv->common_data.pdaf_rdi2_mux_en);
 	if (wm_idx < 0 || wm_idx >= bus_priv->num_client) {
-		CAM_ERR(CAM_ISP, "Unsupported TFE out %d plane %d",
-			tfe_out_res_id, plane);
+		CAM_ERR(CAM_ISP, "Unsupported TFE out %d plane %d wm id %d num client %d",
+			tfe_out_res_id, plane, wm_idx, bus_priv->num_client);
 		return -EINVAL;
 	}
 
@@ -749,8 +794,8 @@ static int cam_tfe_bus_acquire_wm(
 	/* Set WM offset value to default */
 	rsrc_data->offset  = 0;
 
-	if (((rsrc_data->index >= 7) && (rsrc_data->index <= 9)) &&
-		(tfe_out_res_id != CAM_TFE_BUS_TFE_OUT_PDAF)) {
+	if (bus_priv->common_data.is_lite || (((rsrc_data->index >= 7) &&
+		(rsrc_data->index <= 9)) && (tfe_out_res_id != CAM_TFE_BUS_TFE_OUT_PDAF))) {
 		/* WM 7-9 refers to RDI 0/ RDI 1/RDI 2 */
 		rc = cam_tfe_bus_acquire_rdi_wm(rsrc_data);
 		if (rc)
