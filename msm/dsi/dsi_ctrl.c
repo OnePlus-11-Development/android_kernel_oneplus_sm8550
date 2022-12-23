@@ -3317,8 +3317,8 @@ int dsi_ctrl_update_host_config(struct dsi_ctrl *ctrl,
 	if (!(flags & (DSI_MODE_FLAG_SEAMLESS | DSI_MODE_FLAG_VRR |
 		       DSI_MODE_FLAG_DYN_CLK))) {
 		/*
-		 * for dynamic clk switch case link frequence would
-		 * be updated dsi_display_dynamic_clk_switch().
+		 * for dynamic clk switch case link frequencies would
+		 * be updated in dsi_display_update_dsi_bitrate().
 		 */
 		rc = dsi_ctrl_update_link_freqs(ctrl, config, clk_handle,
 				mode);
