@@ -2842,8 +2842,7 @@ static void dp_panel_config_sdp(struct dp_panel *dp_panel,
 	panel = container_of(dp_panel, struct dp_panel_private, dp_panel);
 	panel->catalog->stream_id = dp_panel->stream_id;
 
-	if (panel->panel_on)
-		panel->catalog->config_sdp(panel->catalog, en);
+	panel->catalog->config_sdp(panel->catalog, en);
 }
 
 static int dp_panel_hw_cfg(struct dp_panel *dp_panel, bool enable)
