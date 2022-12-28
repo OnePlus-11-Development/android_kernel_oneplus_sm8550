@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -2981,8 +2981,13 @@ static void _sde_encoder_setup_dither(struct sde_encoder_phys *phys)
 	bpp = dsc->config.bits_per_pixel;
 
 	/* disable dither for 10 bpp or 10bpc dsc config */
-	if (bpp == 10 || bpc == 10) {
-		phys->hw_pp->ops.setup_dither(phys->hw_pp, NULL, 0);
+	/* bpp >> 4 because bpp configuration is in 6.4 format */
+	if ((bpp >> 4) == 10 || bpc == 10) {
+		num_lm = sde_rm_topology_get_num_lm(&sde_kms->rm, topology);
+		for (i = 0; i < num_lm; i++) {
+			hw_pp = sde_enc->hw_pp[i];
+			phys->hw_pp->ops.setup_dither(hw_pp, NULL, 0);
+		}
 		return;
 	}
 
