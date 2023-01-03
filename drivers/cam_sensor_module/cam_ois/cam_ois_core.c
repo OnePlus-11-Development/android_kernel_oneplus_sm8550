@@ -209,6 +209,7 @@ static int cam_ois_power_down(struct cam_ois_ctrl_t *o_ctrl)
 	}
 
 	camera_io_release(&o_ctrl->io_master_info);
+	o_ctrl->cam_ois_state = CAM_OIS_ACQUIRE;
 
 	return rc;
 }
@@ -664,7 +665,6 @@ static int cam_ois_pkt_parse(struct cam_ois_ctrl_t *o_ctrl, void *arg)
 				CAM_ERR(CAM_OIS, " OIS Power up failed");
 				return rc;
 			}
-			o_ctrl->cam_ois_state = CAM_OIS_CONFIG;
 		}
 
 		if (o_ctrl->i2c_fwinit_data.is_settings_valid == 1) {
@@ -732,6 +732,8 @@ static int cam_ois_pkt_parse(struct cam_ois_ctrl_t *o_ctrl, void *arg)
 				CAM_DBG(CAM_OIS, "apply calib data settings success");
 			}
 		}
+
+		o_ctrl->cam_ois_state = CAM_OIS_CONFIG;
 
 		rc = delete_request(&o_ctrl->i2c_fwinit_data);
 		if (rc < 0) {
@@ -937,7 +939,6 @@ void cam_ois_shutdown(struct cam_ois_ctrl_t *o_ctrl)
 		rc = cam_ois_power_down(o_ctrl);
 		if (rc < 0)
 			CAM_ERR(CAM_OIS, "OIS Power down failed");
-		o_ctrl->cam_ois_state = CAM_OIS_ACQUIRE;
 	}
 
 	if (o_ctrl->cam_ois_state >= CAM_OIS_ACQUIRE) {
