@@ -2556,13 +2556,13 @@ static int dsi_panel_parse_bl_config(struct dsi_panel *panel)
 	panel->bl_config.bl_inverted_dbv = utils->read_bool(utils->data,
 		"qcom,mdss-dsi-bl-inverted-dbv");
 
-	state = utils->get_property(utils->data, "qcom,bl-dsc-cmd-state", NULL);
+	state = utils->get_property(utils->data, "qcom,bl-dcs-cmd-state", NULL);
 	if (!state || !strcmp(state, "dsi_hs_mode"))
 		panel->bl_config.lp_mode = false;
 	else if (!strcmp(state, "dsi_lp_mode"))
 		panel->bl_config.lp_mode = true;
 	else
-		DSI_ERR("bl-dsc-cmd-state command state unrecognized-%s\n",
+		DSI_ERR("bl-dcs-cmd-state command state unrecognized-%s\n",
 			state);
 
 	if (panel->bl_config.type == DSI_BACKLIGHT_PWM) {
@@ -4020,6 +4020,7 @@ void dsi_panel_calc_dsi_transfer_time(struct dsi_host_common_cfg *config,
 	u32 jitter_numer, jitter_denom, prefill_lines;
 	u32 default_prefill_lines, actual_prefill_lines, vtotal;
 	u32 min_threshold_us, prefill_time_us, max_transfer_us, packet_overhead;
+	u32 bits_per_symbol = 16, num_of_symbols = 7; /* For Cphy */
 	u16 bpp;
 
 	/* Packet overhead in bits,
@@ -4064,6 +4065,11 @@ void dsi_panel_calc_dsi_transfer_time(struct dsi_host_common_cfg *config,
 	}
 
 	timing->min_dsi_clk_hz = min_bitclk_hz;
+
+	if (config->phy_type == DSI_PHY_TYPE_CPHY) {
+		do_div(timing->min_dsi_clk_hz, bits_per_symbol);
+		timing->min_dsi_clk_hz *= num_of_symbols;
+	}
 
 	/*
 	 * Apart from prefill line time, we need to take into account RSCC mode threshold time. In

@@ -648,6 +648,12 @@ int sde_crtc_reset_hw(struct drm_crtc *crtc, struct drm_crtc_state *old_state,
 	bool recovery_events);
 
 /**
+ * sde_crtc_dump_fences - dump info for input fences of each crtc plane
+ * @crtc: Pointer to DRM crtc instance
+ */
+void sde_crtc_dump_fences(struct drm_crtc *crtc);
+
+/**
  * sde_crtc_request_frame_reset - requests for next frame reset
  * @crtc: Pointer to drm crtc object
  * @encoder: Pointer to drm encoder object
@@ -656,6 +662,9 @@ static inline int sde_crtc_request_frame_reset(struct drm_crtc *crtc,
 		struct drm_encoder *encoder)
 {
 	struct sde_crtc *sde_crtc = to_sde_crtc(crtc);
+
+	if (test_bit(HW_FENCE_IN_FENCES_ENABLE, sde_crtc->hwfence_features_mask))
+		sde_crtc_dump_fences(crtc);
 
 	if (sde_crtc->frame_trigger_mode == FRAME_DONE_WAIT_POSTED_START ||
 			!sde_encoder_is_dsi_display(encoder))
@@ -939,6 +948,16 @@ static inline bool sde_crtc_state_in_clone_mode(struct drm_encoder *encoder,
 		return true;
 
 	return false;
+}
+
+static inline bool _is_crtc_intf_mode_wb(struct drm_crtc *crtc)
+{
+	enum sde_intf_mode intf_mode = sde_crtc_get_intf_mode(crtc, crtc->state);
+
+	if ((intf_mode != INTF_MODE_WB_BLOCK) && (intf_mode != INTF_MODE_WB_LINE))
+		return false;
+
+	return true;
 }
 
 /**

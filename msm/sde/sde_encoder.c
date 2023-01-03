@@ -1449,7 +1449,27 @@ static void _sde_encoder_update_vsync_source(struct sde_encoder_virt *sde_enc,
 	}
 }
 
+static void _sde_encoder_wait_for_vsync_on_autorefresh_busy(struct sde_encoder_phys *phys_enc)
+{
+	u32 autorefresh_status;
+	int ret = 0;
 
+	if (!phys_enc || !phys_enc->hw_intf || !phys_enc->hw_intf->ops.get_autorefresh_status) {
+		SDE_ERROR("invalid params\n");
+		return;
+	}
+
+	autorefresh_status = phys_enc->hw_intf->ops.get_autorefresh_status(phys_enc->hw_intf);
+	if (autorefresh_status) {
+		ret = sde_encoder_wait_for_event(phys_enc->parent, MSM_ENC_VBLANK);
+		if (ret) {
+			autorefresh_status = phys_enc->hw_intf->ops.get_autorefresh_status(
+					phys_enc->hw_intf);
+			SDE_ERROR("wait for vblank timed out, autorefresh_status:%d\n",
+					autorefresh_status);
+		}
+	}
+}
 
 int sde_encoder_helper_switch_vsync(struct drm_encoder *drm_enc,
 	 bool watchdog_te)
@@ -2232,7 +2252,11 @@ static int _sde_encoder_rc_idle(struct drm_encoder *drm_enc,
 	}
 
 	crtc_id = drm_crtc_index(crtc);
-	if (is_vid_mode) {
+	/**
+	 * Avoid power collapse entry for writeback crtc since HAL does not repopulate
+	 * crtc, plane properties like luts for idlepc exit commit.
+	 */
+	if (is_vid_mode || _is_crtc_intf_mode_wb(crtc)) {
 		sde_encoder_irq_control(drm_enc, false);
 		_sde_encoder_pm_qos_remove_request(drm_enc);
 	} else {
@@ -3258,8 +3282,10 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 		for (i = 0; i < sde_enc->num_phys_encs; i++) {
 			struct sde_encoder_phys *phys = sde_enc->phys_encs[i];
 
-			if (phys && phys->ops.disable_autorefresh)
+			if (phys && phys->ops.disable_autorefresh) {
 				phys->ops.disable_autorefresh(phys);
+				_sde_encoder_wait_for_vsync_on_autorefresh_busy(phys);
+			}
 		}
 
 		/* wait for idle */
