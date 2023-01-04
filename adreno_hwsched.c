@@ -132,7 +132,7 @@ static void _retire_timestamp_only(struct kgsl_drawobj *drawobj)
 
 	if (drawobj->flags & KGSL_DRAWOBJ_END_OF_FRAME) {
 		atomic64_inc(&drawobj->context->proc_priv->frame_count);
-		atomic_inc(&drawobj->context->proc_priv->period.frames);
+		atomic_inc(&drawobj->context->proc_priv->period->frames);
 	}
 
 	/* Retire pending GPU events for the object */
@@ -1077,7 +1077,7 @@ void adreno_hwsched_retire_cmdobj(struct adreno_hwsched *hwsched,
 	drawobj = DRAWOBJ(cmdobj);
 	if (drawobj->flags & KGSL_DRAWOBJ_END_OF_FRAME) {
 		atomic64_inc(&drawobj->context->proc_priv->frame_count);
-		atomic_inc(&drawobj->context->proc_priv->period.frames);
+		atomic_inc(&drawobj->context->proc_priv->period->frames);
 	}
 
 	entry = cmdobj->profiling_buf_entry;
@@ -1166,41 +1166,6 @@ void adreno_hwsched_start(struct adreno_device *adreno_dev)
 	adreno_hwsched_trigger(adreno_dev);
 }
 
-static int _skipsaverestore_store(struct adreno_device *adreno_dev, bool val)
-{
-	return adreno_power_cycle_bool(adreno_dev,
-		&adreno_dev->preempt.skipsaverestore, val);
-}
-
-static bool _skipsaverestore_show(struct adreno_device *adreno_dev)
-{
-	return adreno_dev->preempt.skipsaverestore;
-}
-
-static int _usesgmem_store(struct adreno_device *adreno_dev, bool val)
-{
-	return adreno_power_cycle_bool(adreno_dev,
-		&adreno_dev->preempt.usesgmem, val);
-}
-
-static bool _usesgmem_show(struct adreno_device *adreno_dev)
-{
-	return adreno_dev->preempt.usesgmem;
-}
-
-static int _preempt_level_store(struct adreno_device *adreno_dev,
-		unsigned int val)
-{
-	return adreno_power_cycle_u32(adreno_dev,
-		&adreno_dev->preempt.preempt_level,
-		min_t(unsigned int, val, 2));
-}
-
-static unsigned int _preempt_level_show(struct adreno_device *adreno_dev)
-{
-	return adreno_dev->preempt.preempt_level;
-}
-
 static void change_preemption(struct adreno_device *adreno_dev, void *priv)
 {
 	change_bit(ADRENO_DEVICE_PREEMPTION, &adreno_dev->priv);
@@ -1249,17 +1214,11 @@ static bool _ft_long_ib_detect_show(struct adreno_device *adreno_dev)
 }
 
 static ADRENO_SYSFS_BOOL(preemption);
-static ADRENO_SYSFS_U32(preempt_level);
-static ADRENO_SYSFS_BOOL(usesgmem);
-static ADRENO_SYSFS_BOOL(skipsaverestore);
 static ADRENO_SYSFS_RO_U32(preempt_count);
 static ADRENO_SYSFS_BOOL(ft_long_ib_detect);
 
 static const struct attribute *_hwsched_attr_list[] = {
 	&adreno_attr_preemption.attr.attr,
-	&adreno_attr_preempt_level.attr.attr,
-	&adreno_attr_usesgmem.attr.attr,
-	&adreno_attr_skipsaverestore.attr.attr,
 	&adreno_attr_preempt_count.attr.attr,
 	&adreno_attr_ft_long_ib_detect.attr.attr,
 	NULL,

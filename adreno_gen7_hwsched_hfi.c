@@ -17,6 +17,7 @@
 #include "kgsl_eventlog.h"
 #include "kgsl_pwrctrl.h"
 #include "kgsl_trace.h"
+#include "kgsl_util.h"
 
 #define HFI_QUEUE_MAX (HFI_QUEUE_DEFAULT_CNT + HFI_QUEUE_DISPATCH_MAX_CNT)
 
@@ -166,7 +167,10 @@ static void log_profiling_info(struct adreno_device *adreno_dev, u32 *rcvd)
 		info.active = cmd->active;
 	info.retired_on_gmu = cmd->retired_on_gmu;
 
-	kgsl_proc_work_period_update(device, context->proc_priv, info.active);
+	/* protected GPU work must not be reported */
+	if  (!(context->flags & KGSL_CONTEXT_SECURE))
+		kgsl_work_period_update(device, context->proc_priv->period,
+					     info.active);
 
 	trace_adreno_cmdbatch_retired(context, &info, 0, 0, 0);
 
@@ -1132,6 +1136,22 @@ poll:
 	return rc;
 }
 
+static void reset_hfi_mem_records(struct adreno_device *adreno_dev)
+{
+	struct gen7_hwsched_hfi *hw_hfi = to_gen7_hwsched_hfi(adreno_dev);
+	struct kgsl_memdesc *md = NULL;
+	u32 i;
+
+	for (i = 0; i < hw_hfi->mem_alloc_entries; i++) {
+		struct hfi_mem_alloc_desc *desc = &hw_hfi->mem_alloc_table[i].desc;
+
+		if (desc->flags & HFI_MEMFLAG_HOST_INIT) {
+			md = hw_hfi->mem_alloc_table[i].md;
+			memset(md->hostptr, 0x0, md->size);
+		}
+	}
+}
+
 static void reset_hfi_queues(struct adreno_device *adreno_dev)
 {
 	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
@@ -1180,6 +1200,11 @@ void gen7_hwsched_hfi_stop(struct adreno_device *adreno_dev)
 
 	clear_bit(GMU_PRIV_HFI_STARTED, &gmu->flags);
 
+	/*
+	 * Reset the hfi host access memory records, As GMU expects hfi memory
+	 * records to be clear in bootup.
+	 */
+	reset_hfi_mem_records(adreno_dev);
 }
 
 static void enable_async_hfi(struct adreno_device *adreno_dev)
@@ -1411,7 +1436,17 @@ int gen7_hwsched_hfi_start(struct adreno_device *adreno_dev)
 
 	/* Request default BW vote */
 	ret = kgsl_pwrctrl_axi(device, true);
+	if (ret)
+		goto err;
 
+	/* Switch to min GMU clock */
+	gen7_rdpm_cx_freq_update(gmu, gmu->freqs[0] / 1000);
+
+	ret = kgsl_clk_set_rate(gmu->clks, gmu->num_clks, "gmu_clk",
+			gmu->freqs[0]);
+	if (ret)
+		dev_err(&gmu->pdev->dev, "GMU clock:%d set failed:%d\n",
+			gmu->freqs[0], ret);
 err:
 	if (ret)
 		gen7_hwsched_hfi_stop(adreno_dev);

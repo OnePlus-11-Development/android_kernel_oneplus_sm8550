@@ -93,8 +93,7 @@ int kgsl_reclaim_to_pinned_state(
 			break;
 		}
 
-		if (!entry->pending_free &&
-				(entry->memdesc.priv & KGSL_MEMDESC_RECLAIMED))
+		if (entry->memdesc.priv & KGSL_MEMDESC_RECLAIMED)
 			valid_entry = kgsl_mem_entry_get(entry);
 		spin_unlock(&process->mem_lock);
 

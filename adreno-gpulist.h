@@ -2031,7 +2031,7 @@ static const struct kgsl_regmap_list gen7_2_0_hwcg_regs[] = {
 };
 
 static const struct kgsl_regmap_list gen7_2_0_ao_hwcg_regs[] = {
-	{ GEN7_GPU_GMU_AO_GMU_CGC_MODE_CNTL, 0x00020222 },
+	{ GEN7_GPU_GMU_AO_GMU_CGC_MODE_CNTL, 0x00020202 },
 	{ GEN7_GPU_GMU_AO_GMU_CGC_DELAY_CNTL, 0x00010111 },
 	{ GEN7_GPU_GMU_AO_GMU_CGC_HYST_CNTL, 0x00005555 },
 };
