@@ -160,6 +160,7 @@ static netdev_tx_t rmnet_vnd_start_xmit(struct sk_buff *skb,
 				tmp = skb->next;
 				skb->dev = dev;
 				priv->stats.ll_tso_segs++;
+				skb_mark_not_on_list(skb);
 				rmnet_egress_handler(skb, low_latency);
 			}
 		} else if (!low_latency && skb_is_gso(skb)) {
@@ -198,6 +199,7 @@ static netdev_tx_t rmnet_vnd_start_xmit(struct sk_buff *skb,
 						skb_shinfo(skb)->gso_type = orig_gso_type;
 
 						priv->stats.tso_segment_success++;
+						skb_mark_not_on_list(skb);
 						rmnet_egress_handler(skb, low_latency);
 					}
 				}
