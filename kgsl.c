@@ -37,12 +37,9 @@
 #include "kgsl_sync.h"
 #include "kgsl_sysfs.h"
 #include "kgsl_trace.h"
-
-#ifdef ENABLE_GPU_WORK_PERIOD
 /* Instantiate tracepoints */
 #define CREATE_TRACE_POINTS
 #include "kgsl_power_trace.h"
-#endif
 
 #ifndef arch_mmap_check
 #define arch_mmap_check(addr, len, flags)	(0)
@@ -1006,8 +1003,6 @@ static void _log_gpu_work_events(struct work_struct *work)
 		/* Ensure active_time is within work period */
 		active_time = min_t(u64, active_time,
 			       device->gpu_period.end - device->gpu_period.begin);
-
-#ifdef ENABLE_GPU_WORK_PERIOD
 		/*
 		 * Emit GPU work period events via a kernel tracepoint
 		 * to provide information to the Android OS about how
@@ -1018,7 +1013,6 @@ static void _log_gpu_work_events(struct work_struct *work)
 					      device->gpu_period.begin,
 					      device->gpu_period.end,
 					      active_time);
-#endif
 		/* Reset process work stats */
 		memset(&private->period, 0, sizeof(private->period));
 
