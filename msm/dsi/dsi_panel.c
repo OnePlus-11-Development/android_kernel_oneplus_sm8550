@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -790,7 +790,7 @@ static int dsi_panel_parse_timing(struct dsi_mode_info *mode,
 
 	rc = utils->read_u64(utils->data,
 			"qcom,mdss-dsi-panel-clockrate", &tmp64);
-	if (rc == -EOVERFLOW) {
+	if (rc == -EOVERFLOW || rc == -ERANGE) {
 		tmp64 = 0;
 		rc = utils->read_u32(utils->data,
 			"qcom,mdss-dsi-panel-clockrate", (u32 *)&tmp64);
