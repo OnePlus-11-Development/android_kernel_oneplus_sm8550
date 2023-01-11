@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -652,6 +652,13 @@ int sde_crtc_reset_hw(struct drm_crtc *crtc, struct drm_crtc_state *old_state,
  * @crtc: Pointer to DRM crtc instance
  */
 void sde_crtc_dump_fences(struct drm_crtc *crtc);
+
+/**
+ * sde_crtc_is_fence_signaled - check if all fences have been signaled
+ * @crtc: Pointer to DRM crtc instance
+ * Returns: true if all fences are signaled, otherwise false.
+ */
+bool sde_crtc_is_fence_signaled(struct drm_crtc *crtc);
 
 /**
  * sde_crtc_request_frame_reset - requests for next frame reset

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -913,6 +913,14 @@ static int _sde_encoder_phys_vid_wait_for_vblank(
 	ret = sde_encoder_helper_wait_for_irq(phys_enc, INTR_IDX_VSYNC,
 			&wait_info);
 
+	/*
+	 * if hwfencing enabled, try again to wait for up to the extended timeout time in
+	 * increments as long as fence has not been signaled.
+	 */
+	if (ret == -ETIMEDOUT && phys_enc->sde_kms->catalog->hw_fence_rev)
+		ret = sde_encoder_helper_hw_fence_extended_wait(phys_enc, phys_enc->hw_ctl,
+			&wait_info, INTR_IDX_VSYNC);
+
 	if (ret == -ETIMEDOUT) {
 		new_cnt = atomic_add_unless(&phys_enc->pending_kickoff_cnt, -1, 0);
 		timeout = true;
@@ -925,6 +933,10 @@ static int _sde_encoder_phys_vid_wait_for_vblank(
 			flush_register = hw_ctl->ops.get_flush_register(hw_ctl);
 		if (!flush_register)
 			ret = 0;
+
+		/* if we timeout after the extended wait, reset mixers and do sw override */
+		if (ret && phys_enc->sde_kms->catalog->hw_fence_rev)
+			sde_encoder_helper_hw_fence_sw_override(phys_enc, hw_ctl);
 
 		SDE_EVT32(DRMID(phys_enc->parent), new_cnt, flush_register, ret,
 				SDE_EVTLOG_FUNC_CASE1);

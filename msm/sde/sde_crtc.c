@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -4516,6 +4516,18 @@ void sde_crtc_dump_fences(struct drm_crtc *crtc)
 
 	drm_atomic_crtc_for_each_plane(plane, crtc)
 		sde_plane_dump_input_fence(plane);
+}
+
+bool sde_crtc_is_fence_signaled(struct drm_crtc *crtc)
+{
+	struct drm_plane *plane = NULL;
+
+	drm_atomic_crtc_for_each_plane(plane, crtc) {
+		if (!sde_plane_is_sw_fence_signaled(plane))
+			return false;
+	}
+
+	return true;
 }
 
 /**

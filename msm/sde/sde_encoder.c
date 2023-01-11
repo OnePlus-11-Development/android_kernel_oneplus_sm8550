@@ -380,6 +380,55 @@ static int _sde_encoder_wait_timeout(int32_t drm_id, int32_t hw_id,
 	return rc;
 }
 
+int sde_encoder_helper_hw_fence_extended_wait(struct sde_encoder_phys *phys_enc,
+	struct sde_hw_ctl *ctl, struct sde_encoder_wait_info *wait_info, int wait_type)
+{
+	int ret = -ETIMEDOUT;
+	s64 standard_kickoff_timeout_ms = wait_info->timeout_ms;
+	int timeout_iters = EXTENDED_KICKOFF_TIMEOUT_ITERS;
+
+	wait_info->timeout_ms = EXTENDED_KICKOFF_TIMEOUT_MS;
+
+	while (ret == -ETIMEDOUT && timeout_iters--) {
+		ret = sde_encoder_helper_wait_for_irq(phys_enc, wait_type, wait_info);
+		if (ret == -ETIMEDOUT) {
+			/* if dma_fence is not signaled, keep waiting */
+			if (!sde_crtc_is_fence_signaled(phys_enc->parent->crtc))
+				continue;
+
+			/* timed-out waiting and no sw-override support for hw-fences */
+			if (!ctl || !ctl->ops.hw_fence_trigger_sw_override) {
+				SDE_ERROR("invalid argument(s)\n");
+				break;
+			}
+
+			/*
+			 * In case the sw and hw fences were triggered at the same time,
+			 * wait the standard kickoff time one more time. Only override if
+			 * we timeout again.
+			 */
+			wait_info->timeout_ms = standard_kickoff_timeout_ms;
+			ret = sde_encoder_helper_wait_for_irq(phys_enc, wait_type, wait_info);
+			if (ret == -ETIMEDOUT) {
+				sde_encoder_helper_hw_fence_sw_override(phys_enc, ctl);
+
+				/*
+				 * wait the original timeout time again if we
+				 * did sw override due to fence being signaled
+				 */
+				ret = sde_encoder_helper_wait_for_irq(phys_enc, wait_type,
+					wait_info);
+			}
+			break;
+		}
+	}
+
+	/* reset the timeout value */
+	wait_info->timeout_ms = standard_kickoff_timeout_ms;
+
+	return ret;
+}
+
 bool sde_encoder_is_primary_display(struct drm_encoder *drm_enc)
 {
 	struct sde_encoder_virt *sde_enc = to_sde_encoder_virt(drm_enc);
@@ -4945,6 +4994,18 @@ int sde_encoder_helper_reset_mixers(struct sde_encoder_phys *phys_enc,
 		return -EFAULT;
 	}
 	return 0;
+}
+
+void sde_encoder_helper_hw_fence_sw_override(struct sde_encoder_phys *phys_enc,
+		struct sde_hw_ctl *ctl)
+{
+	if (!ctl || !ctl->ops.hw_fence_trigger_sw_override)
+		return;
+
+	SDE_EVT32(DRMID(phys_enc->parent), ctl->idx, ctl->ops.get_hw_fence_status ?
+		ctl->ops.get_hw_fence_status(ctl) : SDE_EVTLOG_ERROR);
+	sde_encoder_helper_reset_mixers(phys_enc, NULL);
+	ctl->ops.hw_fence_trigger_sw_override(ctl);
 }
 
 int sde_encoder_prepare_commit(struct drm_encoder *drm_enc)

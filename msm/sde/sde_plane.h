@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -424,4 +424,11 @@ void sde_plane_add_data_to_minidump_va(struct drm_plane *plane);
  * @plane: Pointer to drm plane structure with the input fence we want to dump
  */
 void sde_plane_dump_input_fence(struct drm_plane *plane);
+
+/**
+ * sde_plane_is_sw_fence_signaled - determine if the sw input dma-fence is signaled
+ * @plane: Pointer to drm plane structure with the input fence to check
+ * Returns: true if the input sw fence is signaled, otherwise false.
+ */
+bool sde_plane_is_sw_fence_signaled(struct drm_plane *plane);
 #endif /* _SDE_PLANE_H_ */
