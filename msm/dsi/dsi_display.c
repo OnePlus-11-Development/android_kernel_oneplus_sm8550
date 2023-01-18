@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -663,7 +663,7 @@ static void dsi_display_parse_te_data(struct dsi_display *display)
 			"qcom,panel-te-source", &val);
 
 	if (rc || (val  > MAX_TE_SOURCE_ID)) {
-		DSI_ERR("invalid vsync source selection\n");
+		DSI_ERR("invalid vsync source (%d) selection, rc = %d\n", val, rc);
 		val = 0;
 	}
 
