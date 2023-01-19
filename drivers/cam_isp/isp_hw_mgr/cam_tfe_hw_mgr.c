@@ -2842,7 +2842,7 @@ static int cam_tfe_mgr_config_hw(void *hw_mgr_priv,
 		ctx->last_submit_bl_cmd.cmd[i].input_len = cdm_cmd->cmd[i].len;
 	}
 
-	if (!cfg->init_packet)
+	if (!cfg->init_packet && !hw_update_data->mup_en)
 		goto end;
 
 	for (i = 0; i < CAM_TFE_HW_CONFIG_WAIT_MAX_TRY; i++) {
@@ -4133,6 +4133,29 @@ static int cam_isp_tfe_packet_generic_blob_handler(void *user_data,
 			clock_config, prepare);
 		if (rc)
 			CAM_ERR(CAM_ISP, "Clock Update Failed");
+	}
+		break;
+	case CAM_ISP_TFE_GENERIC_BLOB_TYPE_DYNAMIC_MODE_SWITCH: {
+		struct cam_isp_mode_switch_info         *mup_config;
+		struct cam_isp_prepare_hw_update_data   *prepare_hw_data;
+
+		if (blob_size < sizeof(struct cam_isp_mode_switch_info)) {
+			CAM_ERR(CAM_ISP, "Invalid blob size %u expected %lu",
+				blob_size,
+				sizeof(struct cam_isp_mode_switch_info));
+			return -EINVAL;
+		}
+
+		mup_config = (struct cam_isp_mode_switch_info *)blob_data;
+		CAM_DBG(CAM_ISP,
+			"Ctx id %d request id %lld csid mup value=%u", tfe_mgr_ctx->ctx_index,
+			prepare->packet->header.request_id, mup_config->mup);
+
+		prepare_hw_data = (struct cam_isp_prepare_hw_update_data *)prepare->priv;
+
+		prepare_hw_data->mup_en = true;
+		prepare_hw_data->mup_val = mup_config->mup;
+		prepare_hw_data->num_exp = mup_config->num_expoures;
 	}
 		break;
 	default:
