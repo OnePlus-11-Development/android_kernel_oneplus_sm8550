@@ -6,6 +6,7 @@
 
 #include <linux/iommu.h>
 #include <linux/sched/clock.h>
+#include <soc/qcom/msm_performance.h>
 
 #include "adreno.h"
 #include "adreno_gen7.h"
@@ -573,16 +574,19 @@ static void process_ctx_bad(struct adreno_device *adreno_dev)
 	adreno_hwsched_fault(adreno_dev, ADRENO_HARD_FAULT);
 }
 
-void gen7_hwsched_process_msgq(struct adreno_device *adreno_dev)
+static void gen7_hwsched_process_msgq(struct adreno_device *adreno_dev)
 {
 	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
+	struct gen7_hwsched_hfi *hw_hfi = to_gen7_hwsched_hfi(adreno_dev);
 	u32 rcvd[MAX_RCVD_SIZE], next_hdr;
+
+	mutex_lock(&hw_hfi->msgq_mutex);
 
 	for (;;) {
 		next_hdr = peek_next_header(gmu, HFI_MSG_ID);
 
 		if (!next_hdr)
-			return;
+			break;
 
 		if (MSG_HDR_GET_ID(next_hdr) == F2H_MSG_CONTEXT_BAD) {
 			gen7_hfi_queue_read(gmu, HFI_MSG_ID,
@@ -606,6 +610,7 @@ void gen7_hwsched_process_msgq(struct adreno_device *adreno_dev)
 			adreno_hwsched_trigger(adreno_dev);
 		}
 	}
+	mutex_unlock(&hw_hfi->msgq_mutex);
 }
 
 static void process_log_block(struct adreno_device *adreno_dev, void *data)
@@ -755,7 +760,8 @@ int gen7_hfi_send_cmd_async(struct adreno_device *adreno_dev, void *data)
 	if (rc)
 		goto done;
 
-	rc = wait_ack_completion(adreno_dev, &pending_ack);
+	rc = adreno_hwsched_wait_ack_completion(adreno_dev, &gmu->pdev->dev, &pending_ack,
+		gen7_hwsched_process_msgq);
 	if (rc)
 		goto done;
 
@@ -1287,7 +1293,8 @@ u32 gen7_hwsched_hfi_get_value(struct adreno_device *adreno_dev, u32 prop)
 	if (rc)
 		goto done;
 
-	rc = wait_ack_completion(adreno_dev, &pending_ack);
+	rc = adreno_hwsched_wait_ack_completion(adreno_dev, &gmu->pdev->dev, &pending_ack,
+		gen7_hwsched_process_msgq);
 
 done:
 	del_waiter(hfi, &pending_ack);
@@ -1644,6 +1651,8 @@ int gen7_hwsched_hfi_probe(struct adreno_device *adreno_dev)
 
 	init_waitqueue_head(&hw_hfi->f2h_wq);
 
+	mutex_init(&hw_hfi->msgq_mutex);
+
 	return 0;
 }
 
@@ -1699,6 +1708,10 @@ static void add_profile_events(struct adreno_device *adreno_dev,
 	info.rb_id = adreno_get_level(context);
 	info.gmu_dispatch_queue = context->gmu_dispatch_queue;
 
+	msm_perf_events_update(MSM_PERF_GFX, MSM_PERF_SUBMIT,
+		pid_nr(context->proc_priv->pid),
+		context->id, drawobj->timestamp,
+		!!(drawobj->flags & KGSL_DRAWOBJ_END_OF_FRAME));
 	trace_adreno_cmdbatch_submitted(drawobj, &info, time->ticks,
 		(unsigned long) time_in_s, time_in_ns / 1000, 0);
 
@@ -2038,7 +2051,8 @@ static int gen7_send_hw_fence_hfi(struct adreno_device *adreno_dev,
 	if (ret)
 		goto done;
 
-	ret = wait_ack_completion(adreno_dev, &pending_ack);
+	ret = adreno_hwsched_wait_ack_completion(adreno_dev, &gmu->pdev->dev, &pending_ack,
+		gen7_hwsched_process_msgq);
 	if (ret)
 		goto done;
 
