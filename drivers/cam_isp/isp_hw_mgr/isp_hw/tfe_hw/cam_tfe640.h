@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 
@@ -18,7 +19,7 @@ static struct cam_tfe_top_reg_offset_common  tfe640_top_commong_reg  = {
 	.stats_feature                          = 0x0000180C,
 	.zoom_feature                           = 0x00001810,
 	.global_reset_cmd                       = 0x00001814,
-	.core_cgc_ctrl                          = 0x00001818,
+	.core_cgc_ctrl_0                        = 0x00001818,
 	.ahb_cgc_ctrl                           = 0x0000181C,
 	.core_cfg_0                             = 0x00001824,
 	.reg_update_cmd                         = 0x0000182C,

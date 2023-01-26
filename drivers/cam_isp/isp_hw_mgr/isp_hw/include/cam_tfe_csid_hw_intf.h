@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_TFE_CSID_HW_INTF_H_
@@ -99,6 +100,7 @@ struct cam_isp_tfe_in_port_generic_info {
  * @major_version : major version
  * @minor_version:  minor version
  * @version_incr:   version increment
+ * @is_lite:        Indicate if it is CSID Lite
  *
  */
 struct cam_tfe_csid_hw_caps {
@@ -108,6 +110,7 @@ struct cam_tfe_csid_hw_caps {
 	uint32_t      minor_version;
 	uint32_t      version_incr;
 	bool          sync_clk;
+	bool          is_lite;
 };
 
 /**

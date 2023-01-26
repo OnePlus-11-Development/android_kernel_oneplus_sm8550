@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -43,6 +44,11 @@ int cam_tfe_init_soc_resources(struct cam_hw_soc_info *soc_info,
 		CAM_ERR(CAM_ISP, "Error! get DT properties failed rc=%d", rc);
 		goto free_soc_private;
 	}
+
+	soc_private->is_tfe_lite = false;
+	if (strnstr(soc_info->compatible, "lite",
+		strlen(soc_info->compatible)) != NULL)
+		soc_private->is_tfe_lite = true;
 
 	/* set some default values */
 	soc_private->num_pid = 0;

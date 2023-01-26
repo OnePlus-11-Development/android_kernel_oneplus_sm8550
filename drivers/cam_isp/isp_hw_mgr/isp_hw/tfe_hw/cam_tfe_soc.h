@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_TFE_SOC_H_
@@ -30,6 +31,7 @@ enum cam_cpas_handle_id {
  * @dsp_clk_index:           DSP clk index in optional clocks
  * @num_pid:                 number of pids of tfe
  * @pid:                     TFE pid value list
+ * @is_tfe_lite:             Flag to indicate if it is TFE Lite HW
  */
 struct cam_tfe_soc_private {
 	uint32_t    cpas_handle;
@@ -37,6 +39,7 @@ struct cam_tfe_soc_private {
 	int32_t     dsp_clk_index;
 	uint32_t    num_pid;
 	uint32_t    pid[CAM_ISP_HW_MAX_PID_VAL];
+	bool        is_tfe_lite;
 };
 
 /*
