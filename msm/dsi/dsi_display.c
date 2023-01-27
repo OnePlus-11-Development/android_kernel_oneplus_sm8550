@@ -29,6 +29,7 @@
 #define MISR_BUFF_SIZE	256
 #define ESD_MODE_STRING_MAX_LEN 256
 #define ESD_TRIGGER_STRING_MAX_LEN 10
+#define CMD_SCHED_PARAM_MAX_BUFF_SIZE 256
 
 #define MAX_NAME_SIZE	64
 #define MAX_TE_RECHECKS 5
@@ -1846,11 +1847,11 @@ static ssize_t debugfs_update_cmd_scheduling_params(struct file *file,
 	if (*ppos)
 		return 0;
 
-	buf = kzalloc(256, GFP_KERNEL);
+	buf = kzalloc(CMD_SCHED_PARAM_MAX_BUFF_SIZE, GFP_KERNEL);
 	if (ZERO_OR_NULL_PTR(buf))
 		return -ENOMEM;
 
-	len = min_t(size_t, user_len, 255);
+	len = min_t(size_t, user_len, CMD_SCHED_PARAM_MAX_BUFF_SIZE - 1);
 	if (copy_from_user(buf, user_buf, len)) {
 		rc = -EINVAL;
 		goto error;
