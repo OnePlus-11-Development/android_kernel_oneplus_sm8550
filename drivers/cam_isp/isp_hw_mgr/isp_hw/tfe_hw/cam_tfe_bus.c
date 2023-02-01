@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/ratelimit.h>
@@ -76,7 +77,6 @@ struct cam_tfe_bus_common_data {
 	cam_hw_mgr_event_cb_func                    event_cb;
 	bool                        rup_irq_enable[CAM_TFE_BUS_RUP_GRP_MAX];
 	bool                                        pdaf_rdi2_mux_en;
-	uint32_t                                    pack_align_shift;
 };
 
 struct cam_tfe_bus_wm_resource_data {
@@ -183,9 +183,6 @@ static bool cam_tfe_bus_can_be_secure(uint32_t out_id)
 	case CAM_TFE_BUS_TFE_OUT_DS4:
 	case CAM_TFE_BUS_TFE_OUT_DS16:
 	case CAM_TFE_BUS_TFE_OUT_AI:
-	case CAM_TFE_BUS_TFE_OUT_PD_LCR_STATS:
-	case CAM_TFE_BUS_TFE_OUT_PD_PREPROCESSED:
-	case CAM_TFE_BUS_TFE_OUT_PD_PARSED:
 		return true;
 
 	case CAM_TFE_BUS_TFE_OUT_STATS_HDR_BE:
@@ -233,12 +230,6 @@ static enum cam_tfe_bus_tfe_out_id
 		return CAM_TFE_BUS_TFE_OUT_DS16;
 	case CAM_ISP_TFE_OUT_RES_AI:
 		return CAM_TFE_BUS_TFE_OUT_AI;
-	case CAM_ISP_TFE_OUT_RES_PD_LCR_STATS:
-		return CAM_TFE_BUS_TFE_OUT_PD_LCR_STATS;
-	case CAM_ISP_TFE_OUT_RES_PD_PREPROCESSED:
-		return CAM_TFE_BUS_TFE_OUT_PD_PREPROCESSED;
-	case CAM_ISP_TFE_OUT_RES_PD_PARSED:
-		return CAM_TFE_BUS_TFE_OUT_PD_PARSED;
 	default:
 		return CAM_TFE_BUS_TFE_OUT_MAX;
 	}
@@ -351,17 +342,6 @@ static int cam_tfe_bus_get_num_wm(
 		switch (format) {
 		case CAM_FORMAT_PLAIN32:
 		case CAM_FORMAT_PLAIN32_20:
-			return 1;
-		default:
-			break;
-		}
-		break;
-	case CAM_TFE_BUS_TFE_OUT_PD_LCR_STATS:
-	case CAM_TFE_BUS_TFE_OUT_PD_PREPROCESSED:
-	case CAM_TFE_BUS_TFE_OUT_PD_PARSED:
-		switch (format) {
-		case CAM_FORMAT_PLAIN16_16:
-		case CAM_FORMAT_PLAIN64:
 			return 1;
 		default:
 			break;
@@ -563,33 +543,6 @@ static int cam_tfe_bus_get_wm_idx(
 			break;
 		case PLANE_C:
 			wm_idx = 14;
-		default:
-			break;
-		}
-		break;
-	case CAM_TFE_BUS_TFE_OUT_PD_LCR_STATS:
-		switch (plane) {
-		case PLANE_Y:
-			wm_idx = 16;
-			break;
-		default:
-			break;
-		}
-		break;
-	case CAM_TFE_BUS_TFE_OUT_PD_PREPROCESSED:
-		switch (plane) {
-		case PLANE_Y:
-			wm_idx = 17;
-			break;
-		default:
-			break;
-		}
-		break;
-	case CAM_TFE_BUS_TFE_OUT_PD_PARSED:
-		switch (plane) {
-		case PLANE_Y:
-			wm_idx = 18;
-			break;
 		default:
 			break;
 		}
@@ -910,48 +863,6 @@ static int cam_tfe_bus_acquire_wm(
 		/*RS state packet format*/
 		if (rsrc_data->index == 15)
 			rsrc_data->pack_fmt = 0x9;
-	} else if (rsrc_data->index == 16) {
-		/* LCR */
-		switch (rsrc_data->format) {
-		case CAM_FORMAT_PLAIN16_16:
-			rsrc_data->stride = ALIGNUP(rsrc_data->width * 2, 8);
-			rsrc_data->en_cfg = 0x1;
-			/* LSB aligned */
-			rsrc_data->pack_fmt |= (1 <<
-				bus_priv->common_data.pack_align_shift);
-			break;
-		default:
-			CAM_ERR(CAM_ISP, "Invalid format %d out_type:%d index: %d",
-				rsrc_data->format, tfe_out_res_id, rsrc_data->index);
-			return -EINVAL;
-		}
-	} else if (rsrc_data->index == 17) {
-		/* PD_PREPROCESSED */
-		switch (rsrc_data->format) {
-		case CAM_FORMAT_PLAIN16_16:
-			rsrc_data->stride = ALIGNUP(rsrc_data->width * 2, 8);
-			rsrc_data->en_cfg = 0x1;
-			break;
-		default:
-			CAM_ERR(CAM_ISP, "Invalid format %d out_type:%d index: %d",
-				rsrc_data->format, tfe_out_res_id, rsrc_data->index);
-			return -EINVAL;
-		}
-	} else if (rsrc_data->index == 18) {
-		/* PD PARSED */
-		switch (rsrc_data->format) {
-		case CAM_FORMAT_PLAIN16_16:
-			rsrc_data->stride = ALIGNUP(rsrc_data->width * 2, 8);
-			rsrc_data->en_cfg = 0x1;
-			/* LSB aligned */
-			rsrc_data->pack_fmt |= (1 <<
-				bus_priv->common_data.pack_align_shift);
-			break;
-		default:
-			CAM_ERR(CAM_ISP, "Invalid format %d out_type:%d index: %d",
-				rsrc_data->format, tfe_out_res_id, rsrc_data->index);
-			return -EINVAL;
-		}
 	} else {
 		CAM_ERR(CAM_ISP, "Invalid WM:%d requested", rsrc_data->index);
 		return -EINVAL;
@@ -1870,8 +1781,6 @@ static const char *cam_tfe_bus_rup_type(
 		return "RDI1 RUP";
 	case CAM_ISP_HW_TFE_IN_RDI2:
 		return "RDI2 RUP";
-	case CAM_ISP_HW_TFE_IN_PDLIB:
-		return "PDLIB RUP";
 	default:
 		return "invalid rup group";
 	}
@@ -2695,7 +2604,6 @@ int cam_tfe_bus_init(
 		hw_info->support_consumed_addr;
 	bus_priv->common_data.pdaf_rdi2_mux_en = hw_info->pdaf_rdi2_mux_en;
 	bus_priv->common_data.rdi_width = hw_info->rdi_width;
-	bus_priv->common_data.pack_align_shift = hw_info->pack_align_shift;
 
 	for (i = 0; i < CAM_TFE_BUS_IRQ_REGISTERS_MAX; i++)
 		bus_priv->bus_irq_error_mask[i] =
