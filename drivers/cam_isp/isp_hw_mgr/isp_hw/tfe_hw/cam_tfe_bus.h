@@ -211,6 +211,8 @@ struct cam_tfe_bus_hw_info {
 	uint32_t num_comp_grp;
 	uint32_t max_wm_per_comp_grp;
 	uint32_t comp_done_shift;
+	uint32_t en_cfg_shift;
+	uint32_t height_shift;
 	uint32_t top_bus_wr_irq_shift;
 	uint32_t comp_buf_done_mask;
 	uint32_t comp_rup_done_mask;
