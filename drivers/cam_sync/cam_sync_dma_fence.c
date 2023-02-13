@@ -337,20 +337,28 @@ static int __cam_dma_fence_signal_fence(
 	struct dma_fence *dma_fence,
 	int32_t status)
 {
+	int rc;
+	unsigned long flags;
 	bool fence_signaled = false;
 
-	fence_signaled = dma_fence_is_signaled(dma_fence);
+	spin_lock_irqsave(dma_fence->lock, flags);
+	fence_signaled = dma_fence_is_signaled_locked(dma_fence);
 	if (fence_signaled) {
-		CAM_WARN(CAM_DMA_FENCE,
+		CAM_DBG(CAM_DMA_FENCE,
 			"dma fence seqno: %llu is already signaled",
 			dma_fence->seqno);
-		return 0;
+		rc = -EINVAL;
+		goto end;
 	}
 
 	if (status)
 		dma_fence_set_error(dma_fence, status);
 
-	return dma_fence_signal(dma_fence);
+	rc = dma_fence_signal_locked(dma_fence);
+
+end:
+	spin_unlock_irqrestore(dma_fence->lock, flags);
+	return rc;
 }
 
 int cam_dma_fence_internal_signal(
@@ -544,6 +552,7 @@ end:
 
 static int __cam_dma_fence_release(int32_t dma_row_idx)
 {
+	int rc;
 	struct dma_fence *dma_fence = NULL;
 	struct cam_dma_fence_row *row = NULL;
 
@@ -558,12 +567,17 @@ static int __cam_dma_fence_release(int32_t dma_row_idx)
 		return -EINVAL;
 	}
 
-	if (row->state == CAM_DMA_FENCE_STATE_ACTIVE) {
+	if (row->state == CAM_DMA_FENCE_STATE_ACTIVE)
 		CAM_WARN(CAM_DMA_FENCE,
-			"Unsignaled fence being released name: %s seqno: %llu fd:%d",
+			"Unsignaled fence being released name: %s seqno: %llu fd: %d",
 			row->name, dma_fence->seqno, row->fd);
-		__cam_dma_fence_signal_fence(dma_fence, -ECANCELED);
-	}
+
+	/* Ensure dma fence is signaled prior to release */
+	rc = __cam_dma_fence_signal_fence(dma_fence, -ECANCELED);
+	if ((!rc) && (row->state == CAM_DMA_FENCE_STATE_SIGNALED))
+		CAM_WARN(CAM_DMA_FENCE,
+			"Unsignaled fence being released but row was marked signaled name: %s seqno: %llu fd: %d",
+			row->name, dma_fence->seqno, row->fd);
 
 	CAM_DBG(CAM_DMA_FENCE,
 		"Releasing dma fence with fd: %d[%s] row_idx: %u current ref_cnt: %u",
@@ -637,8 +651,7 @@ void cam_dma_fence_close(void)
 
 			/* Signal and put if the dma fence is created from camera */
 			if (!row->ext_dma_fence) {
-				if (row->state != CAM_DMA_FENCE_STATE_SIGNALED)
-					__cam_dma_fence_signal_fence(row->fence, -EADV);
+				__cam_dma_fence_signal_fence(row->fence, -EADV);
 				dma_fence_put(row->fence);
 			}
 
