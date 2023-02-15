@@ -995,22 +995,29 @@ static int handle_output_buffer(struct msm_vidc_inst *inst,
 
 	/* fence signalling */
 	for (cnt = 0; cnt < inst->hfi_frame_info.fence_count; cnt++) {
-		if (buf->data_size)
-			msm_vidc_fence_signal(inst, inst->hfi_frame_info.fence_id[cnt]);
-		else
-			msm_vidc_fence_destroy(inst, inst->hfi_frame_info.fence_id[cnt]);
-		inst->fences_per_output_counter++;
+		if (inst->hfi_frame_info.fence_id[cnt] > inst->prev_fence_id) {
+			if (buf->data_size)
+				msm_vidc_fence_signal(inst, inst->hfi_frame_info.fence_id[cnt]);
+			else
+				msm_vidc_fence_destroy(inst, inst->hfi_frame_info.fence_id[cnt]);
+			inst->fences_per_output_counter++;
+			inst->prev_fence_id = inst->hfi_frame_info.fence_id[cnt];
+		} else {
+			i_vpr_e(inst, "%s: invalid fence id %u, prev fence id %u\n",
+				__func__, inst->hfi_frame_info.fence_id[cnt], inst->prev_fence_id);
+			msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
+		}
 	}
 
 	/* validate firmware returned all the fences or not */
-	if (inst->fences_per_output_counter != buf->fence_count) {
-		i_vpr_e(inst, "%s: fence count mismatch. value %d, expected %d\n",
+	if (inst->fences_per_output_counter >= buf->fence_count) {
+		/* reset fence_count value after FBD handling */
+		inst->fences_per_output_counter -= buf->fence_count;
+	} else {
+		i_vpr_e(inst, "%s: fence count mismatch. value %d, min expected %d\n",
 			__func__, inst->fences_per_output_counter, buf->fence_count);
 		msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
 	}
-
-	/* reset fence_count value after FBD handling */
-	inst->fences_per_output_counter = 0;
 
 	if (is_decode_session(inst)) {
 		inst->power.fw_cr = inst->hfi_frame_info.cr;
@@ -1561,7 +1568,7 @@ static int handle_session_early_notify_partial_frame(struct msm_vidc_inst *inst,
 	port = vidc_port_from_hfi(inst, pkt->port);
 	if (port >= MAX_PORT) {
 		i_vpr_e(inst,
-			"%s: invalid port: %d\n", __func__, pkt->port, pkt->type);
+			"%s: invalid port: %d\n", __func__, pkt->port);
 		return -EINVAL;
 	}
 
@@ -1572,6 +1579,12 @@ static int handle_session_early_notify_partial_frame(struct msm_vidc_inst *inst,
 	}
 
 	fence_id = *(u64 *)((u8 *)pkt + sizeof(struct hfi_packet));
+	if (fence_id < inst->prev_fence_id) {
+		i_vpr_e(inst, "%s: invalid fence id %u, prev fence id %u\n",
+			__func__, fence_id, inst->prev_fence_id);
+		msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
+		return -EINVAL;
+	}
 	rc = msm_vidc_fence_signal(inst, fence_id);
 	if (rc) {
 		i_vpr_e(inst,
@@ -1580,6 +1593,7 @@ static int handle_session_early_notify_partial_frame(struct msm_vidc_inst *inst,
 		return rc;
 	}
 	inst->fences_per_output_counter++;
+	inst->prev_fence_id = fence_id;
 
 	i_vpr_l(inst, "%s: received fence id %llu, count %d\n",
 		__func__, fence_id, inst->fences_per_output_counter);
