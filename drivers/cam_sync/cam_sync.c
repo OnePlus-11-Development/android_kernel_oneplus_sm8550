@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -917,6 +917,9 @@ static int cam_sync_dma_fence_cb(
 		goto end;
 	}
 
+	/* Adding dma fence reference on sync */
+	atomic_inc(&row->ref_cnt);
+
 	if (!atomic_dec_and_test(&row->ref_cnt))
 		goto end;
 
@@ -950,7 +953,7 @@ static int cam_generic_fence_alloc_validate_input_info_util(
 
 	*fence_input_info = NULL;
 
-	if (fence_cmd_args->input_data_size <
+	if (fence_cmd_args->input_data_size !=
 		sizeof(struct cam_generic_fence_input_info)) {
 		CAM_ERR(CAM_SYNC, "Size is invalid expected: 0x%llx actual: 0x%llx",
 			sizeof(struct cam_generic_fence_input_info),
@@ -1193,7 +1196,7 @@ static int cam_generic_fence_handle_dma_signal(
 {
 	struct cam_dma_fence_signal signal_dma_fence;
 
-	if (fence_cmd_args->input_data_size < sizeof(struct cam_dma_fence_signal)) {
+	if (fence_cmd_args->input_data_size != sizeof(struct cam_dma_fence_signal)) {
 		CAM_ERR(CAM_DMA_FENCE, "Size is invalid expected: 0x%llx actual: 0x%llx",
 			sizeof(struct cam_dma_fence_signal),
 			fence_cmd_args->input_data_size);

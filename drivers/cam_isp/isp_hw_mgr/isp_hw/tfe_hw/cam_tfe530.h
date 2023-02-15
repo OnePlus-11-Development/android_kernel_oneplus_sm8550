@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 
@@ -18,7 +19,7 @@ static struct cam_tfe_top_reg_offset_common  tfe530_top_commong_reg  = {
 	.stats_feature                          = 0x0000100C,
 	.zoom_feature                           = 0x00001010,
 	.global_reset_cmd                       = 0x00001014,
-	.core_cgc_ctrl                          = 0x00001018,
+	.core_cgc_ctrl_0                        = 0x00001018,
 	.ahb_cgc_ctrl                           = 0x0000101C,
 	.core_cfg_0                             = 0x00001024,
 	.core_cfg_1                             = 0x00001028,
@@ -69,6 +70,8 @@ static struct cam_tfe_top_reg_offset_common  tfe530_top_commong_reg  = {
 	.rdi2_overflow_bit                      = BIT(19),
 	.mup_shift_val                          = 0,
 	.mup_supported                          = false,
+	.height_shift                           = 16,
+	.epoch_shift_val                        = 16,
 };
 
 static struct cam_tfe_camif_reg  tfe530_camif_reg = {
@@ -871,6 +874,8 @@ static struct cam_tfe_bus_hw_info  tfe530_bus_hw_info = {
 	.support_consumed_addr = true,
 	.pdaf_rdi2_mux_en = true,
 	.rdi_width = 64,
+	.en_cfg_shift = 16,
+	.height_shift = 16,
 };
 
 struct cam_tfe_hw_info cam_tfe530 = {
