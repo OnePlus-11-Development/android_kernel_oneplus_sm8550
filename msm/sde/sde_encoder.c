@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -378,6 +378,55 @@ static int _sde_encoder_wait_timeout(int32_t drm_id, int32_t hw_id,
 			(ktime_compare_safe(exp_ktime, cur_ktime) > 0));
 
 	return rc;
+}
+
+int sde_encoder_helper_hw_fence_extended_wait(struct sde_encoder_phys *phys_enc,
+	struct sde_hw_ctl *ctl, struct sde_encoder_wait_info *wait_info, int wait_type)
+{
+	int ret = -ETIMEDOUT;
+	s64 standard_kickoff_timeout_ms = wait_info->timeout_ms;
+	int timeout_iters = EXTENDED_KICKOFF_TIMEOUT_ITERS;
+
+	wait_info->timeout_ms = EXTENDED_KICKOFF_TIMEOUT_MS;
+
+	while (ret == -ETIMEDOUT && timeout_iters--) {
+		ret = sde_encoder_helper_wait_for_irq(phys_enc, wait_type, wait_info);
+		if (ret == -ETIMEDOUT) {
+			/* if dma_fence is not signaled, keep waiting */
+			if (!sde_crtc_is_fence_signaled(phys_enc->parent->crtc))
+				continue;
+
+			/* timed-out waiting and no sw-override support for hw-fences */
+			if (!ctl || !ctl->ops.hw_fence_trigger_sw_override) {
+				SDE_ERROR("invalid argument(s)\n");
+				break;
+			}
+
+			/*
+			 * In case the sw and hw fences were triggered at the same time,
+			 * wait the standard kickoff time one more time. Only override if
+			 * we timeout again.
+			 */
+			wait_info->timeout_ms = standard_kickoff_timeout_ms;
+			ret = sde_encoder_helper_wait_for_irq(phys_enc, wait_type, wait_info);
+			if (ret == -ETIMEDOUT) {
+				sde_encoder_helper_hw_fence_sw_override(phys_enc, ctl);
+
+				/*
+				 * wait the original timeout time again if we
+				 * did sw override due to fence being signaled
+				 */
+				ret = sde_encoder_helper_wait_for_irq(phys_enc, wait_type,
+					wait_info);
+			}
+			break;
+		}
+	}
+
+	/* reset the timeout value */
+	wait_info->timeout_ms = standard_kickoff_timeout_ms;
+
+	return ret;
 }
 
 bool sde_encoder_is_primary_display(struct drm_encoder *drm_enc)
@@ -2981,8 +3030,13 @@ static void _sde_encoder_setup_dither(struct sde_encoder_phys *phys)
 	bpp = dsc->config.bits_per_pixel;
 
 	/* disable dither for 10 bpp or 10bpc dsc config */
-	if (bpp == 10 || bpc == 10) {
-		phys->hw_pp->ops.setup_dither(phys->hw_pp, NULL, 0);
+	/* bpp >> 4 because bpp configuration is in 6.4 format */
+	if ((bpp >> 4) == 10 || bpc == 10) {
+		num_lm = sde_rm_topology_get_num_lm(&sde_kms->rm, topology);
+		for (i = 0; i < num_lm; i++) {
+			hw_pp = sde_enc->hw_pp[i];
+			phys->hw_pp->ops.setup_dither(hw_pp, NULL, 0);
+		}
 		return;
 	}
 
@@ -3237,6 +3291,47 @@ void sde_encoder_virt_reset(struct drm_encoder *drm_enc)
 	sde_rm_release(&sde_kms->rm, drm_enc, false);
 }
 
+void sde_encoder_set_cwb_pending(struct drm_encoder *drm_enc, bool enable)
+{
+	struct sde_encoder_virt *sde_enc;
+	int i;
+
+	if (!drm_enc) {
+		SDE_ERROR("invalid encoder\n");
+		return;
+	}
+
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	for (i = 0; i < sde_enc->num_phys_encs; i++) {
+		if (sde_enc->phys_encs[i])
+			sde_enc->phys_encs[i]->cwb_disable_pending = enable;
+	}
+}
+static void sde_encoder_wait_for_vsync_event_complete(struct sde_encoder_virt *sde_enc)
+{
+	u32 timeout_ms = DEFAULT_KICKOFF_TIMEOUT_MS;
+	int i, ret;
+
+	if (sde_enc->cur_master)
+		timeout_ms = sde_enc->cur_master->kickoff_timeout_ms;
+
+	ret = wait_event_timeout(sde_enc->vsync_event_wq,
+			!sde_enc->vblank_enabled,
+			msecs_to_jiffies(timeout_ms));
+	SDE_EVT32(timeout_ms, ret);
+
+	if (!ret) {
+		SDE_ERROR("vsync event complete timed out %d\n", ret);
+		SDE_EVT32(ret, SDE_EVTLOG_ERROR);
+		for (i = 0; i < sde_enc->num_phys_encs; i++) {
+			struct sde_encoder_phys *phys = sde_enc->phys_encs[i];
+
+			if (phys && phys->ops.control_vblank_irq)
+				phys->ops.control_vblank_irq(phys, false);
+		}
+	}
+}
+
 static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 {
 	struct sde_encoder_virt *sde_enc = NULL;
@@ -3325,6 +3420,13 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 		sde_encoder_resource_control(drm_enc,
 				SDE_ENC_RC_EVENT_PRE_STOP);
 	}
+
+	/*
+	 * wait for any pending vsync timestamp event to sf
+	 * to ensure vbalnk irq is disabled.
+	 */
+	if (sde_enc->vblank_enabled)
+		sde_encoder_wait_for_vsync_event_complete(sde_enc);
 
 	/*
 	 * disable dce after the transfer is complete (for command mode)
@@ -3664,6 +3766,9 @@ void sde_encoder_register_vblank_callback(struct drm_encoder *drm_enc,
 			phys->ops.control_vblank_irq(phys, enable);
 	}
 	sde_enc->vblank_enabled = enable;
+
+	if (!enable)
+		wake_up_all(&sde_enc->vsync_event_wq);
 }
 
 void sde_encoder_register_frame_event_callback(struct drm_encoder *drm_enc,
@@ -4891,6 +4996,18 @@ int sde_encoder_helper_reset_mixers(struct sde_encoder_phys *phys_enc,
 	return 0;
 }
 
+void sde_encoder_helper_hw_fence_sw_override(struct sde_encoder_phys *phys_enc,
+		struct sde_hw_ctl *ctl)
+{
+	if (!ctl || !ctl->ops.hw_fence_trigger_sw_override)
+		return;
+
+	SDE_EVT32(DRMID(phys_enc->parent), ctl->idx, ctl->ops.get_hw_fence_status ?
+		ctl->ops.get_hw_fence_status(ctl) : SDE_EVTLOG_ERROR);
+	sde_encoder_helper_reset_mixers(phys_enc, NULL);
+	ctl->ops.hw_fence_trigger_sw_override(ctl);
+}
+
 int sde_encoder_prepare_commit(struct drm_encoder *drm_enc)
 {
 	struct sde_encoder_virt *sde_enc;
@@ -5561,6 +5678,7 @@ struct drm_encoder *sde_encoder_init(struct drm_device *dev, struct msm_display_
 		sde_enc->frame_trigger_mode = FRAME_DONE_WAIT_POSTED_START;
 
 	mutex_init(&sde_enc->rc_lock);
+	init_waitqueue_head(&sde_enc->vsync_event_wq);
 	kthread_init_delayed_work(&sde_enc->delayed_off_work,
 			sde_encoder_off_work);
 	sde_enc->vblank_enabled = false;

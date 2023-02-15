@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -25,6 +25,10 @@
 
 /* wait for at most 2 vsync for lowest refresh rate (24hz) */
 #define DEFAULT_KICKOFF_TIMEOUT_MS		84
+
+/* if default timeout fails wait additional time in 1s increments */
+#define EXTENDED_KICKOFF_TIMEOUT_MS      1000
+#define EXTENDED_KICKOFF_TIMEOUT_ITERS   10
 
 /* wait 1 sec for the emulated targets */
 #define MAX_KICKOFF_TIMEOUT_MS                  100000
@@ -315,6 +319,8 @@ struct sde_encoder_irq {
  *				mode display
  * @recovered:			flag set to true when recovered from pp timeout
  * @autorefresh_disable_trans:   flag set to true during autorefresh disable transition
+ * @cwb_disable_pending:  Set to true when cwb disable is in progress
+ *                       and HW is still attached to CTL
  */
 struct sde_encoder_phys {
 	struct drm_encoder *parent;
@@ -363,6 +369,7 @@ struct sde_encoder_phys {
 	enum frame_trigger_mode_type frame_trigger_mode;
 	bool recovered;
 	bool autorefresh_disable_trans;
+	bool cwb_disable_pending;
 };
 
 static inline int sde_encoder_phys_inc_pending(struct sde_encoder_phys *phys)
@@ -705,6 +712,13 @@ void sde_encoder_helper_split_config(
  */
 int sde_encoder_helper_reset_mixers(struct sde_encoder_phys *phys_enc,
 		struct drm_framebuffer *fb);
+/**
+ * sde_encoder_helper_hw_fence_sw_override - reset mixers and do hw-fence sw override
+ * @phys_enc: Pointer to physical encoder structure
+ * @ctl: Pointer to hw_ctl structure
+ */
+void sde_encoder_helper_hw_fence_sw_override(struct sde_encoder_phys *phys_enc,
+		struct sde_hw_ctl *ctl);
 
 /**
  * sde_encoder_helper_report_irq_timeout - utility to report error that irq has
@@ -817,6 +831,17 @@ static inline bool sde_encoder_phys_needs_single_flush(
 	return (_sde_encoder_phys_is_ppsplit(phys_enc) ||
 				!_sde_encoder_phys_is_dual_ctl(phys_enc));
 }
+
+/**
+ * sde_encoder_helper_hw_fence_extended_wait - extended kickoff wait for hw-fence enabled case
+ * @phys_enc:	Pointer to physical encoder structure
+ * @ctl:	Pointer to hw ctl structure
+ * @wait_info:	Pointer to wait_info structure
+ * @wait_type:	Enum indicating the irq to wait for
+ * Returns:	-ETIMEDOUT in the case that the extended wait times out, 0 otherwise
+ */
+int sde_encoder_helper_hw_fence_extended_wait(struct sde_encoder_phys *phys_enc,
+	struct sde_hw_ctl *ctl, struct sde_encoder_wait_info *wait_info, int wait_type);
 
 /**
  * sde_encoder_helper_phys_disable - helper function to disable virt encoder

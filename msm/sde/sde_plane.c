@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (C) 2014-2021 The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -610,6 +610,29 @@ void sde_plane_dump_input_fence(struct drm_plane *plane)
 		if (input_fence)
 			sde_fence_dump(input_fence);
 	}
+}
+
+bool sde_plane_is_sw_fence_signaled(struct drm_plane *plane)
+{
+	struct sde_plane *psde;
+	struct sde_plane_state *pstate;
+	struct dma_fence *fence;
+
+	if (!plane) {
+		SDE_ERROR("invalid plane\n");
+	} else if (!plane->state) {
+		SDE_ERROR_PLANE(to_sde_plane(plane), "invalid state\n");
+	} else {
+		psde = to_sde_plane(plane);
+		pstate = to_sde_plane_state(plane->state);
+
+		if (pstate->input_fence) {
+			fence = (struct dma_fence *)pstate->input_fence;
+			return dma_fence_is_signaled(fence);
+		}
+	}
+
+	return false;
 }
 
 int sde_plane_wait_input_fence(struct drm_plane *plane, uint32_t wait_ms)

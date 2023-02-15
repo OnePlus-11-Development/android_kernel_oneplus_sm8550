@@ -253,6 +253,7 @@ int sde_fence_register_hw_fences_wait(struct sde_hw_ctl *hw_ctl, struct dma_fenc
 	int array_childs = 0;
 	int array_count = 0;
 	int fence_list_index = 0;
+	u64 seqno;
 
 	if (!hw_ctl) {
 		SDE_ERROR("wrong ctl\n");
@@ -324,14 +325,18 @@ int sde_fence_register_hw_fences_wait(struct sde_hw_ctl *hw_ctl, struct dma_fenc
 			}
 		}
 
+		seqno = data->hw_fence_array_seqno++;
 		temp_array = dma_fence_array_create(fence_list_index, fence_list,
-				data->dma_context, data->hw_fence_array_seqno++, 0);
+				data->dma_context, seqno, 0);
 		if (!temp_array) {
 			SDE_ERROR("unable to create fence array, cant register for wait\n");
 			_cleanup_fences_refcount(fences, num_fences);
 			kfree(fence_list);
 			return -EINVAL;
 		}
+		SDE_EVT32(ctl_id, fence_list_index, SDE_EVTLOG_H32(data->dma_context),
+			SDE_EVTLOG_L32(data->dma_context), SDE_EVTLOG_H32(seqno),
+			SDE_EVTLOG_L32(seqno));
 
 		base_fence = &temp_array->base;
 		hw_fences = &base_fence;
@@ -593,6 +598,7 @@ int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *hw_ctl, u32 debugf
 	u32 ipcc_signal_id;
 	u32 ipcc_client_id;
 	int ctl_id;
+	u64 qtime;
 
 	/* we must support sw_override as well, so check both functions */
 	if (!hw_mdp || !hw_ctl || !hw_ctl->ops.hw_fence_update_input_fence ||
@@ -618,13 +624,16 @@ int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *hw_ctl, u32 debugf
 
 	SDE_DEBUG("configure input signal:%d out client:%d ctl_id:%d\n", ipcc_signal_id,
 		ipcc_client_id, ctl_id);
-	SDE_EVT32(ctl_id, ipcc_signal_id, ipcc_client_id);
 
 	/* configure dpu hw for the client/signal pair signaling input-fence */
 	hw_ctl->ops.hw_fence_update_input_fence(hw_ctl, ipcc_client_id, ipcc_signal_id);
 
 	/* Enable hw-fence for this ctrl-path */
 	hw_ctl->ops.hw_fence_ctrl(hw_ctl, true, true, 1);
+
+	qtime = arch_timer_read_counter();
+	SDE_EVT32(ctl_id, ipcc_signal_id, ipcc_client_id, SDE_EVTLOG_H32(qtime),
+		SDE_EVTLOG_L32(qtime));
 
 	return 0;
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -987,6 +987,7 @@ static int sde_encoder_phys_wb_atomic_check(struct sde_encoder_phys *phys_enc,
 	const struct drm_display_mode *mode = &crtc_state->mode;
 	int rc;
 	bool clone_mode_curr = false;
+	bool cwb_disable_pending = false;
 
 	SDE_DEBUG("[enc:%d wb:%d] atomic_check:\"%s\",%d,%d]\n", DRMID(phys_enc->parent),
 			WBID(wb_enc), mode->name, mode->hdisplay, mode->vdisplay);
@@ -1003,12 +1004,13 @@ static int sde_encoder_phys_wb_atomic_check(struct sde_encoder_phys *phys_enc,
 
 	sde_conn_state = to_sde_connector_state(conn_state);
 	clone_mode_curr = phys_enc->in_clone_mode;
+	cwb_disable_pending = phys_enc->cwb_disable_pending;
 
 	_sde_enc_phys_wb_detect_cwb(phys_enc, crtc_state);
 
-	if (clone_mode_curr && !cstate->cwb_enc_mask) {
-		SDE_ERROR("[enc:%d wb:%d] WB commit before CWB disable\n",
-				DRMID(phys_enc->parent), WBID(wb_enc));
+	if ((clone_mode_curr || cwb_disable_pending) && !cstate->cwb_enc_mask) {
+		SDE_ERROR("[enc:%d wb:%d] WB commit before CWB disable, Clone mode %d %d\n",
+		 DRMID(phys_enc->parent), WBID(wb_enc), clone_mode_curr, cwb_disable_pending);
 		return -EINVAL;
 	}
 
@@ -1944,6 +1946,7 @@ static int _sde_encoder_phys_wb_wait_for_ctl_start(struct sde_encoder_phys *phys
 {
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
 	struct sde_encoder_wait_info wait_info = {0};
+	struct sde_hw_ctl *hw_ctl = phys_enc->hw_ctl;
 	int rc = 0;
 
 	if (!atomic_read(&phys_enc->pending_ctl_start_cnt))
@@ -1959,8 +1962,22 @@ static int _sde_encoder_phys_wb_wait_for_ctl_start(struct sde_encoder_phys *phys
 	wait_info.timeout_ms = max_t(u32, wb_enc->wbdone_timeout, phys_enc->kickoff_timeout_ms);
 
 	rc = sde_encoder_helper_wait_for_irq(phys_enc, INTR_IDX_CTL_START, &wait_info);
+
+	/*
+	 * if hwfencing enabled, try again to wait for up to the extended timeout time in
+	 * increments as long as fence has not been signaled.
+	 */
+	if (rc == -ETIMEDOUT && phys_enc->sde_kms->catalog->hw_fence_rev && hw_ctl)
+		rc = sde_encoder_helper_hw_fence_extended_wait(phys_enc, hw_ctl,
+			&wait_info, INTR_IDX_CTL_START);
+
 	if (rc == -ETIMEDOUT) {
 		atomic_add_unless(&phys_enc->pending_ctl_start_cnt, -1, 0);
+
+		/* if we timeout after the extended wait, reset mixers and do sw override */
+		if (phys_enc->sde_kms->catalog->hw_fence_rev)
+			sde_encoder_helper_hw_fence_sw_override(phys_enc, hw_ctl);
+
 		SDE_ERROR("[enc:%d wb:%d] ctl_start timed out\n",
 				DRMID(phys_enc->parent), WBID(wb_enc));
 		SDE_EVT32(DRMID(phys_enc->parent), WBID(wb_enc), SDE_EVTLOG_ERROR);

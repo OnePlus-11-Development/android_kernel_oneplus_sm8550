@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -1751,6 +1751,73 @@ static void dp_display_mst_attention(struct dp_display_private *dp)
 	DP_MST_DEBUG("mst_attention_work. mst_active:%d\n", dp->mst.mst_active);
 }
 
+static int dp_display_disable_hdcp(struct dp_display_private *dp, struct dp_panel *dp_panel)
+{
+	struct dp_link_hdcp_status *status;
+	int i;
+
+	status = &dp->link->hdcp_status;
+
+	dp_display_state_add(DP_STATE_HDCP_ABORTED);
+	cancel_delayed_work_sync(&dp->hdcp_cb_work);
+	if (dp_display_is_hdcp_enabled(dp) && status->hdcp_state != HDCP_STATE_INACTIVE) {
+		bool off = true;
+
+		if (dp_display_state_is(DP_STATE_SUSPENDED)) {
+			DP_DEBUG("Can't perform HDCP cleanup while suspended. Defer\n");
+			dp->hdcp_delayed_off = true;
+			return -EINVAL;
+		}
+
+		flush_delayed_work(&dp->hdcp_cb_work);
+		if (dp->mst.mst_active) {
+			if (dp_panel) {
+				/*
+				 * dp_display_pre_disable is turning off the connected mst panel.
+				 * The panel to be turned off is passed as an argument.
+				 */
+				dp_display_hdcp_deregister_stream(dp, dp_panel->stream_id);
+				for (i = DP_STREAM_0; i < DP_STREAM_MAX; i++) {
+					if (i != dp_panel->stream_id && dp->active_panels[i]) {
+						DP_DEBUG("Streams are active. Skip HDCP disable\n");
+						off = false;
+					}
+				}
+			} else {
+				/*
+				 * Attention event requires all the hdcp streams to turn off.
+				 * If the panel passed as argument is NULL, then disable all the
+				 * streams and HDCP.
+				 */
+				for (i = DP_STREAM_0; i < DP_STREAM_MAX; i++)
+					dp_display_hdcp_deregister_stream(dp, i);
+			}
+		}
+
+		if (off) {
+			if (dp->hdcp.ops->off)
+				dp->hdcp.ops->off(dp->hdcp.data);
+			dp_display_update_hdcp_status(dp, true);
+		}
+	}
+
+	return 0;
+}
+
+static void dp_display_attention_hdcp_enable(struct dp_display_private *dp, bool enable)
+{
+	if (!dp_display_state_is(DP_STATE_ENABLED))
+		return;
+
+	if (enable) {
+		dp_display_state_remove(DP_STATE_HDCP_ABORTED);
+		cancel_delayed_work_sync(&dp->hdcp_cb_work);
+		queue_delayed_work(dp->wq, &dp->hdcp_cb_work, HZ/4);
+	} else {
+		dp_display_disable_hdcp(dp, NULL);
+	}
+}
+
 static void dp_display_attention_work(struct work_struct *work)
 {
 	struct dp_display_private *dp = container_of(work,
@@ -1815,6 +1882,7 @@ static void dp_display_attention_work(struct work_struct *work)
 		DP_TEST_LINK_TRAINING | DP_LINK_STATUS_UPDATED)) {
 
 		mutex_lock(&dp->session_lock);
+		dp_display_attention_hdcp_enable(dp, false);
 		dp_audio_enable(dp, false);
 
 		if (dp->link->sink_request & DP_TEST_LINK_PHY_TEST_PATTERN) {
@@ -1834,8 +1902,10 @@ static void dp_display_attention_work(struct work_struct *work)
 			rc = dp->ctrl->link_maintenance(dp->ctrl);
 		}
 
-		if (!rc)
+		if (!rc) {
+			dp_display_attention_hdcp_enable(dp, true);
 			dp_audio_enable(dp, true);
+		}
 
 		mutex_unlock(&dp->session_lock);
 		if (rc)
@@ -2616,9 +2686,7 @@ static int dp_display_pre_disable(struct dp_display *dp_display, void *panel)
 {
 	struct dp_display_private *dp;
 	struct dp_panel *dp_panel = panel;
-	struct dp_link_hdcp_status *status;
 	int rc = 0;
-	size_t i;
 
 	if (!dp_display || !panel) {
 		DP_ERR("invalid input\n");
@@ -2630,44 +2698,13 @@ static int dp_display_pre_disable(struct dp_display *dp_display, void *panel)
 	SDE_EVT32_EXTERNAL(SDE_EVTLOG_FUNC_ENTRY, dp->state);
 	mutex_lock(&dp->session_lock);
 
-	status = &dp->link->hdcp_status;
-
 	if (!dp_display_state_is(DP_STATE_ENABLED)) {
 		dp_display_state_show("[not enabled]");
 		goto end;
 	}
 
-	dp_display_state_add(DP_STATE_HDCP_ABORTED);
-	cancel_delayed_work_sync(&dp->hdcp_cb_work);
-	if (dp_display_is_hdcp_enabled(dp) &&
-			status->hdcp_state != HDCP_STATE_INACTIVE) {
-		bool off = true;
-
-		if (dp_display_state_is(DP_STATE_SUSPENDED)) {
-			DP_DEBUG("Can't perform HDCP cleanup while suspended. Defer\n");
-			dp->hdcp_delayed_off = true;
-			goto clean;
-		}
-
-		flush_delayed_work(&dp->hdcp_cb_work);
-		if (dp->mst.mst_active) {
-			dp_display_hdcp_deregister_stream(dp,
-				dp_panel->stream_id);
-			for (i = DP_STREAM_0; i < DP_STREAM_MAX; i++) {
-				if (i != dp_panel->stream_id &&
-						dp->active_panels[i]) {
-					DP_DEBUG("Streams are still active. Skip disabling HDCP\n");
-					off = false;
-				}
-			}
-		}
-
-		if (off) {
-			if (dp->hdcp.ops->off)
-				dp->hdcp.ops->off(dp->hdcp.data);
-			dp_display_update_hdcp_status(dp, true);
-		}
-	}
+	if (dp_display_disable_hdcp(dp, dp_panel))
+		goto clean;
 
 	dp_display_clear_colorspaces(dp_display);
 
