@@ -112,8 +112,6 @@
 #define GEN7_CP_ALWAYS_ON_CONTEXT_LO     0x982
 #define GEN7_CP_ALWAYS_ON_CONTEXT_HI     0x983
 #define GEN7_CP_AHB_CNTL                 0x98d
-#define GEN7_CP_RL_ERROR_DETAILS_0       0x9b4
-#define GEN7_CP_RL_ERROR_DETAILS_1       0x9cf
 #define GEN7_CP_APERTURE_CNTL_HOST       0xa00
 #define GEN7_CP_APERTURE_CNTL_CD         0xa03
 #define GEN7_CP_BV_PROTECT_STATUS        0xa61
@@ -1052,8 +1050,6 @@
 #define GEN7_CX_DBGC_PERF_ATB_DRAIN_CMD                 0x1844a
 #define GEN7_CX_DBGC_ECO_CNTL                           0x18450
 #define GEN7_CX_DBGC_AHB_DBG_CNTL                       0x18451
-#define GEN7_CX_DBGC_TCM_DBG_ADDR                       0x18580
-#define GEN7_CX_DBGC_TCM_DBG_DATA                       0x18581
 
 /* GMU control registers */
 #define GEN7_GMU_CM3_ITCM_START			0x1b400
