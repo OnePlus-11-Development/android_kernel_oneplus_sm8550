@@ -17,14 +17,6 @@
 #define CAM_ISP_MAX_PATHS                              8
 
 /**
- * enum cam_ife_csid_hw_irq_regs - Specify the top irq reg
- */
-enum cam_ife_csid_hw_irq_regs {
-	CAM_IFE_CSID_IRQ_TOP_REG_STATUS0,
-	CAM_IFE_CSID_IRQ_REGISTERS_MAX,
-};
-
-/**
  * enum cam_ife_csid_input_core_type - Specify the csid input core
  */
 enum cam_ife_csid_input_core_type {
@@ -334,6 +326,7 @@ struct cam_csid_reset_cfg_args {
 	struct cam_isp_resource_node  *node_res;
 };
 
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
 /**
  * struct cam_csid_reset_out_of_sync_count_args
  * @res_node :   resource need to be reset
@@ -342,6 +335,7 @@ struct cam_csid_reset_cfg_args {
 struct cam_csid_reset_out_of_sync_count_args {
 	struct cam_isp_resource_node  *node_res;
 };
+#endif
 
 /**
  * struct cam_csid_get_time_stamp_args-  time stamp capture arguments

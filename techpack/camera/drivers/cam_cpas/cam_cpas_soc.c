@@ -949,7 +949,6 @@ int cam_cpas_get_custom_dt_info(struct cam_hw_info *cpas_hw,
 	int count = 0, i = 0, rc = 0, num_bw_values = 0, num_levels = 0;
 	uint32_t cam_drv_en_mask_val = 0;
 	struct cam_cpas *cpas_core = (struct cam_cpas *) cpas_hw->core_info;
-	uint32_t ahb_bus_client_ab = 0, ahb_bus_client_ib = 0;
 
 	if (!soc_private || !pdev) {
 		CAM_ERR(CAM_CPAS, "invalid input arg %pK %pK",
@@ -1086,26 +1085,26 @@ int cam_cpas_get_custom_dt_info(struct cam_hw_info *cpas_hw,
 			rc = of_property_read_u32_index(of_node,
 				"cam-ahb-bw-KBps",
 				(i * 2),
-				&ahb_bus_client_ab);
+				(uint32_t *) &cpas_core->ahb_bus_client
+				.common_data.bw_pair[i].ab);
 			if (rc) {
 				CAM_ERR(CAM_UTIL,
 					"Error reading ab bw value, rc=%d",
 					rc);
 				return rc;
 			}
-			cpas_core->ahb_bus_client.common_data.bw_pair[i].ab = ahb_bus_client_ab;
 
 			rc = of_property_read_u32_index(of_node,
 				"cam-ahb-bw-KBps",
 				((i * 2) + 1),
-				&ahb_bus_client_ib);
+				(uint32_t *) &cpas_core->ahb_bus_client
+				.common_data.bw_pair[i].ib);
 			if (rc) {
 				CAM_ERR(CAM_UTIL,
 					"Error reading ib bw value, rc=%d",
 					rc);
 				return rc;
 			}
-			cpas_core->ahb_bus_client.common_data.bw_pair[i].ib = ahb_bus_client_ib;
 
 			CAM_DBG(CAM_CPAS,
 				"AHB: Level: %d, ab_value %llu, ib_value: %llu",

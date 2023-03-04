@@ -260,12 +260,12 @@ static int cam_ife_csid_ver2_sof_irq_debug(
 	void *cmd_args)
 {
 	int      i = 0;
-	int      data_idx = 0;
 	bool     sof_irq_enable = false;
 	struct   cam_ife_csid_ver2_reg_info    *csid_reg;
 	struct   cam_ife_csid_ver2_path_cfg    *path_cfg;
 	struct   cam_isp_resource_node         *res;
 	uint32_t irq_mask[CAM_IFE_CSID_IRQ_REG_MAX] = {0};
+	uint32_t data_idx;
 
 	if (*((uint32_t *)cmd_args) == 1)
 		sof_irq_enable = true;
@@ -279,6 +279,7 @@ static int cam_ife_csid_ver2_sof_irq_debug(
 		return 0;
 	}
 
+	data_idx = csid_hw->rx_cfg.phy_sel - 1;
 	csid_reg = (struct cam_ife_csid_ver2_reg_info *)
 			csid_hw->core_info->csid_reg;
 
@@ -313,15 +314,11 @@ static int cam_ife_csid_ver2_sof_irq_debug(
 		csid_hw->hw_intf->hw_idx,
 		(sof_irq_enable) ? "enabled" : "disabled");
 
-	data_idx = (int)(csid_hw->rx_cfg.phy_sel - csid_reg->cmn_reg->phy_sel_base_idx);
-	if (data_idx < 0)
-		CAM_WARN(CAM_ISP, "Can't notify csiphy, incorrect phy selected=%d",
-			data_idx);
-	else {
-		CAM_INFO(CAM_ISP, "Notify CSIPHY: %d", data_idx);
-		cam_subdev_notify_message(CAM_CSIPHY_DEVICE_TYPE,
-			CAM_SUBDEV_MESSAGE_REG_DUMP, (void *)&data_idx);
-	}
+	CAM_INFO(CAM_ISP, "Notify CSIPHY: %d",
+			csid_hw->rx_cfg.phy_sel - 1);
+
+	cam_subdev_notify_message(CAM_CSIPHY_DEVICE_TYPE,
+		CAM_SUBDEV_MESSAGE_REG_DUMP, (void *)&data_idx);
 
 	return 0;
 }
@@ -1179,7 +1176,7 @@ static int cam_ife_csid_ver2_rx_err_bottom_half(
 	uint32_t                                    event_type = 0;
 	uint32_t                                    long_pkt_ftr_val;
 	uint32_t                                    total_crc;
-	int                                         data_idx = 0;
+	uint32_t                                    data_idx;
 
 	if (!handler_priv || !evt_payload_priv) {
 		CAM_ERR(CAM_ISP, "Invalid params");
@@ -1189,6 +1186,7 @@ static int cam_ife_csid_ver2_rx_err_bottom_half(
 	payload = evt_payload_priv;
 	csid_hw = handler_priv;
 	soc_info = &csid_hw->hw_info->soc_info;
+	data_idx = csid_hw->rx_cfg.phy_sel -1;
 
 	log_buf = csid_hw->log_buf;
 	log_buf[0] = '\0';
@@ -1335,17 +1333,12 @@ static int cam_ife_csid_ver2_rx_err_bottom_half(
 		csid_hw->hw_intf->hw_idx,
 		payload->irq_reg_val);
 
-	data_idx = (int)(csid_hw->rx_cfg.phy_sel - csid_reg->cmn_reg->phy_sel_base_idx);
 	if ((!csid_hw->flags.reset_awaited) && csid_hw->flags.fatal_err_detected) {
 		if (!event_type)
 			event_type |= CAM_ISP_HW_ERROR_CSID_FATAL;
 
-		if (data_idx < 0)
-			CAM_WARN(CAM_ISP, "Can't notify csiphy, incorrect phy selected=%d",
-				data_idx);
-		else
-			cam_subdev_notify_message(CAM_CSIPHY_DEVICE_TYPE,
-				CAM_SUBDEV_MESSAGE_APPLY_CSIPHY_AUX, (void *)&data_idx);
+		cam_subdev_notify_message(CAM_CSIPHY_DEVICE_TYPE,
+			CAM_SUBDEV_MESSAGE_APPLY_CSIPHY_AUX, (void *)&data_idx);
 
 		cam_ife_csid_ver2_handle_event_err(csid_hw,
 			rx_irq_status, event_type, false, NULL);
@@ -1371,10 +1364,8 @@ void cam_ife_csid_hw_ver2_rdi_line_buffer_conflict_handler(
 		soc_info->reg_map[CAM_IFE_CSID_CLC_MEM_BASE_ID].mem_base;
 	const struct cam_ife_csid_ver2_path_reg_info *path_reg;
 	uint32_t i = 0, rdi_cfg = 0;
-	uint8_t *log_buf = csid_hw->log_buf;
+	uint8_t *log_buf = NULL;
 	size_t len = 0;
-
-	memset(log_buf, 0x0, sizeof(uint8_t) * CAM_IFE_CSID_LOG_BUF_LEN);
 
 	for (i = CAM_IFE_PIX_PATH_RES_RDI_0; i < CAM_IFE_PIX_PATH_RES_RDI_4;
 		i++) {
@@ -1762,9 +1753,9 @@ void cam_ife_csid_ver2_print_format_measure_info(
 		csid_reg->path_reg[res->res_id];
 	struct cam_hw_soc_info *soc_info = &csid_hw->hw_info->soc_info;
 	void __iomem *base = soc_info->reg_map[CAM_IFE_CSID_CLC_MEM_BASE_ID].mem_base;
-	uint32_t expected_frame = 0, actual_frame = 0;
-	int data_idx = 0;
+	uint32_t expected_frame = 0, actual_frame = 0, data_idx;
 
+	data_idx = csid_hw->rx_cfg.phy_sel - 1;
 	actual_frame = cam_io_r_mb(base + path_reg->format_measure0_addr);
 	expected_frame = cam_io_r_mb(base + path_reg->format_measure_cfg1_addr);
 
@@ -1784,14 +1775,8 @@ void cam_ife_csid_ver2_print_format_measure_info(
 		csid_reg->cmn_reg->format_measure_width_mask_val);
 
 	/* AUX settings update to phy for pix and line count errors */
-	data_idx = (int)(csid_hw->rx_cfg.phy_sel - csid_reg->cmn_reg->phy_sel_base_idx);
-	if (data_idx < 0)
-		CAM_WARN(CAM_ISP, "Can't notify csiphy, incorrect phy selected=%d",
-			data_idx);
-	else
-		cam_subdev_notify_message(CAM_CSIPHY_DEVICE_TYPE,
-			CAM_SUBDEV_MESSAGE_APPLY_CSIPHY_AUX, (void *)&data_idx);
-
+	cam_subdev_notify_message(CAM_CSIPHY_DEVICE_TYPE,
+		CAM_SUBDEV_MESSAGE_APPLY_CSIPHY_AUX, (void *)&data_idx);
 }
 
 static int cam_ife_csid_ver2_ipp_bottom_half(
@@ -2713,7 +2698,6 @@ static int cam_ife_csid_hw_ver2_config_rx(
 	case CAM_ISP_IFE_IN_RES_TPG:
 		csid_hw->rx_cfg.phy_sel = 0;
 		csid_hw->rx_cfg.tpg_mux_sel = 0;
-		break;
 	case CAM_ISP_IFE_IN_RES_CPHY_TPG_0:
 		csid_hw->rx_cfg.tpg_mux_sel = 1;
 		csid_hw->rx_cfg.tpg_num_sel = 1;
@@ -3203,10 +3187,7 @@ static int cam_ife_csid_ver2_init_config_rdi_path(
 	 * Plain format
 	 * Packing format
 	 */
-
-	cfg1 = cam_io_r_mb(mem_base + path_reg->cfg1_addr);
-
-	cfg1 |= (path_cfg->crop_enable << path_reg->crop_h_en_shift_val) |
+	cfg1 = (path_cfg->crop_enable << path_reg->crop_h_en_shift_val) |
 		(path_cfg->crop_enable <<
 		 path_reg->crop_v_en_shift_val);
 
@@ -3370,8 +3351,6 @@ static int cam_ife_csid_ver2_init_config_pxl_path(
 	 * Pix store enable
 	 */
 
-	cfg1 = cam_io_r_mb(mem_base + path_reg->cfg1_addr);
-
 	if (csid_hw->flags.binning_enabled) {
 
 		if (path_reg->binning_supported & CAM_IFE_CSID_BIN_HORIZONTAL)
@@ -3510,17 +3489,16 @@ static int cam_ife_csid_ver2_path_irq_subscribe(
 	struct cam_isp_resource_node *res,
 	uint32_t irq_mask, uint32_t err_irq_mask)
 {
-	uint32_t top_irq_mask[CAM_IFE_CSID_IRQ_REGISTERS_MAX] = {0};
+	uint32_t tmp_mask;
 	struct cam_ife_csid_ver2_path_cfg *path_cfg = res->res_priv;
 	struct cam_ife_csid_ver2_reg_info *csid_reg = csid_hw->core_info->csid_reg;
 	int rc;
 
-	top_irq_mask[CAM_IFE_CSID_IRQ_TOP_REG_STATUS0] =
-		csid_reg->path_reg[res->res_id]->top_irq_mask;
+	tmp_mask = csid_reg->path_reg[res->res_id]->top_irq_mask;
 	path_cfg->top_irq_handle = cam_irq_controller_subscribe_irq(
 		csid_hw->top_irq_controller,
 		CAM_IRQ_PRIORITY_0,
-		top_irq_mask,
+		&tmp_mask,
 		res,
 		cam_ife_csid_ver2_handle_path_irq,
 		NULL, NULL, NULL, CAM_IRQ_EVT_GROUP_0);
@@ -3532,7 +3510,7 @@ static int cam_ife_csid_ver2_path_irq_subscribe(
 	}
 
 	rc = cam_irq_controller_register_dependent(csid_hw->top_irq_controller,
-		csid_hw->path_irq_controller[res->res_id], top_irq_mask);
+		csid_hw->path_irq_controller[res->res_id], &tmp_mask);
 
 	if (rc)
 		goto unsub_top;
@@ -4001,14 +3979,13 @@ static int cam_ife_csid_ver2_csi2_irq_subscribe(struct cam_ife_csid_ver2_hw *csi
 	uint32_t irq_mask, uint32_t err_irq_mask)
 {
 	struct cam_ife_csid_ver2_reg_info *csid_reg = csid_hw->core_info->csid_reg;
-	uint32_t top_irq_mask[CAM_IFE_CSID_IRQ_REGISTERS_MAX] = {0};
+	uint32_t top_irq_mask = csid_reg->csi2_reg->top_irq_mask;
 	int rc;
 
-	top_irq_mask[CAM_IFE_CSID_IRQ_TOP_REG_STATUS0] = csid_reg->csi2_reg->top_irq_mask;
 	csid_hw->rx_cfg.top_irq_handle = cam_irq_controller_subscribe_irq(
 		csid_hw->top_irq_controller,
 		CAM_IRQ_PRIORITY_0,
-		top_irq_mask,
+		&top_irq_mask,
 		csid_hw,
 		cam_ife_csid_ver2_handle_rx_irq,
 		NULL, NULL, NULL, CAM_IRQ_EVT_GROUP_0);
@@ -4017,11 +3994,10 @@ static int cam_ife_csid_ver2_csi2_irq_subscribe(struct cam_ife_csid_ver2_hw *csi
 		CAM_ERR(CAM_ISP, "CSID[%d] RX Subscribe Top Irq fail",
 			csid_hw->hw_intf->hw_idx);
 		rc = -EINVAL;
-		goto err;
 	}
 
 	rc = cam_irq_controller_register_dependent(csid_hw->top_irq_controller,
-		csid_hw->rx_irq_controller, top_irq_mask);
+		csid_hw->rx_irq_controller, &top_irq_mask);
 
 	if (rc)
 		goto unsub_top;
@@ -4078,7 +4054,7 @@ unsub_top:
 	cam_irq_controller_unsubscribe_irq(csid_hw->top_irq_controller,
 			csid_hw->rx_cfg.top_irq_handle);
 	csid_hw->rx_cfg.top_irq_handle = 0;
-err:
+
 	return rc;
 }
 
@@ -4327,7 +4303,7 @@ static int cam_ife_csid_ver2_enable_hw(
 	void __iomem *mem_base;
 	const struct cam_ife_csid_ver2_path_reg_info *path_reg = NULL;
 	uint32_t top_err_irq_mask = 0;
-	uint32_t buf_done_irq_mask[CAM_IFE_CSID_IRQ_REGISTERS_MAX] = {0};
+	uint32_t buf_done_irq_mask = 0;
 	uint32_t top_info_irq_mask = 0;
 
 	if (csid_hw->flags.device_enabled) {
@@ -4367,12 +4343,11 @@ static int cam_ife_csid_ver2_enable_hw(
 	/* Read hw version */
 	val = cam_io_r_mb(mem_base + csid_reg->cmn_reg->hw_version_addr);
 
-	buf_done_irq_mask[CAM_IFE_CSID_IRQ_TOP_REG_STATUS0] =
-		csid_reg->cmn_reg->top_buf_done_irq_mask;
+	buf_done_irq_mask = csid_reg->cmn_reg->top_buf_done_irq_mask;
 	csid_hw->buf_done_irq_handle = cam_irq_controller_subscribe_irq(
 		csid_hw->top_irq_controller,
 		CAM_IRQ_PRIORITY_4,
-		buf_done_irq_mask,
+		&buf_done_irq_mask,
 		csid_hw,
 		cam_ife_csid_ver2_handle_buf_done_irq,
 		NULL,
@@ -4407,7 +4382,7 @@ static int cam_ife_csid_ver2_enable_hw(
 	}
 
 	rc = cam_irq_controller_register_dependent(csid_hw->top_irq_controller,
-		csid_hw->buf_done_irq_controller, buf_done_irq_mask);
+		csid_hw->buf_done_irq_controller, &buf_done_irq_mask);
 
 	if (rc) {
 		cam_irq_controller_unsubscribe_irq(csid_hw->top_irq_controller,
@@ -4432,7 +4407,7 @@ static int cam_ife_csid_ver2_enable_hw(
 		if (csid_hw->top_info_irq_handle < 1) {
 			CAM_ERR(CAM_ISP, "CSID[%d] Subscribe Top Info Irq fail",
 				csid_hw->hw_intf->hw_idx);
-			rc = -EINVAL;
+			return -EINVAL;
 			goto unsubscribe_top_err;
 		}
 	}
@@ -4529,10 +4504,6 @@ static int cam_ife_csid_ver2_disable_core(
 		rc = cam_irq_controller_unsubscribe_irq(
 			csid_hw->top_irq_controller,
 			csid_hw->reset_irq_handle);
-		if (rc)
-			CAM_WARN(CAM_ISP,
-				"CSID:%d Failed to unsubscribe reset irq",
-				csid_hw->hw_intf->hw_idx);
 		csid_hw->reset_irq_handle = 0;
 	}
 
@@ -4654,11 +4625,8 @@ static void cam_ife_csid_ver2_send_secure_info(
 	struct cam_ife_csid_ver2_hw    *csid_hw)
 {
 	struct cam_ife_csid_secure_info        secure_info;
-	struct cam_ife_csid_ver2_reg_info     *csid_reg;
-	int                                    phy_sel = 0;
 
-	csid_reg = (struct cam_ife_csid_ver2_reg_info *)
-			csid_hw->core_info->csid_reg;
+	secure_info.phy_sel = csid_hw->rx_cfg.phy_sel - 1;
 	secure_info.lane_cfg = csid_hw->rx_cfg.lane_cfg;
 	secure_info.cdm_hw_idx_mask = BIT(start_args->cdm_hw_idx);
 	secure_info.vc_mask = 0;
@@ -4668,23 +4636,14 @@ static void cam_ife_csid_ver2_send_secure_info(
 		secure_info.csid_hw_idx_mask |= BIT(csid_hw->dual_core_idx);
 
 	CAM_DBG(CAM_ISP,
-		"PHY secure info for CSID[%u], lane_cfg: 0x%x, ife: 0x%x, cdm: 0x%x, vc_mask: 0x%llx",
-		csid_hw->hw_intf->hw_idx,
+		"PHY secure info for CSID[%u], phy_sel: 0x%x, lane_cfg: 0x%x, ife: 0x%x, cdm: 0x%x, vc_mask: 0x%llx",
+		csid_hw->hw_intf->hw_idx, secure_info.phy_sel,
 		secure_info.lane_cfg, secure_info.csid_hw_idx_mask,
 		secure_info.cdm_hw_idx_mask, secure_info.vc_mask);
 
 	/* Issue one call to PHY for dual IFE cases */
-	phy_sel = (int)(csid_hw->rx_cfg.phy_sel - csid_reg->cmn_reg->phy_sel_base_idx);
-	if (phy_sel < 0) {
-		CAM_WARN(CAM_ISP, "Can't notify csiphy, incorrect phy selected=%d",
-			phy_sel);
-	} else {
-		secure_info.phy_sel = (uint32_t)phy_sel;
-		CAM_DBG(CAM_ISP, "Notify CSIPHY: %d", phy_sel);
-		cam_subdev_notify_message(CAM_CSIPHY_DEVICE_TYPE,
-			CAM_SUBDEV_MESSAGE_DOMAIN_ID_SECURE_PARAMS, (void *)&secure_info);
-	}
-
+	cam_subdev_notify_message(CAM_CSIPHY_DEVICE_TYPE,
+		CAM_SUBDEV_MESSAGE_DOMAIN_ID_SECURE_PARAMS, (void *)&secure_info);
 }
 
 int cam_ife_csid_ver2_start(void *hw_priv, void *args,
@@ -4985,7 +4944,6 @@ static int cam_ife_csid_ver2_top_cfg(
 
 	case CAM_IFE_CSID_INPUT_CORE_SFE:
 		csid_hw->top_cfg.out_ife_en = false;
-		fallthrough;
 	case CAM_IFE_CSID_INPUT_CORE_SFE_IFE:
 
 		if (top_args->core_idx == 0) {
@@ -5716,10 +5674,6 @@ static int cam_ife_csid_init_config_update(
 	}
 
 	path_cfg = (struct cam_ife_csid_ver2_path_cfg *)res->res_priv;
-	/* Skip epoch update if resource does not handle camif IRQs */
-	if (!path_cfg->handle_camif_irq)
-		goto end;
-
 	path_cfg->epoch_cfg = (path_cfg->end_line - path_cfg->start_line) *
 		init_cfg->init_config->epoch_cfg.epoch_factor / 100;
 
@@ -5732,10 +5686,11 @@ static int cam_ife_csid_init_config_update(
 	CAM_DBG(CAM_ISP,
 		"Init Update for res_name: %s epoch_factor: %x",
 		res->res_name, path_cfg->epoch_cfg);
-end:
+
 	return 0;
 }
 
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
 static int cam_ife_csid_ver2_reset_out_of_sync_cnt(
 	struct cam_ife_csid_ver2_hw  *csid_hw, void *args)
 {
@@ -5758,6 +5713,7 @@ static int cam_ife_csid_ver2_reset_out_of_sync_cnt(
 
 	return 0;
 }
+#endif
 
 static int cam_ife_csid_ver2_drv_config(
 	struct cam_ife_csid_ver2_hw  *csid_hw, void *cmd_args)
@@ -5924,9 +5880,11 @@ static int cam_ife_csid_ver2_process_cmd(void *hw_priv,
 	case CAM_ISP_HW_CMD_DRV_CONFIG:
 		rc = cam_ife_csid_ver2_drv_config(csid_hw, cmd_args);
 		break;
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
 	case CAM_IFE_CSID_RESET_OUT_OF_SYNC_CNT:
 		rc = cam_ife_csid_ver2_reset_out_of_sync_cnt(csid_hw, cmd_args);
 		break;
+#endif
 	default:
 		CAM_ERR(CAM_ISP, "CSID:%d unsupported cmd:%d",
 			csid_hw->hw_intf->hw_idx, cmd_type);

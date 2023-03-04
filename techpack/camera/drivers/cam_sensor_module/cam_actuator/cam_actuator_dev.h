@@ -49,6 +49,9 @@ enum cam_actuator_state {
 	CAM_ACTUATOR_ACQUIRE,
 	CAM_ACTUATOR_CONFIG,
 	CAM_ACTUATOR_START,
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	CAM_ACTUATOR_LOCK,
+#endif
 };
 
 /**
@@ -120,6 +123,17 @@ struct cam_actuator_ctrl_t {
 	struct cam_actuator_query_cap act_info;
 	struct actuator_intf_params bridge_intf;
 	uint32_t last_flush_req;
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	bool is_actuator_ready;
+	struct cam_sensor_i2c_reg_array poll_register;
+	enum camera_sensor_i2c_type addr_type;
+	enum camera_sensor_i2c_type data_type;
+	bool camera_actuator_shake_detect_on;
+	enum cam_actuator_state cam_act_last_state;
+	uint32_t ssd_actuator_cci_i2c_master_num;
+	uint32_t ssd_actuator_cci_num;
+	struct mutex actuator_ioctl_mutex;
+#endif
 };
 
 /**

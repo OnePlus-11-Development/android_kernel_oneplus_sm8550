@@ -350,8 +350,10 @@ struct cam_isp_context {
 	struct cam_hw_err_param              err_inject_params;
 	bool                                  aeb_enabled;
 	bool                                  do_internal_recovery;
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
 	uint64_t                              last_sof_jiffies;
 	uint64_t                              last_applied_jiffies;
+#endif
 };
 
 /**

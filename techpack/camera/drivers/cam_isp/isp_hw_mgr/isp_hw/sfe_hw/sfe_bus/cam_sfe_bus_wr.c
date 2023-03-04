@@ -91,7 +91,6 @@ struct cam_sfe_bus_wr_common_data {
 	cam_hw_mgr_event_cb_func                    event_cb;
 	uint32_t                                    irq_err_mask;
 
-	uint32_t                                    sys_cache_default_cfg;
 	uint32_t                                    sfe_debug_cfg;
 	struct cam_sfe_bus_cache_dbg_cfg            cache_dbg_cfg;
 };
@@ -1653,17 +1652,8 @@ static int cam_sfe_bus_start_sfe_out(
 	CAM_DBG(CAM_SFE, "Start SFE:%d out_type:0x%X",
 		rsrc_data->common_data->core_index, rsrc_data->out_type);
 
-	for (i = 0; i < rsrc_data->num_wm; i++) {
+	for (i = 0; i < rsrc_data->num_wm; i++)
 		rc = cam_sfe_bus_start_wm(&rsrc_data->wm_res[i]);
-		if (rc) {
-			CAM_ERR(CAM_SFE,
-				"SFE:%d Start Failed for out_type:0x%X",
-				sfe_out->res_state, rsrc_data->common_data->core_index,
-				rsrc_data->out_type);
-
-			return rc;
-		}
-	}
 
 	memset(bus_irq_reg_mask, 0, sizeof(bus_irq_reg_mask));
 	rc = cam_sfe_bus_start_comp_grp(rsrc_data->comp_grp,
@@ -2213,6 +2203,9 @@ static int cam_sfe_bus_wr_user_dump(
 		}
 
 		rsrc_node = &bus_priv->sfe_out[sfe_out_type];
+		if (!rsrc_node)
+			continue;
+
 		if (rsrc_node->res_state < CAM_ISP_RESOURCE_STATE_RESERVED) {
 			CAM_DBG(CAM_ISP,
 				"SFE BUS WR: path inactive res ID: %d, continuing",
@@ -2546,7 +2539,7 @@ static int cam_sfe_bus_wr_update_wm(void *priv, void *cmd_args,
 			reg_val_pair[j-1]);
 
 		curr_cache_cfg = wm_data->cache_cfg;
-		wm_data->cache_cfg = bus_priv->common_data.sys_cache_default_cfg;
+		wm_data->cache_cfg = 0;
 		if (wm_data->enable_caching) {
 			if ((cache_dbg_cfg->disable_for_scratch) &&
 				(update_buf->use_scratch_cfg))
@@ -2806,7 +2799,7 @@ static int cam_sfe_bus_wr_config_wm(void *priv, void *cmd_args,
 			CAM_BOOL_TO_YESNO(cam_smmu_is_expanded_memory));
 
 		curr_cache_cfg = wm_data->cache_cfg;
-		wm_data->cache_cfg = bus_priv->common_data.sys_cache_default_cfg;
+		wm_data->cache_cfg = 0;
 		if ((!cache_dbg_cfg->disable_for_scratch) &&
 			(wm_data->enable_caching)) {
 			wm_data->cache_cfg =
@@ -3507,7 +3500,6 @@ int cam_sfe_bus_wr_init(
 	bus_priv->common_data.err_irq_subscribe    = false;
 	bus_priv->common_data.sfe_irq_controller   = sfe_irq_controller;
 	bus_priv->common_data.irq_err_mask         = hw_info->irq_err_mask;
-	bus_priv->common_data.sys_cache_default_cfg = hw_info->sys_cache_default_val;
 	bus_priv->constraint_error_info            = hw_info->constraint_error_info;
 	bus_priv->sfe_out_hw_info                  = hw_info->sfe_out_hw_info;
 	rc = cam_cpas_get_cpas_hw_version(&bus_priv->common_data.hw_version);
@@ -3593,6 +3585,8 @@ int cam_sfe_bus_wr_init(
 	return rc;
 
 deinit_sfe_out:
+	if (i < 0)
+		i = CAM_SFE_BUS_SFE_OUT_MAX;
 	for (--i; i >= 0; i--)
 		cam_sfe_bus_deinit_sfe_out_resource(&bus_priv->sfe_out[i]);
 

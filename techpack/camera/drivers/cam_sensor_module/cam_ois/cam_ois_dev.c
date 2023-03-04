@@ -11,6 +11,9 @@
 #include "cam_debug_util.h"
 #include "camera_main.h"
 #include "cam_compat.h"
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+#include "fw_download_interface.h"
+#endif
 
 static struct cam_i3c_ois_data {
 	struct cam_ois_ctrl_t                       *o_ctrl;
@@ -73,6 +76,14 @@ static long cam_ois_subdev_ioctl(struct v4l2_subdev *sd,
 		}
 		rc = cam_ois_subdev_close_internal(sd, NULL);
 		break;
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	case VIDIOC_CAM_SENSOR_STATR:
+		rc = cam_ois_download_start(o_ctrl);
+		break;
+	case VIDIOC_CAM_SENSOR_STOP:
+		cam_ois_do_power_down(o_ctrl);
+		break;
+#endif
 	default:
 		CAM_ERR(CAM_OIS, "Wrong IOCTL cmd: %u", cmd);
 		rc = -ENOIOCTLCMD;
@@ -370,6 +381,18 @@ static int cam_ois_component_bind(struct device *dev,
 	INIT_LIST_HEAD(&(o_ctrl->i2c_mode_data.list_head));
 	INIT_LIST_HEAD(&(o_ctrl->i2c_time_data.list_head));
 	mutex_init(&(o_ctrl->ois_mutex));
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	mutex_init(&(o_ctrl->ois_read_mutex));
+#ifdef ENABLE_OIS_DELAY_POWER_DOWN
+	o_ctrl->ois_power_down_thread_state = CAM_OIS_POWER_DOWN_THREAD_STOPPED;
+	o_ctrl->ois_power_state = CAM_OIS_POWER_OFF;
+	o_ctrl->ois_power_down_thread_exit = false;
+	mutex_init(&(o_ctrl->ois_power_down_mutex));
+	mutex_init(&(o_ctrl->do_ioctl_ois));
+	o_ctrl->ois_download_fw_done = CAM_OIS_FW_NOT_DOWNLOAD;
+	o_ctrl->ois_fd_have_close_state = CAM_OIS_IS_OPEN;
+#endif
+#endif
 	rc = cam_ois_driver_soc_init(o_ctrl);
 	if (rc) {
 		CAM_ERR(CAM_OIS, "failed: soc init rc %d", rc);
@@ -394,6 +417,20 @@ static int cam_ois_component_bind(struct device *dev,
 	init_completion(&g_i3c_ois_data[o_ctrl->soc_info.index].probe_complete);
 
 	CAM_DBG(CAM_OIS, "Component bound successfully");
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	mutex_init(&(o_ctrl->ois_hall_data_mutex));
+	mutex_init(&(o_ctrl->ois_poll_thread_mutex));
+
+	o_ctrl->ois_poll_thread_control_cmd = 0;
+	if (kfifo_alloc(&o_ctrl->ois_hall_data_fifo, SAMPLE_COUNT_IN_DRIVER*SAMPLE_SIZE_IN_DRIVER, GFP_KERNEL)) {
+		CAM_ERR(CAM_OIS, "failed to init ois_hall_data_fifo");
+	}
+
+	if (kfifo_alloc(&o_ctrl->ois_hall_data_fifoV2, SAMPLE_COUNT_IN_DRIVER*SAMPLE_SIZE_IN_DRIVER, GFP_KERNEL)) {
+		CAM_ERR(CAM_OIS, "failed to init ois_hall_data_fifoV2");
+	}
+	InitOISResource(o_ctrl);
+#endif
 	return rc;
 unreg_subdev:
 	cam_unregister_subdev(&(o_ctrl->v4l2_dev_str));

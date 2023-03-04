@@ -444,9 +444,6 @@ static int cam_jpeg_mgr_bottom_half_irq(void *priv, void *data)
 			g_jpeg_hw_mgr.devices[dev_type][0]->hw_priv,
 			CAM_JPEG_CMD_DUMP_HW_MISR_VAL, &misr_args,
 			sizeof(struct cam_jpeg_misr_dump_args));
-		if (rc)
-			CAM_WARN_RATE_LIMIT(CAM_JPEG, "jpeg and camnoc hw misr enable failed %d",
-				rc);
 	}
 
 	/* If we have processed just plane 1 for jpeg dma,
@@ -1012,8 +1009,7 @@ static int cam_jpeg_mgr_prepare_hw_update(void *hw_mgr_priv,
 		return rc;
 	}
 
-	if (!packet->num_cmd_buf ||
-		(packet->num_cmd_buf > CAM_JPEG_MAX_NUM_CMD_BUFFS) ||
+	if ((packet->num_cmd_buf > CAM_JPEG_MAX_NUM_CMD_BUFFS) ||
 		!packet->num_patches || !packet->num_io_configs ||
 		(packet->num_io_configs > CAM_JPEG_IMAGE_MAX)) {
 		CAM_ERR(CAM_JPEG,

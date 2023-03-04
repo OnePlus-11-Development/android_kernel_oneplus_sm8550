@@ -32,7 +32,11 @@
 #include "cam_compat.h"
 #include "camera_main.h"
 
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+#define CAM_REQ_MGR_EVENT_MAX 90
+#else
 #define CAM_REQ_MGR_EVENT_MAX 30
+#endif
 #define CAM_I3C_MASTER_COMPAT "qcom,geni-i3c"
 
 static struct cam_req_mgr_device g_dev;
@@ -359,6 +363,9 @@ static long cam_private_ioctl(struct file *file, void *fh,
 	case CAM_REQ_MGR_CREATE_SESSION: {
 		struct cam_req_mgr_session_info ses_info;
 
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+		camera_provider_pid = task_tgid_nr(current);
+#endif
 		if (k_ioctl->size != sizeof(ses_info))
 			return -EINVAL;
 

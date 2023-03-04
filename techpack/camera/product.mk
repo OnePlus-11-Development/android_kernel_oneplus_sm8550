@@ -7,4 +7,6 @@ endif
 
 ifeq ($(CAMERA_DLKM_ENABLED),true)
 PRODUCT_PACKAGES += camera.ko
+
+-include $(TOP)/kernel/oneplus/sm8550/techpack/camera/oplus/explorer/product.mk
 endif

@@ -10,6 +10,8 @@ ifeq ($(CAMERA_DLKM_ENABLED),true)
 ifneq ($(TARGET_BOARD_AUTO),true)
 ifeq ($(call is-board-platform-in-list,$(TARGET_BOARD_PLATFORM)),true)
 BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/camera.ko
+
+-include $(TOP)/vendor/oplus/kernel/explorer/board.mk
 endif
 endif
 endif

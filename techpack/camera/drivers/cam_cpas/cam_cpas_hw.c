@@ -54,7 +54,7 @@ static void cam_cpas_process_bw_overrides(
 		name_len)) {
 		if (cpas_settings->mnoc_hf_1_ab_bw)
 			*ab = cpas_settings->mnoc_hf_1_ab_bw;
-		if (cpas_settings->mnoc_hf_1_ib_bw)
+		if (cpas_settings->mnoc_hf_0_ib_bw)
 			*ib = cpas_settings->mnoc_hf_1_ib_bw;
 	} else if (strnstr(bus_client->common_data.name, "cam_sf_0",
 		name_len)) {
@@ -953,6 +953,7 @@ static int cam_cpas_axi_consolidate_path_votes(
 		curr_tree_node =
 			cpas_client->tree_node[path_data_type][transac_type];
 		if (curr_tree_node) {
+			path_found = true;
 			memcpy(axi_path, &axi_vote->axi_path[i],
 				sizeof(struct cam_cpas_axi_per_path_bw_vote));
 			con_axi_vote->num_paths++;
@@ -2831,32 +2832,6 @@ done:
 	return rc;
 }
 
-static int cam_cpas_hw_enable_tpg_mux_sel(struct cam_hw_info *cpas_hw,
-	uint32_t tpg_mux)
-{
-	struct cam_cpas *cpas_core = (struct cam_cpas *) cpas_hw->core_info;
-	int rc = 0;
-
-	mutex_lock(&cpas_hw->hw_mutex);
-
-	if (cpas_core->internal_ops.set_tpg_mux_sel) {
-		rc = cpas_core->internal_ops.set_tpg_mux_sel(
-			cpas_hw, tpg_mux);
-		if (rc) {
-			CAM_ERR(CAM_CPAS,
-				"failed in tpg mux selection rc=%d",
-				rc);
-		}
-	} else {
-		CAM_ERR(CAM_CPAS,
-			"CPAS tpg mux sel not enabled");
-		rc = -EINVAL;
-	}
-
-	mutex_unlock(&cpas_hw->hw_mutex);
-	return rc;
-}
-
 static int cam_cpas_activate_cache(
 	struct cam_hw_info *cpas_hw,
 	struct cam_sys_cache_info *cache_info)
@@ -3304,19 +3279,7 @@ static int cam_cpas_hw_process_cmd(void *hw_priv,
 		rc = cam_cpas_hw_csid_process_resume(hw_priv, *csid_idx);
 		break;
 	}
-	case CAM_CPAS_HW_CMD_TPG_MUX_SEL: {
-		uint32_t *tpg_mux_sel;
 
-		if (sizeof(uint32_t) != arg_size) {
-			CAM_ERR(CAM_CPAS, "cmd_type %d, size mismatch %d",
-				cmd_type, arg_size);
-			break;
-		}
-
-		tpg_mux_sel = (uint32_t *)cmd_args;
-		rc = cam_cpas_hw_enable_tpg_mux_sel(hw_priv, *tpg_mux_sel);
-		break;
-	}
 	default:
 		CAM_ERR(CAM_CPAS, "CPAS HW command not valid =%d", cmd_type);
 		break;

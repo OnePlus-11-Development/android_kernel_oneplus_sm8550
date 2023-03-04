@@ -6,3 +6,6 @@
 /* Instantiate tracepoints */
 #define CREATE_TRACE_POINTS
 #include "cam_trace.h"
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+#include "oplus_cam_trace.c"
+#endif

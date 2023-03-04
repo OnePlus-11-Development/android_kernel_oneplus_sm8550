@@ -42,7 +42,6 @@
 
 struct cam_camnoc_info *camnoc_info;
 struct cam_cpas_camnoc_qchannel *qchannel_info;
-struct cam_cpas_top_regs *cpas_top_info;
 
 
 #define CAMNOC_SLAVE_MAX_ERR_CODE 7
@@ -1019,33 +1018,6 @@ static int cam_cpastop_qchannel_handshake(struct cam_hw_info *cpas_hw,
 	return rc;
 }
 
-static int cam_cpastop_set_tpg_mux_sel(struct cam_hw_info *cpas_hw,
-	uint32_t tpg_mux)
-{
-	struct cam_cpas *cpas_core = (struct cam_cpas *) cpas_hw->core_info;
-	struct cam_hw_soc_info *soc_info = &cpas_hw->soc_info;
-	int reg_cpas_top;
-	uint32_t curr_tpg_mux = 0;
-
-	reg_cpas_top = cpas_core->regbase_index[CAM_CPAS_REG_CPASTOP];
-
-	if (cpas_top_info == NULL)
-		return 0;
-
-	if (!cpas_top_info->tpg_mux_sel_enabled)
-		return 0;
-
-	curr_tpg_mux = cam_io_r_mb(soc_info->reg_map[reg_cpas_top].mem_base +
-		cpas_top_info->tpg_mux_sel);
-
-	curr_tpg_mux = curr_tpg_mux | ((1 << tpg_mux) << cpas_top_info->tpg_mux_sel_shift);
-	cam_io_w_mb(curr_tpg_mux, soc_info->reg_map[reg_cpas_top].mem_base +
-		cpas_top_info->tpg_mux_sel);
-	CAM_DBG(CAM_CPAS, "SET TPG MUX to 0x%x", curr_tpg_mux);
-
-	return 0;
-}
-
 static int cam_cpastop_init_hw_version(struct cam_hw_info *cpas_hw,
 	struct cam_cpas_hw_caps *hw_caps)
 {
@@ -1053,7 +1025,6 @@ static int cam_cpastop_init_hw_version(struct cam_hw_info *cpas_hw,
 	struct cam_hw_soc_info *soc_info = &cpas_hw->soc_info;
 	struct cam_cpas *cpas_core = (struct cam_cpas *) cpas_hw->core_info;
 	qchannel_info = NULL;
-	cpas_top_info = NULL;
 
 	CAM_DBG(CAM_CPAS,
 		"hw_version=0x%x Camera Version %d.%d.%d, cpas version %d.%d.%d",
@@ -1135,7 +1106,6 @@ static int cam_cpastop_init_hw_version(struct cam_hw_info *cpas_hw,
 	case CAM_CPAS_TITAN_640_V200:
 		camnoc_info = &cam640_cpas200_camnoc_info;
 		qchannel_info = &cam640_cpas200_qchannel_info;
-		cpas_top_info = &cam640_cpas200_cpas_top_info;
 		break;
 	case CAM_CPAS_TITAN_880_V100:
 		camnoc_info = &cam880_cpas100_camnoc_info;
@@ -1225,7 +1195,6 @@ int cam_cpastop_get_internal_ops(struct cam_cpas_internal_ops *internal_ops)
 	internal_ops->print_poweron_settings =
 		cam_cpastop_print_poweron_settings;
 	internal_ops->qchannel_handshake = cam_cpastop_qchannel_handshake;
-	internal_ops->set_tpg_mux_sel = cam_cpastop_set_tpg_mux_sel;
 
 	return 0;
 }

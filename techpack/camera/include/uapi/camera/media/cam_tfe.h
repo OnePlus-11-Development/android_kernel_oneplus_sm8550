@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __UAPI_CAM_TFE_H__
@@ -72,7 +71,6 @@
 #define CAM_ISP_TFE_GENERIC_BLOB_TYPE_CLOCK_CONFIG        1
 #define CAM_ISP_TFE_GENERIC_BLOB_TYPE_BW_CONFIG_V2        2
 #define CAM_ISP_TFE_GENERIC_BLOB_TYPE_CSID_CLOCK_CONFIG   3
-#define CAM_ISP_TFE_GENERIC_BLOB_TYPE_DYNAMIC_MODE_SWITCH 15
 
 /* DSP mode */
 #define CAM_ISP_TFE_DSP_MODE_NONE                   0
