@@ -42,6 +42,18 @@
 #include "msm_common.h"
 #include "msm_dailink.h"
 
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
+#include "feedback/oplus_audio_kernel_fb.h"
+#ifdef dev_err
+#undef dev_err
+#define dev_err dev_err_fb_delay
+#endif
+#ifdef dev_err_ratelimited
+#undef dev_err_ratelimited
+#define dev_err_ratelimited dev_err_fb_delay
+#endif
+#endif /* CONFIG_OPLUS_FEATURE_MM_FEEDBACK */
+
 #define DRV_NAME "kalama-asoc-snd"
 #define __CHIPSET__ "KALAMA "
 #define MSM_DAILINK_NAME(name) (__CHIPSET__#name)
@@ -50,7 +62,12 @@
 #define WCD9XXX_MBHC_DEF_BUTTONS    8
 #define CODEC_EXT_CLK_RATE          9600000
 #define DEV_NAME_STR_LEN            32
+#ifndef OPLUS_ARCH_EXTENDS
+/* Modify for headset detect */
 #define WCD_MBHC_HS_V_MAX           1600
+#else /* OPLUS_ARCH_EXTENDS */
+#define WCD_MBHC_HS_V_MAX           1700
+#endif /* OPLUS_ARCH_EXTENDS */
 
 #define WCN_CDC_SLIM_RX_CH_MAX 2
 #define WCN_CDC_SLIM_TX_CH_MAX 2
@@ -88,6 +105,11 @@ static int dmic_0_1_gpio_cnt;
 static int dmic_2_3_gpio_cnt;
 static int dmic_4_5_gpio_cnt;
 static int dmic_6_7_gpio_cnt;
+
+#if IS_ENABLED(CONFIG_AUDIO_EXTEND_DRV)
+/*Add for oplus extend aduio*/
+extern void extend_codec_i2s_be_dailinks(struct device *dev, struct snd_soc_dai_link *dailink, size_t size);
+#endif /* CONFIG_AUDIO_EXTEND_DRV */
 
 static void *def_wcd_mbhc_cal(void);
 
@@ -132,7 +154,12 @@ static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool acti
 	if (!pdata->fsa_handle)
 		return false;
 
+	#ifndef OPLUS_ARCH_EXTENDS
+	/* fsa4480_switch_event will return 0 when excute success */
 	return fsa4480_switch_event(pdata->fsa_handle, FSA_MIC_GND_SWAP);
+	#else /* OPLUS_ARCH_EXTENDS */
+	return (0 == fsa4480_switch_event(pdata->fsa_handle, FSA_MIC_GND_SWAP));
+	#endif /* OPLUS_ARCH_EXTENDS */
 }
 
 static void msm_parse_upd_configuration(struct platform_device *pdev,
@@ -140,6 +167,7 @@ static void msm_parse_upd_configuration(struct platform_device *pdev,
 {
 	int ret = 0;
 	u32 dt_values[2];
+	struct snd_soc_card *card = NULL;
 
 	if (!pdev || !pdata)
 		return;
@@ -151,6 +179,16 @@ static void msm_parse_upd_configuration(struct platform_device *pdev,
 			__func__, "qcom,upd_backends_used");
 		return;
 	}
+
+	if (!strcmp(pdata->upd_config.backend_used, "wsa")) {
+		card = (struct snd_soc_card *)platform_get_drvdata(pdev);
+		if (strstr(card->name, "wsa883x"))
+			pdata->get_dev_num = wsa883x_codec_get_dev_num;
+		else
+			pdata->get_dev_num = wsa884x_codec_get_dev_num;
+    } else {
+		pdata->get_dev_num = wcd938x_codec_get_dev_num;
+    }
 
 	ret = of_property_read_u32_array(pdev->dev.of_node,
 			"qcom,upd_lpass_reg_addr", dt_values, MAX_EARPA_REG);
@@ -177,6 +215,7 @@ static void msm_set_upd_config(struct snd_soc_pcm_runtime *rtd)
 {
 	int val1 = 0, val2 = 0, ret = 0;
 	u8  dev_num = 0;
+	char cdc_name[DEV_NAME_STR_LEN];
 	struct snd_soc_component *component = NULL;
 	struct msm_asoc_mach_data *pdata = NULL;
 
@@ -190,6 +229,10 @@ static void msm_set_upd_config(struct snd_soc_pcm_runtime *rtd)
 		pr_err_ratelimited("%s: pdata is NULL\n", __func__);
 		return;
 	}
+	if (!pdata->get_dev_num) {
+		pr_err_ratelimited("%s: get_dev_num is NULL\n", __func__);
+		return;
+	}
 
 	if (!pdata->upd_config.ear_pa_hw_reg_cfg.lpass_cdc_rx0_rx_path_ctl_phy_addr ||
 		!pdata->upd_config.ear_pa_hw_reg_cfg.lpass_wr_fifo_reg_phy_addr ||
@@ -198,37 +241,18 @@ static void msm_set_upd_config(struct snd_soc_pcm_runtime *rtd)
 		return;
 	}
 
+	memset(cdc_name, '\0', DEV_NAME_STR_LEN);
 	if (!strcmp(pdata->upd_config.backend_used, "wsa")) {
-		if (pdata->wsa_max_devs > 0) {
-			component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.1");
-			if (!component) {
-				pr_err("%s: %s component is NULL\n", __func__,
-					"wsa-codec.1");
-				return;
-			}
-		} else {
-			pr_err("%s wsa_max_devs are NULL\n", __func__);
-			return;
-		}
-	} else {
-		component = snd_soc_rtdcom_lookup(rtd, WCD938X_DRV_NAME);
-		if (!component) {
-			pr_err("%s component is NULL\n", __func__);
-			return;
-		}
+		if (pdata->wsa_max_devs > 0)
+			memcpy(cdc_name, "wsa-codec.1", strlen("wsa-codec.1"));
 	}
+	else
+		memcpy(cdc_name, WCD938X_DRV_NAME, sizeof(WCD938X_DRV_NAME));
 
-	if (!strcmp(pdata->upd_config.backend_used, "wsa")) {
-		if (strstr(rtd->card->name, "wsa883x"))
-			pdata->get_dev_num = wsa883x_codec_get_dev_num;
-		else
-			pdata->get_dev_num = wsa884x_codec_get_dev_num;
-	} else {
-		pdata->get_dev_num = wcd938x_codec_get_dev_num;
-	}
-
-	if (!pdata->get_dev_num) {
-		pr_err("%s: get_dev_num is NULL\n", __func__);
+	component = snd_soc_rtdcom_lookup(rtd, cdc_name);
+	if (!component) {
+		pr_err_ratelimited("%s: %s component is NULL\n", __func__,
+			cdc_name);
 		return;
 	}
 
@@ -433,6 +457,8 @@ static void *def_wcd_mbhc_cal(void)
 	btn_high = ((void *)&btn_cfg->_v_btn_low) +
 		(sizeof(btn_cfg->_v_btn_low[0]) * btn_cfg->num_btn);
 
+	#ifndef OPLUS_ARCH_EXTENDS
+	/* Modify for headset button threshold */
 	btn_high[0] = 75;
 	btn_high[1] = 150;
 	btn_high[2] = 237;
@@ -441,6 +467,16 @@ static void *def_wcd_mbhc_cal(void)
 	btn_high[5] = 500;
 	btn_high[6] = 500;
 	btn_high[7] = 500;
+	#else /* OPLUS_ARCH_EXTENDS */
+	btn_high[0] = 130;		/* Hook ,0 ~ 160 Ohm*/
+	btn_high[1] = 131;
+	btn_high[2] = 253;		/* Volume + ,160 ~ 360 Ohm*/
+	btn_high[3] = 425;		/* Volume - ,360 ~ 680 Ohm*/
+	btn_high[4] = 426;
+	btn_high[5] = 426;
+	btn_high[6] = 426;
+	btn_high[7] = 426;
+	#endif /* OPLUS_ARCH_EXTENDS */
 
 	return wcd_mbhc_cal;
 }
@@ -1434,6 +1470,11 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 		rc = of_property_read_u32(dev->of_node,
 				"qcom,mi2s-audio-intf", &val);
 		if (!rc && val) {
+			#if IS_ENABLED(CONFIG_AUDIO_EXTEND_DRV)
+			/*Add for oplus extend audio*/
+			extend_codec_i2s_be_dailinks(dev, msm_mi2s_dai_links, ARRAY_SIZE(msm_mi2s_dai_links));
+			pr_info("exchanged mi2s\n");
+			#endif /* CONFIG_AUDIO_EXTEND_DRV */
 			memcpy(msm_kalama_dai_links + total_links,
 					msm_mi2s_dai_links,
 					sizeof(msm_mi2s_dai_links));
@@ -1443,6 +1484,11 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 		rc = of_property_read_u32(dev->of_node,
 				"qcom,tdm-audio-intf", &val);
 		if (!rc && val) {
+			#if IS_ENABLED(CONFIG_AUDIO_EXTEND_DRV)
+			/*Add for oplus extend audio*/
+			extend_codec_i2s_be_dailinks(dev, msm_tdm_dai_links, ARRAY_SIZE(msm_tdm_dai_links));
+			pr_info("exchanged tdm\n");
+			#endif /* CONFIG_AUDIO_EXTEND_DRV */
 			memcpy(msm_kalama_dai_links + total_links,
 					msm_tdm_dai_links,
 					sizeof(msm_tdm_dai_links));
@@ -1666,6 +1712,78 @@ static int msm_int_wsa884x_init(struct snd_soc_pcm_runtime *rtd)
 	return 0;
 }
 
+#ifdef OPLUS_ARCH_EXTENDS
+//add for sp tuning tools get pcmid and miid
+static uint32_t oplus_sp_miid;
+static int oplus_sp_miid_info(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 0xffffffff; /* 16 bit value */
+	return 0;
+}
+
+static int oplus_sp_miid_get(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = oplus_sp_miid;
+	return 0;
+}
+
+static int oplus_sp_miid_put(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	oplus_sp_miid = (uint32_t)ucontrol->value.integer.value[0];
+	return 1;
+}
+
+static uint32_t oplus_sp_pcm_id;
+static int oplus_sp_pcm_id_info(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 0xffffffff; /* 16 bit value */
+	return 0;
+}
+
+static int oplus_sp_pcm_id_get(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = oplus_sp_pcm_id;
+	return 0;
+}
+
+static int oplus_sp_pcm_id_put(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	oplus_sp_pcm_id = (uint32_t)ucontrol->value.integer.value[0];
+	return 1;
+}
+
+static const struct snd_kcontrol_new oplus_sp_controls[] = {
+	//SP PCMID
+	{
+		.name = "SP PCMID",
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.info = oplus_sp_pcm_id_info,
+		.get = oplus_sp_pcm_id_get,
+		.put = oplus_sp_pcm_id_put,
+	},
+	//SP MIID
+	{
+		.name = "SP MIID",
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.info = oplus_sp_miid_info,
+		.get = oplus_sp_miid_get,
+		.put = oplus_sp_miid_put,
+	},
+};
+#endif /* OPLUS_ARCH_EXTENDS */
+
 static int msm_int_wsa_init(struct snd_soc_pcm_runtime *rtd)
 {
 	if (strstr(rtd->card->name, "wsa883x"))
@@ -1750,6 +1868,11 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_ignore_suspend(dapm, "AMIC3");
 	snd_soc_dapm_ignore_suspend(dapm, "AMIC4");
 	snd_soc_dapm_sync(dapm);
+
+	#ifdef OPLUS_ARCH_EXTENDS
+	//add for sp tuning tools get pcmid and miid
+	snd_soc_add_component_controls(component, oplus_sp_controls, ARRAY_SIZE(oplus_sp_controls));
+	#endif /* OPLUS_ARCH_EXTENDS */
 
 	pdata = snd_soc_card_get_drvdata(component->card);
 	if (!pdata->codec_root) {

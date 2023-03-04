@@ -703,6 +703,10 @@ int bolero_register_macro(struct device *dev, u16 macro_id,
 			priv->macro_params[macro_id].reg_wake_irq =
 						ops->reg_wake_irq;
 	}
+	#ifdef OPLUS_ARCH_EXTENDS
+	/* Modify for sound card register fail Qcom case05379864, CR2984760 */
+	mutex_lock(&priv->macro_lock);
+	#endif /* OPLUS_ARCH_EXTENDS */
 	priv->num_dais += ops->num_dais;
 	priv->num_macros_registered++;
 	priv->macros_supported[macro_id] = true;
@@ -713,6 +717,10 @@ int bolero_register_macro(struct device *dev, u16 macro_id,
 		ret = bolero_copy_dais_from_macro(priv);
 		if (ret < 0) {
 			dev_err(dev, "%s: copy_dais failed\n", __func__);
+			#ifdef OPLUS_ARCH_EXTENDS
+			/* Modify for sound card register fail Qcom case05379864, CR2984760 */
+			mutex_unlock(&priv->macro_lock);
+			#endif /* OPLUS_ARCH_EXTENDS */
 			return ret;
 		}
 		if (priv->macros_supported[TX_MACRO] == false) {
@@ -725,9 +733,18 @@ int bolero_register_macro(struct device *dev, u16 macro_id,
 				priv->bolero_dais, priv->num_dais);
 		if (ret < 0) {
 			dev_err(dev, "%s: register codec failed\n", __func__);
+			#ifdef OPLUS_ARCH_EXTENDS
+			/* Modify for sound card register fail Qcom case05379864, CR2984760 */
+
+			mutex_unlock(&priv->macro_lock);
+			#endif /* OPLUS_ARCH_EXTENDS */
 			return ret;
 		}
 	}
+	#ifdef OPLUS_ARCH_EXTENDS
+	/* Modify for sound card register fail Qcom case05379864, CR2984760 */
+	mutex_unlock(&priv->macro_lock);
+	#endif /* OPLUS_ARCH_EXTENDS */
 	return 0;
 }
 EXPORT_SYMBOL(bolero_register_macro);
@@ -888,7 +905,7 @@ static int bolero_ssr_enable(struct device *dev, void *data)
 				priv->component,
 				BOLERO_MACRO_EVT_CLK_RESET, 0x0);
 	}
-	TRACE_PRINTK("%s: clk count reset\n", __func__);
+	trace_printk("%s: clk count reset\n", __func__);
 
 	if (priv->rsc_clk_cb)
 		priv->rsc_clk_cb(priv->clk_dev, BOLERO_MACRO_EVT_SSR_GFMUX_UP);
@@ -911,7 +928,7 @@ static int bolero_ssr_enable(struct device *dev, void *data)
 	/* Add a 100usec sleep to ensure last register write is done */
 	usleep_range(100,110);
 	bolero_clk_rsc_enable_all_clocks(priv->clk_dev, false);
-	TRACE_PRINTK("%s: regcache_sync done\n", __func__);
+	trace_printk("%s: regcache_sync done\n", __func__);
 	/* call ssr event for supported macros */
 	for (macro_idx = START_MACRO; macro_idx < MAX_MACRO; macro_idx++) {
 		if (!priv->macro_params[macro_idx].event_handler)
@@ -920,7 +937,7 @@ static int bolero_ssr_enable(struct device *dev, void *data)
 			priv->component,
 			BOLERO_MACRO_EVT_SSR_UP, 0x0);
 	}
-	TRACE_PRINTK("%s: SSR up events processed by all macros\n", __func__);
+	trace_printk("%s: SSR up events processed by all macros\n", __func__);
 	bolero_cdc_notifier_call(priv, BOLERO_SLV_EVT_SSR_UP);
 	return 0;
 }
@@ -1396,6 +1413,10 @@ static int bolero_probe(struct platform_device *pdev)
 	priv->core_audio_vote_count = 0;
 
 	dev_set_drvdata(&pdev->dev, priv);
+	#ifdef OPLUS_ARCH_EXTENDS
+	/* Modify for sound card register fail Qcom case05379864, CR2984760 */
+	mutex_init(&priv->macro_lock);
+	#endif /* OPLUS_ARCH_EXTENDS */
 	mutex_init(&priv->io_lock);
 	mutex_init(&priv->clk_lock);
 	mutex_init(&priv->vote_lock);
@@ -1435,6 +1456,10 @@ static int bolero_remove(struct platform_device *pdev)
 		return -EINVAL;
 
 	of_platform_depopulate(&pdev->dev);
+	#ifdef OPLUS_ARCH_EXTENDS
+	/* Modify for sound card register fail Qcom case05379864, CR2984760 */
+	mutex_destroy(&priv->macro_lock);
+	#endif /* OPLUS_ARCH_EXTENDS */
 	mutex_destroy(&priv->io_lock);
 	mutex_destroy(&priv->clk_lock);
 	mutex_destroy(&priv->vote_lock);
@@ -1463,7 +1488,7 @@ int bolero_runtime_resume(struct device *dev)
 		}
 	}
 	priv->core_hw_vote_count++;
-	TRACE_PRINTK("%s: hw vote count %d\n",
+	trace_printk("%s: hw vote count %d\n",
 		__func__, priv->core_hw_vote_count);
 
 audio_vote:
@@ -1482,7 +1507,7 @@ audio_vote:
 		}
 	}
 	priv->core_audio_vote_count++;
-	TRACE_PRINTK("%s: audio vote count %d\n",
+	trace_printk("%s: audio vote count %d\n",
 		__func__, priv->core_audio_vote_count);
 
 done:
@@ -1507,7 +1532,7 @@ int bolero_runtime_suspend(struct device *dev)
 		dev_dbg(dev, "%s: Invalid lpass core hw node\n",
 			__func__);
 	}
-	TRACE_PRINTK("%s: hw vote count %d\n",
+	trace_printk("%s: hw vote count %d\n",
 		__func__, priv->core_hw_vote_count);
 
 	if (priv->lpass_audio_hw_vote != NULL) {
@@ -1520,7 +1545,7 @@ int bolero_runtime_suspend(struct device *dev)
 		dev_dbg(dev, "%s: Invalid lpass audio hw node\n",
 			__func__);
 	}
-	TRACE_PRINTK("%s: audio vote count %d\n",
+	trace_printk("%s: audio vote count %d\n",
 		__func__, priv->core_audio_vote_count);
 
 	mutex_unlock(&priv->vote_lock);

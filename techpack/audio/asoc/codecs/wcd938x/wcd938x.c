@@ -28,6 +28,22 @@
 #include "internal.h"
 #include "asoc/bolero-slave-internal.h"
 
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
+#include "feedback/oplus_audio_kernel_fb.h"
+#ifdef dev_err
+#undef dev_err
+#define dev_err dev_err_fb_delay
+#endif
+#ifdef dev_err_ratelimited
+#undef dev_err_ratelimited
+#define dev_err_ratelimited dev_err_fb_delay
+#endif
+#ifdef pr_err
+#undef pr_err
+#define pr_err pr_err_fb_delay
+#endif
+#endif /* CONFIG_OPLUS_FEATURE_MM_FEEDBACK */
+
 #define NUM_SWRS_DT_PARAMS 5
 #define WCD938X_VARIANT_ENTRY_SIZE 32
 
@@ -42,7 +58,12 @@
 #define ADC_MODE_VAL_ULP1     0x09
 #define ADC_MODE_VAL_ULP2     0x0B
 
+#ifdef OPLUS_ARCH_EXTENDS
+/* workaround Solve the problem that get swr-dev fails after adsp ssr */
+#define NUM_ATTEMPTS 50
+#else /* OPLUS_ARCH_EXTENDS */
 #define NUM_ATTEMPTS 20
+#endif /* OPLUS_ARCH_EXTENDS */
 
 #define DAPM_MICBIAS1_STANDALONE "MIC BIAS1 Standalone"
 #define DAPM_MICBIAS2_STANDALONE "MIC BIAS2 Standalone"
@@ -105,7 +126,7 @@ static u8 tx_mode_bit[] = {
 };
 
 static const DECLARE_TLV_DB_SCALE(line_gain, 0, 7, 1);
-static const DECLARE_TLV_DB_SCALE(analog_gain, 0, 27, 1);
+static const DECLARE_TLV_DB_SCALE(analog_gain, 0, 25, 1);
 
 static int wcd938x_handle_post_irq(void *data);
 static int wcd938x_reset(struct device *dev);
@@ -2157,6 +2178,13 @@ static int wcd938x_get_logical_addr(struct swr_device *swr_dev)
 		/* retry after 4ms */
 		usleep_range(4000, 4010);
 		ret = swr_get_logical_dev_num(swr_dev, swr_dev->addr, &devnum);
+		#ifdef OPLUS_ARCH_EXTENDS
+		/*add log to check retry num issue*/
+		if (ret) {
+			dev_info_ratelimited(&swr_dev->dev, "%s get devnum %d for dev addr %llx failed, ret = %d, num_retry = %d",
+			__func__, devnum, swr_dev->addr, ret, num_retry);
+		}
+		#endif /*OPLUS_ARCH_EXTENDS*/
 	} while (ret && --num_retry);
 
 	if (ret)
@@ -2253,6 +2281,11 @@ static int wcd938x_event_notify(struct notifier_block *block,
 						     NULL);
 		wcd938x->mbhc->wcd_mbhc.deinit_in_progress = true;
 		mbhc = &wcd938x->mbhc->wcd_mbhc;
+		#ifdef OPLUS_ARCH_EXTENDS
+		/* Add for fix headset not correct after ssr */
+		mbhc->plug_before_ssr = mbhc->current_plug;
+		pr_info("%s: mbhc->plug_before_ssr=%d\n", __func__, mbhc->plug_before_ssr);
+		#endif /* OPLUS_ARCH_EXTENDS */
 		wcd938x->usbc_hs_status = get_usbc_hs_status(component,
 						mbhc->mbhc_cfg);
 		wcd938x_mbhc_ssr_down(wcd938x->mbhc, component);
@@ -3129,13 +3162,13 @@ static const struct snd_kcontrol_new wcd938x_snd_controls[] = {
 
 	SOC_SINGLE_TLV("HPHL Volume", WCD938X_HPH_L_EN, 0, 20, 1, line_gain),
 	SOC_SINGLE_TLV("HPHR Volume", WCD938X_HPH_R_EN, 0, 20, 1, line_gain),
-	SOC_SINGLE_TLV("ADC1 Volume", WCD938X_ANA_TX_CH1, 0, 26, 0,
+	SOC_SINGLE_TLV("ADC1 Volume", WCD938X_ANA_TX_CH1, 0, 20, 0,
 			analog_gain),
-	SOC_SINGLE_TLV("ADC2 Volume", WCD938X_ANA_TX_CH2, 0, 26, 0,
+	SOC_SINGLE_TLV("ADC2 Volume", WCD938X_ANA_TX_CH2, 0, 20, 0,
 			analog_gain),
-	SOC_SINGLE_TLV("ADC3 Volume", WCD938X_ANA_TX_CH3, 0, 26, 0,
+	SOC_SINGLE_TLV("ADC3 Volume", WCD938X_ANA_TX_CH3, 0, 20, 0,
 			analog_gain),
-	SOC_SINGLE_TLV("ADC4 Volume", WCD938X_ANA_TX_CH4, 0, 26, 0,
+	SOC_SINGLE_TLV("ADC4 Volume", WCD938X_ANA_TX_CH4, 0, 20, 0,
 			analog_gain),
 
 	SOC_ENUM_EXT("ADC1 ChMap", tx_master_ch_enum,
@@ -4680,9 +4713,8 @@ static int wcd938x_suspend(struct device *dev)
 		clear_bit(ALLOW_BUCK_DISABLE, &wcd938x->status_mask);
 	}
 	if (wcd938x->dapm_bias_off ||
-		(wcd938x->component &&
 		(snd_soc_component_get_bias_level(wcd938x->component) ==
-			SND_SOC_BIAS_OFF))) {
+		 SND_SOC_BIAS_OFF)) {
 		msm_cdc_set_supplies_lpm_mode(wcd938x->dev,
 					      wcd938x->supplies,
 					      pdata->regulator,

@@ -50,7 +50,12 @@
 #define VA_MACRO_ADC_MUX_CFG_OFFSET 0x8
 #define VA_MACRO_ADC_MODE_CFG0_SHIFT 1
 
+#ifndef OPLUS_ARCH_EXTENDS
+/* Modify for pop noise when start dmic */
 #define BOLERO_CDC_VA_TX_DMIC_UNMUTE_DELAY_MS       40
+#else /* OPLUS_ARCH_EXTENDS */
+#define BOLERO_CDC_VA_TX_DMIC_UNMUTE_DELAY_MS       50
+#endif /* OPLUS_ARCH_EXTENDS */
 #define BOLERO_CDC_VA_TX_AMIC_UNMUTE_DELAY_MS       100
 #define BOLERO_CDC_VA_TX_DMIC_HPF_DELAY_MS       300
 #define BOLERO_CDC_VA_TX_AMIC_HPF_DELAY_MS       300
@@ -59,9 +64,21 @@
 #define VA_MACRO_CHILD_DEVICES_MAX 3
 
 static const DECLARE_TLV_DB_SCALE(digital_gain, 0, 1, 0);
+
+#ifndef OPLUS_ARCH_EXTENDS
+/* Modify for set amic and dmic unmute delay alone */
 static int va_tx_unmute_delay = BOLERO_CDC_VA_TX_DMIC_UNMUTE_DELAY_MS;
 module_param(va_tx_unmute_delay, int, 0664);
 MODULE_PARM_DESC(va_tx_unmute_delay, "delay to unmute the tx path");
+#else /* OPLUS_ARCH_EXTENDS */
+static int va_tx_amic_unmute_delay = BOLERO_CDC_VA_TX_AMIC_UNMUTE_DELAY_MS;
+module_param(va_tx_amic_unmute_delay, int, 0664);
+MODULE_PARM_DESC(va_tx_amic_unmute_delay, "delay to unmute the tx amic path");
+
+static int va_tx_dmic_unmute_delay = BOLERO_CDC_VA_TX_DMIC_UNMUTE_DELAY_MS;
+module_param(va_tx_dmic_unmute_delay, int, 0664);
+MODULE_PARM_DESC(va_tx_dmic_unmute_delay, "delay to unmute the tx dmic path");
+#endif /* OPLUS_ARCH_EXTENDS */
 
 static int va_macro_core_vote(void *handle, bool enable);
 
@@ -322,7 +339,7 @@ static int va_macro_event_handler(struct snd_soc_component *component,
 		va_macro_core_vote(va_priv, false);
 		break;
 	case BOLERO_MACRO_EVT_SSR_UP:
-		TRACE_PRINTK("%s, enter SSR up\n", __func__);
+		trace_printk("%s, enter SSR up\n", __func__);
 		/* reset swr after ssr/pdr */
 		va_priv->reset_swr = true;
 		if (va_priv->swr_ctrl_data)
@@ -848,7 +865,13 @@ static bool is_amic_enabled(struct snd_soc_component *component, int decimator)
 	adc_mux_reg = BOLERO_CDC_VA_INP_MUX_ADC_MUX0_CFG1 +
 			VA_MACRO_ADC_MUX_CFG_OFFSET * decimator;
 	if (snd_soc_component_read(component, adc_mux_reg) & SWR_MIC) {
+		#ifndef OPLUS_ARCH_EXTENDS
+		/* Modify for amic pop at record, case04926606 */
 		if (va_priv->version == BOLERO_VERSION_2_1)
+		#else /* OPLUS_ARCH_EXTENDS */
+		if (va_priv->version == BOLERO_VERSION_2_1 ||
+			va_priv->version == BOLERO_VERSION_2_0)
+		#endif /* OPLUS_ARCH_EXTENDS */
 			return true;
 		adc_reg = BOLERO_CDC_VA_INP_MUX_ADC_MUX0_CFG0 +
 			VA_MACRO_ADC_MUX_CFG_OFFSET * decimator;
@@ -1234,12 +1257,25 @@ static int va_macro_enable_dec(struct snd_soc_dapm_widget *w,
 					    TX_HPF_CUT_OFF_FREQ_MASK,
 					    CF_MIN_3DB_150HZ << 5);
 		}
+		#ifndef OPLUS_ARCH_EXTENDS
+		/* Modify for set amic and dmic unmute delay alone */
 		if (is_amic_enabled(component, decimator) < BOLERO_ADC_MAX) {
 			hpf_delay = BOLERO_CDC_VA_TX_AMIC_HPF_DELAY_MS;
 			unmute_delay = BOLERO_CDC_VA_TX_AMIC_UNMUTE_DELAY_MS;
 			if (va_tx_unmute_delay < unmute_delay)
 				va_tx_unmute_delay = unmute_delay;
 		}
+		#else /* OPLUS_ARCH_EXTENDS */
+		if (is_amic_enabled(component, decimator)) {
+			hpf_delay = BOLERO_CDC_VA_TX_AMIC_HPF_DELAY_MS;
+			unmute_delay = BOLERO_CDC_VA_TX_AMIC_UNMUTE_DELAY_MS;
+			if (unmute_delay < va_tx_amic_unmute_delay)
+				unmute_delay = va_tx_amic_unmute_delay;
+		} else {
+			if (unmute_delay < va_tx_dmic_unmute_delay)
+				unmute_delay = va_tx_dmic_unmute_delay;
+		}
+		#endif /* OPLUS_ARCH_EXTENDS */
 		snd_soc_component_update_bits(component,
 				hpf_gate_reg, 0x03, 0x02);
 		if (!is_amic_enabled(component, decimator))
@@ -1258,7 +1294,12 @@ static int va_macro_enable_dec(struct snd_soc_dapm_widget *w,
 		/* schedule work queue to Remove Mute */
 		queue_delayed_work(system_freezable_wq,
 				   &va_priv->va_mute_dwork[decimator].dwork,
+				   #ifndef OPLUS_ARCH_EXTENDS
+				   /* Modify for set amic and dmic unmute delay alone */
 				   msecs_to_jiffies(va_tx_unmute_delay));
+				   #else /* OPLUS_ARCH_EXTENDS */
+				   msecs_to_jiffies(unmute_delay));
+				   #endif /* OPLUS_ARCH_EXTENDS */
 		if (va_priv->va_hpf_work[decimator].hpf_cut_off_freq !=
 							CF_MIN_3DB_150HZ)
 			queue_delayed_work(system_freezable_wq,
