@@ -457,11 +457,10 @@ void gen7_gmu_remove(struct kgsl_device *device);
 /**
  * gen7_gmu_enable_clks - Enable gmu clocks
  * @adreno_dev: Pointer to the adreno device
- * @level: GMU frequency level
  *
  * Return: 0 on success or negative error on failure
  */
-int gen7_gmu_enable_clks(struct adreno_device *adreno_dev, u32 level);
+int gen7_gmu_enable_clks(struct adreno_device *adreno_dev);
 
 /**
  * gen7_gmu_enable_gdsc - Enable gmu gdsc

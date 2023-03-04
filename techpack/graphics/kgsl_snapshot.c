@@ -559,6 +559,46 @@ static void kgsl_device_snapshot_atomic(struct kgsl_device *device)
 			atomic_snapshot_phy_addr(device), snapshot->size);
 }
 
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+/************************************************
+adreno.h
+#define ADRENO_SOFT_FAULT BIT(0)
+#define ADRENO_HARD_FAULT BIT(1)
+#define ADRENO_TIMEOUT_FAULT BIT(2)
+#define ADRENO_IOMMU_PAGE_FAULT BIT(3)
+#define ADRENO_PREEMPT_FAULT BIT(4)
+#define ADRENO_GMU_FAULT BIT(5)
+#define ADRENO_CTX_DETATCH_TIMEOUT_FAULT BIT(6)
+#define ADRENO_GMU_FAULT_SKIP_SNAPSHOT BIT(7)
+*************************************************/
+char* kgsl_get_reason(int faulttype, bool gmu_fault) {
+	if(gmu_fault) {
+		return "GMUFAULT";
+	} else {
+		switch(faulttype) {
+			case 0:
+				return "SOFTFAULT";
+			case 1:
+				return "HANGFAULT";
+			case 2:
+				return "TIMEOUTFAULT";
+			case 3:
+				return "IOMMUPAGEFAULT";
+			case 4:
+				return "PREEMPTFAULT";
+			case 5:
+				return "GMUFAULT";
+			case 6:
+				return "CTXDETATCHFAULT";
+			case 7:
+				return "GMUSKIPFAULT";
+			default:
+				return "UNKNOW";
+		}
+	}
+}
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
+
 /**
  * kgsl_snapshot() - construct a device snapshot
  * @device: device to snapshot
@@ -656,6 +696,16 @@ void kgsl_device_snapshot(struct kgsl_device *device,
 	kgsl_add_to_minidump("GPU_SNAPSHOT", (u64) device->snapshot_memory.ptr,
 			snapshot_phy_addr(device), device->snapshot_memory.size);
 
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+		if (context!= NULL) {
+			dev_err(device->dev, "falut=%s, pid=%d, processname=%s\n",
+				kgsl_get_reason(device->snapshotfault, gmu_fault), context->proc_priv->pid, context->proc_priv->comm);
+			memset(snapshot->snapshot_hashid, '\0', sizeof(snapshot->snapshot_hashid));
+			scnprintf(snapshot->snapshot_hashid, sizeof(snapshot->snapshot_hashid), "%d@%s@%s",
+			context->proc_priv->pid, context->proc_priv->comm, kgsl_get_reason(device->snapshotfault, gmu_fault));
+		}
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
+
 	if (device->skip_ib_capture)
 		BUG_ON(device->force_panic);
 
@@ -737,6 +787,58 @@ static int snapshot_release(struct kgsl_device *device,
 	return ret;
 }
 
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+static bool snapshot_ontrol_on = 0;
+
+static ssize_t snapshot_control_show(struct kgsl_device *device, char *buf) {
+	return snprintf(buf, PAGE_SIZE, "%d\n", device->snapshot_control);
+}
+
+static ssize_t snapshot_control_store(struct kgsl_device *device,
+				const char *buf, size_t count) {
+	unsigned int val = 0;
+	int ret;
+
+	if (device && count > 0)
+		device->snapshot_control = 0;
+
+	ret = kgsl_sysfs_store(buf, &val);
+	if (!ret && device) {
+		device->snapshot_control = (bool)val;
+		snapshot_ontrol_on = device->snapshot_control;
+	}
+
+	return (ssize_t) ret < 0 ? ret : count;
+}
+
+static ssize_t snapshot_hashid_show(struct kgsl_device *device, char *buf) {
+	if (device->snapshot == NULL)
+		return 0;
+	return strlcpy(buf, device->snapshot->snapshot_hashid, PAGE_SIZE);
+}
+
+static ssize_t minidump_test_store(struct kgsl_device *device,
+				const char *buf, size_t count) {
+	unsigned int fault_type = 0;
+	int ret = 0;
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+
+	if (adreno_dev == NULL)
+		return count;
+
+	if (count > 0) {
+		ret = kgsl_sysfs_store(buf, &fault_type);
+		if (!ret && adreno_dev->dispatch_ops && adreno_dev->dispatch_ops->fault) {
+			kgsl_pwrctrl_set_state(device, KGSL_STATE_ACTIVE);
+			adreno_dev->dispatch_ops->fault(adreno_dev, fault_type);
+			dev_err(device->dev, "gpu minidump: gpu minidump trigger, fault_type = %d\n", fault_type);
+		}
+	}
+
+	return (ssize_t) ret < 0 ? ret : count;
+}
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
+
 /* Dump the sysfs binary data to the user */
 static ssize_t snapshot_show(struct file *filep, struct kobject *kobj,
 	struct bin_attribute *attr, char *buf, loff_t off,
@@ -747,6 +849,13 @@ static ssize_t snapshot_show(struct file *filep, struct kobject *kobj,
 	struct kgsl_snapshot_section_header head;
 	struct snapshot_obj_itr itr;
 	int ret = 0;
+
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+		if (snapshot_ontrol_on) {
+			dev_err(device->dev, "snapshot: snapshot_ontrol_on is true, skip snapshot\n");
+			return 0;
+		}
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
 
 	mutex_lock(&device->mutex);
 	snapshot = device->snapshot;
@@ -965,6 +1074,11 @@ static SNAPSHOT_ATTR(snapshot_legacy, 0644, snapshot_legacy_show,
 	snapshot_legacy_store);
 static SNAPSHOT_ATTR(skip_ib_capture, 0644, skip_ib_capture_show,
 		skip_ib_capture_store);
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+static SNAPSHOT_ATTR(snapshot_hashid, 0644, snapshot_hashid_show, NULL);
+static SNAPSHOT_ATTR(snapshot_control, 0644, snapshot_control_show, snapshot_control_store);
+static SNAPSHOT_ATTR(minidump_test, 0644, NULL, minidump_test_store);
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
 
 static ssize_t snapshot_sysfs_show(struct kobject *kobj,
 	struct attribute *attr, char *buf)
@@ -1056,6 +1170,10 @@ void kgsl_device_snapshot_probe(struct kgsl_device *device, u32 size)
 	device->snapshot_crashdumper = true;
 	device->snapshot_legacy = false;
 
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+	device->snapshot_control = 0;
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
+
 	device->snapshot_atomic = false;
 	device->panic_nb.notifier_call = kgsl_panic_notifier_callback;
 	device->panic_nb.priority = 1;
@@ -1071,6 +1189,12 @@ void kgsl_device_snapshot_probe(struct kgsl_device *device, u32 size)
 	if (kobject_init_and_add(&device->snapshot_kobj, &ktype_snapshot,
 		&device->dev->kobj, "snapshot"))
 		return;
+
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+	WARN_ON(sysfs_create_file(&device->snapshot_kobj, &attr_snapshot_hashid.attr));
+	WARN_ON(sysfs_create_file(&device->snapshot_kobj, &attr_snapshot_control.attr));
+	WARN_ON(sysfs_create_file(&device->snapshot_kobj, &attr_minidump_test.attr));
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
 
 	WARN_ON(sysfs_create_bin_file(&device->snapshot_kobj, &snapshot_attr));
 	WARN_ON(sysfs_create_files(&device->snapshot_kobj, snapshot_attrs));
@@ -1097,6 +1221,10 @@ void kgsl_device_snapshot_close(struct kgsl_device *device)
 	sysfs_remove_files(&device->snapshot_kobj, snapshot_attrs);
 
 	kobject_put(&device->snapshot_kobj);
+
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+	device->snapshot_control = 0;
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
 
 	if (device->snapshot_memory.dma_handle)
 		dma_free_coherent(&device->pdev->dev, device->snapshot_memory.size,
