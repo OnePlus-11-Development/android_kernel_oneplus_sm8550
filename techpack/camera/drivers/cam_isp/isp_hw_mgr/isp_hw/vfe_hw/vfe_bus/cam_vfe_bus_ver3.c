@@ -609,7 +609,6 @@ static enum cam_vfe_bus_ver3_packer_format
 	case CAM_FORMAT_NV21:
 		if ((wm_index == 1) || (wm_index == 3) || (wm_index == 5))
 			return PACKER_FMT_VER3_PLAIN_8_LSB_MSB_10_ODD_EVEN;
-		fallthrough;
 	case CAM_FORMAT_NV12:
 	case CAM_FORMAT_UBWC_NV12:
 	case CAM_FORMAT_UBWC_NV12_4R:
@@ -638,7 +637,6 @@ static enum cam_vfe_bus_ver3_packer_format
 	default:
 		return PACKER_FMT_VER3_MAX;
 	}
-	return PACKER_FMT_VER3_MAX;
 }
 
 static int cam_vfe_bus_ver3_handle_rup_top_half(uint32_t evt_id,
@@ -1114,7 +1112,6 @@ static int cam_vfe_bus_ver3_acquire_wm(
 			break;
 		case CAM_FORMAT_UBWC_NV12:
 			rsrc_data->en_ubwc = 1;
-			fallthrough;
 			/* Fall through for NV12 */
 		case CAM_FORMAT_NV21:
 		case CAM_FORMAT_NV12:
@@ -2241,11 +2238,8 @@ static int cam_vfe_bus_ver3_start_vfe_out(
 			return rc;
 	}
 
-	for (i = 0; i < rsrc_data->num_wm; i++) {
+	for (i = 0; i < rsrc_data->num_wm; i++)
 		rc = cam_vfe_bus_ver3_start_wm(&rsrc_data->wm_res[i]);
-		if (rc)
-			return rc;
-	}
 
 	memset(bus_irq_reg_mask, 0, sizeof(bus_irq_reg_mask));
 	rc = cam_vfe_bus_ver3_start_comp_grp(rsrc_data, bus_irq_reg_mask);
@@ -4574,6 +4568,8 @@ int cam_vfe_bus_ver3_init(
 	return rc;
 
 deinit_vfe_out:
+	if (i < 0)
+		i = bus_priv->num_out;
 	for (--i; i >= 0; i--)
 		cam_vfe_bus_ver3_deinit_vfe_out_resource(&bus_priv->vfe_out[i]);
 

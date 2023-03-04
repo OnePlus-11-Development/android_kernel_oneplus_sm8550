@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -917,9 +917,6 @@ static int cam_sync_dma_fence_cb(
 		goto end;
 	}
 
-	/* Adding dma fence reference on sync */
-	atomic_inc(&row->ref_cnt);
-
 	if (!atomic_dec_and_test(&row->ref_cnt))
 		goto end;
 
@@ -953,7 +950,7 @@ static int cam_generic_fence_alloc_validate_input_info_util(
 
 	*fence_input_info = NULL;
 
-	if (fence_cmd_args->input_data_size !=
+	if (fence_cmd_args->input_data_size <
 		sizeof(struct cam_generic_fence_input_info)) {
 		CAM_ERR(CAM_SYNC, "Size is invalid expected: 0x%llx actual: 0x%llx",
 			sizeof(struct cam_generic_fence_input_info),
@@ -1196,7 +1193,7 @@ static int cam_generic_fence_handle_dma_signal(
 {
 	struct cam_dma_fence_signal signal_dma_fence;
 
-	if (fence_cmd_args->input_data_size != sizeof(struct cam_dma_fence_signal)) {
+	if (fence_cmd_args->input_data_size < sizeof(struct cam_dma_fence_signal)) {
 		CAM_ERR(CAM_DMA_FENCE, "Size is invalid expected: 0x%llx actual: 0x%llx",
 			sizeof(struct cam_dma_fence_signal),
 			fence_cmd_args->input_data_size);
@@ -1242,7 +1239,6 @@ static int cam_generic_fence_handle_sync_create(
 {
 	int rc = 0, i, dma_fence_row_idx;
 	bool dma_fence_created;
-	unsigned long fence_sel_mask;
 	struct cam_dma_fence_release_params release_params;
 	struct cam_dma_fence_create_sync_obj_payload dma_sync_create;
 	struct cam_generic_fence_input_info *fence_input_info = NULL;
@@ -1264,8 +1260,8 @@ static int cam_generic_fence_handle_sync_create(
 		/* Reset flag */
 		dma_fence_created = false;
 
-		fence_sel_mask = fence_cfg->fence_sel_mask;
-		if (test_bit(CAM_GENERIC_FENCE_TYPE_DMA_FENCE, &fence_sel_mask)) {
+		if (test_bit(CAM_GENERIC_FENCE_TYPE_DMA_FENCE,
+			(unsigned long *)&fence_cfg->fence_sel_mask)) {
 			rc = cam_dma_fence_create_fd(&fence_cfg->dma_fence_fd,
 				&dma_fence_row_idx, fence_cfg->name);
 			if (rc) {
@@ -1300,7 +1296,8 @@ static int cam_generic_fence_handle_sync_create(
 		}
 
 		/* Register dma fence cb */
-		if (test_bit(CAM_GENERIC_FENCE_TYPE_DMA_FENCE, &fence_sel_mask)) {
+		if (test_bit(CAM_GENERIC_FENCE_TYPE_DMA_FENCE,
+			(unsigned long *)&fence_cfg->fence_sel_mask)) {
 			rc = cam_dma_fence_register_cb(&fence_cfg->sync_obj,
 				&dma_fence_row_idx, cam_sync_dma_fence_cb);
 			if (rc) {
@@ -1347,7 +1344,6 @@ static int cam_generic_fence_handle_sync_release(
 {
 	bool failed = false;
 	int rc = 0, i;
-	unsigned long fence_sel_mask;
 	struct cam_sync_check_for_dma_release check_for_dma_release;
 	struct cam_dma_fence_release_params release_params;
 	struct cam_generic_fence_input_info *fence_input_info = NULL;
@@ -1380,8 +1376,8 @@ static int cam_generic_fence_handle_sync_release(
 				fence_input_info->num_fences_processed);
 		}
 
-		fence_sel_mask = fence_cfg->fence_sel_mask;
-		if (test_bit(CAM_GENERIC_FENCE_TYPE_DMA_FENCE, &fence_sel_mask)) {
+		if (test_bit(CAM_GENERIC_FENCE_TYPE_DMA_FENCE,
+			(unsigned long *)&fence_cfg->fence_sel_mask)) {
 			if (!check_for_dma_release.sync_created_with_dma) {
 				CAM_ERR(CAM_SYNC,
 					"Failed to release dma fence fd: %d with sync_obj: %d, not created together",
@@ -1989,10 +1985,8 @@ static int cam_sync_component_bind(struct device *dev,
 	CAM_DBG(CAM_SYNC, "Component bound successfully");
 	return rc;
 
-#if IS_REACHABLE(CONFIG_MSM_GLOBAL_SYNX)
 dma_driver_deinit:
 	cam_dma_fence_driver_deinit();
-#endif
 workq_destroy:
 	destroy_workqueue(sync_dev->work_queue);
 v4l2_fail:

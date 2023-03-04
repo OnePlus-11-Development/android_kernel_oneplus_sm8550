@@ -12,6 +12,9 @@
 #include <cam_req_mgr_util.h>
 #include "cam_sensor_soc.h"
 #include "cam_soc_util.h"
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+#include "oplus_cam_sensor_core.h"
+#endif
 
 int32_t cam_sensor_get_sub_module_index(struct device_node *of_node,
 	struct cam_sensor_board_info *s_info)
@@ -259,7 +262,9 @@ static int32_t cam_sensor_driver_get_dt_data(struct cam_sensor_ctrl_t *s_ctrl)
 		CAM_DBG(CAM_SENSOR, "cell_idx: %d is not used for AON usecase", soc_info->index);
 		s_ctrl->aon_camera_id = NOT_AON_CAM;
 	}
-
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	cam_sensor_get_dt_data(s_ctrl);
+#endif
 	rc = cam_sensor_util_aon_registration(
 		s_ctrl->sensordata->subdev_id[SUB_MODULE_CSIPHY],
 		s_ctrl->aon_camera_id);
@@ -267,11 +272,6 @@ static int32_t cam_sensor_driver_get_dt_data(struct cam_sensor_ctrl_t *s_ctrl)
 		CAM_ERR(CAM_SENSOR, "Aon registration failed, rc: %d", rc);
 		goto FREE_SENSOR_DATA;
 	}
-
-	if (!of_property_read_bool(of_node, "hw-no-ops"))
-		s_ctrl->hw_no_ops = false;
-	else
-		s_ctrl->hw_no_ops = true;
 
 	return rc;
 

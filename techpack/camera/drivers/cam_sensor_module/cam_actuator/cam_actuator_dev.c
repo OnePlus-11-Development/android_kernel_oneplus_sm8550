@@ -22,6 +22,14 @@ struct completion *cam_actuator_get_i3c_completion(uint32_t index)
 	return &g_i3c_actuator_data[index].probe_complete;
 }
 
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+#include "oplus_cam_actuator_dev.h"
+
+#define VIDIOC_CAM_ACTUATOR_LOCK_ON 0x9003
+#define VIDIOC_CAM_ACTUATOR_LOCK_OFF 0x9004
+#define VIDIOC_CAM_ACTUATOR_SHAKE_DETECT_ON 0x9005
+#endif
+
 static int cam_actuator_subdev_close_internal(struct v4l2_subdev *sd,
 	struct v4l2_subdev_fh *fh)
 {
@@ -61,6 +69,10 @@ static long cam_actuator_subdev_ioctl(struct v4l2_subdev *sd,
 	struct cam_actuator_ctrl_t *a_ctrl =
 		v4l2_get_subdevdata(sd);
 
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	mutex_lock(&(a_ctrl->actuator_ioctl_mutex));
+#endif
+
 	switch (cmd) {
 	case VIDIOC_CAM_CONTROL:
 		rc = cam_actuator_driver_cmd(a_ctrl, arg);
@@ -77,16 +89,35 @@ static long cam_actuator_subdev_ioctl(struct v4l2_subdev *sd,
 	case CAM_SD_SHUTDOWN:
 		if (!cam_req_mgr_is_shutdown()) {
 			CAM_ERR(CAM_CORE, "SD shouldn't come from user space");
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+			mutex_unlock(&(a_ctrl->actuator_ioctl_mutex));
+#endif
 			return 0;
 		}
 
 		rc = cam_actuator_subdev_close_internal(sd, NULL);
 		break;
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	case VIDIOC_CAM_ACTUATOR_SHAKE_DETECT_ON:
+		oplus_cam_actuator_sds_on(a_ctrl);
+		break;
+	case VIDIOC_CAM_ACTUATOR_LOCK_ON:
+		rc = oplus_cam_actuator_lock_on(a_ctrl);
+		break;
+	case VIDIOC_CAM_ACTUATOR_LOCK_OFF:
+		oplus_cam_actuator_lock_off(a_ctrl);
+		break;
+#endif
 	default:
 		CAM_ERR(CAM_ACTUATOR, "Invalid ioctl cmd: %u", cmd);
 		rc = -ENOIOCTLCMD;
 		break;
 	}
+
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	mutex_unlock(&(a_ctrl->actuator_ioctl_mutex));
+#endif
+
 	return rc;
 }
 

@@ -36,6 +36,9 @@
 #define CSIPHY_VERSION_V212                       0x212
 #define CSIPHY_VERSION_V213                       0x213
 #define CSIPHY_VERSION_V220                       0x220
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+#define CSIPHY_VERSION_V212_ENHANCE               0xF212
+#endif
 
 /**
  * @csiphy_dev: CSIPhy device structure

@@ -26,6 +26,9 @@ int32_t cam_actuator_parse_dt(struct cam_actuator_ctrl_t *a_ctrl,
 
 	/* Initialize mutex */
 	mutex_init(&(a_ctrl->actuator_mutex));
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	mutex_init(&(a_ctrl->actuator_ioctl_mutex));
+#endif
 
 	rc = cam_soc_util_get_dt_properties(soc_info);
 	if (rc < 0) {

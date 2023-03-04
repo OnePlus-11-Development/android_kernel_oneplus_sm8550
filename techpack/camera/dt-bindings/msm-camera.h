@@ -100,8 +100,7 @@
 #define CAM_CPAS_ISP_LITE_FUSE 6
 #define CAM_CPAS_CSIPHY_FUSE   7
 #define CAM_CPAS_IPE_VID_OUT_8BPP_LIMIT_ENABLE 8
-#define CAM_CPAS_SHDR_MFHDR_ENABLE   23
-#define CAM_CPAS_FUSE_FEATURE_MAX 24
+#define CAM_CPAS_FUSE_FEATURE_MAX 9
 
 #define CCI_MASTER_0         0
 #define CCI_MASTER_1         1
@@ -126,8 +125,5 @@
 /* Domain ID types */
 #define CAM_CPAS_SECURE_DOMAIN      0
 #define CAM_CPAS_NON_SECURE_DOMAIN  1
-
-/* Group name for common clock source*/
-#define CAM_COMMON_TFE_SRC_CLK       1
 
 #endif

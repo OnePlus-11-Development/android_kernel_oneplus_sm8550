@@ -383,14 +383,9 @@ void cam_hw_cdm_dump_core_debug_registers(struct cam_hw_info *cdm_hw,
 		}
 
 		core_dbg &= ~(CAM_CDM_CORE_DBG_TEST_BUS_EN_MASK |
-			CAM_CDM_CORE_DBG_TEST_BUS_SEL_MASK) |
-			CAM_CDM_CORE_DBG_LOG_AHB_MASK |
-			CAM_CDM_CORE_DBG_FIFO_RB_EN_MASK;
+			CAM_CDM_CORE_DBG_TEST_BUS_SEL_MASK);
 		cam_hw_cdm_enable_core_dbg(cdm_hw, core_dbg);
-	}
-
-	if (core_dbg & CAM_CDM_CORE_DBG_LOG_AHB_MASK ||
-			core_dbg & CAM_CDM_CORE_DBG_FIFO_RB_EN_MASK){
+	} else {
 		cam_hw_cdm_enable_core_dbg(cdm_hw, core_dbg);
 
 		cam_cdm_read_hw_reg(cdm_hw, core->offsets->cmn_reg->debug_status,
@@ -1904,7 +1899,7 @@ int cam_hw_cdm_get_cdm_config(struct cam_hw_info *cdm_hw)
 {
 	struct cam_hw_soc_info *soc_info = NULL;
 	struct cam_cdm *core = NULL;
-	int rc = 0, ret = 0;
+	int rc = 0;
 
 	core = (struct cam_cdm *)cdm_hw->core_info;
 	soc_info = &cdm_hw->soc_info;
@@ -1983,9 +1978,9 @@ int cam_hw_cdm_get_cdm_config(struct cam_hw_info *cdm_hw)
 	}
 
 disable_platform_resource:
-	ret = cam_soc_util_disable_platform_resource(soc_info, true, true);
+	rc = cam_soc_util_disable_platform_resource(soc_info, true, true);
 
-	if (ret) {
+	if (rc) {
 		CAM_ERR(CAM_CDM, "disable platform failed for dev %s",
 				soc_info->dev_name);
 	} else {

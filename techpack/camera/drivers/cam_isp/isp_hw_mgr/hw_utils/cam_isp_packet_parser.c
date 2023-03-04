@@ -1206,11 +1206,9 @@ int cam_isp_add_reg_update(
 	struct cam_kmd_buf_info              *kmd_buf_info)
 {
 	int rc = -EINVAL;
-	struct cam_isp_resource_node            *res;
-	struct cam_isp_hw_mgr_res               *hw_mgr_res;
-	struct cam_isp_hw_get_cmd_update         get_regup;
-	struct cam_isp_mode_switch_data          mup_config;
-	struct cam_isp_prepare_hw_update_data   *prepare_hw_data;
+	struct cam_isp_resource_node         *res;
+	struct cam_isp_hw_mgr_res            *hw_mgr_res;
+	struct cam_isp_hw_get_cmd_update      get_regup;
 	uint32_t kmd_buf_remain_size, num_ent, i, reg_update_size;
 
 	/* Max one hw entries required for each base */
@@ -1255,14 +1253,6 @@ int cam_isp_add_reg_update(
 			get_regup.cmd.size = kmd_buf_remain_size;
 			get_regup.cmd_type = CAM_ISP_HW_CMD_GET_REG_UPDATE;
 			get_regup.res = res;
-
-			prepare_hw_data = (struct cam_isp_prepare_hw_update_data  *)
-				prepare->priv;
-			mup_config.mup = prepare_hw_data->mup_val;
-			mup_config.num_expoures = prepare_hw_data->num_exp;
-			mup_config.mup_en = prepare_hw_data->mup_en;
-
-			get_regup.data = &mup_config;
 
 			rc = res->hw_intf->hw_ops.process_cmd(
 				res->hw_intf->hw_priv,

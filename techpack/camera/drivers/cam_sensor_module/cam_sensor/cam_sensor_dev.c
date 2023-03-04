@@ -11,6 +11,14 @@
 #include "camera_main.h"
 #include "cam_compat.h"
 
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+#include "oplus_cam_sensor_core.h"
+#include "cam_res_mgr_api.h"
+#include <linux/proc_fs.h>
+#include <linux/pid.h>
+static signed int xvs_aon = 0;
+#endif
+
 static struct cam_sensor_i3c_sensor_data {
 	struct cam_sensor_ctrl_t                  *s_ctrl;
 	struct completion                          probe_complete;
@@ -20,6 +28,10 @@ struct completion *cam_sensor_get_i3c_completion(uint32_t index)
 {
 	return &g_i3c_sensor_data[index].probe_complete;
 }
+
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+#include "oplus_cam_sensor_core.h"
+#endif
 
 static int cam_sensor_subdev_close_internal(struct v4l2_subdev *sd,
 	struct v4l2_subdev_fh *fh)
@@ -71,6 +83,51 @@ static long cam_sensor_subdev_ioctl(struct v4l2_subdev *sd,
 					"Failed in Driver cmd: %d", rc);
 		}
 		break;
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	/* Add for AT camera test */
+	case VIDIOC_CAM_FTM_POWNER_DOWN:
+		rc = cam_ftm_power_down(s_ctrl);
+		break;
+	case VIDIOC_CAM_FTM_POWNER_UP:
+		rc = cam_ftm_power_up(s_ctrl);
+		break;
+	case VIDIOC_CAM_AON_POWNER_DOWN:
+		rc = cam_aon_irq_power_down(s_ctrl);
+		break;
+	case VIDIOC_CAM_AON_POWNER_UP:
+		rc = cam_aon_irq_power_up(s_ctrl);
+		if(arg != NULL){
+			if (copy_from_user(&s_ctrl->pid,
+				(void __user *) arg,
+				sizeof(int))) {
+				CAM_ERR(CAM_EEPROM, "Failed Copy from User");
+			}
+			CAM_INFO(CAM_SENSOR, "aon pid: %d", s_ctrl->pid);
+		}
+		break;
+	case VIDIOC_CAM_AON_QUERY_INFO:
+        if(s_ctrl != NULL)
+        {
+            CAM_INFO(CAM_SENSOR,"VIDIOC_CAM_AON_QUERY_INFO = 0x%x",s_ctrl->sensordata->slave_info.sensor_id);
+            if(s_ctrl->sensordata->slave_info.sensor_id == 0x709)
+            {
+                if(copy_to_user((void __user *)arg, &s_ctrl->sensordata->slave_info.sensor_id,sizeof(s_ctrl->sensordata->slave_info.sensor_id)))
+                {
+                    CAM_ERR(CAM_SENSOR,"Failed to copy to user_ptr=%pK",(void __user *)arg);
+                }
+            }
+        }else
+        {
+            CAM_ERR(CAM_SENSOR, "s_ctrl == NULL");
+        }
+        break;
+	case VIDIOC_CAM_SENSOR_STATR:
+		rc = cam_sensor_start(s_ctrl);
+		break;
+	case VIDIOC_CAM_SENSOR_STOP:
+		rc = cam_sensor_stop(s_ctrl);
+		break;
+#endif
 	case CAM_SD_SHUTDOWN:
 		if (!cam_req_mgr_is_shutdown()) {
 			CAM_ERR(CAM_CORE, "SD shouldn't come from user space");
@@ -267,14 +324,6 @@ static int cam_sensor_i2c_component_bind(struct device *dev,
 		goto free_perframe;
 	}
 
-	s_ctrl->i2c_data.bubble_update =
-		kzalloc(sizeof(struct i2c_settings_array) *
-		MAX_PER_FRAME_ARRAY, GFP_KERNEL);
-	if (s_ctrl->i2c_data.bubble_update == NULL) {
-		rc = -ENOMEM;
-		goto free_frame_skip;
-	}
-
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.init_settings.list_head));
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.config_settings.list_head));
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.streamon_settings.list_head));
@@ -286,7 +335,6 @@ static int cam_sensor_i2c_component_bind(struct device *dev,
 	for (i = 0; i < MAX_PER_FRAME_ARRAY; i++) {
 		INIT_LIST_HEAD(&(s_ctrl->i2c_data.per_frame[i].list_head));
 		INIT_LIST_HEAD(&(s_ctrl->i2c_data.frame_skip[i].list_head));
-		INIT_LIST_HEAD(&(s_ctrl->i2c_data.bubble_update[i].list_head));
 	}
 
 	s_ctrl->bridge_intf.device_hdl = -1;
@@ -301,9 +349,6 @@ static int cam_sensor_i2c_component_bind(struct device *dev,
 	s_ctrl->sensordata->power_info.dev = soc_info->dev;
 
 	return rc;
-
-free_frame_skip:
-	kfree(s_ctrl->i2c_data.frame_skip);
 free_perframe:
 	kfree(s_ctrl->i2c_data.per_frame);
 unreg_subdev:
@@ -342,7 +387,6 @@ static void cam_sensor_i2c_component_unbind(struct device *dev,
 
 	kfree(s_ctrl->i2c_data.per_frame);
 	kfree(s_ctrl->i2c_data.frame_skip);
-	kfree(s_ctrl->i2c_data.bubble_update);
 	v4l2_set_subdevdata(&(s_ctrl->v4l2_dev_str.sd), NULL);
 	kfree(s_ctrl);
 }
@@ -392,7 +436,11 @@ static int cam_sensor_component_bind(struct device *dev,
 	struct cam_hw_soc_info *soc_info = NULL;
 	bool i3c_i2c_target;
 	struct platform_device *pdev = to_platform_device(dev);
-
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	struct resource *res = NULL;
+	unsigned long irqflags = 0;
+	unsigned int aon_flag_irq = 0;
+#endif
 	i3c_i2c_target = of_property_read_bool(pdev->dev.of_node, "i3c-i2c-target");
 	if (i3c_i2c_target)
 		return 0;
@@ -449,14 +497,6 @@ static int cam_sensor_component_bind(struct device *dev,
 		goto free_perframe;
 	}
 
-	s_ctrl->i2c_data.bubble_update =
-		kzalloc(sizeof(struct i2c_settings_array) *
-		MAX_PER_FRAME_ARRAY, GFP_KERNEL);
-	if (s_ctrl->i2c_data.bubble_update == NULL) {
-		rc = -ENOMEM;
-		goto free_frame_skip;
-	}
-
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.init_settings.list_head));
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.config_settings.list_head));
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.streamon_settings.list_head));
@@ -464,11 +504,51 @@ static int cam_sensor_component_bind(struct device *dev,
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.reg_bank_unlock_settings.list_head));
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.reg_bank_lock_settings.list_head));
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.read_settings.list_head));
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	xvs_aon = of_get_named_gpio(pdev->dev.of_node, "qcom-aon-irq-gpio", 0);
+	CAM_DBG(CAM_SENSOR, "gpio xvs_aon =%d ", xvs_aon);
+	if(xvs_aon > 0){
+		if (!gpio_is_valid(xvs_aon)) {
+			rc = -1;
+			CAM_ERR(CAM_SENSOR, "gpio is invalid");
+		}
+		rc = devm_gpio_request(&pdev->dev, xvs_aon, "qcom-aon-irq-gpio");
+		if (rc) {
+			CAM_ERR(CAM_SENSOR, "can't request aon gpio %d, err: %d\n", xvs_aon, rc);
+		}
+		gpio_direction_input(xvs_aon);
 
+		res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+		if (res) {
+			aon_flag_irq = res->start;
+			irqflags = (res->flags & IRQF_TRIGGER_MASK) | IRQF_SHARED;
+		} else {
+			aon_flag_irq = gpio_to_irq(xvs_aon);
+			irqflags = IRQF_TRIGGER_RISING;
+		}
+
+		CAM_INFO(CAM_SENSOR, "gpio_to_irq  success aon_flag_irq = %d-->", aon_flag_irq);
+		rc = devm_request_irq(&pdev->dev, aon_flag_irq, aon_interupt_handler,
+				irqflags, "qcom-aon-irq-gpio", pdev);
+		if (rc) {
+			CAM_ERR(CAM_SENSOR, "register failed->rc %d", rc);
+		}
+		disable_irq(aon_flag_irq);
+		enable_irq(aon_flag_irq);
+		INIT_WORK(&s_ctrl->aon_wq, cam_aon_do_work);
+		s_ctrl->pid = 0;
+	}
+#endif
+
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	mutex_init(&(s_ctrl->sensor_power_state_mutex));
+	mutex_init(&(s_ctrl->sensor_initsetting_mutex));
+	s_ctrl->sensor_power_state = CAM_SENSOR_POWER_OFF;
+	s_ctrl->sensor_initsetting_state = CAM_SENSOR_SETTING_WRITE_INVALID;
+#endif
 	for (i = 0; i < MAX_PER_FRAME_ARRAY; i++) {
 		INIT_LIST_HEAD(&(s_ctrl->i2c_data.per_frame[i].list_head));
 		INIT_LIST_HEAD(&(s_ctrl->i2c_data.frame_skip[i].list_head));
-		INIT_LIST_HEAD(&(s_ctrl->i2c_data.bubble_update[i].list_head));
 	}
 
 	s_ctrl->bridge_intf.device_hdl = -1;
@@ -491,8 +571,6 @@ static int cam_sensor_component_bind(struct device *dev,
 
 	return rc;
 
-free_frame_skip:
-	kfree(s_ctrl->i2c_data.frame_skip);
 free_perframe:
 	kfree(s_ctrl->i2c_data.per_frame);
 unreg_subdev:
@@ -529,10 +607,17 @@ static void cam_sensor_component_unbind(struct device *dev,
 	soc_info = &s_ctrl->soc_info;
 	for (i = 0; i < soc_info->num_clk; i++)
 		devm_clk_put(soc_info->dev, soc_info->clk[i]);
-
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	if(xvs_aon > 0)
+	{
+		disable_irq(gpio_to_irq(xvs_aon));
+		devm_free_irq(soc_info->dev, gpio_to_irq(xvs_aon), pdev);
+		devm_gpio_free(soc_info->dev, xvs_aon);
+		xvs_aon = 0;
+	}
+#endif
 	kfree(s_ctrl->i2c_data.per_frame);
 	kfree(s_ctrl->i2c_data.frame_skip);
-	kfree(s_ctrl->i2c_data.bubble_update);
 	platform_set_drvdata(pdev, NULL);
 	v4l2_set_subdevdata(&(s_ctrl->v4l2_dev_str.sd), NULL);
 	devm_kfree(&pdev->dev, s_ctrl);

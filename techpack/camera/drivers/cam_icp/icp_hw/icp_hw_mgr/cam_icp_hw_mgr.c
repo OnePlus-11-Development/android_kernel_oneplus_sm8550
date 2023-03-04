@@ -285,12 +285,8 @@ static int cam_icp_supported_clk_rates(struct cam_icp_hw_mgr *hw_mgr,
 	for (i = 0; i < CAM_MAX_VOTE; i++) {
 		ctx_data->clk_info.clk_rate[i] =
 			soc_info->clk_rate[i][soc_info->src_clk_idx];
-
-		if (ctx_data->clk_info.clk_rate[i])
-			ctx_data->clk_info.max_supported_clk_level = i;
-		CAM_DBG(CAM_PERF, "dev_type: %d clk_info[%d] = %d max_supported_clk_level: %d",
-			ctx_data->icp_dev_acquire_info->dev_type, i, ctx_data->clk_info.clk_rate[i],
-			ctx_data->clk_info.max_supported_clk_level);
+		CAM_DBG(CAM_PERF, "clk_info[%d] = %d",
+			i, ctx_data->clk_info.clk_rate[i]);
 	}
 
 	return 0;
@@ -1384,7 +1380,7 @@ static bool cam_icp_check_clk_update(struct cam_icp_hw_mgr *hw_mgr,
 	if (!ctx_data->clk_info.rt_flag &&
 		(ctx_data->unified_dev_type !=
 		CAM_ICP_RES_TYPE_BPS))
-		base_clk = ctx_data->clk_info.clk_rate[ctx_data->clk_info.max_supported_clk_level];
+		base_clk = ctx_data->clk_info.clk_rate[CAM_MAX_VOTE-1];
 	else
 		base_clk = cam_icp_mgr_calc_base_clk(clk_info->frame_cycles,
 				clk_info->budget_ns);
@@ -2323,39 +2319,9 @@ static void cam_icp_mgr_compute_fw_avg_response_time(struct cam_icp_hw_ctx_data 
 		(perf_stats->total_resp_time / perf_stats->total_requests));
 }
 
-static int cam_icp_mgr_dump_clk(struct cam_icp_hw_ctx_data *ctx_data)
-{
-	uint32_t id, rc = 0;
-	uint32_t *cmd_args = NULL;
-	struct cam_hw_intf *ipe_dev_intf = NULL;
-	struct cam_hw_intf *bps_dev_intf = NULL;
-
-	ipe_dev_intf = icp_hw_mgr.ipe0_dev_intf;
-	bps_dev_intf = icp_hw_mgr.bps_dev_intf;
-
-	if ((!ipe_dev_intf) || (!bps_dev_intf)) {
-		CAM_ERR(CAM_ICP, "dev intfs are wrong, failed to dump clk");
-		return -EINVAL;
-	}
-
-	//dump bps clock
-	id = CAM_ICP_BPS_CMD_DUMP_CLK;
-	bps_dev_intf->hw_ops.process_cmd(
-		bps_dev_intf->hw_priv, id,
-		cmd_args, 0);
-
-	//dump ipe clock
-	id = CAM_ICP_IPE_CMD_DUMP_CLK;
-	ipe_dev_intf->hw_ops.process_cmd(
-		ipe_dev_intf->hw_priv, id,
-		cmd_args, 0);
-
-	return rc;
-}
-
 static int cam_icp_mgr_handle_frame_process(uint32_t *msg_ptr, int flag)
 {
-	int i, rc;
+	int i;
 	uint32_t idx;
 	uint64_t request_id;
 	struct cam_icp_hw_ctx_data *ctx_data = NULL;
@@ -2426,7 +2392,6 @@ static int cam_icp_mgr_handle_frame_process(uint32_t *msg_ptr, int flag)
 				ctx_data->icp_dev_acquire_info->dev_type,
 				request_id);
 			event_id = CAM_CTX_EVT_ID_ERROR;
-			rc = cam_icp_mgr_dump_clk(ctx_data);
 		}
 		buf_data.evt_param = cam_icp_handle_err_type_to_evt_param(ioconfig_ack->err_type);
 	} else {
@@ -3857,7 +3822,6 @@ static int cam_icp_mgr_abort_handle_wq(
 	struct hfi_cmd_work_data   *task_data = NULL;
 	struct cam_icp_hw_ctx_data *ctx_data;
 	struct hfi_cmd_ipebps_async *abort_cmd;
-	struct hfi_cmd_abort        abort_data;
 
 	if (!data || !priv) {
 		CAM_ERR(CAM_ICP, "Invalid params %pK %pK", data, priv);
@@ -3889,26 +3853,14 @@ static int cam_icp_mgr_abort_handle_wq(
 	abort_cmd->fw_handles[0] = ctx_data->fw_handle;
 	abort_cmd->user_data1 = PTR_TO_U64(ctx_data);
 	abort_cmd->user_data2 = (uint64_t)0x0;
-	// default abort_data.user_data
-	abort_data.user_data = 0;
-
-	if (task_data->request_id == 0) {
-		abort_data.abort.num_req_ids = 0;
-	} else {
-		abort_data.abort.num_req_ids = 1;
-		abort_data.abort.num_req_id[0] = task_data->request_id;
-	}
-	memcpy(abort_cmd->payload.direct, &abort_data,
-		sizeof(abort_data));
 
 	rc = hfi_write_cmd(abort_cmd);
 	if (rc) {
 		kfree(abort_cmd);
 		return rc;
 	}
-	CAM_DBG(CAM_ICP, "fw_handle = %x ctx_data = %pK ctx_id %d reqID %lld",
-		ctx_data->fw_handle, ctx_data, ctx_data->ctx_id,
-		task_data->request_id);
+	CAM_DBG(CAM_ICP, "fw_handle = %x ctx_data = %pK ctx_id %d",
+		ctx_data->fw_handle, ctx_data, ctx_data->ctx_id);
 
 	kfree(abort_cmd);
 	return rc;
@@ -4958,13 +4910,13 @@ static int cam_icp_mgr_pkt_validation(struct cam_packet *packet)
 		return -EINVAL;
 	}
 
-	if (!packet->num_io_configs || packet->num_io_configs > IPE_IO_IMAGES_MAX) {
+	if (packet->num_io_configs > IPE_IO_IMAGES_MAX) {
 		CAM_ERR(CAM_ICP, "Invalid number of io configs: %d %d",
 			IPE_IO_IMAGES_MAX, packet->num_io_configs);
 		return -EINVAL;
 	}
 
-	if (!packet->num_cmd_buf || packet->num_cmd_buf > CAM_ICP_CTX_MAX_CMD_BUFFERS) {
+	if (packet->num_cmd_buf > CAM_ICP_CTX_MAX_CMD_BUFFERS) {
 		CAM_ERR(CAM_ICP, "Invalid number of cmd buffers: %d %d",
 			CAM_ICP_CTX_MAX_CMD_BUFFERS, packet->num_cmd_buf);
 		return -EINVAL;
@@ -5907,8 +5859,7 @@ static void cam_icp_mgr_flush_info_dump(
 }
 
 static int cam_icp_mgr_enqueue_abort(
-	struct cam_icp_hw_ctx_data *ctx_data,
-	struct cam_hw_flush_args *flush_args)
+	struct cam_icp_hw_ctx_data *ctx_data)
 {
 	int timeout = 2000, rc;
 	unsigned long rem_jiffies = 0;
@@ -5925,11 +5876,6 @@ static int cam_icp_mgr_enqueue_abort(
 	task_data = (struct hfi_cmd_work_data *)task->payload;
 	task_data->data = (void *)ctx_data;
 	task_data->type = ICP_WORKQ_TASK_CMD_TYPE;
-	task_data->request_id = 0;
-	if ((flush_args->flush_type == CAM_FLUSH_TYPE_REQ) &&
-		 (flush_args->num_req_active)) {
-		task_data->request_id = *(int32_t *)flush_args->flush_req_active[0];
-	}
 	task->process_cb = cam_icp_mgr_abort_handle_wq;
 	cam_req_mgr_workq_enqueue_task(task, &icp_hw_mgr,
 		CRM_TASK_PRIORITY_0);
@@ -6142,7 +6088,7 @@ static int cam_icp_mgr_hw_flush(void *hw_priv, void *hw_flush_args)
 			mutex_unlock(&hw_mgr->hw_mgr_mutex);
 			cam_icp_mgr_flush_info_dump(flush_args,
 				ctx_data->ctx_id);
-			cam_icp_mgr_enqueue_abort(ctx_data, flush_args);
+			cam_icp_mgr_enqueue_abort(ctx_data);
 		} else {
 			mutex_unlock(&hw_mgr->hw_mgr_mutex);
 		}
@@ -6151,14 +6097,12 @@ static int cam_icp_mgr_hw_flush(void *hw_priv, void *hw_flush_args)
 		mutex_unlock(&ctx_data->ctx_mutex);
 		break;
 	case CAM_FLUSH_TYPE_REQ:
-		mutex_lock(&hw_mgr->hw_mgr_mutex);
-		if (flush_args->num_req_active) {
-			mutex_unlock(&hw_mgr->hw_mgr_mutex);
-			cam_icp_mgr_enqueue_abort(ctx_data, flush_args);
-		} else {
-			mutex_unlock(&hw_mgr->hw_mgr_mutex);
-		}
 		mutex_lock(&ctx_data->ctx_mutex);
+		if (flush_args->num_req_active) {
+			CAM_ERR(CAM_ICP, "Flush request is not supported");
+			mutex_unlock(&ctx_data->ctx_mutex);
+			return -EINVAL;
+		}
 		if (flush_args->num_req_pending)
 			cam_icp_mgr_flush_req(ctx_data, flush_args);
 		mutex_unlock(&ctx_data->ctx_mutex);

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include "cam_sync_dma_fence.h"
 
@@ -81,16 +81,12 @@ static void __cam_dma_fence_print_table(void)
 static int __cam_dma_fence_find_free_idx(uint32_t *idx)
 {
 	int rc = 0;
-	bool bit = false;
 
-	do {
-		*idx = find_first_zero_bit(g_cam_dma_fence_dev->bitmap, CAM_DMA_FENCE_MAX_FENCES);
-		if (*idx >= CAM_DMA_FENCE_MAX_FENCES) {
-			rc = -ENOMEM;
-			break;
-		}
-		bit = test_and_set_bit(*idx, g_cam_dma_fence_dev->bitmap);
-	} while (bit);
+	*idx = find_first_zero_bit(g_cam_dma_fence_dev->bitmap, CAM_DMA_FENCE_MAX_FENCES);
+	if (*idx < CAM_DMA_FENCE_MAX_FENCES)
+		set_bit(*idx, g_cam_dma_fence_dev->bitmap);
+	else
+		rc = -ENOMEM;
 
 	if (rc) {
 		CAM_ERR(CAM_DMA_FENCE, "No free idx, printing dma fence table......");
@@ -337,28 +333,20 @@ static int __cam_dma_fence_signal_fence(
 	struct dma_fence *dma_fence,
 	int32_t status)
 {
-	int rc;
-	unsigned long flags;
 	bool fence_signaled = false;
 
-	spin_lock_irqsave(dma_fence->lock, flags);
-	fence_signaled = dma_fence_is_signaled_locked(dma_fence);
+	fence_signaled = dma_fence_is_signaled(dma_fence);
 	if (fence_signaled) {
-		CAM_DBG(CAM_DMA_FENCE,
+		CAM_WARN(CAM_DMA_FENCE,
 			"dma fence seqno: %llu is already signaled",
 			dma_fence->seqno);
-		rc = -EINVAL;
-		goto end;
+		return 0;
 	}
 
 	if (status)
 		dma_fence_set_error(dma_fence, status);
 
-	rc = dma_fence_signal_locked(dma_fence);
-
-end:
-	spin_unlock_irqrestore(dma_fence->lock, flags);
-	return rc;
+	return dma_fence_signal(dma_fence);
 }
 
 int cam_dma_fence_internal_signal(
@@ -552,7 +540,6 @@ end:
 
 static int __cam_dma_fence_release(int32_t dma_row_idx)
 {
-	int rc;
 	struct dma_fence *dma_fence = NULL;
 	struct cam_dma_fence_row *row = NULL;
 
@@ -567,17 +554,12 @@ static int __cam_dma_fence_release(int32_t dma_row_idx)
 		return -EINVAL;
 	}
 
-	if (row->state == CAM_DMA_FENCE_STATE_ACTIVE)
+	if (row->state == CAM_DMA_FENCE_STATE_ACTIVE) {
 		CAM_WARN(CAM_DMA_FENCE,
-			"Unsignaled fence being released name: %s seqno: %llu fd: %d",
+			"Unsignaled fence being released name: %s seqno: %llu fd:%d",
 			row->name, dma_fence->seqno, row->fd);
-
-	/* Ensure dma fence is signaled prior to release */
-	rc = __cam_dma_fence_signal_fence(dma_fence, -ECANCELED);
-	if ((!rc) && (row->state == CAM_DMA_FENCE_STATE_SIGNALED))
-		CAM_WARN(CAM_DMA_FENCE,
-			"Unsignaled fence being released but row was marked signaled name: %s seqno: %llu fd: %d",
-			row->name, dma_fence->seqno, row->fd);
+		__cam_dma_fence_signal_fence(dma_fence, -ECANCELED);
+	}
 
 	CAM_DBG(CAM_DMA_FENCE,
 		"Releasing dma fence with fd: %d[%s] row_idx: %u current ref_cnt: %u",
@@ -651,7 +633,8 @@ void cam_dma_fence_close(void)
 
 			/* Signal and put if the dma fence is created from camera */
 			if (!row->ext_dma_fence) {
-				__cam_dma_fence_signal_fence(row->fence, -EADV);
+				if (row->state != CAM_DMA_FENCE_STATE_SIGNALED)
+					__cam_dma_fence_signal_fence(row->fence, -EADV);
 				dma_fence_put(row->fence);
 			}
 
