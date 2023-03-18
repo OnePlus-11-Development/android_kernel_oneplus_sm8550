@@ -160,9 +160,6 @@ x509.genkey
 # Clang's compilation database file
 /compile_commands.json
 
-# generated defconfigs
-arch/*/configs/vendor/*_defconfig
-
 # Documentation toolchain
 sphinx_*/
 
