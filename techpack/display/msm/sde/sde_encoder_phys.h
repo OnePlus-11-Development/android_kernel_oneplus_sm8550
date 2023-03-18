@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -25,10 +25,6 @@
 
 /* wait for at most 2 vsync for lowest refresh rate (24hz) */
 #define DEFAULT_KICKOFF_TIMEOUT_MS		84
-
-/* if default timeout fails wait additional time in 1s increments */
-#define EXTENDED_KICKOFF_TIMEOUT_MS      1000
-#define EXTENDED_KICKOFF_TIMEOUT_ITERS   10
 
 /* wait 1 sec for the emulated targets */
 #define MAX_KICKOFF_TIMEOUT_MS                  100000
@@ -319,8 +315,6 @@ struct sde_encoder_irq {
  *				mode display
  * @recovered:			flag set to true when recovered from pp timeout
  * @autorefresh_disable_trans:   flag set to true during autorefresh disable transition
- * @cwb_disable_pending:  Set to true when cwb disable is in progress
- *                       and HW is still attached to CTL
  */
 struct sde_encoder_phys {
 	struct drm_encoder *parent;
@@ -369,7 +363,18 @@ struct sde_encoder_phys {
 	enum frame_trigger_mode_type frame_trigger_mode;
 	bool recovered;
 	bool autorefresh_disable_trans;
-	bool cwb_disable_pending;
+#ifdef OPLUS_FEATURE_DISPLAY
+	/* OPLUS_FEATURE_ADFR, qsync enhance */
+	//2 : transferring (wr_ptr_irq)
+	//1 : transfer finish (pp_tx_done_irq)
+	//0 : panel read finish (rd_ptr_irq)
+	//disable qsync or wait vblank to avoid tearing
+	atomic_t frame_state;
+	//threshold for current frame
+	u32 current_sync_threshold_start;
+	//threshold for current qsync mode
+	u32 qsync_sync_threshold_start;
+#endif /* OPLUS_FEATURE_DISPLAY */
 };
 
 static inline int sde_encoder_phys_inc_pending(struct sde_encoder_phys *phys)
@@ -566,6 +571,16 @@ void sde_encoder_phys_setup_cdm(struct sde_encoder_phys *phys_enc,
 void sde_encoder_helper_get_pp_line_count(struct drm_encoder *drm_enc,
 		struct sde_hw_pp_vsync_info *info);
 
+#if defined(CONFIG_PXLW_IRIS)
+/**
+ * sde_encoder_get_transfer_time - get the mdp transfer time in usecs
+ * @drm_enc: Pointer to drm encoder structure
+ * @transfer_time_us: Pointer to store the output value
+ */
+void sde_encoder_get_transfer_time(struct drm_encoder *drm_enc,
+		u32 *transfer_time_us);
+#endif
+
 /**
  * sde_encoder_helper_get_kickoff_timeout_ms- get the kickoff timeout value based on fps
  * @drm_enc: Pointer to drm encoder structure
@@ -612,15 +627,10 @@ int sde_encoder_helper_wait_event_timeout(
 
 /*
  * sde_encoder_get_fps - get the allowed panel jitter in nanoseconds
- * @frame_rate: custom input frame rate
- * @jitter_num: jitter numerator value
- * @jitter_denom: jitter denomerator value,
- * @l_bound: lower frame period boundary
- * @u_bound: upper frame period boundary
+ * @encoder: Pointer to drm encoder object
  */
-void sde_encoder_helper_get_jitter_bounds_ns(uint32_t frame_rate,
-			u32 jitter_num, u32 jitter_denom,
-			ktime_t *l_bound, ktime_t *u_bound);
+void sde_encoder_helper_get_jitter_bounds_ns(struct drm_encoder *encoder,
+			u64 *l_bound, u64 *u_bound);
 
 /**
  * sde_encoder_helper_switch_vsync - switch vsync source to WD or default
@@ -712,13 +722,6 @@ void sde_encoder_helper_split_config(
  */
 int sde_encoder_helper_reset_mixers(struct sde_encoder_phys *phys_enc,
 		struct drm_framebuffer *fb);
-/**
- * sde_encoder_helper_hw_fence_sw_override - reset mixers and do hw-fence sw override
- * @phys_enc: Pointer to physical encoder structure
- * @ctl: Pointer to hw_ctl structure
- */
-void sde_encoder_helper_hw_fence_sw_override(struct sde_encoder_phys *phys_enc,
-		struct sde_hw_ctl *ctl);
 
 /**
  * sde_encoder_helper_report_irq_timeout - utility to report error that irq has
@@ -831,17 +834,6 @@ static inline bool sde_encoder_phys_needs_single_flush(
 	return (_sde_encoder_phys_is_ppsplit(phys_enc) ||
 				!_sde_encoder_phys_is_dual_ctl(phys_enc));
 }
-
-/**
- * sde_encoder_helper_hw_fence_extended_wait - extended kickoff wait for hw-fence enabled case
- * @phys_enc:	Pointer to physical encoder structure
- * @ctl:	Pointer to hw ctl structure
- * @wait_info:	Pointer to wait_info structure
- * @wait_type:	Enum indicating the irq to wait for
- * Returns:	-ETIMEDOUT in the case that the extended wait times out, 0 otherwise
- */
-int sde_encoder_helper_hw_fence_extended_wait(struct sde_encoder_phys *phys_enc,
-	struct sde_hw_ctl *ctl, struct sde_encoder_wait_info *wait_info, int wait_type);
 
 /**
  * sde_encoder_helper_phys_disable - helper function to disable virt encoder

@@ -7,6 +7,12 @@
 #include "sde_hw_color_proc_common_v4.h"
 #include "sde_hw_color_proc_v4.h"
 #include "sde_dbg.h"
+#ifdef OPLUS_FEATURE_DISPLAY
+#include "sde_connector.h"
+#include "../dsi/dsi_display.h"
+extern struct dc_apollo_pcc_sync dc_apollo;
+struct dsi_display *get_main_display(void);
+#endif /* OPLUS_FEATURE_DISPLAY */
 
 static int sde_write_3d_gamut(struct sde_hw_blk_reg_map *hw,
 		struct drm_msm_3d_gamut *payload, u32 base,
@@ -206,6 +212,10 @@ void sde_setup_dspp_pccv4(struct sde_hw_dspp *ctx, void *cfg)
 	struct drm_msm_pcc_coeff *coeffs = NULL;
 	int i = 0;
 	u32 base = 0;
+#ifdef OPLUS_FEATURE_DISPLAY
+	static struct drm_msm_pcc *pcc_cfg_last;
+	struct dsi_display *display = get_main_display();
+#endif /* OPLUS_FEATURE_DISPLAY */
 
 	if (!ctx || !cfg) {
 		DRM_ERROR("invalid param ctx %pK cfg %pK\n", ctx, cfg);
@@ -225,6 +235,10 @@ void sde_setup_dspp_pccv4(struct sde_hw_dspp *ctx, void *cfg)
 	}
 
 	pcc_cfg = hw_cfg->payload;
+#ifdef OPLUS_FEATURE_DISPLAY
+	if (pcc_cfg)
+		dc_apollo.pcc_current = pcc_cfg->r.r;
+#endif /* OPLUS_FEATURE_DISPLAY */
 
 	for (i = 0; i < PCC_NUM_PLANES; i++) {
 		base = ctx->cap->sblk->pcc.base + (i * sizeof(u32));
@@ -272,6 +286,22 @@ void sde_setup_dspp_pccv4(struct sde_hw_dspp *ctx, void *cfg)
 	}
 
 	SDE_REG_WRITE(&ctx->hw, ctx->cap->sblk->pcc.base, PCC_EN);
+
+#ifdef OPLUS_FEATURE_DISPLAY
+	if (display != NULL && display->panel != NULL) {
+		if (display->panel->oplus_priv.dc_apollo_sync_enable) {
+			mutex_lock(&dc_apollo.lock);
+			if (pcc_cfg_last && pcc_cfg) {
+				if (dc_apollo.pcc_last != dc_apollo.pcc_current) {
+					dc_apollo.pcc_last = dc_apollo.pcc_current;
+					dc_apollo.dc_pcc_updated = 1;
+				}
+			}
+			pcc_cfg_last = pcc_cfg;
+			mutex_unlock(&dc_apollo.lock);
+		}
+	}
+#endif /* OPLUS_FEATURE_DISPLAY */
 }
 
 void sde_setup_dspp_ltm_threshv1(struct sde_hw_dspp *ctx, void *cfg)

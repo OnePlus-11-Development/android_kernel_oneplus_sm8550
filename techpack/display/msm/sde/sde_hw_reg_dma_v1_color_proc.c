@@ -15,6 +15,9 @@
 #include "sde_dbg.h"
 #include "sde_hw_util.h"
 
+#if defined(CONFIG_PXLW_IRIS) || defined(CONFIG_PXLW_SOFT_IRIS)
+#include "dsi_iris_api.h"
+#endif
 /* Reserve space of 128 words for LUT dma payload set-up */
 #define REG_DMA_HEADERS_BUFFER_SZ (sizeof(u32) * 128)
 
@@ -4476,9 +4479,22 @@ void reg_dmav2_setup_dspp_igcv4(struct sde_hw_dspp *ctx, void *cfg)
 		data[j++] = (u16)(lut_cfg->c0[i] << 4);
 		data[j++] = (u16)(lut_cfg->c1[i] << 4);
 	}
+#if defined(CONFIG_PXLW_IRIS) || defined(CONFIG_PXLW_SOFT_IRIS)
+	// WA: set last IGC values
+	if (iris_is_chip_supported() || iris_is_softiris_supported()) {
+		data[j++] = (u16)(lut_cfg->c2_last << 4);
+		data[j++] = (u16)(lut_cfg->c0_last << 4);
+		data[j++] = (u16)(lut_cfg->c1_last << 4);
+	} else {
+		data[j++] = (4095 << 4);
+		data[j++] = (4095 << 4);
+		data[j++] = (4095 << 4);
+	}
+#else
 	data[j++] = (4095 << 4);
 	data[j++] = (4095 << 4);
 	data[j++] = (4095 << 4);
+#endif
 	REG_DMA_SETUP_OPS(dma_write_cfg, 0, (u32 *)data, len,
 			REG_BLK_LUT_WRITE, 0, 0, 0);
 	/* table select is only relevant to SSPP Gamut */

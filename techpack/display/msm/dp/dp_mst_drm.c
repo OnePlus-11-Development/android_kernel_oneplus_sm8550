@@ -1204,8 +1204,7 @@ static int dp_mst_connector_atomic_check(struct drm_connector *connector,
 				bridge->num_slots);
 	}
 
-	/* do not attempt to release vcpi slots if crtc state is enable */
-	if (drm_atomic_crtc_needs_modeset(crtc_state) && !crtc_state->enable) {
+	if (drm_atomic_crtc_needs_modeset(crtc_state)) {
 		if (WARN_ON(!old_conn_state->best_encoder)) {
 			rc = -EINVAL;
 			goto end;

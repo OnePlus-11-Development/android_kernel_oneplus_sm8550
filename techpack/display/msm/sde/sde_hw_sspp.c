@@ -15,6 +15,10 @@
 #include "sde_hw_reg_dma_v1_color_proc.h"
 #include "sde_hw_vbif.h"
 
+#if defined(PXLW_IRIS_DUAL)
+#include "dsi_iris_api.h"
+#endif
+
 #define SDE_FETCH_CONFIG_RESET_VALUE   0x00000087
 
 /* SDE_SSPP_SRC */
@@ -214,6 +218,12 @@ static inline int _sspp_subblk_offset(struct sde_hw_pipe *ctx,
 	return rc;
 }
 
+#if defined(PXLW_IRIS_DUAL)
+int iris_sspp_subblk_offset(struct sde_hw_pipe *ctx, int s_id, u32 *idx)
+{
+	return _sspp_subblk_offset(ctx, s_id, idx);
+}
+#endif
 static void sde_hw_sspp_update_multirect(struct sde_hw_pipe *ctx,
 		bool enable,
 		enum sde_sspp_multirect_index index,
@@ -1408,6 +1418,14 @@ static void sde_hw_sspp_setup_dgm_csc(struct sde_hw_pipe *ctx,
 	SDE_REG_WRITE(&ctx->hw, offset, op_mode);
 }
 
+#if defined(PXLW_IRIS_DUAL)
+static void sde_hw_sspp_setup_csc_v2(struct sde_hw_pipe *ctx,
+		const struct sde_format *fmt, struct sde_csc_cfg *data)
+{
+	return iris_sde_hw_sspp_setup_csc_v2(ctx, fmt, data);
+}
+#endif
+
 static bool sde_hw_sspp_setup_clk_force_ctrl(struct sde_hw_blk_reg_map *hw,
 		enum sde_clk_ctrl_type clk_ctrl, bool enable)
 {
@@ -1508,7 +1526,14 @@ static void _setup_layer_ops(struct sde_hw_pipe *c,
 
 	if (test_bit(SDE_SSPP_CSC, &features) ||
 		test_bit(SDE_SSPP_CSC_10BIT, &features))
+#if defined(PXLW_IRIS_DUAL)
+	{
+#endif
 		c->ops.setup_csc = sde_hw_sspp_setup_csc;
+#if defined(PXLW_IRIS_DUAL)
+		c->ops.setup_csc_v2 = sde_hw_sspp_setup_csc_v2;
+	}
+#endif
 
 	if (test_bit(SDE_SSPP_DGM_CSC, &features))
 		c->ops.setup_dgm_csc = sde_hw_sspp_setup_dgm_csc;

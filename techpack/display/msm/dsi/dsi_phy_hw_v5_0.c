@@ -115,6 +115,10 @@
 #define DSI_DYN_REFRESH_PLL_UPPER_ADDR         (0x094)
 #define DSI_DYN_REFRESH_PLL_UPPER_ADDR2        (0x098)
 
+#ifdef OPLUS_FEATURE_DISPLAY
+extern bool oplus_enhance_mipi_strength;
+#endif /* OPLUS_FEATURE_DISPLAY */
+
 static int dsi_phy_hw_v5_0_is_pll_on(struct dsi_phy_hw *phy)
 {
 	u32 data = 0;
@@ -330,9 +334,19 @@ static void dsi_phy_hw_dphy_enable(struct dsi_phy_hw *phy, struct dsi_phy_cfg *c
 	vreg_ctrl_0 = 0x44;
 	glbl_rescode_top_ctrl = less_than_1500_mhz ? 0x3c : 0x03;
 	glbl_rescode_bot_ctrl = less_than_1500_mhz ? 0x38 : 0x3c;
+
+#ifndef OPLUS_FEATURE_DISPLAY
 	glbl_str_swi_cal_sel_ctrl = 0x00;
 	glbl_hstx_str_ctrl_0 = 0x88;
-
+#else
+	if (oplus_enhance_mipi_strength) {
+		glbl_str_swi_cal_sel_ctrl = 0x01;
+		glbl_hstx_str_ctrl_0 = 0xFF;
+	} else {
+		glbl_str_swi_cal_sel_ctrl = 0x00;
+		glbl_hstx_str_ctrl_0 = 0x88;
+	}
+	#endif /* OPLUS_FEATURE_DISPLAY */
 
 	split_link_enabled = cfg->split_link.enabled;
 	lanes_per_sublink = cfg->split_link.lanes_per_sublink;
