@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -19,6 +19,19 @@
 #include "sde_core_irq.h"
 #include "dsi_panel.h"
 #include "sde_hw_color_proc_common_v4.h"
+#ifdef OPLUS_FEATURE_DISPLAY
+#include "../oplus/oplus_display_interface.h"
+extern int dc_apollo_enable;
+extern int oplus_dimlayer_hbm;
+#endif /* OPLUS_FEATURE_DISPLAY */
+
+#if defined(CONFIG_PXLW_IRIS)
+#include "dsi_iris_api.h"
+#endif
+
+#ifdef OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT
+#include "../oplus/oplus_onscreenfingerprint.h"
+#endif /* OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT */
 
 struct sde_cp_node {
 	u32 property_id;
@@ -142,6 +155,12 @@ static void _lm_gc_install_property(struct drm_crtc *crtc);
 #define setup_lm_prop_install_funcs(func) \
 	(func[SDE_MIXER_GC] = _lm_gc_install_property)
 
+#if defined(CONFIG_PXLW_IRIS)
+static int iris_pq_ops = SDE_CP_CRTC_DSPP_MAX;
+static bool iris_pq_dirty;
+struct sde_cp_node *iris_prop_node[SDE_CP_CRTC_DSPP_MAX] = {};
+u32 iris_pq_disable;
+#endif
 enum sde_cp_crtc_pu_features {
 	SDE_CP_CRTC_DSPP_RC_PU,
 	SDE_CP_CRTC_DSPP_SPR_PU,
@@ -252,10 +271,23 @@ static int _set_dspp_pcc_feature(struct sde_hw_dspp *hw_dspp,
 {
 	int ret = 0;
 
+#ifdef OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT
+	if (oplus_ofp_is_supported()) {
+		oplus_ofp_set_dspp_pcc_feature(hw_cfg, hw_crtc, true);
+	}
+#endif /* OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT */
+
 	if (!hw_dspp || !hw_dspp->ops.setup_pcc)
 		ret = -EINVAL;
 	else
 		hw_dspp->ops.setup_pcc(hw_dspp, hw_cfg);
+
+#ifdef OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT
+	if (oplus_ofp_is_supported()) {
+		oplus_ofp_set_dspp_pcc_feature(hw_cfg, hw_crtc, false);
+	}
+#endif /* OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT */
+
 	return ret;
 }
 
@@ -713,37 +745,6 @@ static int _set_ltm_hist_crtl_feature(struct sde_hw_dspp *hw_dspp,
 	return ret;
 }
 
-static int _disable_rc_mask_feature(struct sde_hw_dspp *hw_dspp,
-				 struct sde_hw_cp_cfg *hw_cfg,
-				 struct sde_crtc *sde_crtc)
-{
-	int ret = 0;
-
-	if (!hw_dspp || !hw_cfg || !sde_crtc) {
-		DRM_ERROR("invalid arguments");
-		return -EINVAL;
-	}
-
-	if (!hw_dspp->ops.setup_rc_mask) {
-		DRM_ERROR("invalid rc ops\n");
-		return -EINVAL;
-	}
-
-	DRM_DEBUG_DRIVER("dspp %d setup mask for rc instance %u\n",
-			hw_dspp->idx, hw_dspp->cap->sblk->rc.idx);
-
-	/* send empty payload to disable rc feature */
-	hw_cfg->len = 0;
-	hw_cfg->payload = NULL;
-	ret = hw_dspp->ops.setup_rc_mask(hw_dspp, hw_cfg);
-
-	if (ret)
-		DRM_ERROR("failed to disable rc feature, ret %d\n", ret);
-
-	_update_pu_feature_enable(sde_crtc, SDE_CP_CRTC_DSPP_RC_PU, false);
-	return ret;
-}
-
 static int _check_rc_mask_feature(struct sde_hw_dspp *hw_dspp,
 				 struct sde_hw_cp_cfg *hw_cfg,
 				 struct sde_crtc *sde_crtc)
@@ -973,13 +974,6 @@ static int _feature_unsupported(struct sde_hw_dspp *hw_dspp,
 
 	return 0;
 }
-
-feature_wrapper crtc_feature_disable_wrappers[SDE_CP_CRTC_MAX_FEATURES];
-#define setup_crtc_feature_disable_wrappers(wrappers) \
-do { \
-	memset(wrappers, 0, sizeof(wrappers)); \
-	wrappers[SDE_CP_CRTC_DSPP_RC_MASK] = _disable_rc_mask_feature; \
-} while (0)
 
 feature_wrapper check_crtc_feature_wrappers[SDE_CP_CRTC_MAX_FEATURES];
 #define setup_check_crtc_feature_wrappers(wrappers) \
@@ -1294,6 +1288,14 @@ static int _sde_cp_crtc_cache_property_helper(struct drm_crtc *crtc,
 }
 
 
+#ifdef OPLUS_FEATURE_DISPLAY
+struct sde_kms *get_kms_(struct drm_crtc *crtc)
+{
+	return get_kms(crtc);
+}
+EXPORT_SYMBOL(get_kms_);
+#endif /* OPLUS_FEATURE_DISPLAY */
+
 static void _sde_cp_crtc_attach_property(
 		struct sde_cp_prop_attach *prop_attach)
 {
@@ -1355,6 +1357,12 @@ void sde_cp_crtc_init(struct drm_crtc *crtc)
 	INIT_LIST_HEAD(&sde_crtc->ltm_buf_busy);
 	sde_crtc->disable_pending_cp = false;
 	sde_cp_crtc_disable(crtc);
+#if defined(CONFIG_PXLW_IRIS)
+	if (iris_is_chip_supported()) {
+		iris_pq_ops = SDE_CP_CRTC_DSPP_MAX;
+		memset(iris_prop_node, 0, sizeof(iris_prop_node));
+	}
+#endif
 }
 
 static void _sde_cp_crtc_install_immutable_property(struct drm_crtc *crtc,
@@ -1759,18 +1767,42 @@ static void _sde_cp_crtc_commit_feature(struct sde_cp_node *prop_node,
 			hw_cfg.mixer_info = hw_lm;
 			hw_cfg.displayh = num_mixers * hw_lm->cfg.out_width;
 			hw_cfg.displayv = hw_lm->cfg.out_height;
+#if defined(CONFIG_PXLW_IRIS)
+			if (iris_is_chip_supported() && (iris_pq_ops == SDE_CP_CRTC_DSPP_PCC))
+				hw_cfg.payload = NULL;
+#endif
+#ifdef OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT
+			if (oplus_ofp_is_supported()) {
+				if (prop_node->feature == SDE_CP_CRTC_DSPP_GAMUT) {
+					oplus_ofp_bypass_dspp_gamut(&hw_cfg, sde_crtc);
+				}
+			}
+#endif /* OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT */
 
 			ret = commit_feature(hw_dspp, &hw_cfg, sde_crtc);
 			if (ret)
 				break;
 		}
+#if defined(CONFIG_PXLW_IRIS)
+		if (iris_is_chip_supported()) {
+			if (!ret)
+				iris_prop_node[prop_node->feature] = prop_node;
+		}
+#endif
 
 		if (ret) {
 			DRM_ERROR("failed to %s feature %d\n",
 				((feature_enabled) ? "enable" : "disable"),
 				prop_node->feature);
-			goto disable_feature;
+			return;
 		}
+#if defined(CONFIG_PXLW_IRIS)
+		if (iris_is_chip_supported() && iris_pq_dirty) {
+			DRM_DEBUG_DRIVER("Not update list to feature %d\n",
+				prop_node->feature);
+			return;
+		}
+#endif
 	}
 
 	if (feature_enabled) {
@@ -1784,34 +1816,6 @@ static void _sde_cp_crtc_commit_feature(struct sde_cp_node *prop_node,
 	}
 	/* Programming of feature done remove from dirty list */
 	list_del_init(&prop_node->cp_dirty_list);
-	return;
-
-disable_feature:
-	ret = 0;
-
-	if (crtc_feature_disable_wrappers[prop_node->feature] != NULL) {
-		feature_wrapper disable_handler =
-					crtc_feature_disable_wrappers[prop_node->feature];
-
-		for (i = 0; i < num_mixers && !ret; i++) {
-			hw_lm = sde_crtc->mixers[i].hw_lm;
-			hw_dspp = sde_crtc->mixers[i].hw_dspp;
-			if (!hw_lm) {
-				ret = -EINVAL;
-				continue;
-			}
-			hw_cfg.ctl = sde_crtc->mixers[i].hw_ctl;
-			hw_cfg.mixer_info = hw_lm;
-			hw_cfg.displayh = num_mixers * hw_lm->cfg.out_width;
-			hw_cfg.displayv = hw_lm->cfg.out_height;
-
-			ret = disable_handler(hw_dspp, &hw_cfg, sde_crtc);
-		}
-
-		/* Remove feature from active and dirty list */
-		list_del_init(&prop_node->cp_active_list);
-		list_del_init(&prop_node->cp_dirty_list);
-	}
 }
 
 static const int dspp_feature_to_sub_blk_tbl[SDE_CP_CRTC_MAX_FEATURES] = {
@@ -2246,6 +2250,19 @@ void sde_cp_crtc_apply_properties(struct drm_crtc *crtc)
 	mutex_lock(&sde_crtc->crtc_cp_lock);
 	_sde_clear_ltm_merge_mode(sde_crtc);
 
+#if defined(CONFIG_PXLW_IRIS)
+	if (iris_is_chip_supported()) {
+		iris_pq_dirty = false;
+		if (iris_pq_disable == 1 && iris_pq_ops == SDE_CP_CRTC_DSPP_MAX) {
+			iris_pq_ops = SDE_CP_CRTC_DSPP_PCC;
+			iris_pq_dirty = true;
+		} else if (iris_pq_disable == 0 && iris_pq_ops == SDE_CP_CRTC_DSPP_PCC) {
+			iris_pq_ops = SDE_CP_CRTC_DSPP_MAX;
+			iris_pq_dirty = true;
+		}
+	}
+#endif
+
 	disable_pending_cp = sde_crtc->disable_pending_cp;
 	sde_crtc->disable_pending_cp = false;
 	if (list_empty(&sde_crtc->cp_dirty_list) &&
@@ -2253,7 +2270,16 @@ void sde_cp_crtc_apply_properties(struct drm_crtc *crtc)
 			list_empty(&sde_crtc->ad_active) &&
 			list_empty(&sde_crtc->cp_active_list)) {
 		DRM_DEBUG_DRIVER("all lists are empty\n");
+#if defined(CONFIG_PXLW_IRIS)
+		if (iris_is_chip_supported()) {
+			if (!iris_pq_dirty)
+				goto exit;
+		} else {
+			goto exit;
+		}
+#else
 		goto exit;
+#endif
 	}
 
 	rc = _sde_cp_crtc_update_pu_features(crtc, &need_flush);
@@ -2282,6 +2308,22 @@ void sde_cp_crtc_apply_properties(struct drm_crtc *crtc)
 		_sde_cp_ad_set_prop(sde_crtc, AD_IPC_RESET);
 		set_dspp_flush = true;
 	}
+#if defined(CONFIG_PXLW_IRIS)
+	if (iris_is_chip_supported() && iris_pq_dirty) {
+		for (i = 0; i < SDE_CP_CRTC_DSPP_MAX; i++) {
+			prop_node = iris_prop_node[i];
+			if (prop_node == NULL)
+				continue;
+			_sde_cp_crtc_commit_feature(prop_node, sde_crtc);
+			/* Set the flush flag to true */
+			if (prop_node->is_dspp_feature)
+				set_dspp_flush = true;
+			else
+				set_lm_flush = true;
+		}
+		iris_pq_dirty = false;
+	}
+#endif
 
 	list_for_each_entry_safe(prop_node, n, &sde_crtc->ad_dirty,
 			cp_dirty_list) {
@@ -2401,7 +2443,6 @@ void sde_cp_crtc_install_properties(struct drm_crtc *crtc)
 		setup_lm_prop_install_funcs(lm_prop_install_func);
 		setup_set_crtc_feature_wrappers(set_crtc_feature_wrappers);
 		setup_check_crtc_feature_wrappers(check_crtc_feature_wrappers);
-		setup_crtc_feature_disable_wrappers(crtc_feature_disable_wrappers);
 		setup_set_crtc_pu_feature_wrappers(
 				set_crtc_pu_feature_wrappers);
 		setup_check_crtc_pu_feature_wrappers(
@@ -2793,6 +2834,12 @@ void sde_cp_crtc_mark_features_dirty(struct drm_crtc *crtc)
 		_sde_cp_update_list(prop_node, sde_crtc, true);
 		list_del_init(&prop_node->cp_active_list);
 	}
+#if defined(CONFIG_PXLW_IRIS)
+	if (iris_is_chip_supported()) {
+		iris_pq_ops = SDE_CP_CRTC_DSPP_MAX;
+		memset(iris_prop_node, 0, sizeof(iris_prop_node));
+	}
+#endif
 
 	list_for_each_entry_safe(prop_node, n, &sde_crtc->ad_active,
 				 cp_active_list) {
@@ -4821,6 +4868,42 @@ static bool _sde_cp_feature_in_activelist(u32 feature, struct list_head *list)
 
 	return false;
 }
+
+#ifdef OPLUS_FEATURE_DISPLAY
+void oplus_sde_cp_crtc_pcc_change(struct drm_crtc *crtc_drm)
+{
+	struct sde_cp_node *prop_node = NULL;
+	struct sde_crtc *crtc;
+
+	if (!crtc_drm) {
+		DRM_ERROR("invalid crtc handle");
+		return;
+	}
+	crtc = to_sde_crtc(crtc_drm);
+	mutex_lock(&crtc->crtc_cp_lock);
+	list_for_each_entry(prop_node, &crtc->cp_feature_list, cp_feature_list) {
+		if (prop_node->feature != SDE_CP_CRTC_DSPP_PCC
+			&& prop_node->feature != SDE_CP_CRTC_DSPP_GAMUT) /* Gamut should be taken care of too */
+			continue;
+
+		if (_sde_cp_feature_in_dirtylist(prop_node->feature,
+						 &crtc->cp_dirty_list))
+			continue;
+
+		if (_sde_cp_feature_in_activelist(prop_node->feature,
+						 &crtc->cp_active_list)) {
+			_sde_cp_update_list(prop_node, crtc, true);
+			list_del_init(&prop_node->cp_active_list);
+			continue;
+		}
+
+		pr_err("oplus_pcc: %s %d prop_node->feature=%d\n", __func__, __LINE__, prop_node->feature);
+		_sde_cp_update_list(prop_node, crtc, true);
+	}
+
+	mutex_unlock(&crtc->crtc_cp_lock);
+}
+#endif /* OPLUS_FEATURE_DISPLAY */
 
 /* this func needs to be called within crtc_cp_lock mutex */
 static struct sde_cp_node *_sde_cp_feature_getnode_activelist(u32 feature, struct list_head *list)

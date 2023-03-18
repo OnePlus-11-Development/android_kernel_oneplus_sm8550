@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (C) 2014-2021 The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -38,6 +38,14 @@
 #include "sde_vbif.h"
 #include "sde_plane.h"
 #include "sde_color_processing.h"
+#ifdef OPLUS_FEATURE_DISPLAY
+#include "../oplus/oplus_display_private_api.h"
+#endif /* OPLUS_FEATURE_DISPLAY */
+
+#if defined(CONFIG_PXLW_IRIS)
+#include "dsi_iris_api.h"
+extern u32 iris_pq_disable;
+#endif
 
 #define SDE_DEBUG_PLANE(pl, fmt, ...) SDE_DEBUG("plane%d " fmt,\
 		(pl) ? (pl)->base.base.id : -1, ##__VA_ARGS__)
@@ -592,49 +600,6 @@ static void _sde_plane_set_input_fence(struct sde_plane *psde,
 	SDE_DEBUG_PLANE(psde, "0x%llX\n", fd);
 }
 
-void sde_plane_dump_input_fence(struct drm_plane *plane)
-{
-	struct sde_plane *psde;
-	struct sde_plane_state *pstate;
-	void *input_fence;
-
-	if (!plane) {
-		SDE_ERROR("invalid plane\n");
-	} else if (!plane->state) {
-		SDE_ERROR_PLANE(to_sde_plane(plane), "invalid state\n");
-	} else {
-		psde = to_sde_plane(plane);
-		pstate = to_sde_plane_state(plane->state);
-		input_fence = pstate->input_fence;
-
-		if (input_fence)
-			sde_fence_dump(input_fence);
-	}
-}
-
-bool sde_plane_is_sw_fence_signaled(struct drm_plane *plane)
-{
-	struct sde_plane *psde;
-	struct sde_plane_state *pstate;
-	struct dma_fence *fence;
-
-	if (!plane) {
-		SDE_ERROR("invalid plane\n");
-	} else if (!plane->state) {
-		SDE_ERROR_PLANE(to_sde_plane(plane), "invalid state\n");
-	} else {
-		psde = to_sde_plane(plane);
-		pstate = to_sde_plane_state(plane->state);
-
-		if (pstate->input_fence) {
-			fence = (struct dma_fence *)pstate->input_fence;
-			return dma_fence_is_signaled(fence);
-		}
-	}
-
-	return false;
-}
-
 int sde_plane_wait_input_fence(struct drm_plane *plane, uint32_t wait_ms)
 {
 	struct sde_plane *psde;
@@ -1187,10 +1152,14 @@ static inline void _sde_plane_setup_csc(struct sde_plane *psde, struct sde_plane
 	else
 		pstate->csc_ptr = (struct sde_csc_cfg *)&sde_csc_YUV2RGB_601L;
 
+#if defined(CONFIG_PXLW_IRIS)
+	iris_sde_plane_setup_csc(pstate->csc_ptr);
+#endif
 	SDE_DEBUG_PLANE(psde, "using 0x%X 0x%X 0x%X...\n",
 			pstate->csc_ptr->csc_mv[0],
 			pstate->csc_ptr->csc_mv[1],
 			pstate->csc_ptr->csc_mv[2]);
+
 }
 
 static void sde_color_process_plane_setup(struct drm_plane *plane)
@@ -1361,6 +1330,80 @@ static void sde_color_process_plane_setup(struct drm_plane *plane)
 	}
 }
 
+#if defined(CONFIG_PXLW_IRIS)
+static void sde_color_process_plane_disable(struct drm_plane *plane)
+{
+	struct sde_plane *psde;
+	struct sde_plane_state *pstate;
+	struct drm_msm_3d_gamut *vig_gamut = NULL;
+	struct drm_msm_igc_lut *igc = NULL;
+	struct drm_msm_pgc_lut *gc = NULL;
+	size_t size = 0;
+	struct sde_hw_cp_cfg hw_cfg = {};
+	struct sde_hw_ctl *ctl = _sde_plane_get_hw_ctl(plane);
+	uint32_t dirty = 0;
+
+	psde = to_sde_plane(plane);
+	pstate = to_sde_plane_state(plane->state);
+
+	dirty = SDE_PLANE_DIRTY_VIG_GAMUT | SDE_PLANE_DIRTY_VIG_IGC
+			| SDE_PLANE_DIRTY_DMA_IGC | SDE_PLANE_DIRTY_DMA_GC;
+
+	if (dirty & SDE_PLANE_DIRTY_VIG_GAMUT &&
+			psde->pipe_hw->ops.setup_vig_gamut) {
+		vig_gamut = msm_property_get_blob(&psde->property_info,
+				&pstate->property_state,
+				&size,
+				PLANE_PROP_VIG_GAMUT);
+		hw_cfg.last_feature = 0;
+		hw_cfg.ctl = ctl;
+		hw_cfg.len = sizeof(struct drm_msm_3d_gamut);
+		hw_cfg.payload = NULL;
+		psde->pipe_hw->ops.setup_vig_gamut(psde->pipe_hw, &hw_cfg);
+	}
+
+	if (dirty & SDE_PLANE_DIRTY_VIG_IGC &&
+			psde->pipe_hw->ops.setup_vig_igc) {
+		igc = msm_property_get_blob(&psde->property_info,
+				&pstate->property_state,
+				&size,
+				PLANE_PROP_VIG_IGC);
+		hw_cfg.last_feature = 0;
+		hw_cfg.ctl = ctl;
+		hw_cfg.len = sizeof(struct drm_msm_igc_lut);
+		hw_cfg.payload = NULL;
+		psde->pipe_hw->ops.setup_vig_igc(psde->pipe_hw, &hw_cfg);
+	}
+
+	if (dirty & SDE_PLANE_DIRTY_DMA_IGC &&
+			psde->pipe_hw->ops.setup_dma_igc) {
+		igc = msm_property_get_blob(&psde->property_info,
+				&pstate->property_state,
+				&size,
+				PLANE_PROP_DMA_IGC);
+		hw_cfg.last_feature = 0;
+		hw_cfg.ctl = ctl;
+		hw_cfg.len = sizeof(struct drm_msm_igc_lut);
+		hw_cfg.payload = NULL;
+		psde->pipe_hw->ops.setup_dma_igc(psde->pipe_hw, &hw_cfg,
+				pstate->multirect_index);
+	}
+
+	if (dirty & SDE_PLANE_DIRTY_DMA_GC &&
+			psde->pipe_hw->ops.setup_dma_gc) {
+		gc = msm_property_get_blob(&psde->property_info,
+				&pstate->property_state,
+				&size,
+				PLANE_PROP_DMA_GC);
+		hw_cfg.last_feature = 0;
+		hw_cfg.ctl = ctl;
+		hw_cfg.len = sizeof(struct drm_msm_pgc_lut);
+		hw_cfg.payload = NULL;
+		psde->pipe_hw->ops.setup_dma_gc(psde->pipe_hw, &hw_cfg,
+				pstate->multirect_index);
+	}
+}
+#endif
 static void _sde_plane_setup_scaler(struct sde_plane *psde,
 		struct sde_plane_state *pstate,
 		const struct sde_format *fmt, bool color_fill)
@@ -2822,6 +2865,7 @@ void sde_plane_flush(struct drm_plane *plane)
 	else if (psde->pipe_hw && pstate->csc_ptr && psde->pipe_hw->ops.setup_csc)
 		psde->pipe_hw->ops.setup_csc(psde->pipe_hw, pstate->csc_ptr);
 
+
 	/* flag h/w flush complete */
 	if (plane->state)
 		pstate->pending = false;
@@ -3269,6 +3313,12 @@ static void _sde_plane_update_format_and_rects(struct sde_plane *psde,
 			psde->pipe_hw->ops.set_ubwc_stats_roi(psde->pipe_hw,
 					pstate->multirect_index, NULL);
 	}
+#if defined(PXLW_IRIS_DUAL)
+	if (psde->pipe_hw->ops.setup_csc_v2)
+		psde->pipe_hw->ops.setup_csc_v2(psde->pipe_hw,
+			fmt, pstate->csc_usr_ptr);
+#endif
+
 }
 
 static void _sde_plane_update_sharpening(struct sde_plane *psde)
@@ -3324,6 +3374,11 @@ static void _sde_plane_update_properties(struct drm_plane *plane,
 			psde->pipe_hw->ops.setup_format)
 		_sde_plane_update_format_and_rects(psde, pstate, fmt);
 
+#if defined(CONFIG_PXLW_IRIS)
+	if (iris_is_chip_supported() &&  iris_pq_disable)
+		sde_color_process_plane_disable(plane);
+	else
+#endif
 	sde_color_process_plane_setup(plane);
 
 	/* update sharpening */
@@ -4068,10 +4123,12 @@ static inline void _sde_plane_set_csc_v1(struct sde_plane *psde,
 	for (i = 0; i < SDE_CSC_BIAS_SIZE; ++i) {
 		pstate->csc_cfg.csc_pre_bv[i] = csc_v1.pre_bias[i];
 		pstate->csc_cfg.csc_post_bv[i] = csc_v1.post_bias[i];
+
 	}
 	for (i = 0; i < SDE_CSC_CLAMP_SIZE; ++i) {
 		pstate->csc_cfg.csc_pre_lv[i] = csc_v1.pre_clamp[i];
 		pstate->csc_cfg.csc_post_lv[i] = csc_v1.post_clamp[i];
+
 	}
 	pstate->csc_usr_ptr = &pstate->csc_cfg;
 }

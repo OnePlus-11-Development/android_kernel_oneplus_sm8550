@@ -11,6 +11,8 @@
 #include <linux/errno.h>
 #include <linux/mutex.h>
 #include <linux/soc/qcom/msm_hw_fence.h>
+#include "sde_hw_ctl.h"
+#include "sde_hw_top.h"
 
 #ifndef CHAR_BIT
 #define CHAR_BIT 8 /* define this if limits.h not available */
@@ -24,7 +26,6 @@
 
 #define SDE_FENCE_NAME_SIZE	24
 
-#define MAX_SDE_HFENCE_OUT_SIGNAL_PING_PONG 2
 /**
  * struct sde_fence_context - release/retire fence context/timeline structure
  * @commit_count: Number of detected commits since bootup
@@ -59,36 +60,6 @@ enum sde_fence_event {
 	SDE_FENCE_SIGNAL,
 	SDE_FENCE_RESET_TIMELINE,
 	SDE_FENCE_SIGNAL_ERROR
-};
-
-/**
- * struct sde_hw_fence_data - contains the information of each display-client of the hw-fences
- *                       to communicate with the fence controller.
- * @client_id: client_id enum for the display driver.
- * @hw_fence_client_id: client_id enum for the hw-fence driver.
- * @mem_descriptor: memory descriptor with the hfi for the rx/tx queues mapping.
- * @ipcc_in_client: ipcc client triggering the signal: IN_CLIENT (APPS) -> DPU
- * @ipcc_in_signal: ipcc signal triggered from client to dpu: IN_SIGNAL (APPS) -> DPU
- * @ipcc_out_signal_pp: output signal from dpu to fctl, ping-pongs between two signals
- * @ipcc_out_signal_pp_idx: index of the output signal ping-pong
- * @ipcc_out_client: destination client id (APPS for the FCTL)
- * @ipcc_this_client: ipcc dpu client id (For Waipio: APPS, For Kailua: DPU HW)
- * @dma_context: per client dma context used to create join fences
- * @hw_fence_array_seqno: per-client seq number counter for join fences
- */
-struct sde_hw_fence_data {
-	int client_id;
-	enum hw_fence_client_id hw_fence_client_id;
-	void *hw_fence_handle;
-	struct msm_hw_fence_mem_addr mem_descriptor;
-	u32 ipcc_in_client;
-	u32 ipcc_in_signal;
-	u32 ipcc_out_signal_pp[MAX_SDE_HFENCE_OUT_SIGNAL_PING_PONG];
-	u32 ipcc_out_signal_pp_idx;
-	u32 ipcc_out_client;
-	u32 ipcc_this_client;
-	u64 dma_context;
-	u32 hw_fence_array_seqno;
 };
 
 #if IS_ENABLED(CONFIG_SYNC_FILE)
@@ -260,12 +231,6 @@ void sde_debugfs_timeline_dump(struct sde_fence_context *ctx,
  */
 void sde_fence_list_dump(struct dma_fence *fence, struct seq_file **s);
 
-/**
- * sde_fence_dump - dumps fence info for specified fence
- * @fence: Pointer to fence to dump info for
- */
-void sde_fence_dump(struct dma_fence *fence);
-
 #else
 static inline void *sde_sync_get(uint64_t fd)
 {
@@ -337,10 +302,6 @@ void sde_fence_list_dump(struct dma_fence *fence, struct seq_file **s)
 	/* do nothing */
 }
 
-void sde_fence_dump(struct dma_fence *fence)
-{
-	/* do nothing */
-}
 #endif /* IS_ENABLED(CONFIG_SW_SYNC) */
 
 #endif /* _SDE_FENCE_H_ */

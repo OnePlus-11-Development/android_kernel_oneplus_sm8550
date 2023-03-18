@@ -58,6 +58,14 @@
 #include "msm_mmu.h"
 #include "sde_wb.h"
 #include "sde_dbg.h"
+#if defined(CONFIG_PXLW_IRIS) || defined(CONFIG_PXLW_SOFT_IRIS)
+#include "dsi_iris_api.h"
+#endif
+
+#ifdef OPLUS_FEATURE_DISPLAY
+/* OPLUS_FEATURE_ADFR, oplus adfr */
+#include "../oplus/oplus_adfr.h"
+#endif /* OPLUS_FEATURE_DISPLAY */
 
 /*
  * MSM driver version:
@@ -772,6 +780,20 @@ static int msm_drm_display_thread_create(struct msm_drm_private *priv, struct dr
 		return ret;
 	}
 
+#ifdef OPLUS_FEATURE_DISPLAY
+	/* OPLUS_FEATURE_ADFR, fake frame */
+	/**
+	 * Use a seperate adfr thread for fake frame.
+	 * Because fake frame maybe causes crtc commit/event more heavy.
+	 * This can lead to commit miss TE/retire event delay
+	 */
+	if (oplus_adfr_is_support()) {
+		if (oplus_adfr_thread_create(priv, ddev, dev)) {
+			return -EINVAL;
+		}
+	}
+#endif /* OPLUS_FEATURE_DISPLAY */
+
 	return 0;
 }
 
@@ -914,6 +936,10 @@ static int msm_drm_component_init(struct device *dev)
 	mutex_init(&priv->mm_lock);
 
 	mutex_init(&priv->vm_client_lock);
+
+#ifdef OPLUS_FEATURE_DISPLAY
+	mutex_init(&priv->dspp_lock);
+#endif /* OPLUS_FEATURE_DISPLAY */
 
 	/* Bind all our sub-components: */
 	ret = msm_component_bind_all(dev, ddev);
@@ -1133,36 +1159,16 @@ static void msm_postclose(struct drm_device *dev, struct drm_file *file)
 	context_close(ctx);
 }
 
-static int msm_pending_crtc_last_close_timeout(struct msm_drm_private *priv)
-{
-	const struct msm_kms_funcs *funcs;
-	struct msm_kms *kms;
-	int timeout = LASTCLOSE_TIMEOUT_MS;
-
-	if (!priv || !priv->kms || !priv->kms->funcs)
-		return timeout;
-
-	kms = priv->kms;
-	funcs = kms->funcs;
-
-	if (funcs->get_input_fence_timeout)
-		timeout += funcs->get_input_fence_timeout(kms);
-
-	return timeout;
-}
-
 static void msm_lastclose(struct drm_device *dev)
 {
 	struct msm_drm_private *priv = dev->dev_private;
 	struct msm_kms *kms;
-	int lastclose_timeout;
 	int i, rc;
 
 	if (!priv || !priv->kms)
 		return;
 
 	kms = priv->kms;
-	lastclose_timeout = msm_pending_crtc_last_close_timeout(priv);
 
 	/* check for splash status before triggering cleanup
 	 * if we end up here with splash status ON i.e before first
@@ -1171,7 +1177,7 @@ static void msm_lastclose(struct drm_device *dev)
 	if (kms->funcs && kms->funcs->check_for_splash
 		&& kms->funcs->check_for_splash(kms)) {
 		msm_wait_event_timeout(priv->pending_crtcs_event, !priv->pending_crtcs,
-			lastclose_timeout, rc);
+			LASTCLOSE_TIMEOUT_MS, rc);
 		if (!rc)
 			DRM_INFO("wait for crtc mask 0x%x failed, commit anyway...\n",
 				priv->pending_crtcs);
@@ -1197,7 +1203,7 @@ static void msm_lastclose(struct drm_device *dev)
 
 	/* wait for any pending crtcs to finish before lastclose commit */
 	msm_wait_event_timeout(priv->pending_crtcs_event, !priv->pending_crtcs,
-			lastclose_timeout, rc);
+			LASTCLOSE_TIMEOUT_MS, rc);
 	if (!rc)
 		DRM_INFO("wait for crtc mask 0x%x failed, commit anyway...\n",
 				priv->pending_crtcs);
@@ -1216,7 +1222,7 @@ static void msm_lastclose(struct drm_device *dev)
 
 	/* wait again, before kms driver does it's lastclose commit */
 	msm_wait_event_timeout(priv->pending_crtcs_event, !priv->pending_crtcs,
-			lastclose_timeout, rc);
+			LASTCLOSE_TIMEOUT_MS, rc);
 	if (!rc)
 		DRM_INFO("wait for crtc mask 0x%x failed, commit anyway...\n",
 				priv->pending_crtcs);
@@ -1577,7 +1583,6 @@ static int msm_release(struct inode *inode, struct file *filp)
 	u32 count;
 	unsigned long flags;
 	LIST_HEAD(tmp_head);
-	int lastclose_timeout;
 	int ret = 0;
 
 	mutex_lock(&msm_release_lock);
@@ -1620,8 +1625,6 @@ static int msm_release(struct inode *inode, struct file *filp)
 		kfree(node);
 	}
 
-	lastclose_timeout = msm_pending_crtc_last_close_timeout(priv);
-
 	/**
 	 * Handle preclose operation here for removing fb's whose
 	 * refcount > 1. This operation is not triggered from upstream
@@ -1629,7 +1632,7 @@ static int msm_release(struct inode *inode, struct file *filp)
 	 */
 	if (drm_is_current_master(file_priv)) {
 		msm_wait_event_timeout(priv->pending_crtcs_event, !priv->pending_crtcs,
-			lastclose_timeout, ret);
+			LASTCLOSE_TIMEOUT_MS, ret);
 		if (!ret)
 			DRM_INFO("wait for crtc mask 0x%x failed, commit anyway...\n",
 				priv->pending_crtcs);
@@ -1820,6 +1823,12 @@ static const struct drm_ioctl_desc msm_ioctls[] = {
 			DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MSM_DISPLAY_HINT, msm_ioctl_display_hint_ops,
 			DRM_UNLOCKED),
+#if defined(CONFIG_PXLW_IRIS) || defined(CONFIG_PXLW_SOFT_IRIS)
+	DRM_IOCTL_DEF_DRV(MSM_IRIS_OPERATE_CONF, msm_ioctl_iris_operate_conf,
+			DRM_UNLOCKED|DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(MSM_IRIS_OPERATE_TOOL, msm_ioctl_iris_operate_tool,
+			DRM_UNLOCKED|DRM_RENDER_ALLOW),
+#endif
 };
 
 static const struct file_operations fops = {

@@ -388,7 +388,7 @@ static void dp_panel_update_tu_timings(struct dp_tu_calc_input *in,
 	tu->orig_lwidth          = in->hactive;
 	tu->hbp_relative_to_pclk_fp = drm_fixp_from_fraction(in->hporch, 1);
 	tu->orig_hbp             = in->hporch;
-	tu->rb2                  = (in->hporch < 160) ? 1 : 0;
+	tu->rb2                  = (in->hporch <= 80) ? 1 : 0;
 
 	if (tu->pixelEnc == 420) {
 		temp1_fp = drm_fixp_from_fraction(2, 1);
@@ -418,8 +418,6 @@ static void dp_panel_update_tu_timings(struct dp_tu_calc_input *in,
 
 	if (!in->dsc_en)
 		goto fec_check;
-
-	tu->bpp = 24; // hardcode to 24 if DSC is enabled.
 
 	temp1_fp = drm_fixp_from_fraction(in->compress_ratio, 100);
 	temp2_fp = drm_fixp_from_fraction(in->bpp, 1);

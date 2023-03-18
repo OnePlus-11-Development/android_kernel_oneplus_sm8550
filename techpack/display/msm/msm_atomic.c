@@ -565,6 +565,10 @@ static void complete_commit(struct msm_commit *c)
 	struct msm_drm_private *priv = dev->dev_private;
 	struct msm_kms *kms = priv->kms;
 
+#ifdef OPLUS_FEATURE_DISPLAY
+	mutex_lock(&priv->dspp_lock);
+#endif /* OPLUS_FEATURE_DISPLAY */
+
 	drm_atomic_helper_wait_for_fences(dev, state, false);
 
 	kms->funcs->prepare_commit(kms, state);
@@ -573,6 +577,9 @@ static void complete_commit(struct msm_commit *c)
 
 	drm_atomic_helper_commit_planes(dev, state,
 				DRM_PLANE_COMMIT_ACTIVE_ONLY);
+#ifdef OPLUS_FEATURE_DISPLAY
+	mutex_unlock(&priv->dspp_lock);
+#endif /* OPLUS_FEATURE_DISPLAY */
 
 	msm_atomic_helper_commit_modeset_enables(dev, state);
 

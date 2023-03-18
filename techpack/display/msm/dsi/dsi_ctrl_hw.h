@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -33,6 +33,17 @@
 #define DSI_MDP_INTF_R32(dsi_ctrl_hw, off) DSI_GEN_R32((dsi_ctrl_hw)->mdp_intf_base, off)
 #define DSI_MDP_INTF_W32(dsi_ctrl_hw, off, val) \
 	DSI_GEN_W32_DEBUG((dsi_ctrl_hw)->mdp_intf_base, (dsi_ctrl_hw)->index, off, val)
+
+#ifdef OPLUS_FEATURE_DISPLAY
+#undef DSI_CTRL_HW_ERR
+#include <soc/oplus/system/oplus_mm_kevent_fb.h>
+#define DSI_CTRL_HW_ERR(c, fmt, ...) \
+	do { \
+		DRM_DEV_ERROR(NULL, "[msm-dsi-error]: DSI_%d: "\
+			fmt, c ? c->index : -1,	##__VA_ARGS__); \
+		mm_fb_display_kevent_named(MM_FB_KEY_RATELIMIT_1H, fmt, ##__VA_ARGS__); \
+	} while(0)
+#endif /* OPLUS_FEATURE_DISPLAY */
 
 /**
  * Modifier flag for command transmission. If this flag is set, command
@@ -905,15 +916,6 @@ struct dsi_ctrl_hw_ops {
 	 * @cfg:	Common configuration parameters.
 	 */
 	void (*reset_trig_ctrl)(struct dsi_ctrl_hw *ctrl,
-			struct dsi_host_common_cfg *cfg);
-
-	/**
-	 * hw.ops.init_cmddma_trig_ctrl() - Initialize the default trigger used
-	 *                             for command mode DMA path.
-	 * @ctrl:	Pointer to the controller host hardware.
-	 * @cfg:	Common configuration parameters.
-	 */
-	void (*init_cmddma_trig_ctrl)(struct dsi_ctrl_hw *ctrl,
 			struct dsi_host_common_cfg *cfg);
 
 	/**

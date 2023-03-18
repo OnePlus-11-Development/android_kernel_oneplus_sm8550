@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -46,6 +46,22 @@
 #include "sde_vm.h"
 #include "sde_fence.h"
 
+#ifdef OPLUS_FEATURE_DISPLAY
+#include "../oplus/oplus_display_private_api.h"
+#include "../oplus/oplus_dc_diming.h"
+/* OPLUS_FEATURE_ADFR, oplus adfr */
+#include "../oplus/oplus_adfr.h"
+#include <linux/ktime.h>
+#endif /* OPLUS_FEATURE_DISPLAY */
+
+#ifdef OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT
+#include "../oplus/oplus_onscreenfingerprint.h"
+#endif /* OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT */
+
+#if defined(CONFIG_PXLW_IRIS) || defined(CONFIG_PXLW_SOFT_IRIS)
+#include "dsi_iris_api.h"
+extern u32 iris_pq_disable;
+#endif
 #define SDE_DEBUG_ENC(e, fmt, ...) SDE_DEBUG("enc%d " fmt,\
 		(e) ? (e)->base.base.id : -1, ##__VA_ARGS__)
 
@@ -71,6 +87,13 @@
 #define IDLE_SHORT_TIMEOUT	1
 
 #define EVT_TIME_OUT_SPLIT 2
+
+#if defined(CONFIG_PXLW_IRIS) || defined(CONFIG_PXLW_SOFT_IRIS)
+#define DELAY_LOW_FPS_TIMEOUT_US 10000
+#define DELAY_MEDIUM_FPS_TIMEOUT_US 5500
+#define DELAY_HIGHT_FPS_TIMEOUT_US 1000
+extern iris_backlight_update;
+#endif
 
 /* worst case poll time for delay_kickoff to be cleared */
 #define DELAY_KICKOFF_POLL_TIMEOUT_US 100000
@@ -328,6 +351,14 @@ static bool _sde_encoder_is_autorefresh_enabled(
 	if (!drm_conn || !drm_conn->state)
 		return false;
 
+#if defined(CONFIG_PXLW_IRIS)
+	if (iris_is_chip_supported()) {
+		struct sde_encoder_phys *phys = sde_enc->phys_encs[0];
+
+		if (phys && iris_is_display1_autorefresh_enabled(phys))
+			return true;
+	}
+#endif
 	return sde_connector_get_property(drm_conn->state,
 			CONNECTOR_PROP_AUTOREFRESH) ? true : false;
 }
@@ -378,55 +409,6 @@ static int _sde_encoder_wait_timeout(int32_t drm_id, int32_t hw_id,
 			(ktime_compare_safe(exp_ktime, cur_ktime) > 0));
 
 	return rc;
-}
-
-int sde_encoder_helper_hw_fence_extended_wait(struct sde_encoder_phys *phys_enc,
-	struct sde_hw_ctl *ctl, struct sde_encoder_wait_info *wait_info, int wait_type)
-{
-	int ret = -ETIMEDOUT;
-	s64 standard_kickoff_timeout_ms = wait_info->timeout_ms;
-	int timeout_iters = EXTENDED_KICKOFF_TIMEOUT_ITERS;
-
-	wait_info->timeout_ms = EXTENDED_KICKOFF_TIMEOUT_MS;
-
-	while (ret == -ETIMEDOUT && timeout_iters--) {
-		ret = sde_encoder_helper_wait_for_irq(phys_enc, wait_type, wait_info);
-		if (ret == -ETIMEDOUT) {
-			/* if dma_fence is not signaled, keep waiting */
-			if (!sde_crtc_is_fence_signaled(phys_enc->parent->crtc))
-				continue;
-
-			/* timed-out waiting and no sw-override support for hw-fences */
-			if (!ctl || !ctl->ops.hw_fence_trigger_sw_override) {
-				SDE_ERROR("invalid argument(s)\n");
-				break;
-			}
-
-			/*
-			 * In case the sw and hw fences were triggered at the same time,
-			 * wait the standard kickoff time one more time. Only override if
-			 * we timeout again.
-			 */
-			wait_info->timeout_ms = standard_kickoff_timeout_ms;
-			ret = sde_encoder_helper_wait_for_irq(phys_enc, wait_type, wait_info);
-			if (ret == -ETIMEDOUT) {
-				sde_encoder_helper_hw_fence_sw_override(phys_enc, ctl);
-
-				/*
-				 * wait the original timeout time again if we
-				 * did sw override due to fence being signaled
-				 */
-				ret = sde_encoder_helper_wait_for_irq(phys_enc, wait_type,
-					wait_info);
-			}
-			break;
-		}
-	}
-
-	/* reset the timeout value */
-	wait_info->timeout_ms = standard_kickoff_timeout_ms;
-
-	return ret;
 }
 
 bool sde_encoder_is_primary_display(struct drm_encoder *drm_enc)
@@ -978,7 +960,6 @@ void sde_encoder_set_clone_mode(struct drm_encoder *drm_enc,
 		}
 	}
 
-	sde_crtc_state->cached_cwb_enc_mask = sde_crtc_state->cwb_enc_mask;
 	sde_crtc_state->cwb_enc_mask = 0;
 }
 
@@ -1498,27 +1479,7 @@ static void _sde_encoder_update_vsync_source(struct sde_encoder_virt *sde_enc,
 	}
 }
 
-static void _sde_encoder_wait_for_vsync_on_autorefresh_busy(struct sde_encoder_phys *phys_enc)
-{
-	u32 autorefresh_status;
-	int ret = 0;
 
-	if (!phys_enc || !phys_enc->hw_intf || !phys_enc->hw_intf->ops.get_autorefresh_status) {
-		SDE_ERROR("invalid params\n");
-		return;
-	}
-
-	autorefresh_status = phys_enc->hw_intf->ops.get_autorefresh_status(phys_enc->hw_intf);
-	if (autorefresh_status) {
-		ret = sde_encoder_wait_for_event(phys_enc->parent, MSM_ENC_VBLANK);
-		if (ret) {
-			autorefresh_status = phys_enc->hw_intf->ops.get_autorefresh_status(
-					phys_enc->hw_intf);
-			SDE_ERROR("wait for vblank timed out, autorefresh_status:%d\n",
-					autorefresh_status);
-		}
-	}
-}
 
 int sde_encoder_helper_switch_vsync(struct drm_encoder *drm_enc,
 	 bool watchdog_te)
@@ -2301,11 +2262,7 @@ static int _sde_encoder_rc_idle(struct drm_encoder *drm_enc,
 	}
 
 	crtc_id = drm_crtc_index(crtc);
-	/**
-	 * Avoid power collapse entry for writeback crtc since HAL does not repopulate
-	 * crtc, plane properties like luts for idlepc exit commit.
-	 */
-	if (is_vid_mode || _is_crtc_intf_mode_wb(crtc)) {
+	if (is_vid_mode) {
 		sde_encoder_irq_control(drm_enc, false);
 		_sde_encoder_pm_qos_remove_request(drm_enc);
 	} else {
@@ -2608,6 +2565,13 @@ static int sde_encoder_virt_modeset_rc(struct drm_encoder *drm_enc,
 	int ret;
 	bool is_cmd_mode = false, res_switch = false;
 
+#ifdef OPLUS_FEATURE_DISPLAY
+	if (sde_enc == NULL) {
+		SDE_ERROR("invalid pointer sde_enc");
+		return -EFAULT;
+	}
+#endif /* OPLUS_FEATURE_DISPLAY */
+
 	if (sde_encoder_check_curr_mode(drm_enc, MSM_DISPLAY_CMD_MODE))
 		is_cmd_mode = true;
 
@@ -2678,8 +2642,6 @@ static void sde_encoder_virt_mode_set(struct drm_encoder *drm_enc,
 	struct sde_encoder_virt *sde_enc;
 	struct sde_kms *sde_kms;
 	struct drm_connector *conn;
-	struct drm_crtc_state *crtc_state;
-	struct sde_crtc_state *sde_crtc_state;
 	struct sde_connector_state *c_state;
 	struct msm_display_mode *msm_mode;
 	struct sde_crtc *sde_crtc;
@@ -2715,13 +2677,7 @@ static void sde_encoder_virt_mode_set(struct drm_encoder *drm_enc,
 
 	sde_enc->crtc = drm_enc->crtc;
 	sde_crtc = to_sde_crtc(drm_enc->crtc);
-
-	crtc_state = sde_crtc->base.state;
-	sde_crtc_state = to_sde_crtc_state(crtc_state);
-
-	if (!((sde_enc->disp_info.intf_type == DRM_MODE_CONNECTOR_VIRTUAL) &&
-			((sde_crtc_state->cached_cwb_enc_mask & drm_encoder_mask(drm_enc)))))
-		sde_crtc_set_qos_dirty(drm_enc->crtc);
+	sde_crtc_set_qos_dirty(drm_enc->crtc);
 
 	/* get and store the mode_info */
 	conn = sde_encoder_get_connector(sde_kms->dev, drm_enc);
@@ -2749,14 +2705,6 @@ static void sde_encoder_virt_mode_set(struct drm_encoder *drm_enc,
 	ret = sde_encoder_virt_modeset_rc(drm_enc, adj_mode, msm_mode, true);
 	if (ret)
 		return;
-
-	if ((sde_enc->disp_info.intf_type == DRM_MODE_CONNECTOR_VIRTUAL) &&
-			((sde_crtc_state->cached_cwb_enc_mask & drm_encoder_mask(drm_enc)))) {
-		SDE_EVT32(DRMID(drm_enc), sde_crtc_state->cwb_enc_mask,
-				sde_crtc_state->cached_cwb_enc_mask);
-		sde_crtc_state->cwb_enc_mask = sde_crtc_state->cached_cwb_enc_mask;
-		sde_encoder_set_clone_mode(drm_enc, crtc_state);
-	}
 
 	/* reserve dynamic resources now, indicating non test-only */
 	ret = sde_rm_reserve(&sde_kms->rm, drm_enc, drm_enc->crtc->state, conn->state, false);
@@ -3030,13 +2978,8 @@ static void _sde_encoder_setup_dither(struct sde_encoder_phys *phys)
 	bpp = dsc->config.bits_per_pixel;
 
 	/* disable dither for 10 bpp or 10bpc dsc config */
-	/* bpp >> 4 because bpp configuration is in 6.4 format */
-	if ((bpp >> 4) == 10 || bpc == 10) {
-		num_lm = sde_rm_topology_get_num_lm(&sde_kms->rm, topology);
-		for (i = 0; i < num_lm; i++) {
-			hw_pp = sde_enc->hw_pp[i];
-			phys->hw_pp->ops.setup_dither(hw_pp, NULL, 0);
-		}
+	if (bpp == 10 || bpc == 10) {
+		phys->hw_pp->ops.setup_dither(phys->hw_pp, NULL, 0);
 		return;
 	}
 
@@ -3051,6 +2994,12 @@ static void _sde_encoder_setup_dither(struct sde_encoder_phys *phys)
 	num_lm = sde_rm_topology_get_num_lm(&sde_kms->rm, topology);
 	for (i = 0; i < num_lm; i++) {
 		hw_pp = sde_enc->hw_pp[i];
+#if defined(CONFIG_PXLW_IRIS)
+		if (iris_is_chip_supported() && (iris_pq_disable > 0)) {
+			phys->hw_pp->ops.setup_dither(phys->hw_pp, NULL, 0);
+			continue;
+		}
+#endif
 		phys->hw_pp->ops.setup_dither(hw_pp,
 				dither_cfg, len);
 	}
@@ -3178,6 +3127,13 @@ static void sde_encoder_off_work(struct kthread_work *work)
 	drm_enc = &sde_enc->base;
 
 	SDE_ATRACE_BEGIN("sde_encoder_off_work");
+#ifdef OPLUS_FEATURE_DISPLAY
+	/* OPLUS_FEATURE_ADFR, Add for idle mode control */
+	if (oplus_adfr_is_support() && oplus_adfr_idle_mode_is_enable()) {
+		SDE_DEBUG("kVRR enter idle mode\n");
+		oplus_adfr_handle_idle_mode(sde_enc, true);
+	}
+#endif /* OPLUS_FEATURE_DISPLAY */
 	sde_encoder_idle_request(drm_enc);
 	SDE_ATRACE_END("sde_encoder_off_work");
 }
@@ -3259,6 +3215,14 @@ static void sde_encoder_virt_enable(struct drm_encoder *drm_enc)
 
 	_sde_encoder_virt_enable_helper(drm_enc);
 	sde_encoder_control_te(drm_enc, true);
+
+#ifdef OPLUS_FEATURE_DISPLAY
+	/* OPLUS_FEATURE_ADFR, reset te source */
+	if (oplus_adfr_is_support() &&
+			oplus_adfr_get_vsync_mode() == OPLUS_DOUBLE_TE_VSYNC) {
+		oplus_adfr_vsync_source_reset(drm_enc);
+	}
+#endif /* OPLUS_FEATURE_DISPLAY */
 }
 
 void sde_encoder_virt_reset(struct drm_encoder *drm_enc)
@@ -3289,47 +3253,6 @@ void sde_encoder_virt_reset(struct drm_encoder *drm_enc)
 	SDE_DEBUG_ENC(sde_enc, "encoder disabled\n");
 
 	sde_rm_release(&sde_kms->rm, drm_enc, false);
-}
-
-void sde_encoder_set_cwb_pending(struct drm_encoder *drm_enc, bool enable)
-{
-	struct sde_encoder_virt *sde_enc;
-	int i;
-
-	if (!drm_enc) {
-		SDE_ERROR("invalid encoder\n");
-		return;
-	}
-
-	sde_enc = to_sde_encoder_virt(drm_enc);
-	for (i = 0; i < sde_enc->num_phys_encs; i++) {
-		if (sde_enc->phys_encs[i])
-			sde_enc->phys_encs[i]->cwb_disable_pending = enable;
-	}
-}
-static void sde_encoder_wait_for_vsync_event_complete(struct sde_encoder_virt *sde_enc)
-{
-	u32 timeout_ms = DEFAULT_KICKOFF_TIMEOUT_MS;
-	int i, ret;
-
-	if (sde_enc->cur_master)
-		timeout_ms = sde_enc->cur_master->kickoff_timeout_ms;
-
-	ret = wait_event_timeout(sde_enc->vsync_event_wq,
-			!sde_enc->vblank_enabled,
-			msecs_to_jiffies(timeout_ms));
-	SDE_EVT32(timeout_ms, ret);
-
-	if (!ret) {
-		SDE_ERROR("vsync event complete timed out %d\n", ret);
-		SDE_EVT32(ret, SDE_EVTLOG_ERROR);
-		for (i = 0; i < sde_enc->num_phys_encs; i++) {
-			struct sde_encoder_phys *phys = sde_enc->phys_encs[i];
-
-			if (phys && phys->ops.control_vblank_irq)
-				phys->ops.control_vblank_irq(phys, false);
-		}
-	}
 }
 
 static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
@@ -3377,10 +3300,8 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 		for (i = 0; i < sde_enc->num_phys_encs; i++) {
 			struct sde_encoder_phys *phys = sde_enc->phys_encs[i];
 
-			if (phys && phys->ops.disable_autorefresh) {
+			if (phys && phys->ops.disable_autorefresh)
 				phys->ops.disable_autorefresh(phys);
-				_sde_encoder_wait_for_vsync_on_autorefresh_busy(phys);
-			}
 		}
 
 		/* wait for idle */
@@ -3420,13 +3341,6 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 		sde_encoder_resource_control(drm_enc,
 				SDE_ENC_RC_EVENT_PRE_STOP);
 	}
-
-	/*
-	 * wait for any pending vsync timestamp event to sf
-	 * to ensure vbalnk irq is disabled.
-	 */
-	if (sde_enc->vblank_enabled)
-		sde_encoder_wait_for_vsync_event_complete(sde_enc);
 
 	/*
 	 * disable dce after the transfer is complete (for command mode)
@@ -3734,6 +3648,14 @@ static void sde_encoder_underrun_callback(struct drm_encoder *drm_enc,
 	SDE_DBG_CTRL("panic_underrun");
 
 	SDE_ATRACE_END("encoder_underrun_callback");
+
+#ifdef OPLUS_FEATURE_DISPLAY
+	SDE_MM_ERROR("DisplayDriverID@@422$$sde encoder underrun callback! Count=%d",
+			atomic_read(&phy_enc->underrun_cnt));
+	if (get_eng_version() == AGING) {
+		SDE_DBG_DUMP(SDE_DBG_BUILT_IN_ALL, "panic");
+	}
+#endif /* OPLUS_FEATURE_DISPLAY */
 }
 
 void sde_encoder_register_vblank_callback(struct drm_encoder *drm_enc,
@@ -3766,9 +3688,6 @@ void sde_encoder_register_vblank_callback(struct drm_encoder *drm_enc,
 			phys->ops.control_vblank_irq(phys, enable);
 	}
 	sde_enc->vblank_enabled = enable;
-
-	if (!enable)
-		wake_up_all(&sde_enc->vsync_event_wq);
 }
 
 void sde_encoder_register_frame_event_callback(struct drm_encoder *drm_enc,
@@ -3975,10 +3894,16 @@ static inline void _sde_encoder_trigger_flush(struct drm_encoder *drm_enc,
 			ctl->ops.update_bitmask) {
 		/* perform peripheral flush on every frame update for dp dsc */
 		if (phys->comp_type == MSM_DISPLAY_COMPRESSION_DSC &&
-				phys->comp_ratio && c_conn->ops.update_pps)
-			c_conn->ops.update_pps(phys->connector, NULL, c_conn->display);
+				phys->comp_ratio && c_conn->ops.update_pps) {
+			c_conn->ops.update_pps(phys->connector, NULL,
+					c_conn->display);
+			ctl->ops.update_bitmask(ctl, SDE_HW_FLUSH_PERIPH,
+					phys->hw_intf->idx, 1);
+		}
 
-		ctl->ops.update_bitmask(ctl, SDE_HW_FLUSH_PERIPH, phys->hw_intf->idx, 1);
+		if (sde_enc->dynamic_hdr_updated)
+			ctl->ops.update_bitmask(ctl, SDE_HW_FLUSH_PERIPH,
+					phys->hw_intf->idx, 1);
 	}
 
 	if ((extra_flush && extra_flush->pending_flush_mask)
@@ -4668,6 +4593,10 @@ static int _sde_encoder_prepare_for_kickoff_processing(struct drm_encoder *drm_e
 	/* if any phys needs reset, reset all phys, in-order */
 	if (needs_hw_reset)
 		sde_encoder_needs_hw_reset(drm_enc);
+#if defined(CONFIG_PXLW_IRIS) || defined(CONFIG_PXLW_SOFT_IRIS)
+	iris_sde_prepare_for_kickoff(sde_enc->num_phys_encs,
+			sde_enc->phys_encs[0]);
+#endif
 
 	_sde_encoder_update_master(drm_enc, params);
 
@@ -4700,6 +4629,395 @@ static int _sde_encoder_prepare_for_kickoff_processing(struct drm_encoder *drm_e
 
 	return ret;
 }
+
+#ifdef OPLUS_FEATURE_DISPLAY
+/* Add for backlight smooths */
+struct oplus_apollo_bk apollo_bk;
+u32 g_oplus_save_pcc = 0;
+
+extern int backlight_smooth_enable;
+
+static int get_current_vsync_period(struct drm_connector *connector)
+{
+	struct sde_connector *c_conn = to_sde_connector(connector);
+	struct dsi_display *dsi_display = NULL;
+
+	dsi_display = c_conn->display;
+
+	if (!dsi_display || !dsi_display->panel || !dsi_display->panel->cur_mode
+		|| !dsi_display->panel->cur_mode->priv_info) {
+		SDE_ERROR("Invalid params(s) dsi_display %pK, panel %pK\n",
+			dsi_display,
+			((dsi_display) ? dsi_display->panel : NULL));
+		return -EINVAL;
+	}
+
+	return dsi_display->panel->cur_mode->priv_info->vsync_period;
+}
+
+static int get_current_vsync_width(struct drm_connector *connector)
+{
+	struct sde_connector *c_conn = to_sde_connector(connector);
+	struct dsi_display *dsi_display = NULL;
+
+	dsi_display = c_conn->display;
+
+	if (!dsi_display || !dsi_display->panel || !dsi_display->panel->cur_mode
+		|| !dsi_display->panel->cur_mode->priv_info) {
+		SDE_ERROR("Invalid params(s) dsi_display %pK, panel %pK\n",
+			dsi_display,
+			((dsi_display) ? dsi_display->panel : NULL));
+		return -EINVAL;
+	}
+
+	return dsi_display->panel->cur_mode->priv_info->vsync_width;
+}
+
+static int get_current_display_brightness(struct drm_connector *connector)
+{
+	struct sde_connector *c_conn = to_sde_connector(connector);
+	struct dsi_display *dsi_display = NULL;
+	int brightness_level = 0;
+
+	dsi_display = c_conn->display;
+
+	if (!dsi_display || !dsi_display->panel || !dsi_display->panel->cur_mode) {
+		SDE_ERROR("Invalid params(s) dsi_display %pK, panel %pK\n",
+			dsi_display,
+			((dsi_display) ? dsi_display->panel : NULL));
+		return -EINVAL;
+	}
+
+	brightness_level = dsi_display->panel->bl_config.bl_level;
+
+	return brightness_level;
+}
+
+static bool is_support_apollo_bk(struct drm_connector *connector)
+{
+	struct sde_connector *c_conn = to_sde_connector(connector);
+	struct dsi_display *dsi_display = NULL;
+
+	if(c_conn->connector_type == DRM_MODE_CONNECTOR_DSI) {
+		dsi_display = c_conn->display;
+
+#if defined(CONFIG_PXLW_IRIS)
+		if (iris_is_chip_supported()) {
+			if (!strcmp(dsi_display->display_type, "secondary")) {
+				pr_info("%s: iris secondary panel no need config!\n", __func__);
+				return false;
+			}
+		}
+#endif
+
+		if (!dsi_display || !dsi_display->panel || !dsi_display->panel->oplus_priv.vendor_name) {
+			SDE_ERROR("Invalid params(s) dsi_display %pK, panel %pK\n",
+				dsi_display,
+				((dsi_display) ? dsi_display->panel : NULL));
+			return -EINVAL;
+		}
+
+		if (dsi_display->panel->oplus_priv.is_apollo_support) {
+			return true;
+		}else {
+			return false;
+		}
+	} else {
+		return false;
+	}
+}
+
+bool is_spread_backlight(struct dsi_display *display, int level)
+{
+	if ((display != NULL) && (display->panel != NULL)
+		&& (level <= display->panel->oplus_priv.sync_brightness_level) && (level >= 2)) {
+		return true;
+	}
+	else if (((display != NULL) && (display->panel != NULL)
+		&& (display->panel->oplus_priv.dc_apollo_sync_enable)
+		&& (((level <= display->panel->oplus_priv.sync_brightness_level) && (level >= 2))
+		|| (level == display->panel->oplus_priv.dc_apollo_sync_brightness_level)))) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+void update_pending_backlight(struct dsi_display *display, int level) {
+	if (display == NULL) {
+		return;
+	}
+
+	if (!strcmp(display->display_type, "primary")) {
+		apollo_bk.g_pri_bk_level = level;
+	} else if (!strcmp(display->display_type, "secondary")) {
+		apollo_bk.g_sec_bk_level = level;
+	} else {
+		// Ignore
+	}
+}
+
+int oplus_backlight_wait_vsync(struct drm_encoder *drm_enc)
+{
+	SDE_ATRACE_BEGIN("wait_vsync");
+
+	if (!drm_enc || !drm_enc->crtc ) {
+		SDE_ERROR("%s encoder is disabled", __func__);
+		return -ENOLINK;
+	}
+
+	if (sde_encoder_is_disabled(drm_enc)) {
+		SDE_ERROR("%s encoder is disabled", __func__);
+		return -EIO;
+	}
+
+	//mutex_unlock(&panel->panel_lock);
+	sde_encoder_wait_for_event(drm_enc,  MSM_ENC_VBLANK);
+	//mutex_lock(&panel->panel_lock);
+	SDE_ATRACE_END("wait_vsync");
+
+	return 0;
+}
+
+static int oplus_setbacklight_by_display_type(struct drm_encoder *drm_enc) {
+	struct sde_encoder_virt *sde_enc = NULL;
+	struct dsi_display *display = NULL;
+	struct sde_connector *c_conn = NULL;
+	int rc = 0;
+	char tag_name[64];
+
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	if (sde_enc == NULL)
+		return -EFAULT;
+
+	c_conn = to_sde_connector(sde_enc->phys_encs[0]->connector);
+	if (c_conn == NULL)
+		return -EFAULT;
+
+	if (c_conn->connector_type != DRM_MODE_CONNECTOR_DSI)
+		return 0;
+
+	display = c_conn->display;
+	if (display == NULL)
+		return -EFAULT;
+
+	if (!strcmp(display->display_type, "primary")) {
+		snprintf(tag_name, sizeof(tag_name), "primary: %d", apollo_bk.g_pri_bk_level);
+		SDE_ATRACE_BEGIN(tag_name);
+		rc = c_conn->ops.set_backlight(&c_conn->base, display, apollo_bk.g_pri_bk_level);
+		SDE_ATRACE_END(tag_name);
+	} else if (!strcmp(display->display_type, "secondary")) {
+		snprintf(tag_name, sizeof(tag_name), "secondary: %d", apollo_bk.g_sec_bk_level);
+		SDE_ATRACE_BEGIN(tag_name);
+		rc = c_conn->ops.set_backlight(&c_conn->base, display, apollo_bk.g_sec_bk_level);
+		SDE_ATRACE_END(tag_name);
+	}
+
+	return rc;
+}
+
+#define to_sde_encoder_phys_cmd(x) \
+	container_of(x, struct sde_encoder_phys_cmd, base)
+
+#define DEBOUNCE_TIME 1200
+
+int oplus_sync_panel_brightness(enum oplus_sync_method method, struct drm_encoder *drm_enc)
+{
+	struct sde_encoder_virt *sde_enc = NULL;
+	struct sde_encoder_phys *phys_encoder = NULL;
+	struct sde_connector *c_conn = NULL;
+	struct dsi_display *display = NULL;
+	int rc = 0;
+	struct sde_encoder_phys_cmd *cmd_enc = NULL;
+	struct sde_encoder_phys_cmd_te_timestamp *te_timestamp;
+	s64 us_per_frame;
+	u32 vsync_width;
+	ktime_t last_te_timestamp;
+	s64 delay;
+
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	phys_encoder = sde_enc->phys_encs[0];
+
+	if (phys_encoder == NULL)
+		return -EFAULT;
+	if (phys_encoder->connector == NULL)
+		return -EFAULT;
+
+	c_conn = to_sde_connector(phys_encoder->connector);
+	if (c_conn == NULL)
+		return -EFAULT;
+
+	if (c_conn->connector_type != DRM_MODE_CONNECTOR_DSI)
+		return 0;
+
+	display = c_conn->display;
+	if (display == NULL)
+		return -EFAULT;
+
+	cmd_enc = to_sde_encoder_phys_cmd(phys_encoder);
+	if (cmd_enc == NULL) {
+		return -EFAULT;
+	}
+
+	us_per_frame = get_current_vsync_period(sde_enc->cur_master->connector);
+	vsync_width = get_current_vsync_width(sde_enc->cur_master->connector);
+	te_timestamp = list_last_entry(&cmd_enc->te_timestamp_list, struct sde_encoder_phys_cmd_te_timestamp, list);
+	last_te_timestamp = te_timestamp->timestamp;
+
+	if ((!strcmp(display->display_type, "primary") &&
+			is_spread_backlight(display, apollo_bk.g_pri_bk_level) &&
+			(apollo_bk.g_pri_bk_level != get_current_display_brightness(sde_enc->cur_master->connector))) ||
+		(!strcmp(display->display_type, "secondary") &&
+			is_spread_backlight(display, apollo_bk.g_sec_bk_level) &&
+			(apollo_bk.g_sec_bk_level != get_current_display_brightness(sde_enc->cur_master->connector)))) {
+		SDE_ATRACE_BEGIN("sync_panel_brightness");
+		delay = vsync_width - (ktime_to_us(ktime_sub(ktime_get(), last_te_timestamp)) % us_per_frame);
+		if (delay > 0) {
+			SDE_EVT32(us_per_frame, last_te_timestamp, delay);
+			usleep_range(delay, delay + 100);
+		}
+
+		if ((ktime_to_us(ktime_sub(ktime_get(), last_te_timestamp)) % us_per_frame) > (us_per_frame - DEBOUNCE_TIME)) {
+			SDE_EVT32(us_per_frame, last_te_timestamp);
+			usleep_range(DEBOUNCE_TIME + vsync_width, DEBOUNCE_TIME + 100 + vsync_width);
+		}
+		if (method == OPLUS_PREPARE_KICKOFF_METHOD) {
+			rc = oplus_setbacklight_by_display_type(drm_enc);
+			c_conn->unset_bl_level = 0;
+		} else if(method == OPLUS_POST_KICKOFF_METHOD) {
+			rc = oplus_setbacklight_by_display_type(drm_enc);
+			c_conn->unset_bl_level = 0;
+		} else {
+			oplus_backlight_wait_vsync(c_conn->encoder);
+			rc = oplus_setbacklight_by_display_type(drm_enc);
+			c_conn->unset_bl_level = 0;
+		}
+		SDE_ATRACE_END("sync_panel_brightness");
+	}
+
+	return rc;
+}
+
+// Use oplus_set_brightness instead of backlight_device_set_brightness to avoid time consumption of backlight_generate_event()
+int oplus_set_brightness(struct backlight_device *bd,
+				    unsigned long brightness)
+{
+	int rc = -ENXIO;
+
+	mutex_lock(&bd->ops_lock);
+	if (bd->ops) {
+		if (brightness > bd->props.max_brightness)
+			rc = -EINVAL;
+		else {
+			pr_debug("set brightness to %lu\n", brightness);
+			bd->props.brightness = brightness;
+			rc = backlight_update_status(bd);
+		}
+	}
+	mutex_unlock(&bd->ops_lock);
+
+	return rc;
+}
+
+int oplus_sync_panel_brightness_v2(struct drm_encoder *drm_enc)
+{
+	struct sde_encoder_virt *sde_enc = NULL;
+	struct sde_encoder_phys *phys_encoder = NULL;
+	struct sde_connector *c_conn = NULL;
+	struct dsi_display *display = NULL;
+	struct sde_connector_state *c_state;
+	int rc = 0;
+	struct sde_encoder_phys_cmd *cmd_enc = NULL;
+	struct sde_encoder_phys_cmd_te_timestamp *te_timestamp;
+	s64 us_per_frame;
+	u32 vsync_width;
+	ktime_t last_te_timestamp;
+	s64 delay;
+	bool sync_backlight;
+	u32 brightness;
+	char tag_name[64];
+
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	phys_encoder = sde_enc->phys_encs[0];
+
+	if (phys_encoder == NULL)
+		return -EFAULT;
+	if (phys_encoder->connector == NULL)
+		return -EFAULT;
+
+	c_conn = to_sde_connector(phys_encoder->connector);
+	if (c_conn == NULL)
+		return -EFAULT;
+
+	if (c_conn->connector_type != DRM_MODE_CONNECTOR_DSI)
+		return 0;
+
+	c_state = to_sde_connector_state(c_conn->base.state);
+
+	display = c_conn->display;
+	if (display == NULL)
+		return -EFAULT;
+
+	cmd_enc = to_sde_encoder_phys_cmd(phys_encoder);
+	if (cmd_enc == NULL) {
+		return -EFAULT;
+	}
+
+	us_per_frame = get_current_vsync_period(sde_enc->cur_master->connector);
+	vsync_width = get_current_vsync_width(sde_enc->cur_master->connector);
+	te_timestamp = list_last_entry(&cmd_enc->te_timestamp_list, struct sde_encoder_phys_cmd_te_timestamp, list);
+	if (te_timestamp == NULL) {
+		return rc;
+	}
+	last_te_timestamp = te_timestamp->timestamp;
+
+	sync_backlight = c_conn->bl_need_sync;
+	c_conn->bl_need_sync = false;
+
+	if (sync_backlight) {
+		SDE_ATRACE_BEGIN("sync_panel_brightness");
+		brightness = sde_connector_get_property(c_conn->base.state, CONNECTOR_PROP_SYNC_BACKLIGHT_LEVEL);
+		delay = vsync_width - (ktime_to_us(ktime_sub(ktime_get(), last_te_timestamp)) % us_per_frame);
+		if (delay > 0) {
+			SDE_EVT32(us_per_frame, last_te_timestamp, delay);
+			usleep_range(delay, delay + 100);
+		}
+
+		snprintf(tag_name, sizeof(tag_name), "%s: %d", display->display_type, brightness);
+		SDE_ATRACE_BEGIN(tag_name);
+		rc = oplus_set_brightness(c_conn->bl_device, brightness);
+		SDE_ATRACE_END(tag_name);
+		SDE_ATRACE_END("sync_panel_brightness");
+	}
+
+	return rc;
+}
+
+
+int dc_apollo_sync_hbmon(struct dsi_display *display)
+{
+	if (display == NULL)
+		return 0;
+	if (display->panel == NULL)
+		return 0;
+
+	if (display->panel->oplus_priv.dc_apollo_sync_enable) {
+#ifdef OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT
+		if (oplus_ofp_is_supported() && !oplus_ofp_oled_capacitive_is_enabled()
+				&& !oplus_ofp_ultrasonic_is_enabled()) {
+			if (oplus_ofp_get_hbm_state()) {
+				return 1;
+			}
+		}
+#endif /* OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT */
+
+		return 0;
+	} else {
+		return 0;
+	}
+}
+#endif /* OPLUS_FEATURE_DISPLAY */
 
 int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 		struct sde_encoder_kickoff_params *params)
@@ -4758,7 +5076,24 @@ int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 			if (sde_enc->cur_master &&
 					sde_connector_is_qsync_updated(
 					sde_enc->cur_master->connector))
+#ifdef OPLUS_FEATURE_DISPLAY
+			 {
+				/* OPLUS_FEATURE_ADFR, qsync enhance */
+				if (oplus_adfr_is_support()) {
+					SDE_ATRACE_BEGIN("flush_qsync");
+				}
+#endif /* OPLUS_FEATURE_DISPLAY */
 				_helper_flush_qsync(phys);
+#ifdef OPLUS_FEATURE_DISPLAY
+				/* OPLUS_FEATURE_ADFR, qsync enhance */
+				// fix qsync bug from case 04843535
+				if (oplus_adfr_is_support()) {
+					if (sde_enc->disp_info.display_type == SDE_CONNECTOR_PRIMARY)
+						_sde_encoder_update_rsc_client(drm_enc, true);
+					SDE_ATRACE_END("flush_qsync");
+				}
+			 }
+#endif /* OPLUS_FEATURE_DISPLAY */
 		}
 	}
 
@@ -4811,6 +5146,34 @@ void sde_encoder_kickoff(struct drm_encoder *drm_enc, bool config_changed)
 		SDE_EVT32(DRMID(drm_enc), i, SDE_EVTLOG_FUNC_CASE1);
 	}
 
+#ifdef OPLUS_FEATURE_DISPLAY
+	/* Add for backlight smooths */
+	if ((is_support_apollo_bk(sde_enc->cur_master->connector) == true) && backlight_smooth_enable && !dc_apollo_sync_hbmon(get_main_display())) {
+		if (sde_enc->num_phys_encs > 0 ) {
+			oplus_sync_panel_brightness(OPLUS_POST_KICKOFF_METHOD, drm_enc);
+		}
+	} else {
+		oplus_sync_panel_brightness_v2(drm_enc);
+	}
+
+	/* OPLUS_FEATURE_ADFR, Add for idle mode control */
+	if (oplus_adfr_is_support() && oplus_adfr_idle_mode_is_enable()) {
+		SDE_DEBUG("kVRR exit idle mode\n");
+		oplus_adfr_handle_idle_mode(sde_enc, false);
+	}
+#endif /* OPLUS_FEATURE_DISPLAY */
+
+#if defined(CONFIG_PXLW_IRIS) || defined(CONFIG_PXLW_SOFT_IRIS)
+	iris_sde_encoder_kickoff(sde_enc->num_phys_encs,
+			sde_enc->phys_encs[0]);
+
+	if (iris_is_chip_supported() || iris_is_softiris_supported()) {
+		if (sde_enc->cur_master && sde_enc->cur_master->connector && (iris_backlight_update > 0)) {
+			sde_encoder_wait_vblack(sde_enc->cur_master->connector, drm_enc, 1);
+			sde_encoder_pre_kickoff_update_panel_level(sde_enc->cur_master->connector, drm_enc);
+		}
+	}
+#endif
 	/* update txq for any output retire hw-fence (wb-path) */
 	sde_kms = sde_encoder_get_kms(&sde_enc->base);
 	if (!sde_kms) {
@@ -4820,8 +5183,26 @@ void sde_encoder_kickoff(struct drm_encoder *drm_enc, bool config_changed)
 	if (sde_enc->cur_master)
 		_sde_encoder_update_retire_txq(sde_enc->cur_master, sde_kms);
 
+#ifdef OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT
+	if (oplus_ofp_is_supported()) {
+		oplus_ofp_hbm_handle(sde_enc);
+		oplus_ofp_aod_off_backlight_recovery(sde_enc);
+		oplus_ofp_ultra_low_power_aod_update(sde_enc);
+	}
+#endif /* OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT */
+
 	/* All phys encs are ready to go, trigger the kickoff */
 	_sde_encoder_kickoff_phys(sde_enc, config_changed);
+
+#ifdef OPLUS_FEATURE_DISPLAY
+	/* OPLUS_FEATURE_ADFR, fake frame */
+	if (oplus_adfr_is_support()) {
+		if (sde_encoder_is_dsi_display(drm_enc)) {
+			sde_encoder_adfr_kickoff(sde_enc->crtc, drm_enc,
+				sde_enc->cur_master->connector);
+		}
+	}
+#endif /* OPLUS_FEATURE_DISPLAY */
 
 	/* allow phys encs to handle any post-kickoff business */
 	for (i = 0; i < sde_enc->num_phys_encs; i++) {
@@ -4833,6 +5214,17 @@ void sde_encoder_kickoff(struct drm_encoder *drm_enc, bool config_changed)
 	if (sde_enc->autorefresh_solver_disable &&
 			!_sde_encoder_is_autorefresh_enabled(sde_enc))
 		_sde_encoder_update_rsc_client(drm_enc, true);
+
+#if defined(CONFIG_PXLW_IRIS) || defined(CONFIG_PXLW_SOFT_IRIS)
+	if (iris_is_chip_supported() || iris_is_softiris_supported()) {
+		if (sde_enc->cur_master && sde_enc->cur_master->connector && (iris_backlight_update > 0)) {
+			sde_encoder_post_kickoff_update_panel_level(
+					sde_enc->cur_master->connector);
+		}
+	}
+	iris_sde_encoder_sync_panel_brightness(sde_enc->num_phys_encs,
+			sde_enc->phys_encs[0]);
+#endif
 
 	SDE_ATRACE_END("encoder_kickoff");
 }
@@ -4996,18 +5388,6 @@ int sde_encoder_helper_reset_mixers(struct sde_encoder_phys *phys_enc,
 	return 0;
 }
 
-void sde_encoder_helper_hw_fence_sw_override(struct sde_encoder_phys *phys_enc,
-		struct sde_hw_ctl *ctl)
-{
-	if (!ctl || !ctl->ops.hw_fence_trigger_sw_override)
-		return;
-
-	SDE_EVT32(DRMID(phys_enc->parent), ctl->idx, ctl->ops.get_hw_fence_status ?
-		ctl->ops.get_hw_fence_status(ctl) : SDE_EVTLOG_ERROR);
-	sde_encoder_helper_reset_mixers(phys_enc, NULL);
-	ctl->ops.hw_fence_trigger_sw_override(ctl);
-}
-
 int sde_encoder_prepare_commit(struct drm_encoder *drm_enc)
 {
 	struct sde_encoder_virt *sde_enc;
@@ -5056,6 +5436,20 @@ int sde_encoder_prepare_commit(struct drm_encoder *drm_enc)
 				      sde_enc->cur_master->connector->base.id,
 				      rc);
 	}
+
+#ifdef OPLUS_FEATURE_DISPLAY
+	/* OPLUS_FEATURE_ADFR, fake frame */
+	if (oplus_adfr_is_support()) {
+		if (sde_encoder_is_dsi_display(drm_enc)) {
+			if (sde_enc->cur_master && sde_enc->cur_master->connector) {
+				sde_encoder_adfr_prepare_commit(sde_enc->crtc, drm_enc,
+					sde_enc->cur_master->connector);
+			} else {
+				sde_encoder_adfr_prepare_commit(NULL, NULL, NULL);
+			}
+		}
+	}
+#endif /* OPLUS_FEATURE_DISPLAY */
 
 	return ret;
 }
@@ -5612,6 +6006,10 @@ static const struct drm_encoder_funcs sde_encoder_funcs = {
 		.early_unregister = sde_encoder_early_unregister,
 };
 
+#if defined(CONFIG_PXLW_IRIS)
+static void sde_encoder_disable_autorefresh_work_handler(struct kthread_work *work);
+#endif
+
 struct drm_encoder *sde_encoder_init(struct drm_device *dev, struct msm_display_info *disp_info)
 {
 	struct msm_drm_private *priv = dev->dev_private;
@@ -5678,7 +6076,6 @@ struct drm_encoder *sde_encoder_init(struct drm_device *dev, struct msm_display_
 		sde_enc->frame_trigger_mode = FRAME_DONE_WAIT_POSTED_START;
 
 	mutex_init(&sde_enc->rc_lock);
-	init_waitqueue_head(&sde_enc->vsync_event_wq);
 	kthread_init_delayed_work(&sde_enc->delayed_off_work,
 			sde_encoder_off_work);
 	sde_enc->vblank_enabled = false;
@@ -5693,6 +6090,22 @@ struct drm_encoder *sde_encoder_init(struct drm_device *dev, struct msm_display_
 	kthread_init_work(&sde_enc->esd_trigger_work,
 			sde_encoder_esd_trigger_work_handler);
 
+#ifdef OPLUS_FEATURE_DISPLAY
+	/* OPLUS_FEATURE_ADFR, fake frame */
+	if (oplus_adfr_is_support()) {
+		hrtimer_init(&sde_enc->fakeframe_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+		sde_enc->fakeframe_timer.function = sde_encoder_fakeframe_timer_handler;
+
+		kthread_init_work(&sde_enc->fakeframe_work,
+				sde_encoder_fakeframe_work_handler);
+	}
+#endif /* OPLUS_FEATURE_DISPLAY */
+
+#if defined(CONFIG_PXLW_IRIS)
+	if (iris_is_chip_supported())
+		kthread_init_work(&sde_enc->disable_autorefresh_work,
+				sde_encoder_disable_autorefresh_work_handler);
+#endif
 	memcpy(&sde_enc->disp_info, disp_info, sizeof(*disp_info));
 
 	SDE_DEBUG_ENC(sde_enc, "created\n");
@@ -5759,19 +6172,32 @@ int sde_encoder_wait_for_event(struct drm_encoder *drm_enc,
 			}
 		}
 	}
+#if defined(CONFIG_PXLW_IRIS) || defined(CONFIG_PXLW_SOFT_IRIS)
+	iris_sde_encoder_wait_for_event(sde_enc->num_phys_encs,
+			sde_enc->phys_encs[0], event);
+#endif
 
 	return ret;
 }
 
-void sde_encoder_helper_get_jitter_bounds_ns(u32 frame_rate,
-		u32 jitter_num, u32 jitter_denom,
-		ktime_t *l_bound, ktime_t *u_bound)
+void sde_encoder_helper_get_jitter_bounds_ns(struct drm_encoder *drm_enc,
+		u64 *l_bound, u64 *u_bound)
 {
-	ktime_t jitter_ns, frametime_ns;
+	struct sde_encoder_virt *sde_enc;
+	u64 jitter_ns, frametime_ns;
+	struct msm_mode_info *info;
 
-	frametime_ns = (1 * 1000000000) / frame_rate;
-	jitter_ns =  jitter_num * frametime_ns;
-	do_div(jitter_ns, jitter_denom * 100);
+	if (!drm_enc) {
+		SDE_ERROR("invalid encoder\n");
+		return;
+	}
+
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	info = &sde_enc->mode_info;
+
+	frametime_ns = (1 * 1000000000) / info->frame_rate;
+	jitter_ns =  info->jitter_numer * frametime_ns;
+	do_div(jitter_ns, info->jitter_denom * 100);
 
 	*l_bound = frametime_ns - jitter_ns;
 	*u_bound = frametime_ns + jitter_ns;
@@ -6151,6 +6577,117 @@ void sde_encoder_enable_recovery_event(struct drm_encoder *encoder)
 	sde_enc->recovery_events_enabled = true;
 }
 
+#ifdef OPLUS_FEATURE_DISPLAY
+/* OPLUS_FEATURE_ADFR, fake frame */
+
+// queue the fakeframe work to adfr worker
+int sde_encoder_adfr_trigger_fakeframe(void *enc)
+{
+	struct drm_encoder *drm_enc = enc;
+	struct sde_encoder_virt *sde_enc;
+	struct msm_drm_private *priv;
+	struct msm_drm_thread *event_thread;
+
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	if (!sde_enc || !sde_enc->crtc) {
+		SDE_ERROR("invalid encoder parameters %d\n", !sde_enc);
+		return -EINVAL;
+	}
+
+	priv = drm_enc->dev->dev_private;
+
+	if (sde_enc->crtc->index >= ARRAY_SIZE(priv->adfr_thread)) {
+		SDE_ERROR("invalid crtc index:%u\n",
+				sde_enc->crtc->index);
+		return -EINVAL;
+	}
+	event_thread = &priv->adfr_thread[sde_enc->crtc->index];
+	if (!event_thread) {
+		SDE_ERROR("event_thread not found for crtc:%d\n",
+				sde_enc->crtc->index);
+		return -EINVAL;
+	}
+
+	kthread_queue_work(&event_thread->worker,
+				&sde_enc->fakeframe_work);
+
+	return 0;
+}
+
+// fakevsync timer callback function
+enum hrtimer_restart sde_encoder_fakeframe_timer_handler(struct hrtimer *timer)
+{
+	struct sde_encoder_virt *sde_enc =
+			from_timer(sde_enc, timer, fakeframe_timer);
+
+	sde_encoder_adfr_trigger_fakeframe(&sde_enc->base);
+
+	return HRTIMER_NORESTART;
+}
+
+void oplus_adfr_fakeframe_timer_start(void *enc, int deferred_ms)
+{
+	struct drm_encoder *drm_enc = enc;
+	struct sde_encoder_virt *sde_enc;
+
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	hrtimer_start(&sde_enc->fakeframe_timer, ms_to_ktime(deferred_ms), HRTIMER_MODE_REL);
+}
+
+// cancel the fakeframe timer
+int sde_encoder_adfr_cancel_fakeframe(void *enc)
+{
+	struct drm_encoder *drm_enc = enc;
+	struct sde_encoder_virt *sde_enc;
+
+	sde_enc = to_sde_encoder_virt(drm_enc);
+
+	SDE_ATRACE_BEGIN("sde_encoder_adfr_cancel_fakeframe");
+	hrtimer_cancel(&sde_enc->fakeframe_timer);
+	SDE_ATRACE_END("sde_encoder_adfr_cancel_fakeframe");
+
+	return 0;
+}
+
+// fakeframe work function
+void sde_encoder_fakeframe_work_handler(struct kthread_work *work)
+{
+	struct sde_encoder_virt *sde_enc = container_of(work,
+			struct sde_encoder_virt, fakeframe_work);
+	struct drm_connector *drm_conn;
+
+	if (!sde_enc) {
+		SDE_ERROR("invalid sde encoder\n");
+		return;
+	}
+
+	if (!sde_enc->cur_master) {
+		SDE_ERROR("invalid cur_master encoder\n");
+		return;
+	}
+
+	if (!sde_enc->cur_master->connector) {
+		SDE_ERROR("invalid connector encoder\n");
+		return;
+	}
+
+	drm_conn = sde_enc->cur_master->connector;
+
+	sde_connector_send_fakeframe(drm_conn);
+}
+
+bool sde_encoder_is_disabled(struct drm_encoder *drm_enc)
+{
+	struct sde_encoder_virt *sde_enc;
+	struct sde_encoder_phys *phys;
+
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	phys = sde_enc->phys_encs[0];
+	return (phys->enable_state == SDE_ENC_DISABLED);
+}
+
+#endif /* OPLUS_FEATURE_DISPLAY */
+
 bool sde_encoder_needs_dsc_disable(struct drm_encoder *drm_enc)
 {
 	struct sde_kms *sde_kms;
@@ -6221,6 +6758,272 @@ void sde_encoder_add_data_to_minidump_va(struct drm_encoder *drm_enc)
 			phys_enc->ops.add_to_minidump(phys_enc);
 	}
 }
+
+#if defined(CONFIG_PXLW_IRIS) || defined(CONFIG_PXLW_SOFT_IRIS)
+void sde_encoder_rc_lock(struct drm_encoder *drm_enc)
+{
+	struct sde_encoder_virt *sde_enc;
+
+	if (!drm_enc || !drm_enc->dev || !drm_enc->dev->dev_private) {
+		SDE_ERROR("invalid encoder\n");
+		return;
+	}
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	mutex_lock(&sde_enc->rc_lock);
+}
+
+void sde_encoder_rc_unlock(struct drm_encoder *drm_enc)
+{
+	struct sde_encoder_virt *sde_enc;
+
+	if (!drm_enc || !drm_enc->dev || !drm_enc->dev->dev_private) {
+		SDE_ERROR("invalid encoder\n");
+		return;
+	}
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	mutex_unlock(&sde_enc->rc_lock);
+}
+
+void sde_encoder_disable_autorefresh_handler(struct drm_encoder *drm_enc)
+{
+	struct sde_encoder_virt *sde_enc;
+	struct msm_drm_private *priv;
+	struct msm_drm_thread *event_thread;
+
+	if (!drm_enc || !drm_enc->dev || !drm_enc->dev->dev_private) {
+		SDE_ERROR("invalid encoder parameters\n");
+		return;
+	}
+
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	priv = drm_enc->dev->dev_private;
+	if (!sde_enc->crtc) {
+		SDE_ERROR("invalid crtc");
+		return;
+	}
+
+	if (sde_enc->crtc->index >= ARRAY_SIZE(priv->event_thread)) {
+		SDE_ERROR("invalid crtc index:%u\n",
+				sde_enc->crtc->index);
+		return;
+	}
+	event_thread = &priv->event_thread[sde_enc->crtc->index];
+	if (!event_thread) {
+		SDE_ERROR("event_thread not found for crtc:%d\n",
+				sde_enc->crtc->index);
+		return;
+	}
+
+	kthread_queue_work(&event_thread->worker,
+				&sde_enc->disable_autorefresh_work);
+}
+
+static void sde_encoder_disable_autorefresh_work_handler(struct kthread_work *work)
+{
+	iris_inc_osd_irq_cnt();
+}
+
+#ifndef OPLUS_FEATURE_DISPLAY
+bool sde_encoder_is_disabled(struct drm_encoder *drm_enc)
+{
+	struct sde_encoder_virt *sde_enc;
+	struct sde_encoder_phys *phys;
+
+	sde_enc = to_sde_encoder_virt(drm_enc);
+	phys = sde_enc->phys_encs[0];
+	return (phys->enable_state == SDE_ENC_DISABLED);
+}
+#endif /* OPLUS_FEATURE_DISPLAY */
+void sde_encoder_wait_vblack(struct drm_connector *connector, struct drm_encoder *drm_enc, int wait_num)
+{
+	struct sde_connector *c_conn;
+	struct sde_connector_state *c_state;
+	bool panel_bl_dirty;
+	int wait_vsync_flag;
+	unsigned long flags;
+	u32 fps;
+	struct sde_connector_sync_data sync_data;
+
+	if (!iris_is_chip_supported() && !iris_is_softiris_supported())
+		return;
+
+	if (!drm_enc || !drm_enc->crtc) {
+		SDE_ERROR("Invalid encoder\n");
+		return;
+	}
+
+	if (!connector) {
+		SDE_ERROR("Invalid connector\n");
+		return;
+	}
+
+	c_conn = to_sde_connector(connector);
+	c_state = to_sde_connector_state(connector->state);
+	if (!c_conn->display) {
+		SDE_ERROR("Invalid connnector display\n");
+		return;
+	}
+
+	spin_lock_irqsave(&c_conn->bl_spinlock, flags);
+	memcpy(&sync_data, &c_conn->sync_data[c_conn->bl_rd_index], sizeof(sync_data));
+	spin_unlock_irqrestore(&c_conn->bl_spinlock, flags);
+
+	panel_bl_dirty = sync_data.panel_bl_dirty;
+	wait_vsync_flag = sync_data.wait_vsync_flag;
+
+	if (wait_vsync_flag > 0) {
+		if (panel_bl_dirty) {
+			/* wait wait_num times TE to make sure set backlight in frame start */
+			while (wait_num) {
+				sde_encoder_wait_for_event(drm_enc, MSM_ENC_VBLANK);
+				wait_num--;
+			}
+		}
+		fps = sde_encoder_get_fps(drm_enc);
+		if (fps < 75)
+			usleep_range(DELAY_LOW_FPS_TIMEOUT_US, DELAY_LOW_FPS_TIMEOUT_US + 10);
+		else if (fps > 75 && fps < 100)
+			usleep_range(DELAY_MEDIUM_FPS_TIMEOUT_US, DELAY_MEDIUM_FPS_TIMEOUT_US + 10);
+		else
+			usleep_range(DELAY_HIGHT_FPS_TIMEOUT_US, DELAY_HIGHT_FPS_TIMEOUT_US + 10);
+	}
+}
+
+void sde_encoder_pre_kickoff_update_panel_level(struct drm_connector *connector,  struct drm_encoder *drm_enc)
+{
+	struct sde_connector *c_conn;
+	struct sde_connector_state *c_state;
+	unsigned long flags;
+	int wait_vsync_flag;
+	struct sde_connector_sync_data sync_data;
+
+	if (!iris_is_chip_supported() && !iris_is_softiris_supported())
+		return;
+
+	if (!drm_enc || !drm_enc->crtc) {
+		SDE_ERROR("Invalid encoder\n");
+		return;
+	}
+
+	if (!connector) {
+		SDE_ERROR("Invalid connector\n");
+		return;
+	}
+
+
+	c_conn = to_sde_connector(connector);
+	c_state = to_sde_connector_state(connector->state);
+	if (!c_conn->display) {
+		SDE_ERROR("Invalid connnector display\n");
+		return;
+	}
+
+	spin_lock_irqsave(&c_conn->bl_spinlock, flags);
+	memcpy(&sync_data, &c_conn->sync_data[c_conn->bl_rd_index], sizeof(sync_data));
+	spin_unlock_irqrestore(&c_conn->bl_spinlock, flags);
+
+	wait_vsync_flag = sync_data.wait_vsync_flag;
+	if (wait_vsync_flag > 1)
+		sde_encoder_update_panel_level(connector, drm_enc);
+}
+
+void sde_encoder_post_kickoff_update_panel_level(struct drm_connector *connector)
+{
+	struct sde_connector *c_conn;
+	struct sde_connector_state *c_state;
+	unsigned long flags;
+	int wait_vsync_flag;
+	bool panel_bl_dirty;
+	struct sde_connector_sync_data sync_data;
+
+	if (!iris_is_chip_supported() && !iris_is_softiris_supported())
+		return;
+
+	if (!connector) {
+		SDE_ERROR("Invalid connector\n");
+		return;
+	}
+
+	c_conn = to_sde_connector(connector);
+	c_state = to_sde_connector_state(connector->state);
+	if (!c_conn->display) {
+		SDE_ERROR("Invalid connnector display\n");
+		return;
+	}
+
+	spin_lock_irqsave(&c_conn->bl_spinlock, flags);
+	memcpy(&sync_data, &c_conn->sync_data[c_conn->bl_rd_index], sizeof(sync_data));
+	spin_unlock_irqrestore(&c_conn->bl_spinlock, flags);
+
+	panel_bl_dirty = sync_data.panel_bl_dirty;
+	wait_vsync_flag = sync_data.wait_vsync_flag;
+
+	if (wait_vsync_flag == 0 || wait_vsync_flag == 1) {
+		if (panel_bl_dirty) {
+			sde_connector_update_panel_level(c_conn);
+
+			spin_lock_irqsave(&c_conn->bl_spinlock, flags);
+			memset(&c_conn->sync_data[c_conn->bl_rd_index], 0, sizeof(sync_data));
+			c_conn->bl_rd_index = (c_conn->bl_rd_index + 1) % SDE_CONNECTOR_SYNC_DATA_NUM;
+			spin_unlock_irqrestore(&c_conn->bl_spinlock, flags);
+		}
+	}
+}
+
+void sde_encoder_update_panel_level(struct drm_connector *connector,  struct drm_encoder *drm_enc)
+{
+	struct sde_connector *c_conn;
+	struct sde_connector_state *c_state;
+	unsigned long flags;
+	int wait_vsync_flag;
+	bool panel_bl_dirty;
+	struct sde_connector_sync_data sync_data;
+
+	if (!iris_is_chip_supported() && !iris_is_softiris_supported())
+		return;
+
+	if (!drm_enc || !drm_enc->crtc) {
+		SDE_ERROR("Invalid encoder\n");
+		return;
+	}
+
+	if (!connector) {
+		SDE_ERROR("Invalid connector\n");
+		return;
+	}
+
+	c_conn = to_sde_connector(connector);
+	c_state = to_sde_connector_state(connector->state);
+	if (!c_conn->display) {
+		SDE_ERROR("Invalid connnector display\n");
+		return;
+	}
+
+	spin_lock_irqsave(&c_conn->bl_spinlock, flags);
+	memcpy(&sync_data, &c_conn->sync_data[c_conn->bl_rd_index], sizeof(sync_data));
+	spin_unlock_irqrestore(&c_conn->bl_spinlock, flags);
+
+	panel_bl_dirty = sync_data.panel_bl_dirty;
+	wait_vsync_flag = sync_data.wait_vsync_flag;
+
+	if (panel_bl_dirty) {
+		sde_connector_update_panel_level(c_conn);
+		if (wait_vsync_flag > 1 && wait_vsync_flag < 8) {
+			int cnt = wait_vsync_flag - 1;
+
+			while (cnt) {
+				sde_encoder_wait_vblack(connector, drm_enc, cnt);
+				cnt--;
+			}
+		}
+
+		spin_lock_irqsave(&c_conn->bl_spinlock, flags);
+		memset(&c_conn->sync_data[c_conn->bl_rd_index], 0, sizeof(sync_data));
+		c_conn->bl_rd_index = (c_conn->bl_rd_index + 1) % SDE_CONNECTOR_SYNC_DATA_NUM;
+		spin_unlock_irqrestore(&c_conn->bl_spinlock, flags);
+	}
+}
+#endif	// CONFIG_PXLW_IRIS
 
 void sde_encoder_misr_sign_event_notify(struct drm_encoder *drm_enc)
 {
@@ -6298,3 +7101,4 @@ void sde_encoder_misr_sign_event_notify(struct drm_encoder *drm_enc)
 						(u8 *)&c_conn->previous_misr_sign);
 	}
 }
+
