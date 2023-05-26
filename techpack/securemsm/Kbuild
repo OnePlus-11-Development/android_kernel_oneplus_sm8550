@@ -1,3 +1,5 @@
+SSG_MODULE_ROOT=$(srctree)/techpack/securemsm
+
 LINUXINCLUDE += -I$(SSG_MODULE_ROOT)/ \
                 -I$(SSG_MODULE_ROOT)/linux/ 
 
