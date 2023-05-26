@@ -24,6 +24,6 @@ cc_library_shared {
     vendor: true,
     clang: true,
 
-    cflags: ["-DDEBUG"] + ["-DFEATURE_IPA_ANDROID"] + ["-Wno-int-conversion"],
+    cflags: ["-DDEBUG"] + ["-DFEATURE_IPA_ANDROID"] + ["-Wno-int-conversion", "-Wno-unused-parameter", "-Wno-incompatible-pointer-types", "-Wno-unused-variable", "-Wno-unused-but-set-variable", "-Wno-format"],
 
 }
