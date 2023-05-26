@@ -489,7 +489,7 @@ TRACE_EVENT(smcinvoke_release,
 #endif /* _TRACE_SMCINVOKE_H */
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH ../../../../vendor/qcom/opensource/securemsm-kernel/smcinvoke
+#define TRACE_INCLUDE_PATH ../../techpack/securemsm/smcinvoke
 
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE trace_smcinvoke
