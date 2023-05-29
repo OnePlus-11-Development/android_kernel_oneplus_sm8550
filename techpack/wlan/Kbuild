@@ -1,3 +1,9 @@
+WLAN_PLATFORM_ROOT := $(srctree)/techpack/wlan
+
+ifeq ($(CONFIG_ARCH_KALAMA), y)
+	include $(WLAN_PLATFORM_ROOT)/config/kalama.conf
+endif
+
 ifeq ($(CONFIG_CNSS_OUT_OF_TREE),y)
 KBUILD_CPPFLAGS += -DCONFIG_CNSS_OUT_OF_TREE
 endif
