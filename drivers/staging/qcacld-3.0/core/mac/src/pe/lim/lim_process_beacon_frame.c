@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -38,48 +38,12 @@
 #include "lim_assoc_utils.h"
 #include "lim_prop_exts_utils.h"
 #include "lim_ser_des_utils.h"
-#include "wlan_mlo_t2lm.h"
-#include "wlan_mlo_mgr_roam.h"
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_mlo_mgr_sta.h>
 #include <cds_ieee80211_common.h>
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
-void lim_process_bcn_prb_rsp_t2lm(struct mac_context *mac_ctx,
-				  struct pe_session *session,
-				  tpSirProbeRespBeacon bcn_ptr)
-{
-	struct wlan_objmgr_vdev *vdev;
-	struct wlan_t2lm_context *t2lm_ctx;
-
-	if (!session || !bcn_ptr || !mac_ctx) {
-		pe_err("invalid input parameters");
-		return;
-	}
-
-	vdev = session->vdev;
-	if (!vdev || !wlan_vdev_mlme_is_mlo_vdev(vdev))
-		return;
-
-	if (!mlo_check_if_all_links_up(vdev))
-		return;
-
-	if (bcn_ptr->t2lm_ctx.upcoming_t2lm.t2lm.direction ==
-	    WLAN_T2LM_INVALID_DIRECTION &&
-	    bcn_ptr->t2lm_ctx.established_t2lm.t2lm.direction ==
-	    WLAN_T2LM_INVALID_DIRECTION) {
-		pe_debug("No t2lm IE");
-		return;
-	}
-
-	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
-	qdf_mem_copy((uint8_t *)&t2lm_ctx->tsf, (uint8_t *)bcn_ptr->timeStamp,
-		     sizeof(uint64_t));
-	wlan_process_bcn_prbrsp_t2lm_ie(vdev, &bcn_ptr->t2lm_ctx,
-					t2lm_ctx->tsf);
-}
-
 void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 			    struct pe_session *session,
 			    tSchBeaconStruct *bcn_ptr)
@@ -423,7 +387,6 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		return;
 	}
 
-	lim_process_bcn_prb_rsp_t2lm(mac_ctx, session, bcn_ptr);
 	if (QDF_IS_STATUS_SUCCESS(lim_check_for_ml_probe_req(session)))
 		goto end;
 

@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2011-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,7 +25,7 @@
 
 #if defined(WLAN_SYSFS) && defined(WLAN_SYSFS_RANGE_EXT)
 /**
- * hdd_sysfs_range_ext_create() - API to create range_ext
+ * wlan_hdd_sysfs_range_ext_create() - API to create range_ext
  * @adapter: hdd adapter
  *
  * this file is created per adapter.

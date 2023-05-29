@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -62,7 +62,6 @@
 #include "wlan_vdev_mgr_utils_api.h"
 #include "wlan_pre_cac_api.h"
 #include <wlan_cmn_ieee80211.h>
-#include <target_if.h>
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -500,12 +499,9 @@ is_wlansap_cac_required_for_chan(struct mac_context *mac_ctx,
 	uint8_t sta_cnt, i;
 
 	if (ch_params->ch_width == CH_WIDTH_160MHZ) {
-		wlan_reg_set_create_punc_bitmap(ch_params, true);
-		if (wlan_reg_get_5g_bonded_channel_state_for_pwrmode(mac_ctx->pdev,
-								     chan_freq,
-								     ch_params,
-								     REG_CURRENT_PWR_MODE) ==
-		    CHANNEL_STATE_DFS)
+		if (wlan_reg_get_bonded_channel_state_for_freq(
+		    mac_ctx->pdev, chan_freq,
+		    ch_params->ch_width, 0) == CHANNEL_STATE_DFS)
 			is_ch_dfs = true;
 	} else if (ch_params->ch_width == CH_WIDTH_80P80MHZ) {
 		if (wlan_reg_get_channel_state_for_pwrmode(
@@ -1180,15 +1176,7 @@ validation_done:
 	sap_debug("for configured channel, Ch_freq = %d",
 		  sap_context->chan_freq);
 
-	/*
-	 * Don't check if the frequency is allowed or not if SAP is started
-	 * in fixed channel and coex fixed channel SAP is supported.
-	 */
-
-	if ((sap_context->acs_cfg->acs_mode ||
-	     !target_psoc_get_sap_coex_fixed_chan_cap(
-			wlan_psoc_get_tgt_if_handle(mac_ctx->psoc))) &&
-	    !policy_mgr_is_sap_freq_allowed(mac_ctx->psoc,
+	if (!policy_mgr_is_sap_freq_allowed(mac_ctx->psoc,
 					    sap_context->chan_freq)) {
 		sap_warn("Abort SAP start due to unsafe channel");
 		return QDF_STATUS_E_ABORTED;
@@ -3548,102 +3536,6 @@ static void sap_check_and_update_vdev_ch_params(struct sap_context *sap_ctx)
 		  sap_ctx->ch_params.ch_width);
 }
 
-static qdf_freq_t sap_get_safe_channel_freq(struct sap_context *sap_ctx)
-{
-	qdf_freq_t freq;
-
-	freq = wlan_pre_cac_get_freq_before_pre_cac(sap_ctx->vdev);
-	if (!freq)
-		freq = wlansap_get_safe_channel_from_pcl_and_acs_range(
-								sap_ctx);
-
-	sap_debug("new selected freq %d as target chan as current freq unsafe %d",
-		  freq, sap_ctx->chan_freq);
-
-	return freq;
-}
-
-/**
- * sap_fsm_send_csa_restart_req() - send csa start event
- * @mac_ctx: mac ctx
- * @sap_ctx: SAP context
- *
- * Return: QDF_STATUS
- */
-static inline QDF_STATUS
-sap_fsm_send_csa_restart_req(struct mac_context *mac_ctx,
-			     struct sap_context *sap_ctx)
-{
-	QDF_STATUS status;
-
-	status = policy_mgr_check_and_set_hw_mode_for_channel_switch(
-				mac_ctx->psoc, sap_ctx->sessionId,
-				mac_ctx->sap.SapDfsInfo.target_chan_freq,
-				POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_SAP);
-
-	/*
-	 * If hw_mode_status is QDF_STATUS_E_FAILURE, mean HW
-	 * mode change was required but driver failed to set HW
-	 * mode so ignore CSA for the channel.
-	 */
-	if (status == QDF_STATUS_E_FAILURE) {
-		sap_err("HW change required but failed to set hw mode");
-		return status;
-	}
-
-	/*
-	 * If hw_mode_status is QDF_STATUS_SUCCESS mean HW mode
-	 * change was required and was successfully requested so
-	 * the channel switch will continue after HW mode change
-	 * completion.
-	 */
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		sap_info("Channel change will continue after HW mode change");
-		return QDF_STATUS_SUCCESS;
-	}
-
-	return sme_csa_restart(mac_ctx, sap_ctx->sessionId);
-}
-
-/**
- * sap_fsm_handle_check_safe_channel() - handle channel Avoid event event during
- *                                       cac
- * @mac_ctx: global MAC context
- *
- * Return: QDF_STATUS
- */
-static void sap_fsm_handle_check_safe_channel(struct mac_context *mac_ctx,
-					      struct sap_context *sap_ctx)
-{
-	qdf_freq_t target_chan_freq;
-	struct ch_params ch_params = {0};
-	QDF_STATUS status;
-	enum phy_ch_width target_bw = sap_ctx->ch_params.ch_width;
-
-	if (((!sap_ctx->acs_cfg || !sap_ctx->acs_cfg->acs_mode) &&
-	     target_psoc_get_sap_coex_fixed_chan_cap(
-				wlan_psoc_get_tgt_if_handle(mac_ctx->psoc))) ||
-	    policy_mgr_is_sap_freq_allowed(mac_ctx->psoc, sap_ctx->chan_freq))
-		return;
-
-	/*
-	 * The selected channel is not safe channel. Hence,
-	 * change the sap channel to a safe channel.
-	 */
-	target_chan_freq = sap_get_safe_channel_freq(sap_ctx);
-	ch_params.ch_width = target_bw;
-	target_bw = wlansap_get_csa_chanwidth_from_phymode(
-			sap_ctx, target_chan_freq, &ch_params);
-	sap_debug("sap vdev %d change to safe ch freq %d bw %d from unsafe %d",
-		  sap_ctx->sessionId, target_chan_freq, target_bw,
-		  sap_ctx->chan_freq);
-	status = wlansap_set_channel_change_with_csa(
-			sap_ctx, target_chan_freq, target_bw, false);
-	if (QDF_IS_STATUS_ERROR(status))
-		sap_err("SAP set channel failed for freq: %d, bw: %d",
-			target_chan_freq, target_bw);
-}
-
 /**
  * sap_fsm_state_starting() - utility function called from sap fsm
  * @sap_ctx: SAP context
@@ -3712,16 +3604,9 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 		 * CAC is done if the operating channel is DFS
 		 */
 		if (sap_ctx->ch_params.ch_width == CH_WIDTH_160MHZ) {
-			struct ch_params ch_params = {0};
-
-			wlan_reg_set_create_punc_bitmap(&ch_params, true);
-			ch_params.ch_width = CH_WIDTH_160MHZ;
-			is_dfs =
-			wlan_reg_get_5g_bonded_channel_state_for_pwrmode(mac_ctx->pdev,
-									 sap_chan_freq,
-									 &ch_params,
-									 REG_CURRENT_PWR_MODE) ==
-			CHANNEL_STATE_DFS;
+			is_dfs = wlan_reg_get_5g_bonded_channel_state_for_freq(
+					mac_ctx->pdev, sap_chan_freq,
+					CH_WIDTH_160MHZ) == CHANNEL_STATE_DFS;
 		} else if (sap_ctx->ch_params.ch_width == CH_WIDTH_80P80MHZ) {
 			if (wlan_reg_get_channel_state_for_pwrmode(
 							mac_ctx->pdev,
@@ -3775,13 +3660,6 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 				wlansap_start_beacon_req(sap_ctx);
 			}
 		}
-		/*
-		 * During CSA, it might be possible that ch avoidance event to
-		 * avoid the sap frequency is received. So, check after CSA,
-		 * whether sap frequency is safe if not restart sap to a safe
-		 * channel.
-		 */
-		sap_fsm_handle_check_safe_channel(mac_ctx, sap_ctx);
 	} else if (msg == eSAP_MAC_START_FAILS ||
 		 msg == eSAP_HDD_STOP_INFRA_BSS) {
 			qdf_status = sap_fsm_handle_start_failure(sap_ctx, msg,
@@ -3814,6 +3692,48 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 	}
 
 	return qdf_status;
+}
+
+/**
+ * sap_fsm_send_csa_restart_req() - send csa start event
+ * @mac_ctx: mac ctx
+ * @sap_ctx: SAP context
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+sap_fsm_send_csa_restart_req(struct mac_context *mac_ctx,
+			     struct sap_context *sap_ctx)
+{
+	QDF_STATUS status;
+
+	status = policy_mgr_check_and_set_hw_mode_for_channel_switch(
+				mac_ctx->psoc, sap_ctx->sessionId,
+				mac_ctx->sap.SapDfsInfo.target_chan_freq,
+				POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_SAP);
+
+	/*
+	 * If hw_mode_status is QDF_STATUS_E_FAILURE, mean HW
+	 * mode change was required but driver failed to set HW
+	 * mode so ignore CSA for the channel.
+	 */
+	if (status == QDF_STATUS_E_FAILURE) {
+		sap_err("HW change required but failed to set hw mode");
+		return status;
+	}
+
+	/*
+	 * If hw_mode_status is QDF_STATUS_SUCCESS mean HW mode
+	 * change was required and was successfully requested so
+	 * the channel switch will continue after HW mode change
+	 * completion.
+	 */
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		sap_info("Channel change will continue after HW mode change");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	return sme_csa_restart(mac_ctx, sap_ctx->sessionId);
 }
 
 /**

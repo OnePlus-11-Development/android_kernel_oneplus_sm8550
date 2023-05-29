@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -549,16 +549,6 @@ QDF_STATUS (*send_green_ap_ps_cmd)(wmi_unified_t wmi_handle,
 QDF_STATUS (*extract_green_ap_egap_status_info)(
 		uint8_t *evt_buf,
 		struct wlan_green_ap_egap_status_info *egap_status_info_params);
-#if defined(WLAN_SUPPORT_GAP_LL_PS_MODE)
-QDF_STATUS (*send_green_ap_ll_ps_cmd)(wmi_unified_t wmi_handle,
-				      struct green_ap_ll_ps_cmd_param *ll_ps_params);
-#endif
-#endif
-
-#ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
-QDF_STATUS (*extract_green_ap_ll_ps_param)(
-		uint8_t *evt_buf,
-		struct wlan_green_ap_ll_ps_event_param *ll_ps_params);
 #endif
 
 QDF_STATUS
@@ -3041,30 +3031,6 @@ QDF_STATUS
 (*extract_mlo_link_set_active_resp)(wmi_unified_t wmi_handle,
 				    void *evt_buf,
 				    struct mlo_link_set_active_resp *resp);
-QDF_STATUS
-(*extract_mgmt_rx_ml_cu_params)(wmi_unified_t wmi_handle,
-				void *evt_buf,
-				struct mlo_mgmt_ml_info *cu_params);
-
-QDF_STATUS (*send_mlo_link_removal_cmd)(
-		wmi_unified_t wmi_handle,
-		const struct mlo_link_removal_cmd_params *params);
-
-QDF_STATUS (*extract_mlo_link_removal_evt_fixed_param)(
-		struct wmi_unified *wmi_handle,
-		void *buf,
-		struct mlo_link_removal_evt_params *params);
-
-QDF_STATUS (*extract_mlo_link_removal_tbtt_update)(
-		struct wmi_unified *wmi_handle,
-		void *buf,
-		struct mlo_link_removal_tbtt_info *tbtt_info);
-
-QDF_STATUS (*extract_mgmt_rx_mlo_link_removal_info)(
-		struct wmi_unified *wmi_handle,
-		void *buf,
-		struct mgmt_rx_mlo_link_removal_info *link_removal_info,
-		int num_link_removal_info);
 #endif
 
 #ifdef WLAN_FEATURE_SON
@@ -3122,22 +3088,8 @@ QDF_STATUS
 
 #ifdef WLAN_FEATURE_11BE
 QDF_STATUS (*send_mlo_peer_tid_to_link_map)(
-			wmi_unified_t wmi_handle,
-			struct wmi_host_tid_to_link_map_params *params);
-
-QDF_STATUS (*send_mlo_vdev_tid_to_link_map)(
-			wmi_unified_t wmi_handle,
-			struct wmi_host_tid_to_link_map_ap_params *params);
-
-QDF_STATUS (*extract_mlo_vdev_tid_to_link_map_event)(
-		struct wmi_unified *wmi_handle,
-		uint8_t *buf,
-		struct mlo_vdev_host_tid_to_link_map_resp *params);
-
-QDF_STATUS (*extract_mlo_vdev_bcast_tid_to_link_map_event)(
-			struct wmi_unified *wmi_handle,
-			void *buf,
-			struct mlo_bcast_t2lm_info *bcast_info);
+		wmi_unified_t wmi_handle,
+		struct wmi_host_tid_to_link_map_params *params);
 #endif /* WLAN_FEATURE_11BE */
 
 QDF_STATUS
@@ -3197,14 +3149,6 @@ QDF_STATUS
 					   void *evt_buf,
 					   struct wmi_health_mon_params *param);
 #endif /* HEALTH_MON_SUPPORT */
-
-QDF_STATUS (*send_update_edca_pifs_param_cmd)(
-			wmi_unified_t wmi_handle,
-			struct edca_pifs_vparam *edca_pifs_param);
-
-QDF_STATUS (*extract_sap_coex_cap_service_ready_ext2)(
-			wmi_unified_t wmi_handle, uint8_t *event,
-			struct wmi_host_coex_fix_chan_cap *cap);
 };
 
 /* Forward declaration for psoc*/
@@ -3353,7 +3297,6 @@ struct wmi_soc {
 	/* WMI service bitmap received from target */
 	uint32_t *wmi_service_bitmap;
 	uint32_t *wmi_ext_service_bitmap;
-	uint32_t wmi_ext2_service_bitmap_len;
 	uint32_t *wmi_ext2_service_bitmap;
 	uint32_t services[wmi_services_max];
 	uint16_t wmi_max_cmds;

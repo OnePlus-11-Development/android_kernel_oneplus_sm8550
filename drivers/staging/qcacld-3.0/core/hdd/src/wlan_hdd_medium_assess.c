@@ -16,7 +16,7 @@
  */
 
 /**
- * DOC: wlan_hdd_medium_assess.c
+ * DOC : wlan_hdd_medium_assess.c
  *
  * WLAN Host Device Driver medium assess related implementation
  *
@@ -254,7 +254,7 @@ static int get_congestion_report_len(void)
 
 /**
  * hdd_congestion_reset_data() - reset/invalid the previous data
- * @pdev_id: pdev id
+ * @vdev_id: vdev id
  *
  * Return: None
  */
@@ -777,11 +777,4 @@ void hdd_medium_assess_deinit(void)
 
 		qdf_mc_timer_destroy(&hdd_medium_assess_timer);
 	}
-}
-
-bool hdd_medium_access_state(void)
-{
-	if (!timer_enable)
-		return true;
-	return false;
 }

@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -62,7 +61,7 @@ static inline void hdd_data_stall_send_event(uint32_t reason)
 
 /**
  * hdd_data_stall_process_event() - Process data stall event
- * @msg: data stall message
+ * @message: data stall message
  *
  * Process data stall message
  *
@@ -84,7 +83,7 @@ static QDF_STATUS hdd_data_stall_process_event(struct scheduler_msg *msg)
 
 /**
  * hdd_data_stall_process_cb() - Process data stall message
- * @info: data stall message
+ * @message: data stall message
  *
  * Process data stall message
  *

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -370,7 +370,7 @@ hdd_update_action_oui_for_connect(struct hdd_context *hdd_ctx,
 	uint8_t *str;
 	bool usr_disable_eht;
 
-	if (!ucfg_action_oui_enabled(hdd_ctx->psoc))
+	if (!hdd_ctx->config->action_oui_enable)
 		return;
 
 	usr_disable_eht = ucfg_mlme_get_usr_disable_sta_eht(hdd_ctx->psoc);
@@ -406,8 +406,8 @@ hdd_update_action_oui_for_connect(struct hdd_context *hdd_ctx,
 				ACTION_OUI_11BE_OUI_ALLOW);
 			return;
 		}
-		str = ucfg_action_oui_get_config(hdd_ctx->psoc,
-						 ACTION_OUI_11BE_OUI_ALLOW);
+		str =
+		hdd_ctx->config->action_oui_str[ACTION_OUI_11BE_OUI_ALLOW];
 		if (!qdf_str_len(str))
 			goto send_oui;
 
@@ -589,15 +589,11 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 		qdf_mem_copy(scan_filter->bssid_list[0].bytes, req->bssid,
 			     QDF_MAC_ADDR_SIZE);
 	}
-	if (req->ssid_len > WLAN_SSID_MAX_LEN) {
-		scan_filter->num_of_ssid = 0;
-		hdd_err("req ssid len invalid %zu", req->ssid_len);
-	} else {
-		scan_filter->num_of_ssid = 1;
-		scan_filter->ssid_list[0].length = req->ssid_len;
-		qdf_mem_copy(scan_filter->ssid_list[0].ssid, req->ssid,
-			     scan_filter->ssid_list[0].length);
-	}
+	scan_filter->num_of_ssid = 1;
+	scan_filter->ssid_list[0].length =
+				QDF_MIN(req->ssid_len, QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(scan_filter->ssid_list[0].ssid, req->ssid,
+		     scan_filter->ssid_list[0].length);
 	scan_filter->ignore_auth_enc_type = true;
 	list = ucfg_scan_get_result(hdd_ctx->pdev, scan_filter);
 	qdf_mem_free(scan_filter);
@@ -1265,22 +1261,18 @@ struct hdd_adapter *hdd_get_assoc_link_adapter(struct hdd_adapter *ml_adapter)
 {
 	int i;
 	bool eht_capab;
-	struct hdd_adapter *link_adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(ml_adapter);
 
 	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
-	if (!eht_capab || hdd_adapter_is_sl_ml_adapter(ml_adapter))
+	if (!eht_capab)
 		return ml_adapter;
 
 	for (i = 0; i < WLAN_MAX_MLD; i++) {
-		link_adapter = ml_adapter->mlo_adapter_info.link_adapter[i];
-		if (link_adapter) {
-			if (hdd_adapter_is_associated_with_ml_adapter(
-								link_adapter))
-				return link_adapter;
+		if (hdd_adapter_is_associated_with_ml_adapter(
+		    ml_adapter->mlo_adapter_info.link_adapter[i])) {
+			return ml_adapter->mlo_adapter_info.link_adapter[i];
 		}
 	}
-
 	return NULL;
 }
 #endif
@@ -1372,7 +1364,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	 * hdd_send_ft_assoc_response,
 	 */
 
-	wlan_hdd_set_tx_flow_info();
+	hdd_ipa_set_tx_flow_info();
 	hdd_place_marker(adapter, "ASSOCIATION COMPLETE", NULL);
 
 	if (policy_mgr_is_mcc_in_24G(hdd_ctx->psoc)) {
@@ -1419,7 +1411,6 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_wmm_assoc(adapter, false, uapsd_mask);
 
 	if (!rsp->is_wps_connection &&
-	    !rsp->is_osen_connection &&
 	    (sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_NONE ||
 	     sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_OPEN_SYSTEM ||
 	     sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_SHARED_KEY ||
@@ -1433,15 +1424,12 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	if (is_roam_offload || !is_roam) {
 		/* For FW_ROAM/LFR3 OR connect */
 		/* for LFR 3 get authenticated info from resp */
-		if (is_roam) {
+		if (is_roam)
 			is_auth_required =
 				hdd_cm_is_roam_auth_required(sta_ctx, rsp);
-			if (is_auth_required)
-				wlan_acquire_peer_key_wakelock(hdd_ctx->pdev,
-							      rsp->bssid.bytes);
-		}
-		hdd_debug("is_roam_offload %d, is_roam %d, is_auth_required %d",
-			  is_roam_offload, is_roam, is_auth_required);
+		if (is_auth_required)
+			wlan_acquire_peer_key_wakelock(hdd_ctx->pdev,
+						       rsp->bssid.bytes);
 		hdd_roam_register_sta(adapter, &rsp->bssid, is_auth_required);
 	} else {
 		/* for host roam/LFR2 */
@@ -1567,6 +1555,7 @@ QDF_STATUS hdd_cm_send_vdev_keys(struct wlan_objmgr_vdev *vdev,
 
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
 #define WLAN_WAIT_TIME_HANDOFF_PARAMS 1000
+
 QDF_STATUS hdd_cm_get_handoff_param(struct wlan_objmgr_psoc *psoc,
 				    struct hdd_adapter *adapter,
 				    uint8_t vdev_id, uint32_t param_id)
@@ -1632,42 +1621,6 @@ hdd_cm_get_vendor_handoff_params(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
-
-QDF_STATUS
-hdd_cm_get_scan_ie_params(struct wlan_objmgr_vdev *vdev,
-			  struct element_info *scan_ie,
-			  enum dot11_mode_filter *dot11mode_filter)
-{
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct hdd_adapter *adapter;
-
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, wlan_vdev_get_id(vdev));
-	if (!adapter) {
-		hdd_err("adapter is NULL for vdev %d", wlan_vdev_get_id(vdev));
-		return QDF_STATUS_E_INVAL;
-	}
-
-	if (adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-		scan_ie->ptr =
-			&adapter->scan_info.scan_add_ie.addIEdata[0];
-		scan_ie->len = adapter->scan_info.scan_add_ie.length;
-	} else if (adapter->scan_info.default_scan_ies) {
-		scan_ie->ptr = adapter->scan_info.default_scan_ies;
-		scan_ie->len = adapter->scan_info.default_scan_ies_len;
-	} else if (adapter->scan_info.scan_add_ie.length) {
-		scan_ie->ptr = adapter->scan_info.scan_add_ie.addIEdata;
-		scan_ie->len = adapter->scan_info.scan_add_ie.length;
-	}
-
-	*dot11mode_filter = hdd_get_dot11mode_filter(hdd_ctx);
-
-	return QDF_STATUS_SUCCESS;
-}
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #ifdef WLAN_FEATURE_FILS_SK

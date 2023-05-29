@@ -220,9 +220,7 @@ QDF_STATUS ol_txrx_ipa_disable_autonomy(struct cdp_soc_t *soc_hdl,
  * Return: QDF_STATUS
  */
 QDF_STATUS ol_txrx_ipa_tx_buf_smmu_mapping(struct cdp_soc_t *soc_hdl,
-					   uint8_t pdev_id,
-					   const char *func,
-					   uint32_t line);
+					   uint8_t pdev_id);
 
 /**
  * ol_txrx_ipa_tx_buf_smmu_unmapping() - Release SMMU mappings for IPA
@@ -233,9 +231,7 @@ QDF_STATUS ol_txrx_ipa_tx_buf_smmu_mapping(struct cdp_soc_t *soc_hdl,
  * Return: QDF_STATUS
  */
 QDF_STATUS ol_txrx_ipa_tx_buf_smmu_unmapping(struct cdp_soc_t *soc_hdl,
-					     uint8_t pdev_id,
-					     const char *func,
-					     uint32_t line);
+					     uint8_t pdev_id);
 
 #ifdef CONFIG_IPA_WDI_UNIFIED_API
 /**
@@ -265,9 +261,7 @@ QDF_STATUS ol_txrx_ipa_setup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			     bool is_smmu_enabled,
 			     qdf_ipa_sys_connect_params_t *sys_in,
 			     bool over_gsi,
-			     qdf_ipa_wdi_hdl_t hdl,
-			     qdf_ipa_wdi_hdl_t id,
-			     void *ipa_ast_notify_cb);
+			     qdf_ipa_wdi_hdl_t hdl);
 #else /* CONFIG_IPA_WDI_UNIFIED_API */
 /**
  * ol_txrx_ipa_setup() - Setup and connect IPA pipes

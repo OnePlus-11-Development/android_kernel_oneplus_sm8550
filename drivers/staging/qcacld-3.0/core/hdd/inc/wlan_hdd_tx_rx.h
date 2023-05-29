@@ -21,6 +21,7 @@
 #define WLAN_HDD_TX_RX_H
 
 /**
+ *
  * DOC: wlan_hdd_tx_rx.h
  *
  * Linux HDD Tx/RX APIs
@@ -95,7 +96,7 @@ netdev_tx_t hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev);
 
 /**
  * hdd_tx_timeout() - Wrapper function to protect __hdd_tx_timeout from SSR
- * @dev: pointer to net_device structure
+ * @net_dev: pointer to net_device structure
  * @txqueue: tx queue
  *
  * Function called by OS if there is any timeout during transmission.
@@ -114,7 +115,7 @@ void hdd_tx_timeout(struct net_device *dev);
 /**
  * hdd_tsf_timestamp_rx() - HDD function to set rx packet timestamp
  * @ctx: pointer to HDD context
- * @netbuf: pointer to skb
+ * @nbuf: pointer to skb
  *
  * Return: None
  */
@@ -142,7 +143,7 @@ void hdd_get_tsf_time_cb(uint8_t vdev_id, uint64_t input_time,
 /**
  * hdd_legacy_gro_get_napi() - HDD function to get napi in legacy gro case
  * @nbuf: n/w buffer pointer
- * @enable_rxthread: Rx thread enabled/disabled
+ * @enabled_rxthread: Rx thread enabled/disabled
  *
  * Return: qdf napi struct on success, NULL on failure
  */
@@ -150,9 +151,9 @@ qdf_napi_struct
 *hdd_legacy_gro_get_napi(qdf_nbuf_t nbuf, bool enable_rxthread);
 
 /**
- * hdd_disable_rx_ol_in_concurrency() - Disable RX Offload in concurrency
+ * hdd_rx_handle_concurrency() - Handle concurrency related operations
  *  for rx
- * @disable: true if rx offload should be disabled in concurrency
+ * @is_concurrency: true if there are concurrenct connections else false
  *
  * Return: none
  */
@@ -194,7 +195,7 @@ bool hdd_tx_flow_control_is_pause(void *adapter_context);
 void hdd_register_tx_flow_control(struct hdd_adapter *adapter,
 		qdf_mc_timer_callback_t timer_callback,
 		ol_txrx_tx_flow_control_fp flow_control_fp,
-		ol_txrx_tx_flow_control_is_pause_fp flow_control_is_pause_fp);
+		ol_txrx_tx_flow_control_is_pause_fp flow_control_is_pause);
 void hdd_deregister_tx_flow_control(struct hdd_adapter *adapter);
 
 /**
@@ -209,7 +210,7 @@ void hdd_get_tx_resource(uint8_t vdev_id,
 
 /**
  * hdd_get_tx_flow_low_watermark() - Get TX flow low watermark info
- * @cb_ctx: HDD opaque ctx
+ * @hdd_cb_handle: HDD opaque ctx
  * @intf_id: HDD adapter id
  *
  * Return: flow low watermark value
@@ -365,19 +366,4 @@ void hdd_print_netdev_txq_status(struct net_device *dev);
 uint32_t
 wlan_hdd_dump_queue_history_state(struct hdd_netif_queue_history *q_hist,
 				  char *buf, uint32_t size);
-
-#ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
-/**
- * wlan_hdd_set_tx_flow_info() - To set TX flow info
- *
- * This routine is called to set TX flow info
- *
- * Return: None
- */
-void wlan_hdd_set_tx_flow_info(void);
-#else
-static inline void wlan_hdd_set_tx_flow_info(void)
-{
-}
-#endif
 #endif /* end #if !defined(WLAN_HDD_TX_RX_H) */

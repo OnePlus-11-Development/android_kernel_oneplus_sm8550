@@ -319,11 +319,6 @@ csr_get_vdev_dot11_mode(struct mac_context *mac,
 		return curr_dot11_mode;
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
-	if (!vdev_mlme) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
-		return curr_dot11_mode;
-	}
-
 	vdev_dot11_mode = vdev_mlme->proto.vdev_dot11_mode;
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
@@ -619,7 +614,7 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 		return 0;
 
 	op_mode = wlan_get_opmode_vdev_id(mac_ctx->pdev, vdev_id);
-	if (policy_mgr_is_ll_sap_present(
+	if (policy_mgr_is_ll_sap_present_in_current_mode(
 			mac_ctx->psoc,
 			policy_mgr_convert_device_mode_to_qdf_type(op_mode),
 			vdev_id))

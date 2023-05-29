@@ -683,8 +683,7 @@ static int os_if_nan_parse_security_params(struct nlattr **tb,
 
 /**
  * __os_if_nan_process_ndp_initiator_req() - NDP initiator request handler
- * @psoc: psoc object
- * @iface_name: interface name
+ * @ctx: hdd context
  * @tb: parsed NL attribute list
  *
  * tb will contain following vendor attributes:
@@ -852,7 +851,7 @@ static int os_if_nan_process_ndp_initiator_req(struct wlan_objmgr_psoc *psoc,
 
 /**
  * __os_if_nan_process_ndp_responder_req() - NDP responder request handler
- * @psoc: psoc object
+ * @nan_ctx: hdd context
  * @tb: parsed NL attribute list
  *
  * tb includes following vendor attributes:
@@ -1231,7 +1230,7 @@ static inline uint32_t osif_ndp_get_ndp_initiator_rsp_len(void)
 /**
  * os_if_ndp_initiator_rsp_handler() - NDP initiator response handler
  * @vdev: pointer to vdev object
- * @rsp: response parameters
+ * @rsp_params: response parameters
  *
  * Following vendor event is sent to cfg80211:
  * QCA_WLAN_VENDOR_ATTR_NDP_SUBCMD =
@@ -1412,7 +1411,7 @@ static inline uint32_t osif_ndp_get_ndp_req_ind_len(
 /**
  * os_if_ndp_indication_handler() - NDP indication handler
  * @vdev: pointer to vdev object
- * @event: indication parameters
+ * @ind_params: indication parameters
  *
  * Following vendor event is sent to cfg80211:
  * QCA_WLAN_VENDOR_ATTR_NDP_SUBCMD =
@@ -1647,7 +1646,7 @@ static QDF_STATUS os_if_ndp_confirm_pack_ch_info(struct sk_buff *event,
 /**
  * os_if_ndp_confirm_ind_handler() - NDP confirm indication handler
  * @vdev: pointer to vdev object
- * @ndp_confirm: indication parameters
+ * @ind_params: indication parameters
  *
  * Following vendor event is sent to cfg80211:
  * QCA_WLAN_VENDOR_ATTR_NDP_SUBCMD =
@@ -1789,7 +1788,7 @@ static inline uint32_t osif_ndp_get_ndp_end_rsp_len(void)
 /**
  * os_if_ndp_end_rsp_handler() - NDP end response handler
  * @vdev: pointer to vdev object
- * @rsp: response parameters
+ * @rsp_params: response parameters
  *
  * Following vendor event is sent to cfg80211:
  * QCA_WLAN_VENDOR_ATTR_NDP_SUBCMD =
@@ -1866,7 +1865,7 @@ static inline uint32_t osif_ndp_get_ndp_end_ind_len(
 /**
  * os_if_ndp_end_ind_handler() - NDP end indication handler
  * @vdev: pointer to vdev object
- * @end_ind: indication parameters
+ * @ind_params: indication parameters
  *
  * Following vendor event is sent to cfg80211:
  * QCA_WLAN_VENDOR_ATTR_NDP_SUBCMD =
@@ -1928,8 +1927,8 @@ ndp_end_ind_nla_failed:
 
 /**
  * os_if_new_peer_ind_handler() - NDP new peer indication handler
- * @vdev: vdev object
- * @peer_ind: indication parameters
+ * @adapter: pointer to adapter context
+ * @ind_params: indication parameters
  *
  * Return: none
  */
@@ -1971,8 +1970,8 @@ static void os_if_new_peer_ind_handler(struct wlan_objmgr_vdev *vdev,
 
 /**
  * os_if_peer_departed_ind_handler() - Handle NDP peer departed indication
- * @vdev: vdev object
- * @peer_ind: indication parameters
+ * @adapter: pointer to adapter context
+ * @ind_params: indication parameters
  *
  * Return: none
  */
@@ -2022,8 +2021,7 @@ static inline uint32_t osif_ndp_get_ndi_create_rsp_len(void)
 
 /**
  * os_if_ndp_iface_create_rsp_handler() - NDP iface create response handler
- * @psoc: soc object
- * @vdev: vdev object
+ * @adapter: pointer to adapter context
  * @rsp_params: response parameters
  *
  * The function is expected to send a response back to the user space
@@ -2139,8 +2137,7 @@ close_ndi:
 
 /**
  * os_if_ndp_iface_delete_rsp_handler() - NDP iface delete response handler
- * @psoc: soc object
- * @vdev: vdev object
+ * @adapter: pointer to adapter context
  * @rsp_params: response parameters
  *
  * Return: none
@@ -2571,37 +2568,6 @@ failure:
 }
 
 /**
- * os_if_nan_handle_sr_nan_concurrency() - Handle NAN concurrency for Spatial
- * Reuse
- * @nan_evt: NAN Event parameters
- *
- * Module calls callback to send SR event to userspace.
- *
- * Return: none
- */
-#ifdef WLAN_FEATURE_SR
-static void
-os_if_nan_handle_sr_nan_concurrency(struct nan_event_params *nan_evt) {
-	void (*nan_sr_conc_callback)(struct nan_event_params *nan_evt);
-	struct nan_psoc_priv_obj *psoc_obj =
-				nan_get_psoc_priv_obj(nan_evt->psoc);
-
-	if (!psoc_obj) {
-		nan_err("nan psoc priv object is NULL");
-		return;
-	}
-
-	nan_sr_conc_callback = psoc_obj->cb_obj.nan_sr_concurrency_update;
-	if (nan_sr_conc_callback)
-		nan_sr_conc_callback(nan_evt);
-}
-#else
-static void
-os_if_nan_handle_sr_nan_concurrency(struct nan_event_params *nan_evt)
-{}
-#endif
-
-/**
  * os_if_nan_discovery_event_handler() - NAN Discovery Interface event handler
  * @nan_evt: NAN Event parameters
  *
@@ -2624,8 +2590,6 @@ static void os_if_nan_discovery_event_handler(struct nan_event_params *nan_evt)
 		osif_err("null pdev");
 		return;
 	}
-	os_if_nan_handle_sr_nan_concurrency(nan_evt);
-
 	os_priv = wlan_pdev_get_ospriv(pdev);
 
 	vendor_event =

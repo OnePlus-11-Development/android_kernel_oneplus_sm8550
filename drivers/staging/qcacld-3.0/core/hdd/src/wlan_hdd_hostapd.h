@@ -78,8 +78,9 @@ int hdd_softap_set_channel_change(struct net_device *dev,
 /**
  * hdd_stop_sap_set_tx_power() - Function to set tx power
  * for unsafe channel if restriction bit mask is set else stop the SAP.
+ *
  * @psoc: PSOC object information
- * @adapter: AP/SAP adapter
+ * @vdev_id: vdev id
  *
  * This function set tx power/stop the SAP interface
  *
@@ -92,7 +93,7 @@ void hdd_stop_sap_set_tx_power(struct wlan_objmgr_psoc *psoc,
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 /**
  * hdd_sap_restart_with_channel_switch() - SAP channel change with E/CSA
- * @psoc: psoc common object
+ * @wlan_objmgr_psoc: psoc common object
  * @ap_adapter: HDD adapter
  * @target_chan_freq: Channel frequency to which switch must happen
  * @target_bw: Bandwidth of the target channel
@@ -114,7 +115,6 @@ QDF_STATUS hdd_sap_restart_with_channel_switch(struct wlan_objmgr_psoc *psoc,
  * @psoc: PSOC object information
  * @vdev_id: vdev id
  * @ch_freq: channel to switch
- * @channel_bw: channel bandwidth
  * @forced: Force to switch channel, ignore SCC/MCC check
  *
  * This function restarts SAP with a different channel
@@ -241,14 +241,13 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 /**
  * hdd_init_ap_mode() - to init the AP adaptor
  * @adapter: SAP/GO adapter
- * @reinit: true if re-init, otherwise initial init
+ * @rtnl_held: flag to indicate if RTNL lock needs to be acquired
  *
  * This API can be called to open the SAP session as well as
  * to create and store the vdev object. It also initializes necessary
  * SAP adapter related params.
  */
 QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit);
-
 /**
  * hdd_deinit_ap_mode() - to deinit the AP adaptor
  * @hdd_ctx: pointer to hdd_ctx
@@ -284,7 +283,7 @@ bool hdd_sap_create_ctx(struct hdd_adapter *adapter);
 bool hdd_sap_destroy_ctx(struct hdd_adapter *adapter);
 /**
  * hdd_sap_destroy_ctx_all() - Wrapper API to destroy all SAP context
- * @hdd_ctx: pointer to HDD context
+ * @adapter: pointer to adapter
  * @is_ssr: true if SSR is in progress
  *
  * This wrapper API can be called to destroy all the sap context.
@@ -385,7 +384,7 @@ void hdd_sap_indicate_disconnect_for_sta(struct hdd_adapter *adapter);
  * hdd_handle_acs_2g_preferred_sap_conc() - Handle 2G pereferred SAP
  * concurrency with GO
  * @psoc: soc object
- * @adapter: HDD adapter context
+ * @sap_ctx: sap context
  * @sap_config: sap config
  *
  * In SAP+GO concurrency, if GO is started on 2G and SAP is

@@ -100,8 +100,7 @@ static int dot11p_validate_qos_params(struct ocb_wmm_param qos_params[])
 
 /**
  * dot11p_validate_channel() - validates a DSRC channel
- * @wiphy: pointer to the wiphy
- * @channel_freq: the channel's center frequency
+ * @center_freq: the channel's center frequency
  * @bandwidth: the channel's bandwidth
  * @tx_power: transmit power
  * @reg_power: (output) the max tx power from the regulatory domain
@@ -180,7 +179,6 @@ static int dot11p_validate_channel(struct wiphy *wiphy,
 
 /**
  * hdd_ocb_validate_config() - Validates the config data
- * @adapter: Pointer to HDD Adapter
  * @config: configuration to be validated
  *
  * Return: 0 on success.
@@ -443,7 +441,7 @@ end:
  * __iw_set_dot11p_channel_sched() - Handler for WLAN_SET_DOT11P_CHANNEL_SCHED
  *				     ioctl
  * @dev: Pointer to net_device structure
- * @info: IW Request Info
+ * @iw_request_info: IW Request Info
  * @wrqu: IW Request Userspace Data Pointer
  * @extra: IW Request Kernel Data Pointer
  *
@@ -582,7 +580,7 @@ fail:
 /**
  * iw_set_dot11p_channel_sched() - IOCTL interface for setting channel schedule
  * @dev: Pointer to net_device structure
- * @info: IW Request Info
+ * @iw_request_info: IW Request Info
  * @wrqu: IW Request Userspace Data Pointer
  * @extra: IW Request Kernel Data Pointer
  *
@@ -709,8 +707,7 @@ const struct nla_policy qca_wlan_vendor_dcc_update_ndl[
  * struct wlan_hdd_ocb_config_channel
  * @chan_freq: frequency of the channel
  * @bandwidth: bandwidth of the channel, either 10 or 20 MHz
- * @flags: channel flags
- * @reserved: reserved padding, set to 0
+ * @mac_address: MAC address assigned to this channel
  * @qos_params: QoS parameters
  * @max_pwr: maximum transmit power of the channel (1/2 dBm)
  * @min_pwr: minimum transmit power of the channel (1/2 dBm)

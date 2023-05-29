@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1057,7 +1057,6 @@ util_parse_probereq_info_from_linkinfo(uint8_t *linkinfo,
 			probereq_info->link_id[probereq_info->num_links] = linkid;
 
 			probereq_info->num_links++;
-			mlo_debug("LINK ID requested is = %u", linkid);
 		}
 
 		linkinfo_remlen -= (sizeof(struct subelem_header) +
@@ -1483,7 +1482,6 @@ QDF_STATUS util_validate_sta_prof_ie(const uint8_t *sta_prof_ie,
  * @reportingsta_ie_len: Length for reporting sta ie
  * @plink_frame_currpos: Pointer to Link frame current pos
  * @plink_frame_currlen: Current length of link frame.
- * @link_frame_maxsize: Maximum size of the frame to be generated
  * @linkid: Link Id value
  *
  * Add the basic variant Multi-Link element when
@@ -1497,7 +1495,6 @@ util_add_mlie_for_prb_rsp_gen(const uint8_t *reportingsta_ie,
 			      qdf_size_t reportingsta_ie_len,
 			      uint8_t **plink_frame_currpos,
 			      qdf_size_t *plink_frame_currlen,
-			      qdf_size_t link_frame_maxsize,
 			      uint8_t linkid)
 {
 	uint8_t mlie_len = 0;
@@ -1528,17 +1525,6 @@ util_add_mlie_for_prb_rsp_gen(const uint8_t *reportingsta_ie,
 		     mlie_len,
 		     common_info_len,
 		     link_id_offset);
-
-	/*
-	 * Validate the buffer available before copying ML IE.
-	 * Incase if mlie_len is modified at later place, move this validation
-	 * there to make sure no buffer overflow happens.
-	 */
-	if ((link_frame_maxsize - link_frame_currlen) < mlie_len) {
-		mlo_err("Insufficient space in link specific frame for ML IE. Required: %u octets, available: %zu octets",
-			mlie_len, (link_frame_maxsize - link_frame_currlen));
-		return QDF_STATUS_E_NOMEM;
-	}
 
 	mlie_frame = qdf_mem_malloc(mlie_len);
 	if (!mlie_frame)
@@ -1599,7 +1585,6 @@ util_add_mlie_for_prb_rsp_gen(const uint8_t *reportingsta_ie,
 			      qdf_size_t reportingsta_ie_len,
 			      uint8_t **plink_frame_currpos,
 			      qdf_size_t *plink_frame_currlen,
-			      qdf_size_t link_frame_maxsize,
 			      uint8_t linkid)
 {
 	return QDF_STATUS_SUCCESS;
@@ -2434,13 +2419,11 @@ QDF_STATUS util_gen_link_reqrsp_cmn(uint8_t *frame, qdf_size_t frame_len,
 
 			/* Add BV ML IE for link specific probe response */
 			if (subtype == WLAN_FC0_STYPE_PROBE_RESP) {
-				ret = util_add_mlie_for_prb_rsp_gen(
-					reportingsta_ie,
-					reportingsta_ie[TAG_LEN_POS],
-					&link_frame_currpos,
-					&link_frame_currlen,
-					link_frame_maxsize,
-					linkid);
+				ret = util_add_mlie_for_prb_rsp_gen(reportingsta_ie,
+								    reportingsta_ie[TAG_LEN_POS],
+								    &link_frame_currpos,
+								    &link_frame_currlen,
+								    linkid);
 				if (QDF_IS_STATUS_ERROR(ret)) {
 					qdf_mem_free(mlieseqpayload_copy);
 					return ret;
@@ -2913,63 +2896,6 @@ util_find_mlie(uint8_t *buf, qdf_size_t buflen, uint8_t **mlieseq,
 	*mlieseq = ieseq;
 	*mlieseqlen = ieseqlen;
 	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS
-util_find_mlie_by_variant(uint8_t *buf, qdf_size_t buflen, uint8_t **mlieseq,
-			  qdf_size_t *mlieseqlen, int variant)
-{
-	uint8_t *ieseq;
-	qdf_size_t ieseqlen;
-	QDF_STATUS status;
-	int ml_variant;
-	qdf_size_t buf_parsed_len;
-
-	if (!buf || !buflen || !mlieseq || !mlieseqlen)
-		return QDF_STATUS_E_NULL_VALUE;
-
-	if (variant >= WLAN_ML_VARIANT_INVALIDSTART)
-		return QDF_STATUS_E_PROTO;
-
-	ieseq = NULL;
-	ieseqlen = 0;
-	*mlieseq = NULL;
-	*mlieseqlen = 0;
-	buf_parsed_len = 0;
-
-	while (buflen > buf_parsed_len) {
-		status = util_find_mlie(buf + buf_parsed_len,
-					buflen - buf_parsed_len,
-					&ieseq, &ieseqlen);
-
-		if (QDF_IS_STATUS_ERROR(status))
-			return status;
-
-		/* Even if the element is not found, we have successfully
-		 * examined the buffer. The caller will be provided a NULL value
-		 * for the starting of the Multi-Link element. Hence, we return
-		 * success.
-		 */
-		if (!ieseq)
-			return QDF_STATUS_SUCCESS;
-
-		status = util_get_mlie_variant(ieseq, ieseqlen,
-					       &ml_variant);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			mlo_err("Unable to get Multi-link element variant");
-			return status;
-		}
-
-		if (ml_variant == variant) {
-			*mlieseq = ieseq;
-			*mlieseqlen = ieseqlen;
-			return QDF_STATUS_SUCCESS;
-		}
-
-		buf_parsed_len = ieseq + ieseqlen - buf;
-	}
-
-	return QDF_STATUS_E_INVAL;
 }
 
 QDF_STATUS
@@ -3632,12 +3558,8 @@ util_get_bvmlie_persta_partner_info(uint8_t *mlieseq,
 		return ret;
 	}
 
-	/*
-	 * If Probe Request variant Multi-Link element in the Multi-Link probe
-	 * request does not include any per-STA profile, then all APs affiliated
-	 * with the same AP MLD as the AP identified in the Addr 1 or Addr 3
-	 * field or AP MLD ID of the Multi-Link probe request are requested
-	 * APs return success here
+	/* In case Link Info is absent, the number of partner links will remain
+	 * zero.
 	 */
 	if (!linkinfo) {
 		qdf_mem_free(mlieseqpayload_copy);
@@ -3670,6 +3592,7 @@ util_get_prvmlie_persta_link_id(uint8_t *mlieseq,
 	enum wlan_ml_variant variant;
 	uint8_t *linkinfo;
 	qdf_size_t linkinfo_len;
+	struct mlo_probereq_info pinfo = {0};
 	qdf_size_t mlieseqpayloadlen;
 	uint8_t *mlieseqpayload_copy;
 	bool is_elemfragseq;
@@ -3803,19 +3726,20 @@ util_get_prvmlie_persta_link_id(uint8_t *mlieseq,
 	 * zero.
 	 */
 	if (!linkinfo) {
-		mlo_debug("No link info present");
 		qdf_mem_free(mlieseqpayload_copy);
 		return QDF_STATUS_SUCCESS;
 	}
 
 	ret = util_parse_probereq_info_from_linkinfo(linkinfo,
 						     linkinfo_len,
-						     probereq_info);
+						     &pinfo);
 
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		qdf_mem_free(mlieseqpayload_copy);
 		return ret;
 	}
+
+	qdf_mem_copy(probereq_info, &pinfo, sizeof(*probereq_info));
 
 	qdf_mem_free(mlieseqpayload_copy);
 

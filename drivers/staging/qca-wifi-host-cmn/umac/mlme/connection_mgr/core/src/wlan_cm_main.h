@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -111,7 +111,6 @@ struct cm_state_sm {
  * @cur_candidate_retries: attempts for current candidate
  * @connect_attempts: number of connect attempts tried
  * @connect_active_time: timestamp when connect became active
- * @first_candidate_rsp: connect response for first candidate
  */
 struct cm_connect_req {
 	wlan_cm_id cm_id;
@@ -122,9 +121,6 @@ struct cm_connect_req {
 	uint8_t cur_candidate_retries;
 	uint8_t connect_attempts;
 	qdf_time_t connect_active_time;
-#ifdef CONN_MGR_ADV_FEATURE
-	struct wlan_cm_connect_resp *first_candidate_rsp;
-#endif
 };
 
 /**
@@ -278,18 +274,6 @@ struct cnx_mgr {
 	void (*cm_candidate_list_custom_sort)(struct wlan_objmgr_vdev *vdev,
 					      qdf_list_t *list);
 #endif
-};
-
-/**
- * struct vdev_op_search_arg - vdev op search arguments
- * @current_vdev_id: current vdev id
- * @sap_go_vdev_id: sap/go vdev id
- * @sta_cli_vdev_id: sta/p2p client vdev id
- */
-struct vdev_op_search_arg {
-	uint8_t current_vdev_id;
-	uint8_t sap_go_vdev_id;
-	uint8_t sta_cli_vdev_id;
 };
 
 /**

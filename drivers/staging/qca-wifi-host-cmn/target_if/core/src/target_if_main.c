@@ -111,7 +111,9 @@
 #include "wmi_unified_api.h"
 #include <target_if_twt.h>
 
+#ifdef WLAN_FEATURE_11BE_MLO
 #include <target_if_mlo_mgr.h>
+#endif
 
 #ifdef WLAN_FEATURE_COAP
 #include <target_if_coap.h>
@@ -119,7 +121,7 @@
 
 static struct target_if_ctx *g_target_if_ctx;
 
-struct target_if_ctx *target_if_get_ctx(void)
+struct target_if_ctx *target_if_get_ctx()
 {
 	return g_target_if_ctx;
 }

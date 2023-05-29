@@ -311,7 +311,6 @@ typedef struct sSirProbeRespBeacon {
 	uint8_t ap_power_type;
 #ifdef WLAN_FEATURE_11BE_MLO
 	struct sir_multi_link_ie mlo_ie;
-	struct wlan_t2lm_context t2lm_ctx;
 #endif
 	tDot11fIEWMMParams wmm_params;
 } tSirProbeRespBeacon, *tpSirProbeRespBeacon;
@@ -1812,14 +1811,4 @@ void populate_dot11f_rnr_tbtt_info_7(struct mac_context *mac_ctx,
 				     struct pe_session *rnr_session,
 				     tDot11fIEreduced_neighbor_report *dot11f);
 
-/**
- * populate_dot11f_edca_pifs_param_set() - populate edca/pifs param ie
- * @mac: Mac context
- * @qcn_ie: pointer to tDot11fIEqcn_ie
- *
- * Return: none
- */
-void populate_dot11f_edca_pifs_param_set(
-				struct mac_context *mac,
-				tDot11fIEqcn_ie *qcn_ie);
 #endif /* __PARSE_H__ */

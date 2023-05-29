@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
  * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
@@ -16,7 +17,7 @@
  */
 
 /**
- * DOC: os_if_son.h
+ * DOC : os_if_son.h
  *
  * WLAN Host Device Driver file for son (Self Organizing Network)
  * support.
@@ -42,7 +43,6 @@
  * @os_if_set_bandwidth: set band width
  * @os_if_get_bandwidth: get band width
  * @os_if_set_chan: set chan
- * @os_if_get_sta_count: get station count
  * @os_if_set_country_code: set country code
  * @os_if_set_candidate_freq: set freq to switch after radar detection
  * @os_if_get_candidate_freq: get freq to switch after radar detection
@@ -237,7 +237,7 @@ uint32_t os_if_son_is_cac_in_progress(struct wlan_objmgr_vdev *vdev);
 /**
  * os_if_son_set_chan_ext_offset() - set chan extend offset
  * @vdev: vdev
- * @son_chan_ext_offset: son chan extend offset
+ * @son_chan_ext_offset son chan extend offset
  *
  * Return: 0 on success, negative errno on failure
  */
@@ -424,6 +424,7 @@ void os_if_son_get_phy_stats(struct wlan_objmgr_vdev *vdev,
 
 /**
  * os_if_son_cbs_init() - cbs init
+ * @vdev: vdev
  *
  * Return: 0 on success, negative errno on failure
  */
@@ -431,6 +432,7 @@ int os_if_son_cbs_init(void);
 
 /**
  * os_if_son_cbs_deinit() - cbs deinit
+ * @vdev: vdev
  *
  * Return: 0 on success, negative errno on failure
  */
@@ -496,7 +498,7 @@ QDF_STATUS os_if_son_pdev_ops(struct wlan_objmgr_pdev *pdev,
  *
  * Return: QDF_SUCCCESS_SUCCESS in case of success
  */
-QDF_STATUS os_if_son_vdev_ops(struct wlan_objmgr_vdev *vdev,
+QDF_STATUS os_if_son_vdev_ops(struct wlan_objmgr_vdev *pdev,
 			      enum wlan_mlme_vdev_param type,
 			      void *data, void *ret);
 
@@ -622,7 +624,7 @@ int os_if_son_del_acl_mac(struct wlan_objmgr_vdev *vdev,
 /**
  * os_if_son_kickout_mac() - kickout sta with given mac
  * @vdev: vdev
- * @mac: sta mac to kickout
+ * @acl_mac: sta mac to kickout
  *
  * Return: 0 on success, negative errno on failure
  */

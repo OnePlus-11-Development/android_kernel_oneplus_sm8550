@@ -295,12 +295,16 @@ struct wlan_objmgr_psoc_regulatory {
  * @skip_dfs_chnl_in_p2p_search: Skip Dfs Channel in case of P2P
  *                             Search
  * @band_capability: Preferred band (0:Both,  1:2G only,  2:5G only)
+ * @usr_disable_eht: dynamic disable eht
  */
 struct wlan_objmgr_psoc_user_config {
 	bool is_11d_support_enabled;
 	bool is_11h_support_enabled;
 	uint8_t dot11_mode;
 	uint8_t band_capability;
+	//ifdef OPLUS_FEATURE_WIFI_ARCHITECHURE
+	bool usr_disable_eht;
+	//endif
 };
 
 /**

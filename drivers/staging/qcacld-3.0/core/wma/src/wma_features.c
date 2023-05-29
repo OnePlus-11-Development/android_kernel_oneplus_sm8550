@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -75,7 +75,6 @@
 #include "cdp_txrx_host_stats.h"
 #include "target_if_cm_roam_event.h"
 #include <wlan_mlo_mgr_cmn.h>
-#include "hif.h"
 
 /**
  * WMA_SET_VDEV_IE_SOURCE_HOST - Flag to identify the source of VDEV SET IE
@@ -697,7 +696,7 @@ static void wma_sr_handle_conc(tp_wma_handle wma,
 		if ((!(sr_ctrl & NON_SRG_PD_SR_DISALLOWED) &&
 		     (sr_ctrl & NON_SRG_OFFSET_PRESENT)) ||
 		    (sr_ctrl & SRG_INFO_PRESENT)) {
-			wlan_mlme_update_sr_data(conc_vdev, &val, 0, 0, true);
+			wlan_mlme_update_sr_data(conc_vdev, &val, 0, true);
 			wma_sr_send_pd_threshold(wma, conc_vdev_id, val);
 			wlan_spatial_reuse_osif_event(conc_vdev,
 						      SR_OPERATION_RESUME,
@@ -759,11 +758,11 @@ QDF_STATUS wma_sr_update(tp_wma_handle wma, uint8_t vdev_id, bool enable)
 	     (sr_ctrl & NON_SRG_OFFSET_PRESENT)) ||
 	    (sr_ctrl & SRG_INFO_PRESENT)) {
 		if (enable) {
-			wlan_mlme_update_sr_data(vdev, &val, 0, 0, true);
+			wlan_mlme_update_sr_data(vdev, &val, 0, true);
 		} else {
 			/* VDEV down, disable SR */
 			wlan_vdev_mlme_set_sr_ctrl(vdev, 0);
-			wlan_vdev_mlme_set_non_srg_pd_offset(vdev, 0);
+			wlan_vdev_mlme_set_pd_offset(vdev, 0);
 		}
 
 		wma_debug("SR param val: %x, Enable: %x", val, enable);
@@ -1456,9 +1455,7 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	if (csa_event->ies_present_flag & WMI_WBW_IE_PRESENT) {
 		wb_ie = (struct ieee80211_ie_wide_bw_switch *)
 						(&csa_event->wb_ie[0]);
-		csa_offload_event->new_ch_width =
-			wlan_mlme_convert_vht_op_bw_to_phy_ch_width(
-				wb_ie->new_ch_width);
+		csa_offload_event->new_ch_width = wb_ie->new_ch_width;
 		csa_offload_event->new_ch_freq_seg1 = wb_ie->new_ch_freq_seg1;
 		csa_offload_event->new_ch_freq_seg2 = wb_ie->new_ch_freq_seg2;
 		csa_offload_event->ies_present_flag |= MLME_WBW_IE_PRESENT;
@@ -1469,9 +1466,7 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 				(uint8_t *)&csa_event->cswrap_ie_extended,
 				WLAN_ELEMID_WIDE_BAND_CHAN_SWITCH);
 		if (wb_ie) {
-			csa_offload_event->new_ch_width =
-				wlan_mlme_convert_vht_op_bw_to_phy_ch_width(
-					wb_ie->new_ch_width);
+			csa_offload_event->new_ch_width = wb_ie->new_ch_width;
 			csa_offload_event->new_ch_freq_seg1 =
 						wb_ie->new_ch_freq_seg1;
 			csa_offload_event->new_ch_freq_seg2 =
@@ -1821,10 +1816,6 @@ static const uint8_t *wma_wow_wake_reason_str(A_INT32 wake_reason)
 		return "DELAYED_WAKEUP_TIMER_ELAPSED";
 	case WOW_REASON_DELAYED_WAKEUP_DATA_STORE_LIST_FULL:
 		return "DELAYED_WAKEUP_DATA_STORE_LIST_FULL";
-#ifndef WLAN_SUPPORT_GAP_LL_PS_MODE
-	case WOW_REASON_XGAP:
-		return "XGAP";
-#endif
 	default:
 		return "unknown";
 	}
@@ -2045,13 +2036,16 @@ static int wow_get_wmi_eventid(int32_t reason, uint32_t tag)
 		event_id = wma_ndp_get_eventid_from_tlvtag(tag);
 		break;
 	case WOW_REASON_TDLS_CONN_TRACKER_EVENT:
-		event_id = WMI_TDLS_PEER_EVENTID;
+		event_id = WOW_TDLS_CONN_TRACKER_EVENT;
 		break;
 	case WOW_REASON_ROAM_HO:
 		event_id = WMI_ROAM_EVENTID;
 		break;
 	case WOW_REASON_11D_SCAN:
 		event_id = WMI_11D_NEW_COUNTRY_EVENTID;
+		break;
+	case WOW_ROAM_PREAUTH_START_EVENT:
+		event_id = WMI_ROAM_PREAUTH_STATUS_CMDID;
 		break;
 	case WOW_REASON_ROAM_PMKID_REQUEST:
 		event_id = WMI_ROAM_PMKID_REQUEST_EVENTID;
@@ -2347,11 +2341,21 @@ static void wma_log_pkt_ipv4(uint8_t *data, uint32_t length)
 
 	pkt_len = *(uint16_t *)(data + IPV4_PKT_LEN_OFFSET);
 	ip_addr = (char *)(data + IPV4_SRC_ADDR_OFFSET);
+#ifndef OPLUS_CNSS_POWER_DEBUG
 	wma_nofl_debug("src addr %d:%d:%d:%d", ip_addr[0], ip_addr[1],
 		      ip_addr[2], ip_addr[3]);
+#else
+	wma_nofl_alert("src addr %d:%d:%d:%d", ip_addr[0], ip_addr[1],
+		      ip_addr[2], ip_addr[3]);
+#endif /* OPLUS_CNSS_POWER_DEBUG */
 	ip_addr = (char *)(data + IPV4_DST_ADDR_OFFSET);
+#ifndef OPLUS_CNSS_POWER_DEBUG
 	wma_nofl_debug("dst addr %d:%d:%d:%d", ip_addr[0], ip_addr[1],
 		      ip_addr[2], ip_addr[3]);
+#else
+	wma_nofl_alert("dst addr %d:%d:%d:%d", ip_addr[0], ip_addr[1],
+		      ip_addr[2], ip_addr[3]);
+#endif /* OPLUS_CNSS_POWER_DEBUG */
 	src_port = *(uint16_t *)(data + IPV4_SRC_PORT_OFFSET);
 	dst_port = *(uint16_t *)(data + IPV4_DST_PORT_OFFSET);
 	wma_info("Pkt_len: %u, src_port: %u, dst_port: %u",
@@ -2370,19 +2374,37 @@ static void wma_log_pkt_ipv6(uint8_t *data, uint32_t length)
 
 	pkt_len = *(uint16_t *)(data + IPV6_PKT_LEN_OFFSET);
 	ip_addr = (char *)(data + IPV6_SRC_ADDR_OFFSET);
+#ifndef OPLUS_CNSS_POWER_DEBUG
 	wma_nofl_debug("src addr "IPV6_ADDR_STR, ip_addr[0],
 		 ip_addr[1], ip_addr[2], ip_addr[3], ip_addr[4],
 		 ip_addr[5], ip_addr[6], ip_addr[7], ip_addr[8],
 		 ip_addr[9], ip_addr[10], ip_addr[11],
 		 ip_addr[12], ip_addr[13], ip_addr[14],
 		 ip_addr[15]);
+#else
+	wma_nofl_alert("src addr "IPV6_ADDR_STR, ip_addr[0],
+		 ip_addr[1], ip_addr[2], ip_addr[3], ip_addr[4],
+		 ip_addr[5], ip_addr[6], ip_addr[7], ip_addr[8],
+		 ip_addr[9], ip_addr[10], ip_addr[11],
+		 ip_addr[12], ip_addr[13], ip_addr[14],
+		 ip_addr[15]);
+#endif /* OPLUS_CNSS_POWER_DEBUG */
 	ip_addr = (char *)(data + IPV6_DST_ADDR_OFFSET);
+#ifndef OPLUS_CNSS_POWER_DEBUG
 	wma_nofl_debug("dst addr "IPV6_ADDR_STR, ip_addr[0],
 		 ip_addr[1], ip_addr[2], ip_addr[3], ip_addr[4],
 		 ip_addr[5], ip_addr[6], ip_addr[7], ip_addr[8],
 		 ip_addr[9], ip_addr[10], ip_addr[11],
 		 ip_addr[12], ip_addr[13], ip_addr[14],
 		 ip_addr[15]);
+#else
+	wma_nofl_alert("dst addr "IPV6_ADDR_STR, ip_addr[0],
+		 ip_addr[1], ip_addr[2], ip_addr[3], ip_addr[4],
+		 ip_addr[5], ip_addr[6], ip_addr[7], ip_addr[8],
+		 ip_addr[9], ip_addr[10], ip_addr[11],
+		 ip_addr[12], ip_addr[13], ip_addr[14],
+		 ip_addr[15]);
+#endif /* OPLUS_CNSS_POWER_DEBUG */
 	src_port = *(uint16_t *)(data + IPV6_SRC_PORT_OFFSET);
 	dst_port = *(uint16_t *)(data + IPV6_DST_PORT_OFFSET);
 	wma_info("Pkt_len: %u, src_port: %u, dst_port: %u",
@@ -2753,9 +2775,6 @@ static int wma_wake_event_packet(
 
 	wake_info = event_param->fixed_param;
 
-	wma_debug("Number of delayed packets received = %d",
-		  wake_info->delayed_pkt_count);
-
 	switch (wake_info->wake_reason) {
 	case WOW_REASON_AUTH_REQ_RECV:
 	case WOW_REASON_ASSOC_REQ_RECV:
@@ -3083,9 +3102,6 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event, uint32_t len)
 	}
 
 	wma_wake_event_log_reason(wma, wake_info);
-
-	if (wake_info->wake_reason == WOW_REASON_LOCAL_DATA_UC_DROP)
-		hif_rtpm_set_autosuspend_delay(WOW_LARGE_RX_RTPM_DELAY);
 
 	ucfg_pmo_psoc_wakeup_host_event_received(wma->psoc);
 

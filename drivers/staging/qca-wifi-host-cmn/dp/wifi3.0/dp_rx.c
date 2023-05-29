@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1075,18 +1075,16 @@ bool dp_rx_intrabss_mcbc_fwd(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 						      tid_stats))
 		return false;
 
-	/* Don't send packets if tx is paused */
-	if (!soc->is_tx_pause &&
-	    !dp_tx_send((struct cdp_soc_t *)soc,
-			ta_peer->vdev->vdev_id, nbuf_copy)) {
-		DP_PEER_PER_PKT_STATS_INC_PKT(ta_peer, rx.intra_bss.pkts, 1,
-					      len);
-		tid_stats->intrabss_cnt++;
-	} else {
+	if (dp_tx_send((struct cdp_soc_t *)soc,
+		       ta_peer->vdev->vdev_id, nbuf_copy)) {
 		DP_PEER_PER_PKT_STATS_INC_PKT(ta_peer, rx.intra_bss.fail, 1,
 					      len);
 		tid_stats->fail_cnt[INTRABSS_DROP]++;
 		dp_rx_nbuf_free(nbuf_copy);
+	} else {
+		DP_PEER_PER_PKT_STATS_INC_PKT(ta_peer, rx.intra_bss.pkts, 1,
+					      len);
+		tid_stats->intrabss_cnt++;
 	}
 	return false;
 }
@@ -1137,9 +1135,8 @@ bool dp_rx_intrabss_ucast_fwd(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 	qdf_mem_set(nbuf->cb, 0x0, sizeof(nbuf->cb));
 	dp_classify_critical_pkts(soc, ta_peer->vdev, nbuf);
 
-	/* Don't send packets if tx is paused */
-	if (!soc->is_tx_pause && !dp_tx_send((struct cdp_soc_t *)soc,
-					     tx_vdev_id, nbuf)) {
+	if (!dp_tx_send((struct cdp_soc_t *)soc,
+			tx_vdev_id, nbuf)) {
 		DP_PEER_PER_PKT_STATS_INC_PKT(ta_peer, rx.intra_bss.pkts, 1,
 					      len);
 	} else {
@@ -3128,12 +3125,6 @@ dp_pdev_rx_buffers_attach(struct dp_soc *dp_soc, uint32_t mac_id,
 					rx_desc_pool->buf_size, true,
 					__func__, __LINE__);
 
-			dp_audio_smmu_map(dp_soc->osdev,
-					  qdf_mem_paddr_from_dmaaddr(dp_soc->osdev,
-								     QDF_NBUF_CB_PADDR(nbuf)),
-					  QDF_NBUF_CB_PADDR(nbuf),
-					  rx_desc_pool->buf_size);
-
 			desc_list = next;
 		}
 
@@ -3372,7 +3363,7 @@ dp_rx_pdev_buffers_free(struct dp_pdev *pdev)
 
 	rx_desc_pool = &soc->rx_desc_buf[mac_for_pdev];
 
-	dp_rx_desc_nbuf_free(soc, rx_desc_pool, false);
+	dp_rx_desc_nbuf_free(soc, rx_desc_pool);
 	dp_rx_buffer_pool_deinit(soc, mac_for_pdev);
 }
 

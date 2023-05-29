@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -47,7 +47,6 @@
 #include <lim_mlo.h>
 #include "wlan_mlo_mgr_sta.h"
 #include "../../../../qca-wifi-host-cmn/umac/mlo_mgr/inc/utils_mlo.h"
-#include "wlan_mlo_mgr_roam.h"
 
 #define MAX_SUPPORTED_PEERS_WEP 16
 
@@ -231,16 +230,10 @@ void lim_process_mlm_start_cnf(struct mac_context *mac, uint32_t *msg_buf)
 		if (!LIM_IS_AP_ROLE(pe_session))
 			return;
 		if (pe_session->ch_width == CH_WIDTH_160MHZ) {
-			struct ch_params ch_params = {0};
-
-			if (IS_DOT11_MODE_EHT(pe_session->dot11mode))
-				wlan_reg_set_create_punc_bitmap(&ch_params, true);
-			ch_params.ch_width = pe_session->ch_width;
-			if (wlan_reg_get_5g_bonded_channel_state_for_pwrmode(mac->pdev,
-									     chan_freq,
-									     &ch_params,
-									     REG_CURRENT_PWR_MODE)  !=
-			    CHANNEL_STATE_DFS)
+			if (wlan_reg_get_bonded_channel_state_for_freq(
+					mac->pdev, chan_freq,
+					pe_session->ch_width, 0) !=
+					CHANNEL_STATE_DFS)
 				send_bcon_ind = true;
 		} else if (pe_session->ch_width == CH_WIDTH_80P80MHZ) {
 			if ((wlan_reg_get_channel_state_for_pwrmode(
@@ -2834,6 +2827,8 @@ lim_process_switch_channel_join_mlo(struct pe_session *session_entry,
 			assoc_cnf.sessionId = session_entry->peSessionId;
 			lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,
 					(uint32_t *)&assoc_cnf);
+
+			session_entry->limMlmState = eLIM_MLM_IDLE_STATE;
 			qdf_mem_free(link_assoc_rsp.ptr);
 		}
 	}
@@ -2849,95 +2844,6 @@ lim_process_switch_channel_join_mlo(struct pe_session *session_entry,
 	return QDF_STATUS_SUCCESS;
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
-
-#if defined(WLAN_FEATURE_ROAM_OFFLOAD) && defined(WLAN_FEATURE_11BE_MLO)
-static QDF_STATUS
-lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
-					 struct mac_context *mac_ctx)
-{
-	QDF_STATUS status;
-	struct element_info assoc_rsp = {};
-	struct qdf_mac_addr sta_link_addr;
-
-	assoc_rsp.len = 0;
-	mlo_get_assoc_rsp(session_entry->vdev, &assoc_rsp);
-
-	if (!session_entry->lim_join_req->partner_info.num_partner_links) {
-		pe_debug("MLO_ROAM: num_partner_links is 0");
-		return QDF_STATUS_E_INVAL;
-	}
-	/* Todo: update the sta addr by matching link id */
-	qdf_mem_copy(&sta_link_addr, session_entry->self_mac_addr,
-		     QDF_MAC_ADDR_SIZE);
-
-	pe_err("sta_link_addr" QDF_MAC_ADDR_FMT,
-	       QDF_MAC_ADDR_REF(&sta_link_addr));
-
-	if (assoc_rsp.len) {
-		struct element_info link_assoc_rsp;
-		tLimMlmJoinCnf mlm_join_cnf;
-		tLimMlmAssocCnf assoc_cnf;
-		struct qdf_mac_addr bssid;
-
-		mlm_join_cnf.resultCode = eSIR_SME_SUCCESS;
-		mlm_join_cnf.protStatusCode = STATUS_SUCCESS;
-		/* Update PE sessionId */
-		mlm_join_cnf.sessionId = session_entry->peSessionId;
-		lim_post_sme_message(mac_ctx, LIM_MLM_JOIN_CNF,
-				     (uint32_t *)&mlm_join_cnf);
-
-		session_entry->limSmeState = eLIM_SME_WT_ASSOC_STATE;
-		pe_debug("MLO_ROAM: reassoc rsp len %d ", assoc_rsp.len);
-
-		link_assoc_rsp.ptr = qdf_mem_malloc(assoc_rsp.len);
-		if (!link_assoc_rsp.ptr)
-			return QDF_STATUS_E_NOMEM;
-
-		link_assoc_rsp.len = assoc_rsp.len;
-		session_entry->limMlmState = eLIM_MLM_WT_REASSOC_RSP_STATE;
-		mlo_get_link_mac_addr_from_reassoc_rsp(session_entry->vdev, &bssid);
-		sir_copy_mac_addr(session_entry->limReAssocbssId, bssid.bytes);
-		pe_debug("MLO_ROAM: Generate and process reassoc rsp for link vdev");
-
-		status = util_gen_link_assoc_rsp(assoc_rsp.ptr,
-						 assoc_rsp.len,
-						 true, sta_link_addr,
-						 link_assoc_rsp.ptr,
-						 assoc_rsp.len,
-						 (qdf_size_t *)&link_assoc_rsp.len);
-
-		if (QDF_IS_STATUS_SUCCESS(status)) {
-			pe_debug("MLO_ROAM: process reassoc rsp for link vdev");
-			lim_process_assoc_rsp_frame(mac_ctx,
-						    link_assoc_rsp.ptr,
-						    (link_assoc_rsp.len - WLAN_MAC_HDR_LEN_3A),
-						    LIM_REASSOC,
-						    session_entry);
-			qdf_mem_free(link_assoc_rsp.ptr);
-		} else {
-			pe_debug("MLO_ROAM: link vdev assoc rsp generation failed");
-			assoc_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
-			assoc_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
-			/* Update PE sessionId */
-			assoc_cnf.sessionId = session_entry->peSessionId;
-			lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,
-					     (uint32_t *)&assoc_cnf);
-
-			session_entry->limMlmState = eLIM_MLM_IDLE_STATE;
-			qdf_mem_free(link_assoc_rsp.ptr);
-		}
-	}
-	return QDF_STATUS_SUCCESS;
-}
-
-#else /* (WLAN_FEATURE_ROAM_OFFLOAD) && (WLAN_FEATURE_11BE_MLO) */
-static QDF_STATUS
-lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
-					 struct mac_context *mac_ctx)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* (WLAN_FEATURE_ROAM_OFFLOAD) && (WLAN_FEATURE_11BE_MLO) */
 
 /**
  * lim_process_switch_channel_join_req() -Initiates probe request
@@ -2986,19 +2892,15 @@ static void lim_process_switch_channel_join_req(
 	lim_apply_configuration(mac_ctx, session_entry);
 
 	if (wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev)) {
-		if (mlo_roam_is_auth_status_connected(mac_ctx->psoc,
-						      session_entry->vdev_id))
-			mlo_status = lim_process_switch_channel_join_mlo_roam(session_entry,
-									      mac_ctx);
-		else
-			mlo_status = lim_process_switch_channel_join_mlo(session_entry,
-									 mac_ctx);
+		mlo_status = lim_process_switch_channel_join_mlo(session_entry,
+								 mac_ctx);
 
 		if (mlo_status == QDF_STATUS_E_INVAL)
 			goto error;
 		else
 			return;
 	}
+
 	/*
 	* If deauth_before_connection is enabled, Send Deauth first to AP if
 	* last disconnection was caused by HB failure.
@@ -3268,12 +3170,9 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 
 		/* If MCC upgrade/DBS downgrade happened during channel switch,
 		 * the policy manager connection table needs to be updated.
-		 * STA PCL to F/W need update after sta channel switch.
 		 */
 		policy_mgr_update_connection_info(mac->psoc,
 			pe_session->smeSessionId);
-		wlan_cm_handle_sta_sta_roaming_enablement(mac->psoc,
-							  pe_session->smeSessionId);
 		if (pe_session->opmode == QDF_P2P_CLIENT_MODE) {
 			pe_debug("Send p2p operating channel change conf action frame once first beacon is received on new channel");
 			pe_session->send_p2p_conf_frame = true;
@@ -3283,9 +3182,6 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 			ucfg_pkt_capture_record_channel(pe_session->vdev);
 		break;
 	case LIM_SWITCH_CHANNEL_SAP_DFS:
-		if (QDF_IS_STATUS_SUCCESS(status))
-			lim_set_tpc_power(mac, pe_session);
-
 		/* Note: This event code specific to SAP mode
 		 * When SAP session issues channel change as performing
 		 * DFS, we will come here. Other sessions, for e.g. P2P

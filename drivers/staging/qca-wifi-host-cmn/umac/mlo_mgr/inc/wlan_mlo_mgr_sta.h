@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -91,25 +91,6 @@ void mlo_sta_link_disconn_notify(struct wlan_objmgr_vdev *vdev,
 				 struct wlan_cm_discon_rsp *resp);
 
 /**
- * mlo_handle_sta_link_connect_failure - Notifies that STA link connect failure
- * @vdev: pointer to vdev
- * @rsp: connect resp
- *
- * Return: none
- */
-void mlo_handle_sta_link_connect_failure(struct wlan_objmgr_vdev *vdev,
-					 struct wlan_cm_connect_resp *rsp);
-
-/**
- * mlo_handle_pending_disconnect - Handle pending disconnect if received
- * while link connect is ongoing.
- * @vdev: pointer to vdev
- *
- * Return: none
- */
-void mlo_handle_pending_disconnect(struct wlan_objmgr_vdev *vdev);
-
-/**
  * mlo_is_mld_sta - Check if MLD associated with the vdev is a station
  * @vdev: pointer to vdev
  *
@@ -124,15 +105,6 @@ bool mlo_is_mld_sta(struct wlan_objmgr_vdev *vdev);
  * Return: true if mld is disconnected, false otherwise
  */
 bool ucfg_mlo_is_mld_disconnected(struct wlan_objmgr_vdev *vdev);
-
-/**
- * mlo_is_mld_disconnecting_connecting - Check whether MLD is disconnecting or
- * connecting
- * @vdev: pointer to vdev
- *
- * Return: true if mld is disconnecting or connecting, false otherwise
- */
-bool mlo_is_mld_disconnecting_connecting(struct wlan_objmgr_vdev *vdev);
 
 #ifndef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 /**
@@ -589,26 +561,6 @@ void mlo_internal_disconnect_links(struct wlan_objmgr_vdev *vdev);
  */
 void mlo_sta_get_vdev_list(struct wlan_objmgr_vdev *vdev, uint16_t *vdev_count,
 			   struct wlan_objmgr_vdev **wlan_vdev_list);
-
-/**
- * mlo_allocate_and_copy_ies() - allocate and copy ies
- * @target: target connect req pointer
- * @source: source connect req pointer
- *
- * Return: None
- */
-void
-mlo_allocate_and_copy_ies(struct wlan_cm_connect_req *target,
-			  struct wlan_cm_connect_req *source);
-
-/**
- * mlo_free_connect_ies() - free connect ies
- * @connect_req: connect req pointer
- *
- * Return: None
- */
-void
-mlo_free_connect_ies(struct wlan_cm_connect_req *connect_req);
 #else
 static inline
 QDF_STATUS mlo_connect(struct wlan_objmgr_vdev *vdev,
@@ -664,12 +616,6 @@ bool ucfg_mlo_is_mld_disconnected(struct wlan_objmgr_vdev *vdev)
 	return true;
 }
 #endif
-
-static inline
-bool mlo_is_mld_disconnecting_connecting(struct wlan_objmgr_vdev *vdev)
-{
-	return false;
-}
 
 static inline
 bool mlo_is_mld_sta(struct wlan_objmgr_vdev *vdev)

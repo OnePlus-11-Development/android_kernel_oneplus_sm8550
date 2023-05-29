@@ -1270,17 +1270,6 @@ void lim_add_bss_he_cfg(struct bss_params *add_bss, struct pe_session *session);
 void lim_copy_bss_he_cap(struct pe_session *session);
 
 /**
- * lim_update_he_caps_mcs() - Update he caps MCS
- * @mac: MAC context
- * @session: pointer to PE session
- *
- * Return: None
- */
-void lim_update_he_caps_mcs(struct mac_context *mac,
-			    struct pe_session *session);
-
-
-/**
  * lim_update_he_6gop_assoc_resp() - Update HE 6GHz op info to BSS params
  * @add_bss: pointer to add bss params
  * @he_op: Pointer to HE operation info IE
@@ -1662,11 +1651,6 @@ void lim_copy_bss_he_cap(struct pe_session *session)
 {
 }
 
-static inline
-void lim_update_he_caps_mcs(struct mac_context *mac, struct pe_session *session)
-{
-}
-
 static inline void lim_copy_join_req_he_cap(struct pe_session *session)
 {
 }
@@ -1776,9 +1760,6 @@ lim_update_he_6ghz_band_caps(struct mac_context *mac,
 #ifdef WLAN_FEATURE_11BE
 static inline bool lim_is_session_eht_capable(struct pe_session *session)
 {
-	if (!session)
-		return false;
-
 	return session->eht_capable;
 }
 
@@ -3108,18 +3089,6 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
 uint8_t lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
 			     tDot11fIEVHTOperation *vht_op,
 			     tDot11fIEHTInfo *ht_info);
-
-/*
- * lim_set_tpc_power() - Function to compute and send TPC power level to the
- * FW based on the opmode of the pe_session
- *
- * @mac_ctx:    Pointer to Global MAC structure
- * @pe_session: Pointer to session
- *
- * Return: TPC status
- */
-bool
-lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session);
 
 /**
  * lim_update_tx_power() - Function to update the TX power for

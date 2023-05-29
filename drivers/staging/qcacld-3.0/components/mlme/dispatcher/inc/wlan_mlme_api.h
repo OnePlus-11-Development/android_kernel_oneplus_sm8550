@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1050,17 +1050,6 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 					  struct wma_tgt_cfg *cfg);
 #endif
 
-/**
- * wlan_mlme_convert_vht_op_bw_to_phy_ch_width() - convert channel width in VHT
- *                                                 operation IE to phy_ch_width
- * @channel_width: channel width in VHT operation IE. If it is 0, please use HT
- *                 information IE to check whether it is 20MHz or 40MHz.
- *
- * Return: phy_ch_width
- */
-enum phy_ch_width wlan_mlme_convert_vht_op_bw_to_phy_ch_width(
-						uint8_t channel_width);
-
 #ifdef WLAN_FEATURE_11BE
 /**
  * mlme_update_tgt_eht_caps_in_cfg() - Update tgt eht cap in mlme component
@@ -1101,18 +1090,6 @@ bool wlan_mlme_get_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc);
  */
 void wlan_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 				       bool disable);
-#else
-static inline
-bool wlan_mlme_get_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc)
-{
-	return true;
-}
-
-static inline
-void wlan_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
-				       bool disable)
-{
-}
 #endif
 
 /**
@@ -1239,21 +1216,6 @@ QDF_STATUS wlan_mlme_set_default_primary_iface(struct wlan_objmgr_psoc *psoc);
  * Return: True or False
  */
 bool wlan_mlme_is_primary_interface_configured(struct wlan_objmgr_psoc *psoc);
-
-/**
- * wlan_mlme_peer_get_assoc_rsp_ies() - Get the assoc response IEs of peer
- * @peer: WLAN peer objmgr
- * @ie_buf: Pointer to IE buffer
- * @ie_len: Length of the IE buffer
- *
- * Get the pointer to assoc response IEs of the peer from MLME
- * and length of the IE buffer.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wlan_mlme_peer_get_assoc_rsp_ies(struct wlan_objmgr_peer *peer,
-					    const uint8_t **ie_buf,
-					    size_t *ie_len);
 
 /**
  * wlan_mlme_get_mcc_duty_cycle_percentage() - Get primary STA iface duty
@@ -2243,22 +2205,6 @@ wlan_mlme_get_enable_dynamic_nss_chains_cfg(struct wlan_objmgr_psoc *psoc,
 					    bool *value);
 
 /**
- * wlan_mlme_get_restart_sap_on_dynamic_nss_chains_cfg() - API to get whether
- * SAP needs to be restarted or not on dynamic nss chain config
- * @psoc: psoc context
- * @value: data to be set
- *
- * API to get whether SAP needs to be restarted or not on dynamic nss chain
- * config
- *
- * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
- */
-QDF_STATUS
-wlan_mlme_get_restart_sap_on_dynamic_nss_chains_cfg(
-						struct wlan_objmgr_psoc *psoc,
-						bool *value);
-
-/**
  * wlan_mlme_get_vht_enable2x2() - Enables/disables VHT Tx/Rx MCS values for 2x2
  * @psoc: psoc context
  * @value: data to be set
@@ -2449,18 +2395,6 @@ wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value);
 
 #ifdef CONFIG_BAND_6GHZ
 /**
- * wlan_mlme_is_standard_6ghz_conn_policy_enabled() - Get the 6 GHz standard
- *                                                    connection policy flag
- * @psoc: psoc context
- * @value: Enable/Disable value ptr.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
-					       bool *value);
-
-/**
  * wlan_mlme_is_relaxed_6ghz_conn_policy_enabled() - Get the 6ghz relaxed
  *                                                   connection policy flag
  * @psoc: psoc context
@@ -2484,14 +2418,6 @@ QDF_STATUS
 wlan_mlme_set_relaxed_6ghz_conn_policy(struct wlan_objmgr_psoc *psoc,
 				       bool value);
 #else
-static inline QDF_STATUS
-wlan_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
-					       bool *value)
-{
-	*value = false;
-	return QDF_STATUS_SUCCESS;
-}
-
 static inline QDF_STATUS
 wlan_mlme_is_relaxed_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 					      bool *value)
@@ -2551,28 +2477,6 @@ wlan_mlme_set_eml_params(struct wlan_objmgr_psoc *psoc,
 void
 wlan_mlme_get_eml_params(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_mlo_eml_cap *cap);
-
-/**
- * wlan_mlme_get_t2lm_negotiation_supported() - Get the T2LM
- * negotiation supported value
- * @psoc: psoc context
- *
- * Return: t2lm negotiation supported value
- */
-enum t2lm_negotiation_support
-wlan_mlme_get_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc);
-
-/**
- * wlan_mlme_set_t2lm_negotiation_supported() - Set the T2LM
- * negotiation supported value
- * @psoc: psoc context
- * @value: t2lm negotiation supported value
- *
- * Return: qdf status
- */
-QDF_STATUS
-wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
-					 uint8_t value);
 #else
 static inline QDF_STATUS
 wlan_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
@@ -2597,19 +2501,6 @@ static inline void
 wlan_mlme_get_eml_params(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_mlo_eml_cap *cap)
 {
-}
-
-static inline enum t2lm_negotiation_support
-wlan_mlme_get_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc)
-{
-	return T2LM_NEGOTIATION_DISABLED;
-}
-
-static inline QDF_STATUS
-wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
-					 uint8_t value)
-{
-	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 
@@ -2889,6 +2780,15 @@ wlan_mlme_get_ignore_fw_reg_offload_ind(struct wlan_objmgr_psoc *psoc,
  *  Return: Meaningful string from enum WMI_ROAM_TRIGGER_REASON_ID
  */
 char *mlme_get_roam_trigger_str(uint32_t roam_scan_trigger);
+
+/**
+ * mlme_get_roam_scan_type_str() - Get the string for roam sacn type
+ * @roam_scan_type: roam scan type coming from fw via
+ * wmi_roam_scan_info tlv
+ *
+ *  Return: Meaningful string for roam sacn type
+ */
+char *mlme_get_roam_scan_type_str(uint32_t roam_scan_type);
 
 /**
  * mlme_get_roam_status_str() - Get the string for roam status
@@ -3625,14 +3525,6 @@ QDF_STATUS mlme_set_ext_opr_rate(struct wlan_objmgr_vdev *vdev, uint8_t *src,
 				 qdf_size_t len);
 
 /**
- * mlme_clear_ext_opr_rate() - clear extended operational rate
- * @vdev: vdev pointer
- *
- * Return: QDF_SUCCESS if success
- */
-QDF_STATUS mlme_clear_ext_opr_rate(struct wlan_objmgr_vdev *vdev);
-
-/**
  * mlme_get_mcs_rate() - get MCS based rate
  * @vdev: vdev pointer
  * @dst: buffer to get rates set
@@ -3655,14 +3547,6 @@ QDF_STATUS mlme_set_mcs_rate(struct wlan_objmgr_vdev *vdev, uint8_t *src,
 			     qdf_size_t len);
 
 /**
- * mlme_clear_mcs_rate() - clear MCS based rate
- * @vdev: vdev pointer
- *
- * Return: QDF_SUCCESS if success
- */
-QDF_STATUS mlme_clear_mcs_rate(struct wlan_objmgr_vdev *vdev);
-
-/**
  * wlan_mlme_is_sta_mon_conc_supported() - Check if STA + Monitor mode
  * concurrency is supported
  * @psoc: pointer to psoc object
@@ -3670,23 +3554,6 @@ QDF_STATUS mlme_clear_mcs_rate(struct wlan_objmgr_vdev *vdev);
  * Return: True if supported
  */
 bool wlan_mlme_is_sta_mon_conc_supported(struct wlan_objmgr_psoc *psoc);
-
-/**
- * wlan_mlme_get_phy_max_freq_range() - Get phy supported max channel
- * frequency range
- * @psoc: psoc for country information
- * @low_2ghz_chan: 2.4 GHz low channel frequency
- * @high_2ghz_chan: 2.4 GHz high channel frequency
- * @low_5ghz_chan: 5 GHz low channel frequency
- * @high_5ghz_chan: 5 GHz high channel frequency
- *
- * Return: QDF status
- */
-QDF_STATUS wlan_mlme_get_phy_max_freq_range(struct wlan_objmgr_psoc *psoc,
-					    uint32_t *low_2ghz_chan,
-					    uint32_t *high_2ghz_chan,
-					    uint32_t *low_5ghz_chan,
-					    uint32_t *high_5ghz_chan);
 
 #ifdef FEATURE_WDS
 /**
@@ -4117,39 +3984,4 @@ wlan_mlme_get_ch_width_from_phymode(enum wlan_phymode phy_mode);
  */
 enum phy_ch_width
 wlan_mlme_get_peer_ch_width(struct wlan_objmgr_psoc *psoc, uint8_t *mac);
-
-#if defined(WLAN_FEATURE_SR)
-/**
- * wlan_mlme_get_sr_enable_modes() - get mode for which SR is enabled
- *
- * @psoc: psoc context
- * @val: pointer to hold the value of SR(Spatial Reuse) enable modes
- *
- * Return: void
- */
-void
-wlan_mlme_get_sr_enable_modes(struct wlan_objmgr_psoc *psoc, uint8_t *val);
-#endif
-
-/**
- * wlan_mlme_set_edca_pifs_param() - set edca/pifs param for ll sap
- * @ep: pointer to wlan_edca_pifs_param_ie
- * @type: edca_param_type
- *
- * Return: None
- */
-void
-wlan_mlme_set_edca_pifs_param(struct wlan_edca_pifs_param_ie *ep,
-			      enum host_edca_param_type type);
-/**
- * wlan_mlme_stats_get_periodic_display_time() - get display time
- * @psoc: pointer to psoc object
- * @periodic_display_time: buffer to hold value
- *
- * Return: QDF Status
- */
-QDF_STATUS
-wlan_mlme_stats_get_periodic_display_time(struct wlan_objmgr_psoc *psoc,
-					  uint32_t *periodic_display_time);
-
 #endif /* _WLAN_MLME_API_H_ */

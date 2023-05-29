@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2018 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -85,7 +84,7 @@ disa_vdev_get_id(struct wlan_objmgr_vdev *vdev)
 
 /* Tree Navigation */
 
-/*
+/**
  * !PLEASE READ!
  *
  * The following are objmgr navigation helpers for traversing objmgr object

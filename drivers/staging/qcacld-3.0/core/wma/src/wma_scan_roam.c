@@ -1,6 +1,6 @@
  /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -296,8 +296,7 @@ cm_handle_auth_offload(struct auth_offload_event *auth_event)
 				auth_event->vdev_id,
 				auth_event->ta);
 	status = wma->csr_roam_auth_event_handle_cb(mac_ctx, auth_event->vdev_id,
-						    auth_event->ap_bssid,
-						    auth_event->akm);
+						    auth_event->ap_bssid);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wma_err_rl("Trigger pre-auth failed");
 		return QDF_STATUS_E_FAILURE;
@@ -561,17 +560,11 @@ wma_roam_update_vdev(tp_wma_handle wma,
 
 	vdev_id = roamed_vdev_id;
 	wma->interfaces[vdev_id].nss = roam_synch_ind_ptr->nss;
-
-	/* update channel width */
+	/* update freq and channel width */
+	wma->interfaces[vdev_id].ch_freq =
+		roam_synch_ind_ptr->chan_freq;
 	wma->interfaces[vdev_id].chan_width =
 		roam_synch_ind_ptr->chan_width;
-	/* Fill link freq from roam_synch_ind */
-	if (is_multi_link_roam(roam_synch_ind_ptr))
-		wma->interfaces[vdev_id].ch_freq =
-			mlo_roam_get_chan_freq(vdev_id, roam_synch_ind_ptr);
-	else
-		wma->interfaces[vdev_id].ch_freq =
-			roam_synch_ind_ptr->chan_freq;
 
 	del_sta_params = qdf_mem_malloc(sizeof(*del_sta_params));
 	if (!del_sta_params) {
@@ -1526,7 +1519,7 @@ int wma_extscan_hotlist_match_event_handler(void *handle,
 		return -ENOMEM;
 
 	dest_ap = &dest_hotlist->ap[0];
-	dest_hotlist->numOfAps = numap;
+	dest_hotlist->numOfAps = event->total_entries;
 	dest_hotlist->requestId = event->config_request_id;
 
 	if (event->first_entry_index +
@@ -1692,7 +1685,6 @@ static int wma_group_num_bss_to_scan_id(const u_int8_t *cmd_param_info,
 	struct extscan_cached_scan_results *t_cached_result;
 	struct extscan_cached_scan_result *t_scan_id_grp;
 	int i, j;
-	uint32_t total_scan_num_results = 0;
 	tSirWifiScanResult *ap;
 
 	param_buf = (WMI_EXTSCAN_CACHED_RESULTS_EVENTID_param_tlvs *)
@@ -1703,19 +1695,16 @@ static int wma_group_num_bss_to_scan_id(const u_int8_t *cmd_param_info,
 	t_cached_result = cached_result;
 	t_scan_id_grp = &t_cached_result->result[0];
 
-	for (i = 0; i < t_cached_result->num_scan_ids; i++) {
-		total_scan_num_results += t_scan_id_grp->num_results;
-		t_scan_id_grp++;
-	}
-
-	if (total_scan_num_results > param_buf->num_bssid_list) {
-		wma_err("total_scan_num_results %d, num_bssid_list %d",
-			total_scan_num_results,
-			param_buf->num_bssid_list);
+	if ((t_cached_result->num_scan_ids *
+	     QDF_MIN(t_scan_id_grp->num_results,
+		     param_buf->num_bssid_list)) > param_buf->num_bssid_list) {
+		wma_err("num_scan_ids %d, num_results %d num_bssid_list %d",
+			 t_cached_result->num_scan_ids,
+			 t_scan_id_grp->num_results,
+			 param_buf->num_bssid_list);
 		return -EINVAL;
 	}
 
-	t_scan_id_grp = &t_cached_result->result[0];
 	wma_debug("num_scan_ids:%d",
 			t_cached_result->num_scan_ids);
 	for (i = 0; i < t_cached_result->num_scan_ids; i++) {
@@ -1726,7 +1715,8 @@ static int wma_group_num_bss_to_scan_id(const u_int8_t *cmd_param_info,
 			return -ENOMEM;
 
 		ap = &t_scan_id_grp->ap[0];
-		for (j = 0; j < t_scan_id_grp->num_results; j++) {
+		for (j = 0; j < QDF_MIN(t_scan_id_grp->num_results,
+					param_buf->num_bssid_list); j++) {
 			ap->channel = src_hotlist->channel;
 			ap->ts = WMA_MSEC_TO_USEC(src_rssi->tstamp);
 			ap->rtt = src_hotlist->rtt;
@@ -3010,7 +3000,6 @@ cm_roam_pe_sync_callback(struct roam_offload_synch_ind *sync_ind,
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	struct pe_session *pe_session;
-	bool new_link_session = false;
 	QDF_STATUS status;
 
 	if (!wma)
@@ -3018,7 +3007,6 @@ cm_roam_pe_sync_callback(struct roam_offload_synch_ind *sync_ind,
 
 	pe_session = pe_find_session_by_vdev_id(wma->mac_context, vdev_id);
 	if (!pe_session) {
-		new_link_session = true;
 		/* Legacy to MLO roaming: create new pe session */
 		status = lim_create_and_fill_link_session(wma->mac_context,
 							  vdev_id,
@@ -3034,13 +3022,6 @@ cm_roam_pe_sync_callback(struct roam_offload_synch_ind *sync_ind,
 				vdev_id, sync_ind, ie_len,
 				SIR_ROAM_SYNCH_PROPAGATION);
 
-	/* delete newly added pe session in case of failure */
-	if (new_link_session && QDF_IS_STATUS_ERROR(status)) {
-		pe_session = pe_find_session_by_vdev_id(wma->mac_context,
-							vdev_id);
-		if (pe_session)
-			pe_delete_session(wma->mac_context, pe_session);
-	}
 	return status;
 }
 

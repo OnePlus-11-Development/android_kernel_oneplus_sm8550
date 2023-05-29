@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -176,7 +176,7 @@ uint8_t ccp_wapi_oui02[HDD_WAPI_OUI_SIZE] = { 0x00, 0x14, 0x72, 0x02 };
 
 #define HDD_PEER_AUTHORIZE_WAIT 10
 
-/*
+/**
  * beacon_filter_table - table of IEs used for beacon filtering
  */
 static const int beacon_filter_table[] = {
@@ -200,7 +200,7 @@ static const int beacon_filter_table[] = {
 #endif
 };
 
-/*
+/**
  * beacon_filter_extn_table - table of extn IEs used for beacon filtering
  */
 static const int beacon_filter_extn_table[] = {
@@ -237,21 +237,22 @@ void wlan_hdd_sae_copy_ta_addr(struct cfg80211_external_auth_params *params,
 			       struct sir_sae_info *sae_info)
 {
 	struct qdf_mac_addr ta = QDF_MAC_ADDR_ZERO_INIT;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	bool roaming;
 
-	status = ucfg_cm_get_sae_auth_ta(adapter->hdd_ctx->pdev,
-					 sae_info->vdev_id,
-					 &ta);
-	if (QDF_IS_STATUS_SUCCESS(status))
+	roaming = wlan_cm_roaming_in_progress(adapter->hdd_ctx->pdev,
+					      sae_info->vdev_id);
+	if (roaming) {
+		ucfg_cm_get_sae_auth_ta(adapter->hdd_ctx->pdev,
+					sae_info->vdev_id,
+					&ta);
 		qdf_mem_copy(params->tx_addr, ta.bytes, QDF_MAC_ADDR_SIZE);
-	else if (wlan_vdev_mlme_is_mlo_vdev(adapter->vdev))
+		hdd_debug("ta:" QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(params->tx_addr));
+	} else if (wlan_vdev_mlme_is_mlo_vdev(adapter->vdev)) {
 		qdf_mem_copy(params->tx_addr,
 			     wlan_vdev_mlme_get_linkaddr(adapter->vdev),
 			     QDF_MAC_ADDR_SIZE);
-
-	hdd_debug("status:%d ta:" QDF_MAC_ADDR_FMT, status,
-		  QDF_MAC_ADDR_REF(params->tx_addr));
-
+	}
 }
 #else
 static inline
@@ -261,34 +262,6 @@ void wlan_hdd_sae_copy_ta_addr(struct cfg80211_external_auth_params *params,
 {
 }
 #endif
-
-/**
- * wlan_hdd_get_keymgmt_for_sae_akm() - Get the keymgmt OUI
- * corresponding to the SAE AKM type
- * @akm: AKM type
- *
- * This API is used to get the keymgmt OUI for the SAE AKM type.
- * Return: keymgmt OUI
- */
-static uint32_t
-wlan_hdd_get_keymgmt_for_sae_akm(uint32_t akm)
-{
-	if (akm == WLAN_AKM_SAE)
-		return WLAN_AKM_SUITE_SAE;
-	else if (akm == WLAN_AKM_FT_SAE)
-		return WLAN_AKM_SUITE_FT_OVER_SAE;
-	else if (akm == WLAN_AKM_SAE_EXT_KEY)
-		return WLAN_AKM_SUITE_SAE_EXT_KEY;
-	/**
-	 * Legacy FW doesn't support SAE-EXK-KEY or
-	 * Cross-SAE_AKM roaming. In such cases, send
-	 * SAE for both SAE and FT-SAE AKMs. The supplicant
-	 * has backward compatibility to handle this case.
-	 */
-	else
-		return WLAN_AKM_SUITE_SAE;
-}
-
 /**
  * wlan_hdd_sae_callback() - Sends SAE info to supplicant
  * @adapter: pointer adapter context
@@ -316,8 +289,10 @@ static void wlan_hdd_sae_callback(struct hdd_adapter *adapter,
 
 	flags = cds_get_gfp_flags();
 
-	params.key_mgmt_suite =
-		wlan_hdd_get_keymgmt_for_sae_akm(sae_info->akm);
+	params.key_mgmt_suite = 0x00;
+	params.key_mgmt_suite |= 0x0F << 8;
+	params.key_mgmt_suite |= 0xAC << 16;
+	params.key_mgmt_suite |= 0x8 << 24;
 
 	params.action = NL80211_EXTERNAL_AUTH_START;
 	qdf_mem_copy(params.bssid, sae_info->peer_mac_addr.bytes,
@@ -432,7 +407,6 @@ enum band_info hdd_conn_get_connected_band(struct hdd_adapter *adapter)
 
 /**
  * hdd_conn_get_connected_cipher_algo() - get current connection cipher type
- * @adapter: pointer to the hdd adapter
  * @sta_ctx: pointer to global HDD Station context
  * @pConnectedCipherAlgo: pointer to connected cipher algo
  *
@@ -474,6 +448,17 @@ struct hdd_adapter *hdd_get_sta_connection_in_progress(
 		    (QDF_P2P_DEVICE_MODE == adapter->device_mode)) {
 			if (hdd_cm_is_connecting(adapter)) {
 				hdd_debug("vdev_id %d: Connection is in progress",
+					  adapter->vdev_id);
+				hdd_adapter_dev_put_debug(adapter, dbgid);
+				if (next_adapter)
+					hdd_adapter_dev_put_debug(next_adapter,
+								  dbgid);
+				return adapter;
+			} else if (hdd_cm_is_vdev_associated(adapter) &&
+				   sme_is_sta_key_exchange_in_progress(
+							hdd_ctx->mac_handle,
+							adapter->vdev_id)) {
+				hdd_debug("vdev_id %d: Key exchange is in progress",
 					  adapter->vdev_id);
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
@@ -523,36 +508,6 @@ bool hdd_is_any_sta_connected(struct hdd_context *hdd_ctx)
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 	return false;
-}
-
-QDF_STATUS hdd_get_first_connected_sta_vdev_id(struct hdd_context *hdd_ctx,
-					       uint32_t *vdev_id)
-{
-	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
-	wlan_net_dev_ref_dbgid dbgid =
-				NET_DEV_HOLD_IS_ANY_STA_CONNECTED;
-
-	if (!hdd_ctx) {
-		hdd_err("HDD context is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
-					   dbgid) {
-		if (adapter->device_mode == QDF_STA_MODE ||
-		    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-			if (hdd_cm_is_vdev_connected(adapter)) {
-				*vdev_id = adapter->vdev_id;
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
-								  dbgid);
-				return QDF_STATUS_SUCCESS;
-			}
-		}
-		hdd_adapter_dev_put_debug(adapter, dbgid);
-	}
-	return QDF_STATUS_E_FAILURE;
 }
 
 /**
@@ -1594,6 +1549,9 @@ bool hdd_any_valid_peer_present(struct hdd_adapter *adapter)
  * hdd_roam_mic_error_indication_handler() - MIC error indication handler
  * @adapter: pointer to adapter
  * @roam_info: pointer to roam info
+ * @roam_id: roam id
+ * @roam_status: roam status
+ * @roam_result: roam result
  *
  * This function indicates the Mic failure to the supplicant
  *
@@ -2149,8 +2107,7 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_debug("set hw mode change not done");
 
-	policy_mgr_check_concurrent_intf_and_restart_sap(hdd_ctx->psoc,
-			!!adapter->session.ap.sap_config.acs_cfg.acs_mode);
+	policy_mgr_check_concurrent_intf_and_restart_sap(hdd_ctx->psoc);
 	wlan_twt_concurrency_update(hdd_ctx);
 }
 
@@ -2620,7 +2577,6 @@ struct osif_cm_ops osif_ops = {
 	.vendor_handoff_params_cb = hdd_cm_get_vendor_handoff_params,
 #endif
 	.send_vdev_keys_cb = hdd_cm_send_vdev_keys,
-	.get_scan_ie_params_cb = hdd_cm_get_scan_ie_params,
 };
 
 QDF_STATUS hdd_cm_register_cb(void)

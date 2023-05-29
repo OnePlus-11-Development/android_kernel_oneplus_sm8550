@@ -261,11 +261,9 @@ QDF_STATUS reg_get_domain_from_country_code(v_REGDOMAIN_t *reg_domain_ptr,
 #ifdef CONFIG_REG_CLIENT
 /**
  * reg_get_6g_power_type_for_ctry() - Return power type for 6G based on cntry IE
- * @psoc: pointer to psoc
- * @pdev: pointer to pdev
- * @ap_ctry: pointer to country string in country IE
- * @sta_ctry: pointer to sta programmed country
- * @pwr_type_6g: pointer to 6G power type
+ * @ap_ctry: ptr to country string in country IE
+ * @sta_ctry: ptr to sta programmed country
+ * @pwr_type_6g: ptr to 6G power type
  * @ctry_code_match: Check for country IE and sta country code match
  * @ap_pwr_type: AP's power type as advertised in HE ops IE
  * Return: QDF_STATUS

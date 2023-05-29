@@ -164,7 +164,7 @@ enum oem_capability_mask {
 /**
  * struct oem_get_capability_rsp - capabilities set by userspace and target.
  * @target_cap: target capabilities
- * @cap: capabilities set by userspace via set request
+ * @client_capabilities: capabilities set by userspace via set request
  */
 struct oem_get_capability_rsp {
 	struct oem_data_cap target_cap;
@@ -217,10 +217,10 @@ int oem_deactivate_service(void);
 void hdd_send_oem_data_rsp_msg(struct oem_data_rsp *oem_rsp);
 
 /**
- * hdd_update_channel_bw_info() - set bandwidth info for the chan
+ * update_channel_bw_info() - set bandwidth info for the chan
  * @hdd_ctx: hdd context
  * @chan_freq: channel freq for which info are required
- * @hdd_chan_info: struct where the bandwidth info is filled
+ * @chan_info: struct where the bandwidth info is filled
  *
  * This function finds the maximum bandwidth allowed, secondary
  * channel offset and center freq for the channel as per regulatory

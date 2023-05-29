@@ -234,6 +234,9 @@ static QDF_STATUS send_set_mcc_channel_time_quota_cmd_tlv(
 }
 
 #ifdef WLAN_FEATURE_MCC_QUOTA
+extern struct channel_quota fw_update_quota[MAX_MCC_QUOTA_CH_NUM];
+// End
+
 /**
  * convert_to_host_quota_type() - convert wmi quota type to host quota type
  * @quota_type: wmi target quota type
@@ -308,6 +311,12 @@ extract_mcc_quota_ev_param_tlv(wmi_unified_t wmi_handle,
 			wmi_mcc_quota_info[i].chan_time_quota.chan_mhz;
 		param->chan_quota[i].channel_time_quota =
 			wmi_mcc_quota_info[i].chan_time_quota.channel_time_quota;
+		/* FW may change the MCC quota due to leaky AP, GO AP beacon interval etc even when driver/FW set the fixed quota mode
+		 * From 8550T, Qualcomm support transfer this change event to driver from FW,
+		 * for let easy debug purpose, it's default off, let it default on */
+		fw_update_quota[i].chan_mhz = param->chan_quota[i].chan_mhz;
+		fw_update_quota[i].channel_time_quota = param->chan_quota[i].channel_time_quota;
+		// End
 		wmi_debug("mcc quota [%d] chan %d, quota %d",
 			  i, param->chan_quota[i].chan_mhz,
 			  param->chan_quota[i].channel_time_quota);

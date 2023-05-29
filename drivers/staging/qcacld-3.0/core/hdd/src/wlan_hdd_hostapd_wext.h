@@ -38,4 +38,10 @@ static inline void hdd_register_hostapd_wext(struct net_device *dev)
 }
 #endif
 
+#ifdef OPLUS_BUG_STABILITY
+//Add for: hotspot manager
+int oplus_wlan_hdd_modify_acl(struct net_device *dev, char* extra);
+int oplus_wlan_hdd_set_max_assoc(struct net_device *dev, char* extra);
+#endif /* OPLUS_BUG_STABILITY */
+
 #endif /* end #ifndef WLAN_HDD_HOSTAPD_H */

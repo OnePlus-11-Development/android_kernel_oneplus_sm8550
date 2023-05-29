@@ -130,7 +130,7 @@ static iw_softap_get_ini_cfg(struct net_device *dev,
 }
 
 /**
- * __iw_softap_set_two_ints_getnone() - Generic "set two integer" ioctl handler
+ * iw_softap_set_two_ints_getnone() - Generic "set two integer" ioctl handler
  * @dev: device upon which the ioctl was received
  * @info: ioctl request information
  * @wrqu: ioctl request data
@@ -257,15 +257,6 @@ static int __iw_softap_set_two_ints_getnone(struct net_device *dev,
 	return ret;
 }
 
-/**
- * iw_softap_set_two_ints_getnone() - Generic "set two integer" ioctl handler
- * @dev: device upon which the ioctl was received
- * @info: ioctl request information
- * @wrqu: ioctl request data
- * @extra: ioctl extra data
- *
- * Return: 0 on success, non-zero on error
- */
 static int iw_softap_set_two_ints_getnone(struct net_device *dev,
 					  struct iw_request_info *info,
 					  union iwreq_data *wrqu, char *extra)
@@ -1482,6 +1473,143 @@ int iw_softap_modify_acl(struct net_device *dev,
 	return errno;
 }
 
+#ifdef OPLUS_BUG_STABILITY
+//Add for: hotspot management
+#ifndef MAC_ADDRESS_STR
+#define MAC_ADDRESS_STR "%02x:%02x:%02x:%02x:%02x:%02x"
+#endif /* MAC_ADDRESS_STR */
+#ifndef MAC_ADDR_ARRAY
+#define MAC_ADDR_ARRAY(a) (a)[0], (a)[1], (a)[2], (a)[3], (a)[4], (a)[5]
+#endif /* MAC_ADDR_ARRAY */
+
+static
+int __oplus_iw_softap_modify_acl(struct net_device *dev,
+			   struct iw_request_info *info,
+			   union iwreq_data *wrqu, char *extra)
+{
+	struct hdd_adapter *adapter = (netdev_priv(dev));
+	uint8_t *value = (uint8_t *) extra;
+	uint8_t pPeerStaMac[QDF_MAC_ADDR_SIZE];
+	int listType, cmd, i;
+	int ret;
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+	struct hdd_context *hdd_ctx;
+
+	hdd_enter_dev(dev);
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return ret;
+
+	for (i = 0; i < QDF_MAC_ADDR_SIZE; i++)
+		pPeerStaMac[i] = *(value + i);
+
+	listType = (int)(*(value + i));
+	i++;
+	cmd = (int)(*(value + i));
+
+	hdd_debug("Modify ACL mac:" MAC_ADDRESS_STR " type: %d cmd: %d",
+	       MAC_ADDR_ARRAY(pPeerStaMac), listType, cmd);
+
+	qdf_status = wlansap_modify_acl(
+		WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+		pPeerStaMac, (eSapACLType) listType, (eSapACLCmdType) cmd);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		hdd_err("Modify ACL failed");
+		ret = -EIO;
+	}
+	hdd_exit();
+	return ret;
+}
+
+int
+static __oplus_iw_softap_setparam(struct net_device *dev,
+			    struct iw_request_info *info,
+			    union iwreq_data *wrqu, char *extra)
+{
+	struct hdd_adapter *adapter = (netdev_priv(dev));
+	int *value = (int *)extra;
+	int sub_cmd = value[0];
+	int set_value = value[1];
+	QDF_STATUS status;
+	int ret = 0;
+	struct hdd_context *hdd_ctx;
+
+	hdd_enter_dev(dev);
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return -EINVAL;
+
+	switch (sub_cmd) {
+	case QCSAP_PARAM_MAX_ASSOC:
+		if (cfg_min(CFG_ASSOC_STA_LIMIT) > set_value) {
+			hdd_err("Invalid setMaxAssoc value %d",
+			       set_value);
+			ret = -EINVAL;
+		} else {
+			if (cfg_max(CFG_ASSOC_STA_LIMIT) < set_value) {
+				hdd_warn("setMaxAssoc %d > max allowed %d.",
+				       set_value,
+				       cfg_max(CFG_ASSOC_STA_LIMIT));
+				hdd_warn("Setting it to max allowed and continuing");
+				set_value = cfg_max(CFG_ASSOC_STA_LIMIT);
+			}
+			status = ucfg_mlme_set_assoc_sta_limit(hdd_ctx->psoc, set_value);
+			if (status != QDF_STATUS_SUCCESS) {
+				hdd_err("setMaxAssoc failure, status: %d",
+				       status);
+				ret = -EIO;
+			}
+		}
+		break;
+
+	default:
+		hdd_err("Invalid setparam command %d value %d",
+		       sub_cmd, set_value);
+		ret = -EINVAL;
+		break;
+	}
+	hdd_exit();
+	return ret;
+}
+
+//Add for: hotspot manager
+int oplus_wlan_hdd_modify_acl(struct net_device *dev, char *extra)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __oplus_iw_softap_modify_acl(dev, NULL, NULL, extra);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
+int oplus_wlan_hdd_set_max_assoc(struct net_device *dev, char* extra)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __oplus_iw_softap_setparam(dev, NULL, NULL, extra);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#endif /* OPLUS_BUG_STABILITY */
+
 int
 static __iw_softap_getchannel(struct net_device *dev,
 			      struct iw_request_info *info,
@@ -1877,7 +2005,7 @@ static iw_softap_disassoc_sta(struct net_device *dev,
 }
 
 /**
- * __iw_get_char_setnone() - Generic "get char" private ioctl handler
+ * iw_get_char_setnone() - Generic "get char" private ioctl handler
  * @dev: device upon which the ioctl was received
  * @info: ioctl request information
  * @wrqu: ioctl request data
@@ -1920,15 +2048,6 @@ static int __iw_get_char_setnone(struct net_device *dev,
 	return ret;
 }
 
-/**
- * iw_get_char_setnone() - Generic "get char" private ioctl handler
- * @dev: device upon which the ioctl was received
- * @info: ioctl request information
- * @wrqu: ioctl request data
- * @extra: ioctl extra data
- *
- * Return: 0 on success, non-zero on error
- */
 static int iw_get_char_setnone(struct net_device *dev,
 				struct iw_request_info *info,
 				union iwreq_data *wrqu, char *extra)
@@ -2601,7 +2720,7 @@ iw_get_softap_linkspeed(struct net_device *dev,
  * @dev: net device
  * @info: iwpriv request information
  * @wrqu: iwpriv command parameter
- * @extra: extra data pointer
+ * @extra
  *
  * This function will call wlan_cfg80211_mc_cp_stats_get_peer_rssi
  * to get rssi
@@ -2682,7 +2801,7 @@ __iw_get_peer_rssi(struct net_device *dev, struct iw_request_info *info,
  * @dev: net device
  * @info: iwpriv request information
  * @wrqu: iwpriv command parameter
- * @extra: extra data pointer
+ * @extra
  *
  * This function will call __iw_get_peer_rssi
  *
@@ -3312,7 +3431,7 @@ const struct iw_handler_def hostapd_handler_def = {
 };
 
 /**
- * hdd_register_hostapd_wext() - register hostapd wext context
+ * hdd_register_wext() - register wext context
  * @dev: net device handle
  *
  * Registers wext interface context for a given net device

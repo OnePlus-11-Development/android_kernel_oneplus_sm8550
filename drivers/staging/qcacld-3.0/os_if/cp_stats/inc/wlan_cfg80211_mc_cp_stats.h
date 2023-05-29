@@ -87,7 +87,8 @@ wlan_cfg80211_mc_cp_stats_get_station_stats(struct wlan_objmgr_vdev *vdev,
 /**
  * wlan_cfg80211_mc_cp_stats_free_stats_event() - API to release station
  * statistics buffer
- * @info:    pointer to object populated with station stats
+ * @vdev:    Pointer to vdev
+ * @info:    pointer to object to populate with station stats
  *
  * Return: None
  */

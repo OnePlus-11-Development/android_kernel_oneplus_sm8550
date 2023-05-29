@@ -21,6 +21,9 @@
  * DOC: qdf_nbuf.c
  * QCA driver framework(QDF) network buffer management APIs
  */
+#ifdef IPA_OFFLOAD
+#include <i_qdf_ipa_wdi3.h>
+#endif
 #include <linux/hashtable.h>
 #include <linux/kernel.h>
 #include <linux/version.h>
@@ -41,7 +44,6 @@
 #include <qdf_types.h>
 #include <net/ieee80211_radiotap.h>
 #include <pld_common.h>
-#include <qdf_crypto.h>
 
 #if defined(FEATURE_TSO)
 #include <net/ipv6.h>
@@ -50,10 +52,6 @@
 #include <linux/if_vlan.h>
 #include <linux/ip.h>
 #endif /* FEATURE_TSO */
-
-#ifdef IPA_OFFLOAD
-#include <i_qdf_ipa_wdi3.h>
-#endif /* IPA_OFFLOAD */
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
 
@@ -746,21 +744,6 @@ __qdf_nbuf_t __qdf_nbuf_clone(__qdf_nbuf_t skb)
 
 qdf_export_symbol(__qdf_nbuf_clone);
 
-#ifdef QCA_DP_TX_NBUF_LIST_FREE
-void
-__qdf_nbuf_dev_kfree_list(__qdf_nbuf_queue_head_t *nbuf_queue_head)
-{
-	dev_kfree_skb_list_fast(nbuf_queue_head);
-}
-#else
-void
-__qdf_nbuf_dev_kfree_list(__qdf_nbuf_queue_head_t *nbuf_queue_head)
-{
-}
-#endif
-
-qdf_export_symbol(__qdf_nbuf_dev_kfree_list);
-
 #ifdef NBUF_MEMORY_DEBUG
 struct qdf_nbuf_event {
 	qdf_nbuf_t nbuf;
@@ -860,7 +843,6 @@ void qdf_nbuf_map_check_for_smmu_leaks(void)
 	qdf_tracker_check_for_leaks(&qdf_nbuf_smmu_map_tracker);
 }
 
-#ifdef IPA_OFFLOAD
 QDF_STATUS qdf_nbuf_smmu_map_debug(qdf_nbuf_t nbuf,
 				   uint8_t hdl,
 				   uint8_t num_buffers,
@@ -907,7 +889,6 @@ QDF_STATUS qdf_nbuf_smmu_unmap_debug(qdf_nbuf_t nbuf,
 }
 
 qdf_export_symbol(qdf_nbuf_smmu_unmap_debug);
-#endif /* IPA_OFFLOAD */
 
 static void qdf_nbuf_panic_on_free_if_smmu_mapped(qdf_nbuf_t nbuf,
 						  const char *func,
@@ -936,7 +917,7 @@ static inline void qdf_net_buf_update_smmu_params(QDF_NBUF_TRACK *p_node)
 	p_node->smmu_map_iova_addr = 0;
 	p_node->smmu_map_pa_addr = 0;
 }
-#else /* !NBUF_SMMU_MAP_UNMAP_DEBUG */
+#else
 #ifdef NBUF_MEMORY_DEBUG
 static void qdf_nbuf_smmu_map_tracking_init(void)
 {
@@ -955,7 +936,7 @@ static void qdf_nbuf_panic_on_free_if_smmu_mapped(qdf_nbuf_t nbuf,
 static inline void qdf_net_buf_update_smmu_params(QDF_NBUF_TRACK *p_node)
 {
 }
-#endif /* NBUF_MEMORY_DEBUG */
+#endif
 
 #ifdef IPA_OFFLOAD
 QDF_STATUS qdf_nbuf_smmu_map_debug(qdf_nbuf_t nbuf,
@@ -981,8 +962,8 @@ QDF_STATUS qdf_nbuf_smmu_unmap_debug(qdf_nbuf_t nbuf,
 }
 
 qdf_export_symbol(qdf_nbuf_smmu_unmap_debug);
-#endif /* IPA_OFFLOAD */
-#endif /* NBUF_SMMU_MAP_UNMAP_DEBUG */
+#endif
+#endif
 
 #ifdef NBUF_MAP_UNMAP_DEBUG
 #define qdf_nbuf_map_tracker_bits 11 /* 2048 buckets */
@@ -1505,90 +1486,14 @@ __qdf_nbuf_data_get_dhcp_subtype(uint8_t *data)
 	return subtype;
 }
 
-#define EAPOL_WPA_KEY_INFO_ACK BIT(7)
-#define EAPOL_WPA_KEY_INFO_MIC BIT(8)
-#define EAPOL_WPA_KEY_INFO_ENCR_KEY_DATA BIT(12) /* IEEE 802.11i/RSN only */
-
+#define EAPOL_MASK				0x8002
+#define EAPOL_M1_BIT_MASK			0x8000
+#define EAPOL_M2_BIT_MASK			0x0000
+#define EAPOL_M3_BIT_MASK			0x8002
+#define EAPOL_M4_BIT_MASK			0x0002
 /**
- * __qdf_nbuf_data_get_eapol_key() - Get EAPOL key
- * @data: Pointer to EAPOL packet data buffer
- *
- * We can distinguish M1/M3 from M2/M4 by the ack bit in the keyinfo field
- * The ralationship between the ack bit and EAPOL type is as follows:
- *
- *  EAPOL type  |   M1    M2   M3  M4
- * --------------------------------------
- *     Ack      |   1     0    1   0
- * --------------------------------------
- *
- * Then, we can differentiate M1 from M3, M2 from M4 by below methods:
- * M2/M4: by keyDataLength or Nonce value being 0 for M4.
- * M1/M3: by the mic/encrKeyData bit in the keyinfo field.
- *
- * Return: subtype of the EAPOL packet.
- */
-static inline enum qdf_proto_subtype
-__qdf_nbuf_data_get_eapol_key(uint8_t *data)
-{
-	uint16_t key_info, key_data_length;
-	enum qdf_proto_subtype subtype;
-	uint64_t *key_nonce;
-
-	key_info = qdf_ntohs((uint16_t)(*(uint16_t *)
-			(data + EAPOL_KEY_INFO_OFFSET)));
-
-	key_data_length = qdf_ntohs((uint16_t)(*(uint16_t *)
-				(data + EAPOL_KEY_DATA_LENGTH_OFFSET)));
-	key_nonce = (uint64_t *)(data + EAPOL_WPA_KEY_NONCE_OFFSET);
-
-	if (key_info & EAPOL_WPA_KEY_INFO_ACK)
-		if (key_info &
-		    (EAPOL_WPA_KEY_INFO_MIC | EAPOL_WPA_KEY_INFO_ENCR_KEY_DATA))
-			subtype = QDF_PROTO_EAPOL_M3;
-		else
-			subtype = QDF_PROTO_EAPOL_M1;
-	else
-		if (key_data_length == 0 ||
-		    !((*key_nonce) || (*(key_nonce + 1)) ||
-		      (*(key_nonce + 2)) || (*(key_nonce + 3))))
-			subtype = QDF_PROTO_EAPOL_M4;
-		else
-			subtype = QDF_PROTO_EAPOL_M2;
-
-	return subtype;
-}
-
-/**
- * __qdf_nbuf_data_get_eap_code() - Get EAPOL code
- * @data: Pointer to EAPOL packet data buffer
- *
- * Return: subtype of the EAPOL packet.
- */
-static inline enum qdf_proto_subtype
-__qdf_nbuf_data_get_eap_code(uint8_t *data)
-{
-	uint8_t code = *(data + EAP_CODE_OFFSET);
-
-	switch (code) {
-	case QDF_EAP_REQUEST:
-		return QDF_PROTO_EAP_REQUEST;
-	case QDF_EAP_RESPONSE:
-		return QDF_PROTO_EAP_RESPONSE;
-	case QDF_EAP_SUCCESS:
-		return QDF_PROTO_EAP_SUCCESS;
-	case QDF_EAP_FAILURE:
-		return QDF_PROTO_EAP_FAILURE;
-	case QDF_EAP_INITIATE:
-		return QDF_PROTO_EAP_INITIATE;
-	case QDF_EAP_FINISH:
-		return QDF_PROTO_EAP_FINISH;
-	default:
-		return QDF_PROTO_INVALID;
-	}
-}
-
-/**
- * __qdf_nbuf_data_get_eapol_subtype() - get the subtype of EAPOL packet.
+ * __qdf_nbuf_data_get_eapol_subtype() - get the subtype
+ *            of EAPOL packet.
  * @data: Pointer to EAPOL packet data buffer
  *
  * This func. returns the subtype of EAPOL packet.
@@ -1598,22 +1503,31 @@ __qdf_nbuf_data_get_eap_code(uint8_t *data)
 enum qdf_proto_subtype
 __qdf_nbuf_data_get_eapol_subtype(uint8_t *data)
 {
-	uint8_t pkt_type = *(data + EAPOL_PACKET_TYPE_OFFSET);
+	uint16_t eapol_key_info;
+	enum qdf_proto_subtype subtype = QDF_PROTO_INVALID;
+	uint16_t mask;
 
-	switch (pkt_type) {
-	case EAPOL_PACKET_TYPE_EAP:
-		return __qdf_nbuf_data_get_eap_code(data);
-	case EAPOL_PACKET_TYPE_START:
-		return QDF_PROTO_EAPOL_START;
-	case EAPOL_PACKET_TYPE_LOGOFF:
-		return QDF_PROTO_EAPOL_LOGOFF;
-	case EAPOL_PACKET_TYPE_KEY:
-		return __qdf_nbuf_data_get_eapol_key(data);
-	case EAPOL_PACKET_TYPE_ASF:
-		return QDF_PROTO_EAPOL_ASF;
-	default:
-		return QDF_PROTO_INVALID;
+	eapol_key_info = (uint16_t)(*(uint16_t *)
+			(data + EAPOL_KEY_INFO_OFFSET));
+
+	mask = eapol_key_info & EAPOL_MASK;
+
+	switch (mask) {
+	case EAPOL_M1_BIT_MASK:
+		subtype = QDF_PROTO_EAPOL_M1;
+		break;
+	case EAPOL_M2_BIT_MASK:
+		subtype = QDF_PROTO_EAPOL_M2;
+		break;
+	case EAPOL_M3_BIT_MASK:
+		subtype = QDF_PROTO_EAPOL_M3;
+		break;
+	case EAPOL_M4_BIT_MASK:
+		subtype = QDF_PROTO_EAPOL_M4;
+		break;
 	}
+
+	return subtype;
 }
 
 qdf_export_symbol(__qdf_nbuf_data_get_eapol_subtype);
@@ -3966,23 +3880,6 @@ unshare_buf:
 
 qdf_export_symbol(qdf_nbuf_unshare_debug);
 
-void
-qdf_nbuf_dev_kfree_list_debug(__qdf_nbuf_queue_head_t *nbuf_queue_head,
-			      const char *func, uint32_t line)
-{
-	qdf_nbuf_t  buf;
-
-	if (qdf_nbuf_queue_empty(nbuf_queue_head))
-		return;
-
-	if (is_initial_mem_debug_disabled)
-		return __qdf_nbuf_dev_kfree_list(nbuf_queue_head);
-
-	while ((buf = qdf_nbuf_queue_head_dequeue(nbuf_queue_head)) != NULL)
-		qdf_nbuf_free_debug(buf, func, line);
-}
-
-qdf_export_symbol(qdf_nbuf_dev_kfree_list_debug);
 #endif /* NBUF_MEMORY_DEBUG */
 
 #if defined(FEATURE_TSO)
@@ -6241,7 +6138,7 @@ void qdf_nbuf_add_rx_frag_debug(qdf_frag_t buf, qdf_nbuf_t nbuf,
 	fragp = qdf_nbuf_get_frag_addr(nbuf, num_nr_frags - 1);
 
 	/* Update frag address in frag debug tracking table */
-	if (fragp != buf && !take_frag_ref)
+	if (fragp != buf)
 		qdf_frag_debug_update_addr(buf, fragp, func, line);
 
 	/* Update frag refcount in frag debug tracking table */

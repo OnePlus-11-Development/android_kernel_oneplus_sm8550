@@ -68,7 +68,6 @@ enum peer_status {
  * @hs20_present: hs20 element present or not
  * @ht_op_present: ht operation present or not
  * @vht_op_present: vht operation present or not
- * @reserved: reserved spare bits
  */
 struct hdd_conn_flag {
 	uint8_t ht_present:1;
@@ -118,7 +117,7 @@ struct hdd_conn_flag {
  * struct hdd_connection_info - structure to store connection information
  * @conn_state: connection state of the NIC
  * @bssid: BSSID
- * @ssid: SSID Info
+ * @SSID: SSID Info
  * @peer_macaddr:Peer Mac Address of the IBSS Stations
  * @auth_type: Auth Type
  * @uc_encrypt_type: Unicast Encryption Type
@@ -135,12 +134,8 @@ struct hdd_conn_flag {
  * @noise: holds noise information
  * @ht_caps: holds ht capabilities info
  * @vht_caps: holds vht capabilities info
- * @conn_flag: flag conn info params is present or not
  * @hs20vendor_ie: holds passpoint/hs20 info
- * @ht_operation: HT operation info
- * @vht_operation: VHT operation info
- * @he_operation: HE operation info
- * @he_oper_len: length of @he_operation
+ * @conn_flag: flag conn info params is present or not
  * @roam_count: roaming counter
  * @signal: holds rssi info
  * @assoc_status_code: holds assoc fail reason
@@ -274,17 +269,6 @@ void hdd_abort_ongoing_sta_connection(struct hdd_context *hdd_ctx);
 bool hdd_is_any_sta_connected(struct hdd_context *hdd_ctx);
 
 /**
- * hdd_get_first_connected_sta_vdev_id() - check if any sta in connected state
- * and exteact the vdev id of connected STA.
- * @hdd_ctx: hdd context
- * @vdev_id: pointer to vdev id
- *
- * Return: QDF_STATUS enumeration
- */
-QDF_STATUS hdd_get_first_connected_sta_vdev_id(struct hdd_context *hdd_ctx,
-					       uint32_t *vdev_id);
-
-/**
  * hdd_sme_roam_callback() - hdd sme roam callback
  * @context: pointer to adapter context
  * @roam_info: pointer to roam info
@@ -378,7 +362,7 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
  *
  * This information is passed to iwconfig later. The peer that joined
  * last is passed as information to iwconfig.
- *
+
  * Return: true if success, false otherwise
  */
 bool hdd_save_peer(struct hdd_station_ctx *sta_ctx,
@@ -458,7 +442,7 @@ bool hdd_any_valid_peer_present(struct hdd_adapter *adapter);
 QDF_STATUS hdd_cm_register_cb(void);
 
 /**
- * hdd_cm_unregister_cb - Resets legacy callbacks to osif
+ * void hdd_cm_unregister_cb(void)() - Resets legacy callbacks to osif
  *
  * API to reset legacy callbacks to osif
  * Context: Any context.

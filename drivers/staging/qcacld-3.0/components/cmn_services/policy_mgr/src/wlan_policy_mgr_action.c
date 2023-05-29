@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -38,7 +38,6 @@
 #include "sap_api.h"
 #include "wlan_mlme_api.h"
 #include "wlan_mlme_ucfg_api.h"
-#include "target_if.h"
 
 enum policy_mgr_conc_next_action (*policy_mgr_get_current_pref_hw_mode_ptr)
 	(struct wlan_objmgr_psoc *psoc);
@@ -334,7 +333,7 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 					uint32_t vdev_id)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-	uint32_t conn_index = 0, ch_freq, cur_freq;
+	uint32_t conn_index = 0, ch_freq;
 	bool found = false;
 	struct policy_mgr_vdev_entry_info conn_table_entry;
 	enum policy_mgr_chain_mode chain_mask = POLICY_MGR_ONE_ONE;
@@ -381,8 +380,6 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	cur_freq = pm_conc_connection_list[conn_index].freq;
-
 	mode = policy_mgr_get_mode(conn_table_entry.type,
 					conn_table_entry.sub_type);
 	ch_freq = conn_table_entry.mhz;
@@ -413,13 +410,6 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_check_n_start_opportunistic_timer(psoc);
 	policy_mgr_handle_ml_sta_links_on_vdev_up_csa(psoc,
 				policy_mgr_get_qdf_mode_from_pm(mode), vdev_id);
-
-	if (policy_mgr_is_conc_sap_present_on_sta_freq(psoc, mode, cur_freq))
-		policy_mgr_update_indoor_concurrency(psoc, vdev_id, 0,
-						     SWITCH_WITH_CONCURRENCY);
-	else
-		policy_mgr_update_indoor_concurrency(psoc, vdev_id, cur_freq,
-						     SWITCH_WITHOUT_CONCURRENCY);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1633,8 +1623,7 @@ bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
 
 bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 			struct wlan_objmgr_psoc *psoc,
-			uint32_t sap_vdev_id, uint32_t *intf_ch_freq,
-			bool is_acs_mode)
+			uint32_t sap_vdev_id, uint32_t *intf_ch_freq)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t curr_sap_freq = 0, new_sap_freq = 0;
@@ -1716,10 +1705,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 			break;
 		}
 
-		if ((is_acs_mode ||
-		     !target_psoc_get_sap_coex_fixed_chan_cap(
-					wlan_psoc_get_tgt_if_handle(psoc))) &&
-		    sta_sap_scc_on_lte_coex_chan &&
+		if (sta_sap_scc_on_lte_coex_chan &&
 		    !policy_mgr_is_safe_channel(psoc, op_ch_freq_list[i]) &&
 		    pm_ctx->last_disconn_sta_freq == op_ch_freq_list[i]) {
 			curr_sap_freq = op_ch_freq_list[i];
@@ -2003,6 +1989,7 @@ void policy_mgr_nan_sap_post_enable_conc_check(struct wlan_objmgr_psoc *psoc)
 	struct policy_mgr_conc_connection_info *sap_info = NULL;
 	uint8_t i;
 	qdf_freq_t nan_freq_2g, nan_freq_5g;
+	QDF_STATUS status;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -2010,7 +1997,6 @@ void policy_mgr_nan_sap_post_enable_conc_check(struct wlan_objmgr_psoc *psoc)
 		return;
 	}
 
-	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
 		if (pm_conc_connection_list[i].mode == PM_SAP_MODE &&
 		    pm_conc_connection_list[i].in_use) {
@@ -2018,26 +2004,28 @@ void policy_mgr_nan_sap_post_enable_conc_check(struct wlan_objmgr_psoc *psoc)
 			break;
 		}
 	}
-	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-
 	if (!sap_info)
-		goto end;
+		return;
 	if (sap_info->freq == 0)
-		goto end;
+		return;
 	nan_freq_2g = policy_mgr_mode_specific_get_channel(psoc,
 							   PM_NAN_DISC_MODE);
 	nan_freq_5g = wlan_nan_get_disc_5g_ch_freq(psoc);
 	if (sap_info->freq == nan_freq_2g || sap_info->freq == nan_freq_5g) {
 		policy_mgr_debug("NAN and SAP already in SCC");
-		goto end;
+		return;
 	}
 	if (nan_freq_2g == 0)
-		goto end;
+		return;
 
 	if (pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress &&
 	    pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress()) {
-		policy_mgr_debug("channel switch is already in progress");
-		return;
+		policy_mgr_debug("wait as channel switch is already in progress");
+		status = qdf_wait_single_event(
+					&pm_ctx->channel_switch_complete_evt,
+					CHANNEL_SWITCH_COMPLETE_TIMEOUT);
+		if (QDF_IS_STATUS_ERROR(status))
+			policy_mgr_err("wait for event failed, still continue with channel switch");
 	}
 
 	if (pm_ctx->hdd_cbacks.wlan_hdd_set_sap_csa_reason)
@@ -2064,9 +2052,6 @@ void policy_mgr_nan_sap_post_enable_conc_check(struct wlan_objmgr_psoc *psoc)
 						       sap_info->bw),
 						       true);
 	}
-
-end:
-	pm_ctx->sta_ap_intf_check_work_info->nan_force_scc_in_progress = false;
 }
 
 void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc)
@@ -2139,8 +2124,12 @@ void policy_mgr_check_sap_restart(struct wlan_objmgr_psoc *psoc,
 
 	if (pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress &&
 	    pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress()) {
-		policy_mgr_debug("channel switch is already in progress");
-		return;
+		policy_mgr_debug("wait as channel switch is already in progress");
+		status =
+			qdf_wait_single_event(&pm_ctx->channel_switch_complete_evt,
+					      CHANNEL_SWITCH_COMPLETE_TIMEOUT);
+		if (QDF_IS_STATUS_ERROR(status))
+			policy_mgr_err("wait for event failed, still continue with channel switch");
 	}
 
 	if (!pm_ctx->hdd_cbacks.wlan_hdd_get_channel_for_sap_restart) {
@@ -2362,11 +2351,6 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 		return;
 	}
 	work_info = pm_ctx->sta_ap_intf_check_work_info;
-
-	if (work_info->nan_force_scc_in_progress) {
-		policy_mgr_nan_sap_post_enable_conc_check(pm_ctx->psoc);
-		return;
-	}
 	/*
 	 * Check if force scc is required for GO + GO case. vdev id will be
 	 * valid in case of GO+GO force scc only. So, for valid vdev id move
@@ -2712,7 +2696,7 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
  * Return: None
  */
 void policy_mgr_check_concurrent_intf_and_restart_sap(
-		struct wlan_objmgr_psoc *psoc, bool is_acs_mode)
+		struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t mcc_to_scc_switch;
@@ -2752,7 +2736,7 @@ void policy_mgr_check_concurrent_intf_and_restart_sap(
 	 * as soon as STA disconnected.
 	 */
 	if (policy_mgr_is_sap_restart_required_after_sta_disconnect(
-			psoc, INVALID_VDEV_ID, &sap_freq, is_acs_mode)) {
+					psoc, INVALID_VDEV_ID, &sap_freq)) {
 		policy_mgr_debug("move the SAP to configured channel %u",
 				 sap_freq);
 		restart_sap = true;
@@ -2972,26 +2956,6 @@ void policy_mgr_process_forcescc_for_go(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_debug("change interface request already queued");
 }
 #endif
-
-void policy_mgr_process_force_scc_for_nan(struct wlan_objmgr_psoc *psoc)
-{
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
-		return;
-	}
-	if (!pm_ctx->sta_ap_intf_check_work_info) {
-		policy_mgr_err("invalid work info");
-		return;
-	}
-
-	pm_ctx->sta_ap_intf_check_work_info->nan_force_scc_in_progress = true;
-
-	if (!qdf_delayed_work_start(&pm_ctx->sta_ap_intf_check_work, 0))
-		policy_mgr_debug("change interface request already queued");
-}
 
 QDF_STATUS policy_mgr_wait_for_connection_update(struct wlan_objmgr_psoc *psoc)
 {

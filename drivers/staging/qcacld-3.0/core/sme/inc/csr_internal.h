@@ -499,6 +499,7 @@ bool csr_roam_is11r_assoc(struct mac_context *mac, uint8_t sessionId);
 #ifdef FEATURE_WLAN_ESE
 /* Returns whether the current association is a ESE assoc or not */
 bool csr_roam_is_ese_assoc(struct mac_context *mac, uint32_t sessionId);
+bool csr_roam_is_ese_ini_feature_enabled(struct mac_context *mac);
 QDF_STATUS csr_get_tsm_stats(struct mac_context *mac,
 		tCsrTsmStatsCallback callback,
 		struct qdf_mac_addr bssId,
@@ -597,19 +598,16 @@ bool csr_is_mcc_channel(struct mac_context *mac_ctx, uint32_t chan_freq);
  * @mac_ctx: Global mac context pointer
  * @vdev_id: Vdev id
  * @bssid: candidate AP bssid
- * @akm: candidate AKM
  */
 QDF_STATUS
 csr_roam_auth_offload_callback(struct mac_context *mac_ctx,
 			       uint8_t vdev_id,
-			       struct qdf_mac_addr bssid,
-			       uint32_t akm);
+			       struct qdf_mac_addr bssid);
 #else
 static inline QDF_STATUS
 csr_roam_auth_offload_callback(struct mac_context *mac_ctx,
 			       uint8_t vdev_id,
-			       struct qdf_mac_addr bssid,
-			       uint32_t akm)
+			       struct qdf_mac_addr bssid)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -210,19 +210,13 @@ static QDF_STATUS dp_rx_desc_nbuf_collect(struct dp_soc *soc,
 static void dp_rx_desc_nbuf_cleanup(struct dp_soc *soc,
 				    qdf_nbuf_t nbuf_unmap_list,
 				    qdf_nbuf_t nbuf_free_list,
-				    uint16_t buf_size,
-				    bool is_mon_pool)
+				    uint16_t buf_size)
 {
 	qdf_nbuf_t nbuf = nbuf_unmap_list;
 	qdf_nbuf_t next;
 
 	while (nbuf) {
 		next = nbuf->next;
-
-		if (!is_mon_pool)
-			dp_audio_smmu_unmap(soc->osdev,
-					    QDF_NBUF_CB_PADDR(nbuf),
-					    buf_size);
 
 		if (dp_ipa_handle_rx_buf_smmu_mapping(soc, nbuf, buf_size,
 					   false, __func__, __LINE__))
@@ -252,13 +246,12 @@ void dp_rx_desc_nbuf_and_pool_free(struct dp_soc *soc, uint32_t pool_id,
 				&nbuf_unmap_list, &nbuf_free_list);
 	qdf_spin_unlock_bh(&rx_desc_pool->lock);
 	dp_rx_desc_nbuf_cleanup(soc, nbuf_unmap_list, nbuf_free_list,
-				rx_desc_pool->buf_size, false);
+				rx_desc_pool->buf_size);
 	qdf_spinlock_destroy(&rx_desc_pool->lock);
 }
 
 void dp_rx_desc_nbuf_free(struct dp_soc *soc,
-			  struct rx_desc_pool *rx_desc_pool,
-			  bool is_mon_pool)
+			  struct rx_desc_pool *rx_desc_pool)
 {
 	qdf_nbuf_t nbuf_unmap_list = NULL;
 	qdf_nbuf_t nbuf_free_list = NULL;
@@ -267,7 +260,7 @@ void dp_rx_desc_nbuf_free(struct dp_soc *soc,
 				&nbuf_unmap_list, &nbuf_free_list);
 	qdf_spin_unlock_bh(&rx_desc_pool->lock);
 	dp_rx_desc_nbuf_cleanup(soc, nbuf_unmap_list, nbuf_free_list,
-				rx_desc_pool->buf_size, is_mon_pool);
+				rx_desc_pool->buf_size);
 }
 
 qdf_export_symbol(dp_rx_desc_nbuf_free);
@@ -432,8 +425,7 @@ void dp_rx_desc_nbuf_and_pool_free(struct dp_soc *soc, uint32_t pool_id,
 }
 
 void dp_rx_desc_nbuf_free(struct dp_soc *soc,
-			  struct rx_desc_pool *rx_desc_pool,
-			  bool is_mon_pool)
+			  struct rx_desc_pool *rx_desc_pool)
 {
 	qdf_nbuf_t nbuf;
 	int i;

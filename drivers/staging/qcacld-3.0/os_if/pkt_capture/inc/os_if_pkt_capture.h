@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -69,10 +68,9 @@ set_monitor_mode_policy[SET_MONITOR_MODE_CONFIG_MAX + 1];
  * os_if_monitor_mode_configure() - Process monitor mode configuration
  * operation in the received vendor command
  * @adapter: adapter pointer
- * @data: %QCA_NL80211_VENDOR_SUBCMD_SET_MONITOR_MODE payload
- * @data_len: length of @data
+ * @tb: nl attributes Handles QCA_NL80211_VENDOR_SUBCMD_SET_MONITOR_MODE
  *
- * Return: %QDF_STATUS_SUCCESS on success, error status otherwise
+ * Return: 0 for Success and negative value for failure
  */
 QDF_STATUS os_if_monitor_mode_configure(struct hdd_adapter *adapter,
 					const void *data, int data_len);

@@ -111,8 +111,9 @@ __wlan_cfg80211_coex_set_btc_chain_mode(struct wlan_objmgr_vdev *vdev,
 }
 
 /**
- * wlan_cfg80211_coex_set_btc_chain_mode() - set btc chain mode
- * @vdev: pointer to vdev structure.
+ * wlan_hdd_cfg80211_set_btc_chain_mode() - set btc chain mode
+ * @wiphy: pointer to wireless wiphy structure.
+ * @wdev: pointer to wireless_dev structure.
  * @data: pointer to btc chain mode command parameters.
  * @data_len: the length in byte of btc chain mode command parameters.
  *

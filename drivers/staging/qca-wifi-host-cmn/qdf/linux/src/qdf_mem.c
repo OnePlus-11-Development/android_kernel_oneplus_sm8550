@@ -2325,7 +2325,7 @@ void *qdf_aligned_malloc_fl(uint32_t *size,
 
 qdf_export_symbol(qdf_aligned_malloc_fl);
 
-#if defined(DP_UMAC_HW_RESET_SUPPORT) || defined(WLAN_SUPPORT_PPEDS)
+#ifdef DP_UMAC_HW_RESET_SUPPORT
 /**
  * qdf_tx_desc_pool_free_bufs() - Go through elems and call the registered  cb
  * @ctxt: Context to be passed to the cb

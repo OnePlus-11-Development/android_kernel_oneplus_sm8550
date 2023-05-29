@@ -23,9 +23,6 @@
 
 /**
  * typedef osif_conditional_csa_ind_legacy_cb - CSA indication callback
- * @vdev: vdev upon which channel switch is occurring
- * @completed: true if channel switch has completed, false if channel
- *             switch is being initiated
  *
  * This callback is to send conditional channel switch status
  *
@@ -37,11 +34,7 @@ typedef void
 					      bool completed);
 
 /**
- * typedef osif_pre_cac_complete_status_legacy_cb - pre cac complete callback
- * @psoc: SOC where pre-cac is required
- * @vdev_id: ID of the vdev where pre-cac is required
- * @status: QDF_STATUS_SUCCESS if pre-cac was successful, otherwise an
- *          appropriate QDF error status code
+ * typedef osif_pre_cac_complete_legacy_cb - pre cac complete callback
  *
  * This callback is used to indicate the pre cac complete status
  *
@@ -54,7 +47,7 @@ typedef void
 						  QDF_STATUS status);
 
 /**
- * struct osif_pre_cac_legacy_ops - pre cac legacy callbacks
+ * osif_pre_cac_ops: pre cac legacy callbacks
  * @conditional_csa_ind_legacy_cb: Callback for CSA indication
  * @pre_cac_complete_legacy_cb: Callback for pre cac complete status
  */

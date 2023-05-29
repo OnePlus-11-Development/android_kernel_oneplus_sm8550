@@ -3475,7 +3475,7 @@ int wma_process_rmf_frame(tp_wma_handle wma_handle,
 				return -EINVAL;
 			}
 		} else {
-			wma_err_rl("Rx unprotected unicast mgmt frame");
+			wma_err("Rx unprotected unicast mgmt frame");
 			rx_pkt->pkt_meta.dpuFeedback =
 				DPU_FEEDBACK_UNPROTECTED_ERROR;
 		}
@@ -3849,12 +3849,13 @@ static int wma_mgmt_rx_process(void *handle, uint8_t *data,
 
 	mgmt_rx_params = qdf_mem_malloc(sizeof(*mgmt_rx_params));
 	if (!mgmt_rx_params) {
+		wma_err("memory allocation failed");
 		return -ENOMEM;
 	}
 
 	if (wmi_extract_mgmt_rx_params(wma_handle->wmi_handle,
 			data, mgmt_rx_params, &bufp) != QDF_STATUS_SUCCESS) {
-		wma_err_rl("Extraction of mgmt rx params failed");
+		wma_err("Extraction of mgmt rx params failed");
 		qdf_mem_free(mgmt_rx_params);
 		return -EINVAL;
 	}
@@ -3862,8 +3863,8 @@ static int wma_mgmt_rx_process(void *handle, uint8_t *data,
 	if (mgmt_rx_params->buf_len > data_len ||
 	    !mgmt_rx_params->buf_len ||
 	    !bufp) {
-		wma_err_rl("Invalid data_len %u, buf_len %u bufp %pK",
-			   data_len, mgmt_rx_params->buf_len, bufp);
+		wma_err("Invalid data_len %u, buf_len %u bufp %pK",
+			data_len, mgmt_rx_params->buf_len, bufp);
 		qdf_mem_free(mgmt_rx_params);
 		return -EINVAL;
 	}
@@ -3983,8 +3984,7 @@ QDF_STATUS wma_de_register_mgmt_frm_client(void)
 QDF_STATUS wma_register_roaming_callbacks(
 	QDF_STATUS (*csr_roam_auth_event_handle_cb)(struct mac_context *mac,
 						    uint8_t vdev_id,
-						    struct qdf_mac_addr bssid,
-						    uint32_t akm),
+						    struct qdf_mac_addr bssid),
 	pe_roam_synch_fn_t pe_roam_synch_cb,
 	QDF_STATUS (*pe_disconnect_cb) (struct mac_context *mac,
 					uint8_t vdev_id,
@@ -4169,21 +4169,5 @@ QDF_STATUS wma_mgmt_frame_fill_peer_cb(struct wlan_objmgr_peer *peer,
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_LEGACY_WMA_ID);
 
 	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS
-wma_update_edca_pifs_param(WMA_HANDLE handle,
-			   struct edca_pifs_vparam *edca_pifs_param)
-{
-	tp_wma_handle wma_handle = (tp_wma_handle) handle;
-	QDF_STATUS status;
-
-	status = wmi_unified_update_edca_pifs_param(wma_handle->wmi_handle,
-						    edca_pifs_param);
-
-	if (QDF_IS_STATUS_ERROR(status))
-		wma_err("Failed to set EDCA/PIFS Parameters");
-
-	return status;
 }
 #endif

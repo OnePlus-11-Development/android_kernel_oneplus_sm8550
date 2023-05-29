@@ -1544,13 +1544,13 @@ static QDF_STATUS lim_process_csa_wbw_ie(struct mac_context *mac_ctx,
 		struct pe_session *session_entry)
 {
 	struct ch_params ch_params = {0};
-	enum phy_ch_width ap_new_ch_width;
+	uint8_t ap_new_ch_width;
 	uint8_t center_freq_diff;
 	uint32_t fw_vht_ch_wd = wma_get_vht_ch_width() + 1;
 	uint32_t cent_freq1, cent_freq2;
 	uint32_t csa_cent_freq, csa_cent_freq1 = 0, csa_cent_freq2 = 0;
 
-	ap_new_ch_width = csa_params->new_ch_width;
+	ap_new_ch_width = csa_params->new_ch_width + 1;
 
 	if (!csa_params->new_ch_freq_seg1 && !csa_params->new_ch_freq_seg2) {
 		pe_err("CSA wide BW IE has invalid center freq");
@@ -2319,16 +2319,9 @@ lim_send_sme_ap_channel_switch_resp(struct mac_context *mac,
 				BIT(band));
 
 	if (ch_width == CH_WIDTH_160MHZ) {
-		struct ch_params ch_params = {0};
-
-		if (IS_DOT11_MODE_EHT(pe_session->dot11mode))
-			wlan_reg_set_create_punc_bitmap(&ch_params, true);
-		ch_params.ch_width = ch_width;
-		if (wlan_reg_get_5g_bonded_channel_state_for_pwrmode(mac->pdev,
-								     pe_session->curr_op_freq,
-								     &ch_params,
-								     REG_CURRENT_PWR_MODE) ==
-		    CHANNEL_STATE_DFS)
+		if (wlan_reg_get_bonded_channel_state_for_freq(
+		    mac->pdev, pe_session->curr_op_freq,
+		    ch_width, 0) == CHANNEL_STATE_DFS)
 			is_ch_dfs = true;
 	} else if (ch_width == CH_WIDTH_80P80MHZ) {
 		if (wlan_reg_get_channel_state_for_pwrmode(
@@ -2401,8 +2394,7 @@ lim_update_spatial_reuse(struct pe_session *session)
 	uint8_t vdev_id = session->vdev_id;
 
 	sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(session->vdev);
-	non_srg_pd_max_offset =
-		wlan_vdev_mlme_get_non_srg_pd_offset(session->vdev);
+	non_srg_pd_max_offset = wlan_vdev_mlme_get_pd_offset(session->vdev);
 	if (non_srg_pd_max_offset && sr_ctrl &&
 	    wlan_vdev_mlme_get_he_spr_enabled(session->vdev)) {
 		psoc = wlan_vdev_get_psoc(session->vdev);
@@ -2515,10 +2507,10 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 		return;
 	csa_tx_offload = wlan_psoc_nif_fw_ext_cap_get(mac_ctx->psoc,
 						WLAN_SOC_CEXT_CSA_TX_OFFLOAD);
-	if (session->dfsIncludeChanSwIe && !csa_tx_offload &&
-	    ((session->gLimChannelSwitch.switchCount ==
-	      mac_ctx->sap.SapDfsInfo.sap_ch_switch_beacon_cnt) ||
-	     (session->gLimChannelSwitch.switchCount == 1)))
+	if (session->dfsIncludeChanSwIe &&
+	    (session->gLimChannelSwitch.switchCount ==
+	    mac_ctx->sap.SapDfsInfo.sap_ch_switch_beacon_cnt) &&
+	    !csa_tx_offload)
 		lim_process_ap_ecsa_timeout(session);
 
 

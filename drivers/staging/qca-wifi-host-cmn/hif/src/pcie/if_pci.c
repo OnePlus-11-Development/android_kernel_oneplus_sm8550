@@ -2368,9 +2368,9 @@ int hif_pci_bus_suspend(struct hif_softc *scn)
 	}
 
 	/*
-	 * In an unlikely case, if draining becomes infinite loop,
-	 * it returns an error, shall abort the bus suspend.
-	 */
+	* In an unlikely case, if draining becomes infinite loop,
+	* it returns an error, shall abort the bus suspend.
+	*/
 	ret = hif_drain_fw_diag_ce(scn);
 	if (ret) {
 		hif_err("draining fw_diag_ce goes infinite, so abort suspend");
@@ -3020,7 +3020,6 @@ int hif_ce_msi_configure_irq_by_ceid(struct hif_softc *scn, int ce_id)
 	struct HIF_CE_state *ce_sc = HIF_GET_CE_STATE(scn);
 	struct hif_pci_softc *pci_sc = HIF_GET_PCI_SOFTC(scn);
 	int pci_slot;
-	unsigned long irq_flags;
 
 	if (ce_id >= CE_COUNT_MAX)
 		return -EINVAL;
@@ -3042,12 +3041,8 @@ int hif_ce_msi_configure_irq_by_ceid(struct hif_softc *scn, int ce_id)
 	pci_slot = hif_get_pci_slot(scn);
 	msi_data = irq_id + msi_irq_start;
 	irq = pld_get_msi_irq(scn->qdf_dev->dev, msi_data);
-	if (pld_is_one_msi(scn->qdf_dev->dev))
-		irq_flags = IRQF_SHARED | IRQF_NOBALANCING;
-	else
-		irq_flags = IRQF_SHARED;
-	hif_debug("%s: (ce_id %d, irq_id %d, msi_data %d, irq %d flag 0x%lx tasklet %pK)",
-		  __func__, ce_id, irq_id, msi_data, irq, irq_flags,
+	hif_debug("%s: (ce_id %d, irq_id %d, msi_data %d, irq %d tasklet %pK)",
+		  __func__, ce_id, irq_id, msi_data, irq,
 		  &ce_sc->tasklets[ce_id]);
 
 	/* implies the ce is also initialized */
@@ -3061,7 +3056,7 @@ int hif_ce_msi_configure_irq_by_ceid(struct hif_softc *scn, int ce_id)
 		      pci_slot, ce_id);
 
 	ret = pfrm_request_irq(scn->qdf_dev->dev,
-			       irq, hif_ce_interrupt_handler, irq_flags,
+			       irq, hif_ce_interrupt_handler, IRQF_SHARED,
 			       ce_irqname[pci_slot][ce_id],
 			       &ce_sc->tasklets[ce_id]);
 	if (ret)
@@ -3081,7 +3076,7 @@ static int hif_ce_msi_configure_irq(struct hif_softc *scn)
 	struct HIF_CE_state *ce_sc = HIF_GET_CE_STATE(scn);
 	struct CE_attr *host_ce_conf = ce_sc->host_ce_config;
 
-	if (!scn->ini_cfg.disable_wake_irq) {
+	if (!scn->disable_wake_irq) {
 		/* do wake irq assignment */
 		ret = pld_get_user_msi_assignment(scn->qdf_dev->dev, "WAKE",
 						  &msi_data_count,
@@ -3149,7 +3144,7 @@ free_irq:
 	}
 
 free_wake_irq:
-	if (!scn->ini_cfg.disable_wake_irq) {
+	if (!scn->disable_wake_irq) {
 		pfrm_free_irq(scn->qdf_dev->dev,
 			      scn->wake_irq, scn->qdf_dev->dev);
 		scn->wake_irq = 0;
@@ -3435,7 +3430,6 @@ int hif_pci_configure_grp_irq(struct hif_softc *scn,
 	int irq = 0;
 	int j;
 	int pci_slot;
-	unsigned long irq_flags;
 
 	if (pld_get_enable_intx(scn->qdf_dev->dev))
 		return hif_grp_configure_legacyirq(scn, hif_ext_group);
@@ -3452,12 +3446,8 @@ int hif_pci_configure_grp_irq(struct hif_softc *scn,
 			qdf_dev_set_irq_status_flags(irq,
 						     QDF_IRQ_DISABLE_UNLAZY);
 
-		if (pld_is_one_msi(scn->qdf_dev->dev))
-			irq_flags = IRQF_SHARED | IRQF_NOBALANCING;
-		else
-			irq_flags = IRQF_SHARED | IRQF_NO_SUSPEND;
-		hif_debug("request_irq = %d for grp %d irq_flags 0x%lx",
-			  irq, hif_ext_group->grp_id, irq_flags);
+		hif_debug("request_irq = %d for grp %d",
+			  irq, hif_ext_group->grp_id);
 
 		qdf_scnprintf(dp_irqname[pci_slot][hif_ext_group->grp_id],
 			      DP_IRQ_NAME_LEN, "pci%u_wlan_grp_dp_%u",
@@ -3465,7 +3455,7 @@ int hif_pci_configure_grp_irq(struct hif_softc *scn,
 		ret = pfrm_request_irq(
 				scn->qdf_dev->dev, irq,
 				hif_ext_group_interrupt_handler,
-				irq_flags,
+				IRQF_SHARED | IRQF_NO_SUSPEND,
 				dp_irqname[pci_slot][hif_ext_group->grp_id],
 				hif_ext_group);
 		if (ret) {

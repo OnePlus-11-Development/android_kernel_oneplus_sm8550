@@ -69,8 +69,7 @@ QDF_STATUS mlo_msgq_post(enum mlo_msg_type type,
 
 	case MLO_PEER_DEAUTH:
 		peer_deauth = (struct peer_deauth_notify_s *)payload;
-		mlo_mlme_peer_deauth(peer_deauth->peer,
-				     peer_deauth->is_disassoc);
+		mlo_mlme_peer_deauth(peer_deauth->peer);
 		wlan_objmgr_peer_release_ref(peer_deauth->peer,
 					     WLAN_MLO_MGR_ID);
 		break;
@@ -195,7 +194,6 @@ QDF_STATUS mlo_msgq_post(enum mlo_msg_type type,
 		peer_deauth = &msg->m.peer_deauth;
 		peer_deauth_l = (struct peer_deauth_notify_s *)payload;
 		peer_deauth->peer = peer_deauth_l->peer;
-		peer_deauth->is_disassoc = peer_deauth_l->is_disassoc;
 		break;
 
 	case MLO_PEER_PENDING_AUTH:

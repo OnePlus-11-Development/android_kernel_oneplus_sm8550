@@ -81,7 +81,6 @@
 
 #ifdef WLAN_FEATURE_11BE_MLO
 #include "wlan_mlo_mgr_cmn.h"
-#include <wlan_mlo_t2lm.h>
 #endif
 
 #include <wlan_twt_tgt_if_rx_api.h>
@@ -967,8 +966,6 @@ wlan_lmac_if_mlo_mgr_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 	/* register handler for received mlo related events */
 	rx_ops->mlo_rx_ops.process_link_set_active_resp =
 		mlo_process_link_set_active_resp;
-	rx_ops->mlo_rx_ops.process_mlo_vdev_tid_to_link_map_event =
-		wlan_mlo_vdev_tid_to_link_map_event;
 }
 #else
 static void

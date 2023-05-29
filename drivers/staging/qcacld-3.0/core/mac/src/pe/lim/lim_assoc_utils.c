@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -60,6 +60,12 @@
 #include <cdp_txrx_cfg.h>
 #include <cdp_txrx_cmn.h>
 #include <lim_mlo.h>
+
+#ifdef FEATURE_WLAN_TDLS
+#define IS_TDLS_PEER(type)  ((type) == STA_ENTRY_TDLS_PEER)
+#else
+#define IS_TDLS_PEER(type) 0
+#endif
 
 /**
  * lim_cmp_ssid() - utility function to compare SSIDs
@@ -2775,7 +2781,6 @@ lim_del_sta(struct mac_context *mac,
 	 * link peer before post WMA_DELETE_STA_REQ, which will free
 	 * wlan_objmgr_peer of the link peer
 	 */
-	lim_mlo_notify_peer_disconn(pe_session, sta);
 	lim_mlo_delete_link_peer(pe_session, sta);
 	/* Update PE session ID */
 	pDelStaParams->sessionId = pe_session->peSessionId;
@@ -3347,8 +3352,8 @@ lim_check_and_announce_join_success(struct mac_context *mac_ctx,
 					&aid,
 					&session_entry->dph.dphHashTable);
 
-	if (sta_ds && QDF_IS_STATUS_SUCCESS(lim_update_srp_ie(beacon_probe_rsp,
-							      sta_ds))) {
+	if (QDF_IS_STATUS_SUCCESS(lim_update_srp_ie(beacon_probe_rsp,
+						    sta_ds))) {
 		/* update the SR parameters */
 		lim_update_vdev_sr_elements(session_entry, sta_ds);
 		/* TODO: Need to send SRP IE update event to userspace */
@@ -3564,47 +3569,6 @@ static void lim_update_vht_oper_assoc_resp(struct mac_context *mac_ctx,
 	pAddBssParams->staContext.ch_width = ch_width;
 }
 
-#ifdef WLAN_FEATURE_11BE
-/**
- * lim_update_eht_oper_assoc_resp : Update BW based on EHT operation IE.
- * @pe_session : session entry.
- * @pAddBssParams: parameters required for add bss params.
- * @eht_op: EHT Oper IE to update.
- *
- * Return : void
- */
-static void lim_update_eht_oper_assoc_resp(struct pe_session *pe_session,
-					   struct bss_params *pAddBssParams,
-					   tDot11fIEeht_op *eht_op)
-{
-	enum phy_ch_width ch_width;
-
-	ch_width = wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
-						eht_op->channel_width);
-
-	/* Due to puncturing, EHT AP's send seg1 in VHT IE as zero which causes
-	 * downgrade to 80 MHz, check EHT IE and if EHT IE supports 160MHz
-	 * then stick to 160MHz only
-	 */
-
-	if (ch_width > pAddBssParams->ch_width &&
-	    ch_width >= pe_session->ch_width) {
-		pe_debug("eht ch_width %d and ch_width of add bss param %d",
-			 ch_width, pAddBssParams->ch_width);
-		ch_width = pe_session->ch_width;
-	}
-
-	pAddBssParams->ch_width = ch_width;
-	pAddBssParams->staContext.ch_width = ch_width;
-}
-#else
-static void lim_update_eht_oper_assoc_resp(struct pe_session *pe_session,
-					   struct bss_params *pAddBssParams,
-					   tDot11fIEeht_op *eht_op)
-{
-}
-#endif
-
 #ifdef WLAN_SUPPORT_TWT
 /**
  * lim_set_sta_ctx_twt() - Save the TWT settings in STA context
@@ -3763,12 +3727,6 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		lim_add_bss_eht_cap(pAddBssParams, pAssocRsp);
 		lim_add_bss_eht_cfg(pAddBssParams, pe_session);
 	}
-
-	if (lim_is_session_eht_capable(pe_session) &&
-	    pAssocRsp->eht_op.present &&
-	    pAssocRsp->eht_op.eht_op_information_present)
-		lim_update_eht_oper_assoc_resp(pe_session, pAddBssParams,
-					       &pAssocRsp->eht_op);
 
 	if (pAssocRsp->bss_max_idle_period.present) {
 		pAddBssParams->bss_max_idle_period =
@@ -4727,14 +4685,3 @@ void lim_extract_ies_from_deauth_disassoc(struct pe_session *session,
 	mlme_set_peer_disconnect_ies(session->vdev, &ie);
 }
 
-uint8_t *lim_get_src_addr_from_frame(struct element_info *frame)
-{
-	struct wlan_frame_hdr *hdr;
-
-	if (!frame || !frame->len || frame->len < WLAN_MAC_HDR_LEN_3A)
-		return NULL;
-
-	hdr = (struct wlan_frame_hdr *)frame->ptr;
-
-	return hdr->i_addr2;
-}

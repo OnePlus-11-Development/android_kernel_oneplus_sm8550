@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -465,19 +465,6 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
- * lim_process_bcn_prb_rsp_t2lm() - process beacon/probe response
- * 11be t2lm IE
- * @mac_ctx: global mac context
- * @session: pe session
- * @bcn_ptr: pointer to tpSirProbeRespBeacon
- *
- * Return none
- */
-void lim_process_bcn_prb_rsp_t2lm(struct mac_context *mac_ctx,
-				  struct pe_session *session,
-				  tpSirProbeRespBeacon bcn_ptr);
-
-/**
  * lim_process_beacon_mlo() - process beacon mlo IE
  * @mac_ctx: global mac context
  * @session: pe session
@@ -493,13 +480,6 @@ static inline
 void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 			    struct pe_session *session,
 			    tSchBeaconStruct *bcn_ptr)
-{
-}
-
-static inline
-void lim_process_bcn_prb_rsp_t2lm(struct mac_context *mac_ctx,
-				  struct pe_session *session,
-				  tpSirProbeRespBeacon bcn_ptr)
 {
 }
 #endif
@@ -762,17 +742,6 @@ static inline void lim_process_rx_scan_handler(struct wlan_objmgr_vdev *vdev,
 void lim_process_set_he_bss_color(struct mac_context *mac_ctx, uint32_t *msg_buf);
 
 /**
- * lim_reconfig_obss_scan_param() - reconfig the obss scan params
- *
- * @mac_ctx: global mac context pointer
- * @msg_buf: message buffer pointer
- *
- * Return: void
- */
-void lim_reconfig_obss_scan_param(struct mac_context *mac_ctx,
-				  uint32_t *msg_buf);
-
-/**
  * lim_process_obss_color_collision_info() - Process the obss color collision
  *  request.
  * @mac_ctx: global mac context pointer
@@ -799,11 +768,6 @@ void lim_send_obss_color_collision_cfg(struct mac_context *mac_ctx,
 static inline void lim_process_set_he_bss_color(struct mac_context *mac_ctx,
 		uint32_t *msg_buf)
 {}
-
-static inline void lim_reconfig_obss_scan_param(struct mac_context *mac_ctx,
-						uint32_t *msg_buf)
-{
-}
 static inline void lim_process_obss_color_collision_info(struct mac_context *mac_ctx,
 							 uint32_t *msg_buf)
 {}
@@ -1413,34 +1377,6 @@ QDF_STATUS lim_send_delba_action_frame(struct mac_context *mac_ctx,
 				       uint8_t vdev_id,
 				       uint8_t *peer_macaddr, uint8_t tid,
 				       uint8_t reason_code);
-
-#ifdef WLAN_FEATURE_11BE_MLO
-/**
- * lim_send_t2lm_action_rsp_frame() - Send T2LM negotiation response to peer
- * @mac_ctx: mac context
- * @peer_mac: Peer mac addr
- * @session: PE session entry
- * @token: Dialog token
- * @status_code: T2LM negotiation response status code
- *
- * Return: 0 for success, non-zero for failure
- */
-QDF_STATUS
-lim_send_t2lm_action_rsp_frame(struct mac_context *mac_ctx,
-			       tSirMacAddr peer_mac,
-			       struct pe_session *session,
-			       uint8_t token,
-			       enum wlan_t2lm_resp_frm_type status_code);
-#else
-static inline QDF_STATUS
-lim_send_t2lm_action_rsp_frame(struct mac_context *mac_ctx,
-			       tSirMacAddr peer_mac,
-			       struct pe_session *session, uint8_t token,
-			       enum wlan_t2lm_resp_frm_type status_code)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
 
 /**
  * lim_process_join_failure_timeout() - This function is called to process

@@ -789,8 +789,7 @@ qdf_export_symbol(tgt_dfs_send_subchan_marking);
 #ifdef QCA_SUPPORT_AGILE_DFS
 void tgt_dfs_set_fw_adfs_support(struct wlan_objmgr_pdev *pdev,
 				 bool fw_adfs_support_160,
-				 bool fw_adfs_support_non_160,
-				 bool fw_adfs_support_320)
+				 bool fw_adfs_support_non_160)
 {
 	struct wlan_dfs *dfs;
 
@@ -802,8 +801,7 @@ void tgt_dfs_set_fw_adfs_support(struct wlan_objmgr_pdev *pdev,
 
 	dfs_set_fw_adfs_support(dfs,
 				fw_adfs_support_160,
-				fw_adfs_support_non_160,
-				fw_adfs_support_320);
+				fw_adfs_support_non_160);
 }
 
 qdf_export_symbol(tgt_dfs_set_fw_adfs_support);

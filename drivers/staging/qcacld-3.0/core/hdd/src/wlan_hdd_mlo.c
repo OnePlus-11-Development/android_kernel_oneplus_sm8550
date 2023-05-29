@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,7 +16,7 @@
  */
 
 /**
- * DOC: wlan_hdd_mlo.c
+ * DOC : wlan_hdd_mlo.c
  *
  * WLAN Host Device Driver file for 802.11be (Extremely High Throughput)
  * support.
@@ -134,14 +134,13 @@ QDF_STATUS hdd_wlan_unregister_mlo_interfaces(struct hdd_adapter *adapter,
 	int i;
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
 	struct hdd_adapter *link_adapter;
+	struct qdf_mac_addr adapter_mac;
 
 	mlo_adapter_info = &adapter->mlo_adapter_info;
 
 	if (mlo_adapter_info->is_link_adapter) {
-		if (adapter->device_mode == QDF_STA_MODE) {
-			ucfg_dp_destroy_intf(adapter->hdd_ctx->psoc,
-					     &adapter->mac_addr);
-		}
+		qdf_copy_macaddr(&adapter_mac, &adapter->mac_addr);
+		ucfg_dp_destroy_intf(adapter->hdd_ctx->psoc, &adapter_mac);
 		hdd_remove_front_adapter(adapter->hdd_ctx, &adapter);
 		return QDF_STATUS_E_AGAIN;
 	}
@@ -150,10 +149,8 @@ QDF_STATUS hdd_wlan_unregister_mlo_interfaces(struct hdd_adapter *adapter,
 		link_adapter = mlo_adapter_info->link_adapter[i];
 		if (!link_adapter)
 			continue;
-		if (adapter->device_mode == QDF_STA_MODE) {
-			ucfg_dp_destroy_intf(link_adapter->hdd_ctx->psoc,
-					     &link_adapter->mac_addr);
-		}
+		qdf_copy_macaddr(&adapter_mac, &link_adapter->mac_addr);
+		ucfg_dp_destroy_intf(link_adapter->hdd_ctx->psoc, &adapter_mac);
 		hdd_remove_adapter(link_adapter->hdd_ctx, link_adapter);
 		hdd_mlo_close_adapter(link_adapter, rtnl_held);
 	}
@@ -212,13 +209,7 @@ hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter)
 	adapter->mlo_adapter_info.is_ml_adapter = true;
 }
 
-void
-hdd_adapter_set_sl_ml_adapter(struct hdd_adapter *adapter)
-{
-	adapter->mlo_adapter_info.is_single_link_ml = true;
-}
-
-struct hdd_adapter *hdd_get_ml_adapter(struct hdd_context *hdd_ctx)
+struct hdd_adapter *hdd_get_ml_adater(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER_BY_VDEV;
@@ -250,11 +241,6 @@ int hdd_update_vdev_mac_address(struct hdd_context *hdd_ctx,
 
 	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
 	if (hdd_adapter_is_ml_adapter(adapter) && eht_capab) {
-		if (hdd_adapter_is_sl_ml_adapter(adapter)) {
-			ret = hdd_dynamic_mac_address_set(hdd_ctx, adapter,
-							  mac_addr);
-			return ret;
-		}
 		mlo_adapter_info = &adapter->mlo_adapter_info;
 
 		for (i = 0; i < WLAN_MAX_MLD; i++) {

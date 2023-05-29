@@ -651,8 +651,7 @@ struct sme_ready_req {
 	uint16_t length;
 	QDF_STATUS (*csr_roam_auth_event_handle_cb)(struct mac_context *mac,
 						    uint8_t vdev_id,
-						    struct qdf_mac_addr bssid,
-						    uint32_t akm);
+						    struct qdf_mac_addr bssid);
 	pe_roam_synch_fn_t pe_roam_synch_cb;
 	stop_roaming_fn_t stop_roaming_cb;
 	QDF_STATUS (*sme_msg_cb)(struct mac_context *mac,
@@ -1680,20 +1679,6 @@ struct sir_set_he_bss_color {
 	uint16_t length;
 	uint8_t vdev_id;
 	uint8_t bss_color;
-};
-
-/**
- * struct sir_cfg_obss_scan
- * @message_type: SME message type
- * @length: size of struct sir_cfg_obss_scan
- * @vdev_id: vdev ID
- * @is_scan_reconfig: true for NDP session
- */
-struct sir_cfg_obss_scan {
-	uint16_t message_type;
-	uint16_t length;
-	uint8_t vdev_id;
-	bool is_scan_reconfig;
 };
 
 /**
@@ -5158,7 +5143,6 @@ struct sir_roam_scan_stats {
  * @vdev_id: vdev id
  * @peer_mac_addr: peer MAC address
  * @ssid: SSID
- * @akm: key mgmt suite used
  */
 struct sir_sae_info {
 	uint16_t msg_type;
@@ -5166,7 +5150,6 @@ struct sir_sae_info {
 	uint32_t vdev_id;
 	struct qdf_mac_addr peer_mac_addr;
 	tSirMacSSid ssid;
-	uint32_t akm;
 };
 
 /**

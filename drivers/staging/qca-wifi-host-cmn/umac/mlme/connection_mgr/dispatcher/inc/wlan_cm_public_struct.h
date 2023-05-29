@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015,2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -147,8 +147,6 @@ struct wlan_fils_con_info {
  * @CM_OSIF_CFG_CONNECT: Connect request initiated due to config change
  * @CM_OSIF_CFG_DISCONNECT: Disconnect request initiated due to config change
  * @CM_MLO_LINK_VDEV_DISCONNECT: Disconnect req for ML link
- * @CM_MLO_LINK_VDEV_CONNECT: Connect req for ML link
- * @CM_MLO_ROAM_INTERNAL_DISCONNECT: Disconnect req triggered for mlo roaming
  * @CM_SOURCE_MAX: max value of connection manager source
  * @CM_SOURCE_INVALID: Invalid connection manager req source
  */
@@ -166,8 +164,6 @@ enum wlan_cm_source {
 	CM_OSIF_CFG_CONNECT,
 	CM_OSIF_CFG_DISCONNECT,
 	CM_MLO_LINK_VDEV_DISCONNECT,
-	CM_MLO_LINK_VDEV_CONNECT,
-	CM_MLO_ROAM_INTERNAL_DISCONNECT,
 	CM_SOURCE_MAX,
 	CM_SOURCE_INVALID = CM_SOURCE_MAX,
 };
@@ -368,7 +364,6 @@ struct wlan_cm_vdev_discon_req {
  * @CM_SER_FAILURE: Failed to serialize command
  * @CM_SER_TIMEOUT: Serialization cmd timeout
  * @CM_GENERIC_FAILURE: Generic failure apart from above
- * @CM_VALID_CANDIDATE_CHECK_FAIL: Valid Candidate Check fail
  */
 enum wlan_cm_connect_fail_reason {
 	CM_NO_CANDIDATE_FOUND,
@@ -385,7 +380,6 @@ enum wlan_cm_connect_fail_reason {
 	CM_SER_FAILURE,
 	CM_SER_TIMEOUT,
 	CM_GENERIC_FAILURE,
-	CM_VALID_CANDIDATE_CHECK_FAIL,
 };
 
 #ifdef WLAN_FEATURE_FILS_SK
@@ -431,14 +425,12 @@ struct fils_connect_rsp_params {
 /**
  * struct connect_rsp_ies - connect rsp ies stored in vdev filled during connect
  * @bcn_probe_rsp: Raw beacon or probe rsp of connected AP
- * @link_bcn_probe_rsp: Raw beacon or probe rsp of connected non-assoc link
  * @assoc_req: assoc req IE pointer send during connect
  * @assoc_rsq: assoc rsp IE received during connection
  * @fills_ie: fills connection ie received during connection
  */
 struct wlan_connect_rsp_ies {
 	struct element_info bcn_probe_rsp;
-	struct element_info link_bcn_probe_rsp;
 	struct element_info assoc_req;
 	struct element_info assoc_rsp;
 #ifdef WLAN_FEATURE_FILS_SK
