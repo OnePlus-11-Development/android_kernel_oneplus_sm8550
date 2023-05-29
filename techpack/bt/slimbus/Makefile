@@ -1,3 +1,9 @@
+BT_ROOT := $(srctree)/techpack/bt
+
+ifeq ($(CONFIG_ARCH_KALAMA), y)
+	include $(BT_ROOT)/config/kalama.conf
+endif
+
 ccflags-y += -I$(BT_ROOT)/include
 ccflags-y += -I$(BT_ROOT)/btfmcodec/include
 #Below src is for BTFM SLAVE CODEC Driver support on LE platform.

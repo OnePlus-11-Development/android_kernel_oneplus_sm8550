@@ -1,3 +1,9 @@
+BT_ROOT := $(srctree)/techpack/bt
+
+ifeq ($(CONFIG_ARCH_KALAMA), y)
+	include $(BT_ROOT)/config/kalama.conf
+endif
+
 ccflags-y += -I$(BT_ROOT)/include
 ccflags-y += -I$(BT_ROOT)/btfmcodec/include
 btfmcodec-objs := btfm_codec.o btfm_codec_hw_interface.o btfm_codec_interface.o btfm_codec_btadv_interface.o

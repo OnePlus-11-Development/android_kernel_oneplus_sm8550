@@ -1,3 +1,9 @@
+BT_ROOT := $(srctree)/techpack/bt
+
+ifeq ($(CONFIG_ARCH_KALAMA), y)
+	include $(BT_ROOT)/config/kalama.conf
+endif
+
 ifeq ($(CONFIG_MSM_BT_POWER),m)
 KBUILD_CPPFLAGS += -DCONFIG_MSM_BT_POWER
 endif
