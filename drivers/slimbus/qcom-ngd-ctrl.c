@@ -613,6 +613,7 @@ static void qcom_slim_ngd_tx_msg_dma_cb(void *args)
 	if (ctrl->capability_timeout) {
 		ctrl->capability_timeout = false;
 		SLIM_WARN(ctrl, "Timedout due to delayed interrupt\n");
+		desc->comp = NULL;
 		return;
 	}
 	spin_lock_irqsave(&ctrl->tx_buf_lock, flags);
@@ -974,14 +975,15 @@ static int qcom_slim_ngd_xfer_msg(struct slim_controller *sctrl,
 		return -EINVAL;
 	}
 
+	mutex_lock(&ctrl->tx_lock);
 	ret = check_hw_state(ctrl, txn);
 	if (ret) {
 		SLIM_WARN(ctrl, "ADSP slimbus not up MC:0x%x,mt:0x%x ret:%d\n",
 						txn->mc, txn->mt, ret);
+		mutex_unlock(&ctrl->tx_lock);
 		return ret;
 	}
 
-	mutex_lock(&ctrl->tx_lock);
 	pbuf = qcom_slim_ngd_tx_msg_get(ctrl, txn->rl, &tx_sent);
 	if (!pbuf) {
 		SLIM_ERR(ctrl, "Message buffer unavailable\n");
@@ -1620,10 +1622,6 @@ static int qcom_slim_ngd_runtime_resume(struct device *dev)
 		else
 			SLIM_WARN(ctrl, "HW wakeup attempt during SSR\n");
 
-		SLIM_WARN(ctrl, "%s Power up request failed, try resume again\n",
-			  __func__);
-		qcom_slim_ngd_disable_irq(ctrl);
-		ret = -EAGAIN;
 	} else {
 		ctrl->state = QCOM_SLIM_NGD_CTRL_AWAKE;
 	}
@@ -1631,7 +1629,7 @@ static int qcom_slim_ngd_runtime_resume(struct device *dev)
 	mutex_unlock(&ctrl->suspend_resume_lock);
 	SLIM_INFO(ctrl, "Slim runtime resume: ret %d irq_disabled %d\n",
 			ret, ctrl->irq_disabled);
-	return ret;
+	return 0;
 }
 
 static int qcom_slim_ngd_enable(struct qcom_slim_ngd_ctrl *ctrl, bool enable)
