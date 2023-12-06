@@ -30,6 +30,10 @@ config OPLUS_SYSTEM_KERNEL
   help
 	define this config to add oplus sytstem kernel feature
 
+#ifdef OPLUS_FEATURE_MM_FEEDBACK
+source "drivers/soc/oplus/multimedia/Kconfig"
+#endif /* OPLUS_FEATURE_MM_FEEDBACK */
+
 #ifdef OPLUS_FEATURE_SENSOR_SMEM
 source "drivers/soc/oplus/sensor/Kconfig"
 #endif /* OPLUS_FEATURE_SENSOR_SMEM */
